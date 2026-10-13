@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="8cf920ee-af79-43d3-b986-6330a3a22002" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/FacilityService/.dockerignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/FacilityService/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/IdentityService/.dockerignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/IdentityService/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/PeopleService/.dockerignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/PeopleService/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ScheduleService/.dockerignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ScheduleService/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/pom.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/IdentityServiceApplication.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/controller/HealthController.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/Account.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/AuditLog.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/ModuleConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/Organization.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/PasswordResetToken.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/entity/RefreshToken.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/enums/AccountRole.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/enums/AccountStatus.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/enums/ModuleCode.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/enums/OrganizationStatus.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/enums/OrganizationType.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/repository/AccountRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/repository/ModuleConfigRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/repository/OrganizationRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/repository/RefreshTokenRepository.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/java/com/mems/identity/security/SecurityConfig.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/resources/application.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/identity-service/src/main/resources/db/migration/V1__init_identity_schema.sql" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0000519686106255" />
+      <entry key="S2" value="1.0857599709041774" />
+      <entry key="S5" value="1.432135995668495" />
+      <entry key="S10" value="1.8540592296465068" />
+      <entry key="S30" value="2.472771917593312" />
+      <entry key="S60" value="2.7113743397457295" />
+      <entry key="M2" value="2.8674043474498108" />
+      <entry key="M5" value="3.391666827698673" />
+      <entry key="M10" value="4.40751753937904" />
+      <entry key="M15" value="5.133094846319124" />
+      <entry key="M30" value="6.251095901001448" />
+      <entry key="H1" value="7.026615489054311" />
+      <entry key="H2" value="7.4854705404963235" />
+      <entry key="H4" value="7.735342910147289" />
+      <entry key="D1" value="7.954824691717943" />
+      <entry key="W1" value="7.993519757469738" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.9460576467255959" />
+      <entry key="MS500" value="0.9890222406255533" />
+      <entry key="S2" value="1.0827241397404794" />
+      <entry key="S5" value="1.4304887502137944" />
+      <entry key="S10" value="1.8529722418975114" />
+      <entry key="S30" value="2.472280872954871" />
+      <entry key="S60" value="2.711103984802171" />
+      <entry key="M2" value="2.867259776978931" />
+      <entry key="M5" value="3.3915796237909435" />
+      <entry key="M10" value="4.407433966361017" />
+      <entry key="M15" value="5.133017465345449" />
+      <entry key="M30" value="6.251039277852577" />
+      <entry key="H1" value="7.0265806428167785" />
+      <entry key="H2" value="7.485451136699524" />
+      <entry key="H4" value="7.735332662446547" />
+      <entry key="D1" value="7.954822903279206" />
+      <entry key="W1" value="7.993519499943506" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 7,
+  "fromUser": false
+}]]></component>
+  <component name="ProjectId" id="3KecA9MnfIRI44YkTEV3lng9kgb" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/User/documents/Đồ Án/Final_Project/backend/ScheduleService",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\User\documents\Đồ Án\Final_Project\backend\ScheduleService" />
+      <recent name="D:\User\documents\Đồ Án\Final_Project\backend\PeopleService" />
+      <recent name="D:\User\documents\Đồ Án\Final_Project\backend\FacilityService" />
+      <recent name="D:\User\documents\Đồ Án\Final_Project\backend\IdentityService" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-a203e0a19954-intellij.indexing.shared.core-IU-262.10315.125" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-IU-262.10315.125" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="8cf920ee-af79-43d3-b986-6330a3a22002" name="Changes" comment="" />
+      <created>1791921327752</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1791921327752</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

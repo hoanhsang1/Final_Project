@@ -1,20 +1,84 @@
-version: "3.9"
-
 services:
-  postgres:
-    image: postgres:16
-    container_name: mems-postgres
+  mysql:
+    image: mysql:8.4
+    container_name: mems-mysql
     restart: unless-stopped
     environment:
-      POSTGRES_USER: mems_user
-      POSTGRES_PASSWORD: mems_pass
-      # Tạo sẵn database cho identity-service; service sau (people, schedule, facility)
-      # thêm database riêng trong init script này khi tới lượt code, KHÔNG dùng chung 1 DB.
-      POSTGRES_DB: mems_identity
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "3307:3306"
     volumes:
-      - mems_pg_data:/var/lib/postgresql/data
+      - mems_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  identity-org-service:
+    build:
+      context: ./backend/IdentityService
+    container_name: mems-identity-org
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/mems_identity_db
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  people-service:
+    build:
+      context: ./backend/PeopleService
+    container_name: mems-people
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/mems_people_db
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  schedule-service:
+    build:
+      context: ./backend/ScheduleService
+    container_name: mems-schedule
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/mems_schedule_db
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  facility-service:
+    build:
+      context: ./backend/FacilityService
+    container_name: mems-facility
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/mems_facility_db
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
 volumes:
-  mems_pg_data:
+  mems_mysql_data:
