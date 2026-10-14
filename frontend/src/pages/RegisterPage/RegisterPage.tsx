@@ -1,0 +1,3 @@
+export default function RegisterPage() {
+  return <div>Trang đăng ký tổ chức</div>;
+}

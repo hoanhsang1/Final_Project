@@ -25,12 +25,12 @@ Mọi task đều phải thỏa phần này.
 - **Không gọi API** trong toàn bộ phạm vi này. Không cài TanStack Query / Axios / Zustand / Zod / Recharts / dayjs / Playwright ở giai đoạn này — thêm khi có việc thật dùng tới.
 - **Bốn tác nhân, đúng thứ tự này:**
 
-  | `id` (slug, ASCII) | `label` (UI) | `description` (UI) |
-  |---|---|---|
-  | `platform-admin` | Admin hệ thống | Quản trị toàn nền tảng |
-  | `academic-staff` | Cán bộ quản lý | Giáo vụ của tổ chức |
-  | `teacher` | Giáo viên | Xem lịch dạy, báo sự cố thiết bị |
-  | `student` | Sinh viên | Xem thời khóa biểu |
+  | `id` (slug, ASCII) | `label` (UI)   | `description` (UI)               |
+  | ------------------ | -------------- | -------------------------------- |
+  | `platform-admin`   | Admin hệ thống | Quản trị toàn nền tảng           |
+  | `academic-staff`   | Cán bộ quản lý | Giáo vụ của tổ chức              |
+  | `teacher`          | Giáo viên      | Xem lịch dạy, báo sự cố thiết bị |
+  | `student`          | Sinh viên      | Xem thời khóa biểu               |
 
 - **Giá trị token (chép nguyên):** `colorPrimary: '#1677ff'`, `borderRadius: 10`, `colorBgLayout: '#f1f5fb'`, `fontFamily: '-apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'`. Nền trang `#f1f5fb`; thẻ trắng bo `16px`, đổ bóng `0 4px 20px rgba(22,119,255,.08)`, rộng tối đa `420px`, canh giữa.
 - **Đường dẫn (ASCII, không dấu):** `/` → chuyển hướng `/dang-nhap`; `/dang-nhap`; `/dang-ky`; `/xem-thu/:vaiTro`; `*` → 404.
@@ -40,17 +40,18 @@ Mọi task đều phải thỏa phần này.
 
 Năm tình huống dưới đây kế hoạch không tự sinh ra test, nhưng người dùng thật sẽ gặp — mỗi dòng đã được gắn test ở task tương ứng:
 
-1. **`/xem-thu/<slug lạ>`** (gõ sai, hoặc link cũ sau khi đổi slug) → phải hiện thông báo "không có vai trò này", **không** trắng trang, không crash. *(Task 7)*
-2. **Mở thẳng `/xem-thu/giao-vien`** khi chưa bấm nút nào (dán link, F5) → phải dựng đúng, không phụ thuộc state từ lần bấm trước. *(Task 7)*
-3. **Tiếng Việt có dấu** ở nhãn nút, tiêu đề trang, `document.title` → không vỡ chữ. *(Task 3, Task 5)*
-4. **Bấm tab "Đăng ký" rồi Back của trình duyệt** → phải quay về đúng tab "Đăng nhập", không kẹt ở Đăng ký. *(Task 4)*
-5. **Cửa sổ hẹp ~1024px** (reviewer kéo nhỏ cửa sổ) → thẻ không tràn, không sinh thanh cuộn ngang. *(Task 8)*
+1. **`/xem-thu/<slug lạ>`** (gõ sai, hoặc link cũ sau khi đổi slug) → phải hiện thông báo "không có vai trò này", **không** trắng trang, không crash. _(Task 7)_
+2. **Mở thẳng `/xem-thu/giao-vien`** khi chưa bấm nút nào (dán link, F5) → phải dựng đúng, không phụ thuộc state từ lần bấm trước. _(Task 7)_
+3. **Tiếng Việt có dấu** ở nhãn nút, tiêu đề trang, `document.title` → không vỡ chữ. _(Task 3, Task 5)_
+4. **Bấm tab "Đăng ký" rồi Back của trình duyệt** → phải quay về đúng tab "Đăng nhập", không kẹt ở Đăng ký. _(Task 4)_
+5. **Cửa sổ hẹp ~1024px** (reviewer kéo nhỏ cửa sổ) → thẻ không tràn, không sinh thanh cuộn ngang. _(Task 8)_
 
 ---
 
 ### Task 1: Dựng khung dự án và bộ công cụ
 
 **Files:**
+
 - Create: `frontend/package.json`, `frontend/vite.config.ts`, `frontend/tsconfig*.json`, `frontend/index.html`
 - Create: `frontend/eslint.config.js`, `frontend/.prettierrc.json`, `frontend/.prettierignore`
 - Create: `frontend/.gitignore` (bổ sung)
@@ -59,16 +60,19 @@ Năm tình huống dưới đây kế hoạch không tự sinh ra test, nhưng n
 - Test: `frontend/src/App.test.tsx`
 
 **Interfaces:**
+
 - Consumes: không
 - Produces: các script `npm run dev` · `npm run build` · `npm test` · `npm run lint` · `npm run format`
 
 - [ ] **Step 1: Scaffold**
 
 Chạy trong `D:\Final_Project\frontend` (tạo thư mục trước):
+
 ```
 npm create vite@latest . -- --template react-ts
 npm install
 ```
+
 Template hiện tại cho: React 19.2, TypeScript 6.0, Vite 8.3, `@vitejs/plugin-react` 6.1.
 
 - [ ] **Step 2: Cài dependency của dự án**
@@ -79,6 +83,7 @@ npm install -D vitest@^5 @testing-library/react@^16 @testing-library/jest-dom@^7
 ```
 
 Lý do các lựa chọn ít thấy:
+
 - `antd@5` giữ đúng **ADR-FE-002**. antd mới nhất đã là v6 nhưng ADR chốt v5.
 - `@ant-design/v5-patch-for-react-19` là gói **chính thức của antd** để v5 chạy được trên React 19 (template sinh React 19). Sẽ import một dòng ở `main.tsx`.
 - Template Vite mặc định dùng `oxlint`, nhưng `AGENTS.md` yêu cầu ESLint + `eslint-plugin-jsx-a11y` → cài ESLint riêng, bỏ script `oxlint`.
@@ -99,6 +104,7 @@ Nội dung: `import '@testing-library/jest-dom/vitest';` và `import '@ant-desig
 - [ ] **Step 6: Viết test khói (failing trước)**
 
 `frontend/src/App.test.tsx`
+
 ```tsx
 import { render, screen } from '@testing-library/react';
 import App from './App';
@@ -108,6 +114,7 @@ it('dựng được ứng dụng', () => {
   expect(screen.getByText(/mems/i)).toBeInTheDocument();
 });
 ```
+
 `src/App.tsx` tạm thời trả về `<div>MEMS</div>`.
 
 - [ ] **Step 7: Chạy test và build**
@@ -130,6 +137,7 @@ git commit -m "feat(fe): dựng khung Vite + React + TypeScript + Ant Design 5"
 ### Task 2: Theme, ConfigProvider và khung định tuyến
 
 **Files:**
+
 - Create: `frontend/src/theme.ts`
 - Modify: `frontend/src/main.tsx`
 - Create: `frontend/src/router.tsx`
@@ -141,6 +149,7 @@ git commit -m "feat(fe): dựng khung Vite + React + TypeScript + Ant Design 5"
 - Test: `frontend/src/router.test.tsx`
 
 **Interfaces:**
+
 - Consumes: không
 - Produces:
   - `src/theme.ts` → `export const themeToken: ThemeConfig['token']` (locale `vi_VN` import thẳng trong `main.tsx`, không đặt ở đây)
@@ -154,11 +163,13 @@ Xuất một hằng chứa đúng các giá trị token ở Global Constraints, 
 - [ ] **Step 2: Viết test định tuyến (failing trước)**
 
 `frontend/src/router.test.tsx` — dùng `createMemoryRouter` với chính bảng route trong `src/router.tsx` (tách `routes` thành mảng xuất được để test dùng lại):
+
 ```tsx
 it('chuyển hướng gốc về trang đăng nhập', …)           // router ban đầu ở '/'
 it('hiện trang đăng ký ở /dang-ky', …)
 it('hiện 404 ở đường dẫn không tồn tại', …)
 ```
+
 Chạy `npm test` → phải FAIL vì chưa có route.
 
 - [ ] **Step 3: Tạo `src/router.tsx`**
@@ -180,6 +191,7 @@ Run: `npm test` → tất cả PASS.
 - [ ] **Step 7: Kiểm tra bằng mắt + commit**
 
 Run: `npm run dev`, mở 4 đường dẫn, xác nhận mỗi đường dẫn ra đúng trang tạm và không có lỗi trong console.
+
 ```bash
 git add frontend
 git commit -m "feat(fe): theme Ant Design 5, locale vi_VN và khung định tuyến"
@@ -190,23 +202,34 @@ git commit -m "feat(fe): theme Ant Design 5, locale vi_VN và khung định tuy�
 ### Task 3: Nguồn dữ liệu tác nhân và nút tác nhân
 
 **Files:**
+
 - Create: `frontend/src/features/auth/roles.ts`
 - Create: `frontend/src/components/RoleButton/RoleButton.tsx`
 - Test: `frontend/src/features/auth/roles.test.ts`
 - Test: `frontend/src/components/RoleButton/RoleButton.test.tsx`
 
 **Interfaces:**
+
 - Consumes: không
 - Produces:
+
   ```ts
   export type RoleId = 'platform-admin' | 'academic-staff' | 'teacher' | 'student';
-  export interface Role { id: RoleId; label: string; description: string; }
-  export const ROLES: readonly Role[];              // đúng thứ tự ở Global Constraints
-  export function findRole(slug: string | undefined): Role | undefined;   // nhận thẳng useParams()
-  export function rolePreviewPath(id: RoleId): string;   // '/xem-thu/<id>'
+  export interface Role {
+    id: RoleId;
+    label: string;
+    description: string;
+  }
+  export const ROLES: readonly Role[]; // đúng thứ tự ở Global Constraints
+  export function findRole(slug: string | undefined): Role | undefined; // nhận thẳng useParams()
+  export function rolePreviewPath(id: RoleId): string; // '/xem-thu/<id>'
   ```
+
   ```tsx
-  export interface RoleButtonProps { role: Role; onSelect: (role: Role) => void; }
+  export interface RoleButtonProps {
+    role: Role;
+    onSelect: (role: Role) => void;
+  }
   export function RoleButton(props: RoleButtonProps): JSX.Element;
   ```
 
@@ -214,10 +237,15 @@ git commit -m "feat(fe): theme Ant Design 5, locale vi_VN và khung định tuy�
 
 ```ts
 it('có đúng 4 tác nhân, đúng thứ tự', () => {
-  expect(ROLES.map(r => r.id)).toEqual(['platform-admin','academic-staff','teacher','student']);
+  expect(ROLES.map((r) => r.id)).toEqual([
+    'platform-admin',
+    'academic-staff',
+    'teacher',
+    'student',
+  ]);
 });
 it('mọi nhãn đều có chữ tiếng Việt có dấu', () => {
-  expect(ROLES.map(r => r.label)).toContain('Cán bộ quản lý');
+  expect(ROLES.map((r) => r.label)).toContain('Cán bộ quản lý');
 });
 it('findRole trả undefined với slug lạ', () => {
   expect(findRole('giao-vien')).toBeUndefined();
@@ -226,6 +254,7 @@ it('rolePreviewPath ghép đúng', () => {
   expect(rolePreviewPath('teacher')).toBe('/xem-thu/teacher');
 });
 ```
+
 Chạy → FAIL.
 
 - [ ] **Step 2: Viết `roles.ts`** cho test xanh.
@@ -243,6 +272,7 @@ it('là button thật, bấm được bằng bàn phím', …)        // role ==
 - [ ] **Step 5: Chạy test + commit**
 
 Run: `npm test` → PASS.
+
 ```bash
 git add frontend/src/features frontend/src/components
 git commit -m "feat(fe): dữ liệu 4 tác nhân và nút chọn tác nhân"
@@ -253,18 +283,27 @@ git commit -m "feat(fe): dữ liệu 4 tác nhân và nút chọn tác nhân"
 ### Task 4: Khung thẻ đăng nhập/đăng ký dùng chung
 
 **Files:**
+
 - Create: `frontend/src/components/AuthCard/AuthCard.tsx`
 - Create: `frontend/src/components/AuthCard/types.ts`
 - Test: `frontend/src/components/AuthCard/AuthCard.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `themeToken` từ Task 2 (chỉ để tham chiếu, không import nếu không cần)
 - Produces:
+
   ```tsx
   export type AuthTab = 'login' | 'register';
-  export interface AuthCardProps { activeTab: AuthTab; title: string; subtitle: string; children: ReactNode; }
+  export interface AuthCardProps {
+    activeTab: AuthTab;
+    title: string;
+    subtitle: string;
+    children: ReactNode;
+  }
   export function AuthCard(props: AuthCardProps): JSX.Element;
   ```
+
   Thẻ căn giữa màn hình, rộng tối đa 420px, có logo chữ "M" + tiêu đề "MEMS" + phụ đề, và 2 tab.
 
 - [ ] **Step 1: Viết test (failing trước)**
@@ -274,6 +313,7 @@ it('tab đang mở được đánh dấu cho trình đọc màn hình', …)  //
 it('tab kia là liên kết tới /dang-ky', …)                  // getByRole('link', {name:'Đăng ký'}), href
 it('render children', …)
 ```
+
 Chạy → FAIL.
 
 - [ ] **Step 2: Viết `AuthCard.tsx`**
@@ -283,6 +323,7 @@ Dùng antd `Card` + `Tabs` (hoặc `Segmented`), nhưng tab phải là **liên k
 - [ ] **Step 3: Chạy test + commit**
 
 Run: `npm test` → PASS.
+
 ```bash
 git add frontend/src/components/AuthCard
 git commit -m "feat(fe): khung thẻ đăng nhập/đăng ký dùng chung"
@@ -293,10 +334,12 @@ git commit -m "feat(fe): khung thẻ đăng nhập/đăng ký dùng chung"
 ### Task 5: Trang đăng nhập
 
 **Files:**
+
 - Modify: `frontend/src/pages/LoginPage/LoginPage.tsx`
 - Test: `frontend/src/pages/LoginPage/LoginPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `AuthCard` (Task 4), `ROLES` / `RoleButton` / `rolePreviewPath` (Task 3)
 - Produces: component trang, xuất mặc định, không nhận prop
 
@@ -308,6 +351,7 @@ it('có đủ 4 nút tác nhân', …)                            // getAllByRol
 it('bấm "Giáo viên" thì chuyển tới /xem-thu/teacher', …)  // memory router, đọc location sau click
 it('bấm Đăng nhập khi bỏ trống thì hiện lỗi tại trường', …) // antd Form required
 ```
+
 Chạy → FAIL.
 
 - [ ] **Step 2: Viết `LoginPage.tsx`**
@@ -321,6 +365,7 @@ Cuối thẻ: dòng "Chưa có tổ chức? Đăng ký tổ chức" trỏ `/dang
 - [ ] **Step 3: Chạy test + commit**
 
 Run: `npm test` → PASS.
+
 ```bash
 git add frontend/src/pages/LoginPage
 git commit -m "feat(fe): trang đăng nhập với 4 nút chọn tác nhân"
@@ -331,10 +376,12 @@ git commit -m "feat(fe): trang đăng nhập với 4 nút chọn tác nhân"
 ### Task 6: Trang đăng ký tổ chức
 
 **Files:**
+
 - Modify: `frontend/src/pages/RegisterPage/RegisterPage.tsx`
 - Test: `frontend/src/pages/RegisterPage/RegisterPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `AuthCard` (Task 4)
 - Produces: component trang, xuất mặc định, không nhận prop
 
@@ -350,17 +397,19 @@ it('nêu rõ tổ chức sẽ ở trạng thái chờ duyệt', …)      // get
 it('bỏ trống rồi gửi thì hiện lỗi tại từng trường', …)
 it('mật khẩu nhập lại khác thì báo lỗi', …)
 ```
+
 Chạy → FAIL.
 
 - [ ] **Step 2: Viết `RegisterPage.tsx`**
 
-`AuthCard activeTab="register"`. `Form` antd, `layout="vertical"`, hai nhóm có tiêu đề "Thông tin tổ chức" và "Tài khoản quản trị". `Select` cho Loại tổ chức (Trường học / Trung tâm). Quy tắc `required` trên mọi trường; `confirmPassword` dùng `rules` với validator so khớp. Khối `Alert` (antd) màu cảnh báo nêu: *"Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được."* Nút `Gửi đăng ký` chỉ validate, **không** gọi API.
+`AuthCard activeTab="register"`. `Form` antd, `layout="vertical"`, hai nhóm có tiêu đề "Thông tin tổ chức" và "Tài khoản quản trị". `Select` cho Loại tổ chức (Trường học / Trung tâm). Quy tắc `required` trên mọi trường; `confirmPassword` dùng `rules` với validator so khớp. Khối `Alert` (antd) màu cảnh báo nêu: _"Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được."_ Nút `Gửi đăng ký` chỉ validate, **không** gọi API.
 
 Lưu ý: dùng `Form` của antd ở bước này; khi nối API sẽ thay bằng React Hook Form + Zod theo ADR — ghi chú `// TODO` ngay tại chỗ.
 
 - [ ] **Step 3: Chạy test + commit**
 
 Run: `npm test` → PASS.
+
 ```bash
 git add frontend/src/pages/RegisterPage
 git commit -m "feat(fe): trang đăng ký tổ chức"
@@ -371,10 +420,12 @@ git commit -m "feat(fe): trang đăng ký tổ chức"
 ### Task 7: Trang "Bạn đang là …"
 
 **Files:**
+
 - Modify: `frontend/src/pages/RolePreviewPage/RolePreviewPage.tsx`
 - Test: `frontend/src/pages/RolePreviewPage/RolePreviewPage.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `findRole` (Task 3); tham số định tuyến `vaiTro`
 - Produces: component trang, xuất mặc định
 
@@ -387,15 +438,17 @@ it('slug lạ thì hiện thông báo, không trắng trang', …)           // 
 it('có nút quay lại về /dang-nhap', …)
 it('có dòng nói rõ chưa kết nối hệ thống', …)                     // getByText(/chưa kết nối/i)
 ```
+
 Chạy → FAIL.
 
 - [ ] **Step 2: Viết `RolePreviewPage.tsx`**
 
-`useParams()` lấy `vaiTro`; `findRole(vaiTro)`. Nếu không tìm thấy → hiện `Result` hoặc `Empty` của antd: "Không có vai trò này" + nút quay lại (Review Focus #1). Nếu tìm thấy → thẻ trắng căn giữa: dòng nhỏ "Bạn đang là", tên vai trò cỡ lớn, và `Tag`/`Alert` nêu *"Chế độ xem thử — chưa kết nối hệ thống"* (màu **kèm chữ**, không chỉ màu — BR-08), cuối cùng là nút `Quay lại đăng nhập` trỏ `/dang-nhap`.
+`useParams()` lấy `vaiTro`; `findRole(vaiTro)`. Nếu không tìm thấy → hiện `Result` hoặc `Empty` của antd: "Không có vai trò này" + nút quay lại (Review Focus #1). Nếu tìm thấy → thẻ trắng căn giữa: dòng nhỏ "Bạn đang là", tên vai trò cỡ lớn, và `Tag`/`Alert` nêu _"Chế độ xem thử — chưa kết nối hệ thống"_ (màu **kèm chữ**, không chỉ màu — BR-08), cuối cùng là nút `Quay lại đăng nhập` trỏ `/dang-nhap`.
 
 - [ ] **Step 3: Chạy test + commit**
 
 Run: `npm test` → PASS.
+
 ```bash
 git add frontend/src/pages/RolePreviewPage
 git commit -m "feat(fe): trang xem thử theo vai trò"
@@ -406,17 +459,19 @@ git commit -m "feat(fe): trang xem thử theo vai trò"
 ### Task 8: Chốt, kiểm tra cuối và tài liệu
 
 **Files:**
+
 - Create: `frontend/AGENTS.md` (chuyển từ `D:\mems-frontend\AGENTS.md`)
 - Create: `frontend/README.md`
 - Modify: `frontend/AGENTS.md` (sửa dòng mobile-first)
 
 **Interfaces:**
+
 - Consumes: mọi task trước
 - Produces: không
 
 - [ ] **Step 1: Chuyển `AGENTS.md` vào `frontend/` và sửa quyết định nền tảng**
 
-Chép `D:\mems-frontend\AGENTS.md` → `frontend/AGENTS.md`; đường dẫn ADR ở dòng 4 sửa thành `../../Đồ án tốt nghiệp/Tài liệu liên quan dự án/Frontend_Stack_MEMS.md`. Đổi mục 2: bỏ *"Mobile-first. Kiểm thử tại 320 / 768 / 1024 / 1440 px."*, thay bằng *"Desktop-first (quyết định Sprint 1). Tối thiểu 1024px; không yêu cầu bố cục mobile."* Thêm một dòng ghi chú ngay dưới: antd v6 đã ra nhưng repo bám **Ant Design 5** theo ADR-FE-002.
+Chép `D:\mems-frontend\AGENTS.md` → `frontend/AGENTS.md`; đường dẫn ADR ở dòng 4 sửa thành `../../Đồ án tốt nghiệp/Tài liệu liên quan dự án/Frontend_Stack_MEMS.md`. Đổi mục 2: bỏ _"Mobile-first. Kiểm thử tại 320 / 768 / 1024 / 1440 px."_, thay bằng _"Desktop-first (quyết định Sprint 1). Tối thiểu 1024px; không yêu cầu bố cục mobile."_ Thêm một dòng ghi chú ngay dưới: antd v6 đã ra nhưng repo bám **Ant Design 5** theo ADR-FE-002.
 
 - [ ] **Step 2: Viết `frontend/README.md`**
 
@@ -431,6 +486,7 @@ Run: `npm run build` → thành công.
 - [ ] **Step 4: Kiểm tra bằng mắt ở các bề rộng**
 
 Run: `npm run dev`. Với mỗi đường dẫn `/dang-nhap`, `/dang-ky`, `/xem-thu/teacher`, `/xem-thu/sai-ten`, ở các bề rộng **1024px, 1280px, 1440px, 1920px**:
+
 - thẻ nằm giữa, không tràn, **không có thanh cuộn ngang** (Review Focus #5)
 - tiếng Việt hiển thị đúng dấu
 - Tab tới từng nút bằng bàn phím: viền focus nhìn thấy rõ
@@ -444,7 +500,7 @@ git commit -m "docs(fe): README, AGENTS.md và chốt Sprint 1"
 git push -u origin nghia/fe-sprint1
 ```
 
-*(Push cần danh tính git và quyền trên repo của Sang — nếu chưa có, dừng ở commit.)*
+_(Push cần danh tính git và quyền trên repo của Sang — nếu chưa có, dừng ở commit.)_
 
 ---
 
