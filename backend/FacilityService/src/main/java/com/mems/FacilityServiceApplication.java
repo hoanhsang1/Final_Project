@@ -1,13 +1,13 @@
-package com.mems.people;
+package com.mems;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class PeopleServiceApplication {
+public class FacilityServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(PeopleServiceApplication.class, args);
+		SpringApplication.run(FacilityServiceApplication.class, args);
 	}
 
 }
