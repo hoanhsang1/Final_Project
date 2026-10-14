@@ -16,7 +16,7 @@ it('chuyển hướng gốc về trang đăng nhập', () => {
 
 it('hiện trang đăng ký ở /dang-ky', () => {
   renderAt('/dang-ky');
-  expect(screen.getByText('Trang đăng ký tổ chức')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Đăng ký tổ chức' })).toBeInTheDocument();
 });
 
 it('hiện 404 ở đường dẫn không tồn tại', () => {
