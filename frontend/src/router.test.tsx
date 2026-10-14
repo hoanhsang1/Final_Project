@@ -11,7 +11,7 @@ function renderAt(path: string) {
 it('chuyển hướng gốc về trang đăng nhập', () => {
   const router = renderAt('/');
   expect(router.state.location.pathname).toBe('/dang-nhap');
-  expect(screen.getByText('Trang đăng nhập')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Đăng nhập để tiếp tục' })).toBeInTheDocument();
 });
 
 it('hiện trang đăng ký ở /dang-ky', () => {

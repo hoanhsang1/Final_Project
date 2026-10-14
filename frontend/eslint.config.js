@@ -21,6 +21,16 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.flatConfigs.recommended.rules,
+      // Cho phép đánh dấu tham số/biến cố ý chưa dùng bằng tiền tố `_`
+      // (ví dụ tham số của handler sẽ dùng khi nối API ở sprint sau).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
   prettier,
