@@ -117,5 +117,28 @@ CREATE TABLE audit_log (
  FOREIGN KEY (actor_account_id) REFERENCES account(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
+CREATE TABLE user_session (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    account_id CHAR(36) NOT NULL,
+    device_info VARCHAR(255),
+    ip_address VARCHAR(45),
+    created_at DATETIME(3) NOT NULL,
+    last_active_at DATETIME(3) NOT NULL,
+    expires_at DATETIME(3) NOT NULL,
+    revoked_at DATETIME(3) NULL,
+
+    INDEX idx_session_account (account_id),
+
+    CONSTRAINT fk_session_account
+        FOREIGN KEY (account_id)
+        REFERENCES account(id)
+);
+
+ALTER TABLE refresh_token
+ADD COLUMN session_id CHAR(36) NULL,
+ADD INDEX idx_refresh_session (session_id),
+ADD CONSTRAINT fk_refresh_session
+    FOREIGN KEY (session_id)
+    REFERENCES user_session(id);
 -- Enforce role scope and organization membership in Identity Service when assigning roles.
 -- Platform role: account.org_id IS NULL; organization role: account.org_id IS NOT NULL.

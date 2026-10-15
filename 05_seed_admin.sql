@@ -61,11 +61,11 @@ WHERE r.code='STUDENT';
 -- 2. Replace the placeholder below with that hash and uncomment the statements.
 -- 3. Use a strong unique password; rotate it after first login.
 --    Do not commit a real password/hash into Git.
--- INSERT INTO account (id,org_id,username,email,password_hash,status)
--- VALUES (UUID(),NULL,'platform_admin','admin@your-domain.example','REPLACE_WITH_REAL_BCRYPT_HASH','active');
--- INSERT INTO account_role (account_id,role_id)
--- SELECT a.id,r.id FROM account a JOIN role r ON r.code='SUPER_ADMIN'
--- WHERE a.username='platform_admin';
+INSERT INTO account (id,org_id,username,email,password_hash,status)
+ VALUES (UUID(),NULL,'platform_admin','admin@your-domain.example','$2a$10$UsjFg5cwZ4pju1rQprE03.BdbcZaRbB.zG0sZziwyYpo4WMpty5Ai','active');
+INSERT INTO account_role (account_id,role_id)
+ SELECT a.id,r.id FROM account a JOIN role r ON r.code='SUPER_ADMIN'
+WHERE a.username='platform_admin';
 
 -- For a demo organization, create an organization in 'pending' and an ORG_ADMIN
 -- account scoped to it; approval should be done via the application workflow.
