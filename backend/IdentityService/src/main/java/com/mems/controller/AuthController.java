@@ -8,8 +8,10 @@ import com.mems.dto.LoginRequest;
 import com.mems.dto.LoginResponse;
 import com.mems.dto.LogoutRequest;
 import com.mems.dto.RefreshTokenRequest;
-import com.mems.service.IAuthService;
-
+import com.mems.service.impl.IAuthService;
+import com.mems.dto.RegisterOrganizationRequest;
+import com.mems.service.OrganizationRegistrationService;
+import java.util.Map;
 
 import jakarta.validation.Valid;
 
@@ -29,6 +31,9 @@ public class AuthController {
     
     @Autowired 
     private IAuthService authService;
+
+    @Autowired
+    private OrganizationRegistrationService registrationService;
 
     @GetMapping("/test")
     public ResponseEntity<ApiResponse<Void>> getMethodName() {
@@ -60,6 +65,18 @@ public class AuthController {
         authService.logout(request);
 
         return ResponseEntity.noContent().build();
+    }
+
+    
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(
+            @Valid @RequestBody RegisterOrganizationRequest request
+    ) {
+        Map<String, Object> result = registrationService.register(request);
+
+        return ResponseEntity
+                .status(org.springframework.http.HttpStatus.CREATED)
+                .body(result);
     }
 
     

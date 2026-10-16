@@ -1,4 +1,4 @@
-package com.mems.service;
+package com.mems.service.impl;
 
 public interface IIdentityService {
 

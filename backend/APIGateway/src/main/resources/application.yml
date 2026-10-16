@@ -2,7 +2,17 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: identity-service
+        - id: identity-auth
           uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/auth/**
+
+        - id: identity-modules
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/modules/**,/api/v1/modules
+
+        - id: identity-organizations
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/organizations/**

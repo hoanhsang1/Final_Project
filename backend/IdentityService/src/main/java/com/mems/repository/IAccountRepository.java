@@ -21,4 +21,6 @@ public interface IAccountRepository extends JpaRepository<Account, String> {
     List<String> findRoleCodesByAccountId(
         @Param("accountId") String accountId
     );
+
+    Boolean existsByUsername(String username);
 }

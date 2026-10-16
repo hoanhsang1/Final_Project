@@ -56,6 +56,20 @@ SELECT r.id,p.id FROM role r JOIN permission p
 ON p.code IN ('CLASS_READ','SCHEDULE_READ','INCIDENT_CREATE')
 WHERE r.code='STUDENT';
 
+INSERT INTO role (code, name, scope)
+VALUES ('ORG_OWNER', 'Organization Owner', 'organization');
+
+INSERT INTO module (code, name, is_active)
+VALUES
+('STUDENT_MANAGEMENT', 'Quản lý học sinh', TRUE),
+('TEACHER_MANAGEMENT', 'Quản lý giáo viên', TRUE),
+('CLASS_MANAGEMENT', 'Quản lý lớp học', TRUE),
+('SCHEDULE_MANAGEMENT', 'Quản lý lịch học', TRUE),
+('ROOM_MANAGEMENT', 'Quản lý phòng học', TRUE),
+('EQUIPMENT_MANAGEMENT', 'Quản lý thiết bị', TRUE)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name);
+
 -- ADMIN BOOTSTRAP (optional):
 -- 1. Generate a UNIQUE BCrypt hash with Spring Security BCryptPasswordEncoder.
 -- 2. Replace the placeholder below with that hash and uncomment the statements.
