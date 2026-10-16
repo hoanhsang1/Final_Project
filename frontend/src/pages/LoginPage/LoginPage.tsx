@@ -1,9 +1,13 @@
-import { Button, Checkbox, Divider, Flex, Form, Input, Typography, theme } from 'antd';
+import { useMutation } from '@tanstack/react-query';
+import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Typography, theme } from 'antd';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { RoleButton } from '../../components/RoleButton/RoleButton';
+import { login } from '../../features/auth/authApi';
 import { ROLES, rolePreviewPath } from '../../features/auth/roles';
 import type { Role } from '../../features/auth/roles';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Text } = Typography;
 
@@ -16,10 +20,40 @@ interface LoginFormValues {
 export default function LoginPage() {
   const { token } = theme.useToken();
   const navigate = useNavigate();
+  const setSession = useAuthStore((s) => s.setSession);
 
-  const handleSubmit = (_values: LoginFormValues) => {
-    // TODO(Sprint 2): gọi API đăng nhập khi Sang chốt contract.
-    // Chưa nối backend theo yêu cầu Sprint 1 — chỉ dựng giao diện để chốt design.
+  /** Lỗi từ backend / lỗi mạng, hiển thị inline trong form. */
+  const [formError, setFormError] = useState<string | null>(null);
+  /** Thông báo khi đăng nhập OK nhưng vai trò chưa có trang tương ứng. */
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: (res) => {
+      setFormError(null);
+      setSession(res);
+
+      // Đọc role MỚI NHẤT từ store (setSession đã cập nhật xong).
+      const role = useAuthStore.getState().role;
+      if (role) {
+        navigate(rolePreviewPath(role));
+      } else {
+        // Đăng nhập được nhưng vai trò chưa có màn hình ở Sprint này.
+        setNotice(
+          'Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau.',
+        );
+      }
+    },
+    onError: (error: Error) => {
+      // NFR-REL-001: lỗi thì hiển thị rõ, KHÔNG điều hướng, KHÔNG hiện thành công.
+      setFormError(error.message);
+    },
+  });
+
+  const handleSubmit = (values: LoginFormValues) => {
+    setNotice(null);
+    // Backend không có trường "remember" — chỉ gửi 2 field contract yêu cầu.
+    loginMutation.mutate({ username: values.username, password: values.password });
   };
 
   const handleSelectRole = (role: Role) => {
@@ -59,8 +93,27 @@ export default function LoginPage() {
           </Button>
         </Flex>
 
+        {formError && (
+          <Alert
+            type="error"
+            showIcon
+            message={formError}
+            style={{ marginBottom: token.margin }}
+            role="alert"
+          />
+        )}
+        {notice && (
+          <Alert
+            type="warning"
+            showIcon
+            message={notice}
+            style={{ marginBottom: token.margin }}
+            role="status"
+          />
+        )}
+
         <Form.Item style={{ marginBottom: token.margin }}>
-          <Button type="primary" htmlType="submit" block>
+          <Button type="primary" htmlType="submit" block loading={loginMutation.isPending}>
             Đăng nhập
           </Button>
         </Form.Item>
