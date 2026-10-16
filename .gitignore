@@ -5,6 +5,13 @@
 *.log
 .env
 
+# Sổ tay/scratch của agent (executing-plans) - không commit
+.superpowers/
+
+# Node (frontend/)
+node_modules/
+dist/
+
 # BlueJ files
 *.ctxt
 
