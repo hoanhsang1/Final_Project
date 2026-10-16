@@ -134,6 +134,31 @@ CREATE TABLE user_session (
         REFERENCES account(id)
 );
 
+
+CREATE TABLE IF NOT EXISTS module (
+    code VARCHAR(60) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS organization_module (
+    org_id CHAR(36) NOT NULL,
+    module_code VARCHAR(60) NOT NULL,
+    status ENUM('requested', 'active', 'rejected')
+        NOT NULL DEFAULT 'requested',
+
+    PRIMARY KEY (org_id, module_code),
+
+    CONSTRAINT fk_org_module_org
+        FOREIGN KEY (org_id)
+        REFERENCES organization(id),
+
+    CONSTRAINT fk_org_module_module
+        FOREIGN KEY (module_code)
+        REFERENCES module(code)
+);
+
+
 ALTER TABLE refresh_token
 ADD COLUMN session_id CHAR(36) NULL,
 ADD INDEX idx_refresh_session (session_id),

@@ -13,6 +13,7 @@ import com.mems.repository.IAccountRepository;
 import com.mems.repository.IOrganizationRepository;
 
 import com.mems.security.JwtService;
+import com.mems.service.impl.IAuthService;
 import com.mems.exception.ApiException;
 
 import org.springframework.http.HttpStatus;
