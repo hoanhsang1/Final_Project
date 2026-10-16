@@ -1,15 +1,21 @@
-import { Button, Card, Flex, Result, Tag, theme, Typography } from 'antd';
+import { Button, Card, Flex, Result, Space, Tag, theme, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { findRole } from '../../features/auth/roles';
+import { useAuthStore } from '../../stores/authStore';
 import { cardStyle, layoutBackground } from '../../theme';
 
 const { Text, Title } = Typography;
 
 /**
- * Trang "Bạn đang là …" — chỉ để xem thử bố cục theo vai trò, **không** xác thực.
+ * Trang "Bạn đang là …" — hiện có HAI chế độ, phân biệt bằng phiên đăng nhập thật:
  *
- * Đọc thẳng slug trên URL (`/xem-thu/:vaiTro`) nên dán link hoặc F5 vẫn dựng đúng,
- * không phụ thuộc việc người dùng đã bấm nút ở trang đăng nhập hay chưa.
+ * 1. **Đã đăng nhập** (có phiên trong `authStore`): hiện tên đăng nhập + vai trò lấy
+ *    từ chính phiên thật, kèm nút Đăng xuất. Đây là màn hình tạm thay cho trang chủ
+ *    theo vai trò (Sprint sau sẽ dựng).
+ * 2. **Xem thử** (chưa đăng nhập, người dùng bấm nút chọn vai trò ở trang đăng nhập):
+ *    chỉ dựng bố cục để xem trước, KHÔNG xác thực.
+ *
+ * Đọc thẳng slug trên URL (`/xem-thu/:vaiTro`) nên dán link hoặc F5 vẫn dựng đúng.
  */
 export default function RolePreviewPage() {
   const { token } = theme.useToken();
@@ -17,6 +23,17 @@ export default function RolePreviewPage() {
   const { vaiTro } = useParams();
 
   const role = findRole(vaiTro);
+
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const username = useAuthStore((s) => s.username);
+  const clearSession = useAuthStore((s) => s.clearSession);
+
+  const handleLogout = () => {
+    // TODO(Sprint sau): gọi luôn POST /api/v1/auth/logout để thu hồi refresh token ở BE.
+    // Hiện chỉ xoá phiên phía client — refresh token vẫn còn hiệu lực ở BE tới 7 ngày.
+    clearSession();
+    navigate('/dang-nhap');
+  };
 
   const backButton = (
     <Button type="primary" onClick={() => navigate('/dang-nhap')}>
@@ -34,15 +51,24 @@ export default function RolePreviewPage() {
         {role ? (
           <Flex vertical align="center" gap={token.marginXS}>
             {/* BR-08: trạng thái phải kèm CHỮ, không chỉ dựa vào màu. */}
-            <Tag color="processing">Chế độ xem thử — chưa kết nối hệ thống</Tag>
-            <Text type="secondary">Bạn đang là</Text>
+            {isAuthenticated ? (
+              <Tag color="success">Đã đăng nhập</Tag>
+            ) : (
+              <Tag color="processing">Chế độ xem thử — chưa đăng nhập</Tag>
+            )}
+
+            <Text type="secondary">{isAuthenticated ? 'Xin chào' : 'Bạn đang là'}</Text>
             <Title level={3} style={{ margin: 0 }}>
-              {role.label}
+              {isAuthenticated ? (username ?? role.label) : role.label}
             </Title>
             <Text type="secondary" style={{ textAlign: 'center' }}>
-              {role.description}
+              {isAuthenticated ? `Vai trò: ${role.label} — ${role.description}` : role.description}
             </Text>
-            <div style={{ marginTop: token.margin }}>{backButton}</div>
+
+            <Space style={{ marginTop: token.margin }}>
+              {isAuthenticated && <Button onClick={handleLogout}>Đăng xuất</Button>}
+              {backButton}
+            </Space>
           </Flex>
         ) : (
           <Result
