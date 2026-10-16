@@ -1,36 +1,90 @@
-import { Alert, Button, Divider, Form, Input, Select, Typography, theme } from 'antd';
+import { useMutation } from '@tanstack/react-query';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Divider,
+  Form,
+  Input,
+  Result,
+  Select,
+  Typography,
+  theme,
+} from 'antd';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
+import { register } from '../../features/auth/authApi';
+import type { OrgType, RegisterRequest } from '../../features/auth/types';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 /**
- * Bám đúng `org_type` trong schema `organization` của repo backend.
- * Nhãn hiển thị bằng tiếng Việt, giá trị gửi lên giữ nguyên tiếng Anh.
+ * Loại tổ chức — value gửi lên UPPERCASE, khớp đúng OrgType enum backend.
  */
-const ORG_TYPE_OPTIONS = [
-  { value: 'school', label: 'Trường học' },
-  { value: 'center', label: 'Trung tâm' },
+const ORG_TYPE_OPTIONS: { value: OrgType; label: string }[] = [
+  { value: 'SCHOOL', label: 'Trường học' },
+  { value: 'CENTER', label: 'Trung tâm' },
 ];
 
+/**
+ * Danh sách module hệ thống — mã khớp với bảng `module` trong DB.
+ * Chỉ hiển thị module đang active (backend sẽ validate lại phía server).
+ */
+const MODULE_OPTIONS = [
+  { value: 'STUDENT_MANAGEMENT', label: 'Quản lý học sinh' },
+  { value: 'CLASS_MANAGEMENT', label: 'Quản lý lớp học' },
+  { value: 'SCHEDULE_MANAGEMENT', label: 'Quản lý thời khoá biểu' },
+  { value: 'FACILITY_MANAGEMENT', label: 'Quản lý cơ sở vật chất' },
+];
+
+/** Form values phía FE — field name có thể khác contract BE, sẽ map lại trong handleSubmit. */
 interface RegisterFormValues {
-  name: string;
-  org_type: 'school' | 'center';
-  contact_email: string;
-  contact_phone: string;
+  organizationName: string;
+  orgType: OrgType;
   username: string;
   email: string;
   password: string;
   confirmPassword: string;
+  modules: string[];
 }
 
 export default function RegisterPage() {
   const { token } = theme.useToken();
 
-  const handleSubmit = (_values: RegisterFormValues) => {
-    // TODO(Sprint 2): gọi API đăng ký tổ chức khi Sang chốt contract.
-    // TODO(Sprint 2): thay antd Form bằng React Hook Form + Zod theo AGENTS.md mục 7 / ADR-FE.
-    // Sprint 1 chỉ dựng giao diện để chốt design, không gọi API.
+  const registerMutation = useMutation({
+    mutationFn: (payload: RegisterRequest) => register(payload),
+  });
+
+  const handleSubmit = (values: RegisterFormValues) => {
+    const payload: RegisterRequest = {
+      organizationName: values.organizationName.trim(),
+      orgType: values.orgType,
+      username: values.username.trim(),
+      email: values.email.trim(),
+      password: values.password,
+      modules: values.modules ?? [],
+    };
+    registerMutation.mutate(payload);
   };
+
+  // Hiển thị màn hình thành công sau khi đăng ký
+  if (registerMutation.isSuccess) {
+    return (
+      <AuthCard activeTab="register" title="Đăng ký tổ chức" subtitle="">
+        <Result
+          status="success"
+          title="Gửi đăng ký thành công!"
+          subTitle={
+            <Text>
+              Tổ chức của bạn đang ở trạng thái{' '}
+              <Text strong>Chờ duyệt</Text>. Admin hệ thống sẽ xem xét và phê
+              duyệt trong thời gian sớm nhất. Bạn sẽ nhận thông báo qua email
+              khi được duyệt.
+            </Text>
+          }
+        />
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard
@@ -46,56 +100,63 @@ export default function RegisterPage() {
         style={{ marginBottom: token.margin }}
       />
 
-      <Form<RegisterFormValues> layout="vertical" requiredMark={false} onFinish={handleSubmit}>
+      <Form<RegisterFormValues>
+        layout="vertical"
+        requiredMark={false}
+        onFinish={handleSubmit}
+        disabled={registerMutation.isPending}
+      >
+        {/* ── Thông tin tổ chức ── */}
         <Title level={5} style={{ marginTop: 0 }}>
           Thông tin tổ chức
         </Title>
 
         <Form.Item
           label="Tên tổ chức"
-          name="name"
+          name="organizationName"
           rules={[{ required: true, message: 'Vui lòng nhập tên tổ chức' }]}
         >
-          <Input placeholder="Ví dụ: Trường Đại học Bách khoa" />
+          <Input placeholder="Ví dụ: Trường THPT Nguyễn Du" />
         </Form.Item>
 
         <Form.Item
           label="Loại tổ chức"
-          name="org_type"
+          name="orgType"
           rules={[{ required: true, message: 'Vui lòng chọn loại tổ chức' }]}
         >
-          <Select placeholder="Chọn loại tổ chức" options={[...ORG_TYPE_OPTIONS]} />
+          <Select placeholder="Chọn loại tổ chức" options={ORG_TYPE_OPTIONS} />
         </Form.Item>
 
         <Form.Item
-          label="Email liên hệ"
-          name="contact_email"
-          rules={[
-            { required: true, message: 'Vui lòng nhập email liên hệ' },
-            { type: 'email', message: 'Email liên hệ không hợp lệ' },
-          ]}
+          label="Module cần sử dụng"
+          name="modules"
+          rules={[{ required: true, type: 'array', min: 1, message: 'Vui lòng chọn ít nhất 1 module' }]}
         >
-          <Input placeholder="lienhe@truong.edu.vn" />
-        </Form.Item>
-
-        <Form.Item
-          label="Số điện thoại"
-          name="contact_phone"
-          rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
-        >
-          <Input placeholder="Ví dụ: 028 1234 5678" />
+          <Checkbox.Group>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+              {MODULE_OPTIONS.map((m) => (
+                <Checkbox key={m.value} value={m.value}>
+                  {m.label}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
         </Form.Item>
 
         <Divider />
 
+        {/* ── Tài khoản quản trị ── */}
         <Title level={5}>Tài khoản quản trị</Title>
 
         <Form.Item
           label="Tên đăng nhập"
           name="username"
-          rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
+          rules={[
+            { required: true, message: 'Vui lòng nhập tên đăng nhập' },
+            { min: 3, message: 'Tên đăng nhập tối thiểu 3 ký tự' },
+          ]}
         >
-          <Input autoComplete="username" placeholder="Ví dụ: nghia.ledai" />
+          <Input autoComplete="username" placeholder="Ví dụ: nguyen.van.a" />
         </Form.Item>
 
         <Form.Item
@@ -112,9 +173,12 @@ export default function RegisterPage() {
         <Form.Item
           label="Mật khẩu"
           name="password"
-          rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
+          rules={[
+            { required: true, message: 'Vui lòng nhập mật khẩu' },
+            { min: 12, message: 'Mật khẩu tối thiểu 12 ký tự' },
+          ]}
         >
-          <Input.Password autoComplete="new-password" placeholder="Nhập mật khẩu" />
+          <Input.Password autoComplete="new-password" placeholder="Tối thiểu 12 ký tự" />
         </Form.Item>
 
         <Form.Item
@@ -136,8 +200,24 @@ export default function RegisterPage() {
           <Input.Password autoComplete="new-password" placeholder="Nhập lại mật khẩu" />
         </Form.Item>
 
+        {/* Hiển thị lỗi từ server */}
+        {registerMutation.isError && (
+          <Alert
+            type="error"
+            showIcon
+            message={(registerMutation.error as Error).message}
+            style={{ marginBottom: token.margin }}
+            role="alert"
+          />
+        )}
+
         <Form.Item style={{ marginBottom: 0 }}>
-          <Button type="primary" htmlType="submit" block>
+          <Button
+            type="primary"
+            htmlType="submit"
+            block
+            loading={registerMutation.isPending}
+          >
             Gửi đăng ký
           </Button>
         </Form.Item>
