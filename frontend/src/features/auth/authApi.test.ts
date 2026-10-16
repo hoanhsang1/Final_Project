@@ -48,13 +48,17 @@ describe('login', () => {
     );
   });
 
-  it('dịch message kỹ thuật "MethodArgumentNotValid" sang thông báo dễ hiểu khi 400', async () => {
+  it('dịch "Invalid or expired refresh token" sang tiếng Việt khi 401', async () => {
     mockPost.mockRejectedValue(
-      axiosLikeError(400, { success: false, message: 'MethodArgumentNotValid', data: null }),
+      axiosLikeError(401, {
+        success: false,
+        message: 'Invalid or expired refresh token',
+        data: null,
+      }),
     );
 
-    await expect(login({ username: '', password: '' })).rejects.toThrow(
-      'Vui lòng nhập tên đăng nhập và mật khẩu.',
+    await expect(login({ username: 'x', password: 'y' })).rejects.toThrow(
+      'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
     );
   });
 });
@@ -69,13 +73,22 @@ describe('getAuthErrorMessage', () => {
     expect(getAuthErrorMessage(err)).toBe('Sai tên đăng nhập hoặc mật khẩu.');
   });
 
-  it('dịch "MethodArgumentNotValid" (tên kỹ thuật) sang thông báo người dùng hiểu', () => {
-    const err = axiosLikeError(400, {
+  it('dịch lỗi nghiệp vụ 403 "Account is not active" (dùng chữ "Vô hiệu hoá", BR-04)', () => {
+    const err = axiosLikeError(403, {
       success: false,
-      message: 'MethodArgumentNotValid',
+      message: 'Account is not active',
       data: null,
     });
-    expect(getAuthErrorMessage(err)).toBe('Vui lòng nhập tên đăng nhập và mật khẩu.');
+    expect(getAuthErrorMessage(err)).toBe('Tài khoản đã bị vô hiệu hoá.');
+  });
+
+  it('dịch lỗi nghiệp vụ 403 "Organization is not active"', () => {
+    const err = axiosLikeError(403, {
+      success: false,
+      message: 'Organization is not active',
+      data: null,
+    });
+    expect(getAuthErrorMessage(err)).toBe('Tổ chức đã bị vô hiệu hoá.');
   });
 
   it('giữ nguyên message nếu backend đã trả tiếng Việt', () => {

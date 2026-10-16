@@ -47,9 +47,14 @@ apiClient.interceptors.request.use((config) => {
  * Response interceptor: gặp 401 → gọi refresh → retry request gốc.
  * Refresh thất bại → xoá token (trang đăng nhập tự xử lý điều hướng).
  *
- * ⚠️ Endpoint /api/v1/auth/refresh CHƯA tồn tại trong backend hiện tại.
- * Khối này chỉ chạy khi backend đã có; khi chưa có thì 401 rơi vào nhánh
- * clearTokens() để không bị vòng lặp vô hạn.
+ * Contract refresh đã kiểm chứng thực nghiệm (POST /api/v1/auth/refresh):
+ * - Body: { refreshToken }
+ * - 200 → trả LoginResponse MỚI, refreshToken bị ROTATE (token cũ bị thu hồi)
+ * - 401 → {"success":false,"message":"Invalid or expired refresh token",...}
+ * Refresh token là chuỗi ngẫu nhiên 32 byte (KHÔNG phải JWT), sống 7 ngày.
+ *
+ * Lưu ý: nếu refresh thất bại thì xoá token nhưng chưa tự điều hướng —
+ * phần điều hướng về /dang-nhap thuộc router/guard (việc Sprint sau).
  */
 apiClient.interceptors.response.use(
   (response) => response,
