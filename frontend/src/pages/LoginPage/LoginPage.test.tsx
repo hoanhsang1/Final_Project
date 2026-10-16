@@ -100,14 +100,14 @@ it('nhập đúng rồi bấm Đăng nhập thì gọi API và vào trang theo v
 });
 
 it('nhập sai mật khẩu thì hiện lỗi, KHÔNG điều hướng (NFR-REL-001)', async () => {
-  mockLogin.mockRejectedValue(new Error('Invalid username or password'));
+  mockLogin.mockRejectedValue(new Error('Sai tên đăng nhập hoặc mật khẩu.'));
   const router = renderLogin();
 
   await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'gv');
   await userEvent.type(screen.getByLabelText('Mật khẩu'), 'sai');
   await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
-  expect(await screen.findByText('Invalid username or password')).toBeInTheDocument();
+  expect(await screen.findByText('Sai tên đăng nhập hoặc mật khẩu.')).toBeInTheDocument();
   expect(router.state.location.pathname).toBe('/dang-nhap');
   expect(useAuthStore.getState().isAuthenticated).toBe(false);
 });

@@ -38,13 +38,13 @@ describe('login', () => {
     });
   });
 
-  it('ném lỗi có message "Invalid username or password" khi 401', async () => {
+  it('ném lỗi tiếng Việt khi 401 (dịch từ "Invalid username or password")', async () => {
     mockPost.mockRejectedValue(
       axiosLikeError(401, { success: false, message: 'Invalid username or password', data: null }),
     );
 
     await expect(login({ username: 'x', password: 'y' })).rejects.toThrow(
-      'Invalid username or password',
+      'Sai tên đăng nhập hoặc mật khẩu.',
     );
   });
 
@@ -60,13 +60,13 @@ describe('login', () => {
 });
 
 describe('getAuthErrorMessage', () => {
-  it('lấy message từ response.data.message khi backend trả lỗi có cấu trúc', () => {
+  it('dịch "Invalid username or password" sang tiếng Việt', () => {
     const err = axiosLikeError(401, {
       success: false,
       message: 'Invalid username or password',
       data: null,
     });
-    expect(getAuthErrorMessage(err)).toBe('Invalid username or password');
+    expect(getAuthErrorMessage(err)).toBe('Sai tên đăng nhập hoặc mật khẩu.');
   });
 
   it('dịch "MethodArgumentNotValid" (tên kỹ thuật) sang thông báo người dùng hiểu', () => {
@@ -76,6 +76,24 @@ describe('getAuthErrorMessage', () => {
       data: null,
     });
     expect(getAuthErrorMessage(err)).toBe('Vui lòng nhập tên đăng nhập và mật khẩu.');
+  });
+
+  it('giữ nguyên message nếu backend đã trả tiếng Việt', () => {
+    const err = axiosLikeError(500, {
+      success: false,
+      message: 'Đã xảy ra lỗi hệ thống',
+      data: null,
+    });
+    expect(getAuthErrorMessage(err)).toBe('Đã xảy ra lỗi hệ thống');
+  });
+
+  it('KHÔNG hiện thẳng message tiếng Anh chưa biết cho người dùng', () => {
+    const err = axiosLikeError(500, {
+      success: false,
+      message: 'Something exploded in the server',
+      data: null,
+    });
+    expect(getAuthErrorMessage(err)).toBe('Đã xảy ra lỗi. Vui lòng thử lại.');
   });
 
   it('trả về thông báo mặc định khi lỗi mạng (không có response)', () => {

@@ -11,7 +11,9 @@ export default defineConfig({
     // FE chỉ thấy origin của chính nó → CORS không còn là vấn đề khi dev.
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // Dùng 127.0.0.1 thay vì localhost: Node 17+ ưu tiên IPv6 (::1) khi resolve
+        // "localhost", nhưng gateway có thể chỉ nghe IPv4 ở một số cấu hình → tránh 502.
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },

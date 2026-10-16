@@ -23,9 +23,24 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 }
 
 /**
- * Rút message lỗi thân thiện từ axios error.
+ * Bảng dịch message backend (tiếng Anh) sang tiếng Việt.
  *
- * Ưu tiên `response.data.message` mà backend trả về; nếu lỗi mạng hoặc
+ * Backend trả message tiếng Anh; yêu cầu dự án là UI copy tiếng Việt.
+ * Chỉ dịch những message ĐÃ kiểm chứng thực nghiệm. Message lạ → fallback
+ * tiếng Việt chung, KHÔNG hiện thẳng tiếng Anh cho người dùng cuối.
+ */
+const MESSAGE_VI: Record<string, string> = {
+  'Invalid username or password': 'Sai tên đăng nhập hoặc mật khẩu.',
+  // MSG-LOGIN-10: cố ý gộp "sai tên đăng nhập HOẶC sai mật khẩu" — backend đã gộp sẵn
+  // (username không tồn tại và sai mật khẩu trả cùng message) để chống dò tài khoản.
+  MethodArgumentNotValid: 'Vui lòng nhập tên đăng nhập và mật khẩu.',
+  'Refresh token not found': 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+};
+
+/**
+ * Rút message lỗi thân thiện (tiếng Việt) từ axios error.
+ *
+ * Ưu tiên dịch `response.data.message` mà backend trả về; nếu lỗi mạng hoặc
  * response không có body lỗi thì dùng thông báo mặc định.
  */
 export function getAuthErrorMessage(error: unknown): string {
@@ -35,14 +50,18 @@ export function getAuthErrorMessage(error: unknown): string {
     request?: unknown;
   };
 
-  // Lỗi từ backend có cấu trúc {success, message, data} → lấy message.
   const serverMessage = err?.response?.data?.message;
   if (typeof serverMessage === 'string' && serverMessage.length > 0) {
-    // "MethodArgumentNotValid" là tên kỹ thuật, không thân thiện → thay bằng thông báo người dùng hiểu.
-    if (serverMessage === 'MethodArgumentNotValid') {
-      return 'Vui lòng nhập tên đăng nhập và mật khẩu.';
+    // Message đã có trong bảng dịch → dùng bản tiếng Việt.
+    if (MESSAGE_VI[serverMessage]) {
+      return MESSAGE_VI[serverMessage];
     }
-    return serverMessage;
+    // Backend có thể đã trả tiếng Việt sẵn (vd "Đã xảy ra lỗi hệ thống") → giữ nguyên.
+    if (/[àáảãạăâđêôơư]/i.test(serverMessage)) {
+      return serverMessage;
+    }
+    // Message tiếng Anh chưa biết → không hiện thẳng cho người dùng cuối.
+    return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
 
   // Không có response → lỗi mạng / backend chưa chạy.
