@@ -1,20 +1,115 @@
-version: "3.9"
-
 services:
-  postgres:
-    image: postgres:16
-    container_name: mems-postgres
+  eureka-server:
+    container_name: mems-eureka
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    volumes:
+      - ~/.m2:/root/.m2
+    build:
+      context: ./backend/EurekaServer
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - mems-network
+
+  identity-org-service:
+    build:
+      context: ./backend/IdentityService
+    container_name: mems-identity-org
     restart: unless-stopped
     environment:
-      POSTGRES_USER: mems_user
-      POSTGRES_PASSWORD: mems_pass
-      # Tạo sẵn database cho identity-service; service sau (people, schedule, facility)
-      # thêm database riêng trong init script này khi tới lượt code, KHÔNG dùng chung 1 DB.
-      POSTGRES_DB: mems_identity
+      DB_URL: jdbc:mysql://host.docker.internal:3306/mems_identity_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "5432:5432"
+      - "8081:8081"
     volumes:
-      - mems_pg_data:/var/lib/postgresql/data
+      - ~/.m2:/root/.m2
+    networks:
+      - mems-network
 
-volumes:
-  mems_pg_data:
+  people-service:
+    build:
+      context: ./backend/PeopleService
+    container_name: mems-people
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://host.docker.internal:3306/mems_people_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8082:8082"
+    volumes:
+      - ~/.m2:/root/.m2
+    networks:
+      - mems-network
+
+  schedule-service:
+    build:
+      context: ./backend/ScheduleService
+    container_name: mems-schedule
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://host.docker.internal:3306/mems_schedule_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ~/.m2:/root/.m2
+    networks:
+      - mems-network
+
+  facility-service:
+    build:
+      context: ./backend/FacilityService
+    container_name: mems-facility
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://host.docker.internal:3306/mems_facility_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8084:8084"
+    volumes:
+      - ~/.m2:/root/.m2
+    networks:
+      - mems-network
+  
+  api-gateway:
+    build:
+      context: ./backend/APIGateway
+      dockerfile: Dockerfile
+    container_name: mems-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ~/.m2:/root/.m2
+    environment:
+      IDENTITY_SERVICE_URL: http://identity-org-service:8081
+      SPRING_CLOUD_DISCOVERY_ENABLED: "true"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    networks:
+      - mems-network
+
+networks:
+  mems-network:
+    driver: bridge

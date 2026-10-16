@@ -1,0 +1,34 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+coverage
+
+# Biến môi trường — không bao giờ commit (ADR-FE-003)
+.env
+.env.local
+.env.*.local
+
+# Cấu hình agent dùng riêng của Nghĩa, không đưa vào repo nhóm
+opencode.json
+.opencode/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
