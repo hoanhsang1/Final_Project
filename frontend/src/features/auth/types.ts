@@ -54,3 +54,36 @@ export interface JwtPayload {
   /** Thời điểm hết hạn (epoch giây). */
   exp: number;
 }
+
+/**
+ * Loại tổ chức — khớp đúng enum OrgType phía backend.
+ * Gửi lên dạng UPPERCASE: "SCHOOL" | "CENTER".
+ */
+export type OrgType = 'SCHOOL' | 'CENTER';
+
+/**
+ * Request body gửi lên khi đăng ký tổ chức.
+ * Các field name khớp đúng record RegisterOrganizationRequest.java.
+ */
+export interface RegisterRequest {
+  organizationName: string;
+  orgType: OrgType;
+  username: string;
+  email: string;
+  password: string;
+  /** Danh sách mã module, ví dụ ["STUDENT_MANAGEMENT", "CLASS_MANAGEMENT"]. */
+  modules: string[];
+}
+
+/**
+ * Response thành công (HTTP 201) từ POST /api/v1/auth/register.
+ * BE trả Map<String, Object> với các key sau.
+ */
+export interface RegisterResponse {
+  organizationId: string;
+  accountId: string;
+  organizationStatus: 'PENDING';
+  accountStatus: 'PENDING';
+  requestedModules: string[];
+}
+

@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/api';
-import type { LoginRequest, LoginResponse } from './types';
+import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from './types';
 
 /**
  * Gọi API đăng nhập thật.
@@ -86,5 +86,52 @@ export function getAuthErrorMessage(error: unknown): string {
     return 'Không kết nối được máy chủ. Vui lòng thử lại.';
   }
 
+  return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+}
+
+/**
+ * Gọi API đăng ký tổ chức mới.
+ *
+ * Contract (POST /api/v1/auth/register → HTTP 201):
+ * - Body: RegisterRequest (organizationName, orgType, username, email, password, modules)
+ * - Thành công 201 → RegisterResponse (organizationId, accountId, organizationStatus, accountStatus, requestedModules)
+ * - Lỗi 409 → "Username already exists"
+ * - Lỗi 400 → "Invalid module: ..."
+ *
+ * Sau khi đăng ký, tổ chức ở trạng thái PENDING — cần admin duyệt mới đăng nhập được.
+ */
+export async function register(request: RegisterRequest): Promise<RegisterResponse> {
+  try {
+    const { data } = await apiClient.post<RegisterResponse>('/api/v1/auth/register', request);
+    return data;
+  } catch (error) {
+    throw new Error(getRegisterErrorMessage(error));
+  }
+}
+
+/** Dịch lỗi register từ backend sang tiếng Việt. */
+function getRegisterErrorMessage(error: unknown): string {
+  const err = error as {
+    isAxiosError?: boolean;
+    response?: { data?: { message?: string } | null };
+    request?: unknown;
+  };
+
+  const serverMessage = err?.response?.data?.message;
+  if (typeof serverMessage === 'string' && serverMessage.length > 0) {
+    const MAP: Record<string, string> = {
+      'Username already exists': 'Tên đăng nhập đã được sử dụng.',
+      'Organization name already exists': 'Tên tổ chức đã tồn tại.',
+    };
+    if (MAP[serverMessage]) return MAP[serverMessage];
+    // Tiếng Việt từ backend → giữ nguyên
+    if (/[àáảãạăâđêôơư]/i.test(serverMessage)) return serverMessage;
+    if (serverMessage.startsWith('Invalid module:')) {
+      const mod = serverMessage.replace('Invalid module:', '').trim();
+      return `Module "${mod}" không hợp lệ hoặc chưa được kích hoạt.`;
+    }
+    return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+  }
+  if (err?.request) return 'Không kết nối được máy chủ. Vui lòng thử lại.';
   return 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }
