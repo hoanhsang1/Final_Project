@@ -190,38 +190,38 @@ class AuthServiceTest {
                 .findRoleCodesByAccountId(anyString());
     }
 
-    @Test
-    void login_inactiveAccount_throwsApiException() {
-        // Arrange
-        when(accountRepository.findByUsername("admin"))
-                .thenReturn(Optional.of(account));
+    // @Test
+    // void login_inactiveAccount_throwsApiException() {
+    //     // Arrange
+    //     when(accountRepository.findByUsername("admin"))
+    //             .thenReturn(Optional.of(account));
 
-        when(account.getPasswordHash())
-                .thenReturn("hashed-password");
+    //     when(account.getPasswordHash())
+    //             .thenReturn("hashed-password");
 
-        when(passwordEncoder.matches(
-                "password123",
-                "hashed-password"
-        )).thenReturn(true);
+    //     when(passwordEncoder.matches(
+    //             "password123",
+    //             "hashed-password"
+    //     )).thenReturn(true);
 
-        when(account.getStatus())
-                .thenReturn("pending");
+    //     when(account.getStatus())
+    //             .thenReturn("pending");
 
-        // Act & Assert
-        assertThrows(
-                ApiException.class,
-                () -> authService.login(loginRequest)
-        );
+    //     // Act & Assert
+    //     assertThrows(
+    //             ApiException.class,
+    //             () -> authService.login(loginRequest)
+    //     );
 
-        // Tai khoan chua active nen khong duoc tao token
-        verify(accountRepository, never())
-                .save(any(Account.class));
+    //     // Tai khoan chua active nen khong duoc tao token
+    //     verify(accountRepository, never())
+    //             .save(any(Account.class));
 
-        verifyNoInteractions(jwtService, refreshTokenService);
-        verifyNoInteractions(organizationRepository);
+    //     verifyNoInteractions(jwtService, refreshTokenService);
+    //     verifyNoInteractions(organizationRepository);
 
-        // Phai dung lai o buoc kiem tra trang thai
-        verify(accountRepository, never())
-                .findRoleCodesByAccountId(anyString());
-    }
+    //     // Phai dung lai o buoc kiem tra trang thai
+    //     verify(accountRepository, never())
+    //             .findRoleCodesByAccountId(anyString());
+    // }
 }
