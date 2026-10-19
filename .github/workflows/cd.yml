@@ -27,6 +27,6 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.module }}
+          context: ./backend/${{ matrix.module }}
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/mems-${{ env.IMAGE }}:latest
