@@ -1,8 +1,10 @@
 import { ROLES, findRole, rolePreviewPath } from './roles';
 
-it('có đúng 4 tác nhân, đúng thứ tự', () => {
+it('có đúng 5 tác nhân, đúng thứ tự', () => {
+  // `org-owner` thêm ở Sprint 2 (`D-06`): role backend `ORG_OWNER` cần slug FE.
   expect(ROLES.map((r) => r.id)).toEqual([
     'platform-admin',
+    'org-owner',
     'academic-staff',
     'teacher',
     'student',
@@ -13,6 +15,7 @@ it('mọi nhãn đều có chữ tiếng Việt có dấu', () => {
   expect(ROLES.map((r) => r.label)).toContain('Cán bộ quản lý');
   expect(ROLES.map((r) => r.label)).toEqual([
     'Admin hệ thống',
+    'Chủ tổ chức',
     'Cán bộ quản lý',
     'Giáo viên',
     'Sinh viên',

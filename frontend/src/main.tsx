@@ -1,7 +1,7 @@
 // Bản vá chính thức của antd để Ant Design 5 chạy được trên React 19.
 import '@ant-design/v5-patch-for-react-19';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider } from 'antd';
+import { App, ConfigProvider } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -27,8 +27,11 @@ const queryClient = new QueryClient({
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      {/* `App` của antd: để `message`/`notification` đi qua ConfigProvider (đúng token/theme). */}
       <ConfigProvider locale={viVN} theme={{ token: themeToken }}>
-        <RouterProvider router={router} />
+        <App>
+          <RouterProvider router={router} />
+        </App>
       </ConfigProvider>
     </QueryClientProvider>
   </StrictMode>,

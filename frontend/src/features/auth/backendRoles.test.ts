@@ -18,6 +18,10 @@ describe('mapBackendRole', () => {
     expect(mapBackendRole(['ACADEMIC_STAFF'])).toBe('academic-staff');
   });
 
+  it('ánh xạ ORG_OWNER → org-owner (`D-06`)', () => {
+    expect(mapBackendRole(['ORG_OWNER'])).toBe('org-owner');
+  });
+
   it('trả về null với role chưa có màn hình ở Sprint 1 (FACILITY_STAFF)', () => {
     expect(mapBackendRole(['FACILITY_STAFF'])).toBeNull();
   });

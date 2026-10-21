@@ -135,3 +135,16 @@ function getRegisterErrorMessage(error: unknown): string {
   if (err?.request) return 'Không kết nối được máy chủ. Vui lòng thử lại.';
   return 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }
+
+/**
+ * Đăng xuất — `POST /api/v1/auth/logout` (204, không body).
+ *
+ * `D-13`: Sprint 1 mới chỉ xoá token phía client, refresh token vẫn sống ở BE tới 7 ngày.
+ * Sprint 2 (console quản trị) gọi API này để BE thu hồi refresh token.
+ *
+ * Cố ý KHÔNG bọc lỗi thành `Error` tiếng Việt: lỗi logout không được chặn người dùng
+ * thoát phiên — caller vẫn phải xoá session và điều hướng về trang đăng nhập.
+ */
+export async function logout(): Promise<void> {
+  await apiClient.post('/api/v1/auth/logout');
+}

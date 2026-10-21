@@ -18,6 +18,14 @@ interface AuthSession {
   username: string | null;
   /** Slug vai trò phía FE, đã ánh xạ từ role backend. */
   role: RoleId | null;
+  /**
+   * Danh sách role backend GỐC lấy từ JWT (vd: `["SUPER_ADMIN"]`).
+   *
+   * Giữ riêng vì `role` chỉ chứa MỘT slug đã ánh xạ — không đủ để chặn quyền:
+   * tài khoản có nhiều role sẽ bị mất thông tin. Guard khu vực quản trị kiểm
+   * `backendRoles.includes('SUPER_ADMIN')`.
+   */
+  backendRoles: string[];
   isAuthenticated: boolean;
   setSession: (res: LoginResponse) => void;
   clearSession: () => void;
@@ -35,16 +43,20 @@ function decodeJwtPayload(token: string): { userId?: string; username?: string; 
 }
 
 /** Khôi phục phiên từ localStorage khi app khởi động (reload trang không bị đá ra). */
-function restoreSession(): Pick<AuthSession, 'userId' | 'username' | 'role' | 'isAuthenticated'> {
+function restoreSession(): Pick<
+  AuthSession,
+  'userId' | 'username' | 'role' | 'backendRoles' | 'isAuthenticated'
+> {
   const token = getAccessToken();
   if (!token) {
-    return { userId: null, username: null, role: null, isAuthenticated: false };
+    return { userId: null, username: null, role: null, backendRoles: [], isAuthenticated: false };
   }
   const payload = decodeJwtPayload(token);
   return {
     userId: payload.userId ?? null,
     username: payload.username ?? null,
     role: mapBackendRole(payload.roles ?? []),
+    backendRoles: payload.roles ?? [],
     isAuthenticated: true,
   };
 }
@@ -59,11 +71,18 @@ export const useAuthStore = create<AuthSession>((set) => ({
       userId: payload.userId ?? null,
       username: payload.username ?? null,
       role: mapBackendRole(payload.roles ?? []),
+      backendRoles: payload.roles ?? [],
       isAuthenticated: true,
     });
   },
   clearSession: () => {
     clearTokens();
-    set({ userId: null, username: null, role: null, isAuthenticated: false });
+    set({
+      userId: null,
+      username: null,
+      role: null,
+      backendRoles: [],
+      isAuthenticated: false,
+    });
   },
 }));

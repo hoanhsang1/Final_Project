@@ -13,6 +13,7 @@ import type { RoleId } from './roles';
  */
 const ROLE_MAP: Record<string, RoleId> = {
   SUPER_ADMIN: 'platform-admin',
+  ORG_OWNER: 'org-owner',
   ACADEMIC_STAFF: 'academic-staff',
   TEACHER: 'teacher',
   STUDENT: 'student',

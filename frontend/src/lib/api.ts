@@ -29,6 +29,26 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+/**
+ * Callback gọi khi phiên đăng nhập KHÔNG cứu được (refresh token hết hạn / bị thu hồi).
+ *
+ * Interceptor nằm ngoài React nên không tự điều hướng được; app đăng ký handler
+ * vào đây để xoá nốt phiên trong store và đưa người dùng về `/dang-nhap`
+ * (ADR-FE-003 #3 — "refresh thất bại → xoá token + đá về trang đăng nhập").
+ */
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function onUnauthorized(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+/** Xoá token và báo cho app biết phiên đã hết hạn. */
+function handleSessionExpired(): void {
+  clearTokens();
+  unauthorizedHandler?.();
+}
+
 /** Đánh dấu request đang chờ refresh để tránh refresh song song nhiều request 401 cùng lúc. */
 let isRefreshing = false;
 /** Hàng đợi các request bị kẹt chờ refresh xong. */
@@ -53,8 +73,8 @@ apiClient.interceptors.request.use((config) => {
  * - 401 → {"success":false,"message":"Invalid or expired refresh token",...}
  * Refresh token là chuỗi ngẫu nhiên 32 byte (KHÔNG phải JWT), sống 7 ngày.
  *
- * Lưu ý: nếu refresh thất bại thì xoá token nhưng chưa tự điều hướng —
- * phần điều hướng về /dang-nhap thuộc router/guard (việc Sprint sau).
+ * Lưu ý: khi refresh thất bại, token đã bị xoá và app được báo qua `onUnauthorized`
+ * để tự đưa người dùng về /dang-nhap (xem `SessionWatcher`).
  */
 apiClient.interceptors.response.use(
   (response) => response,
@@ -72,7 +92,7 @@ apiClient.interceptors.response.use(
 
     // Đã thử refresh rồi mà vẫn 401 → dừng, không lặp.
     if (original.config._retry) {
-      clearTokens();
+      handleSessionExpired();
       return Promise.reject(error);
     }
 
@@ -102,7 +122,7 @@ apiClient.interceptors.response.use(
       return apiClient(original.config!);
     } catch {
       // Refresh thất bại → xoá token, đá về đăng nhập.
-      clearTokens();
+      handleSessionExpired();
       return Promise.reject(error);
     } finally {
       isRefreshing = false;

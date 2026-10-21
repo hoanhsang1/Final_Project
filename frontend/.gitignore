@@ -13,6 +13,12 @@ dist-ssr
 *.local
 coverage
 
+# Playwright (e2e)
+test-results
+playwright-report
+blob-report
+.playwright
+
 # Biến môi trường — không bao giờ commit (ADR-FE-003)
 .env
 .env.local

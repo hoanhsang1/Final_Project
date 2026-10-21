@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Alert,
   Button,
@@ -8,12 +8,19 @@ import {
   Input,
   Result,
   Select,
+  Skeleton,
   Typography,
   theme,
 } from 'antd';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { register } from '../../features/auth/authApi';
 import type { OrgType, RegisterRequest } from '../../features/auth/types';
+import { MSG_MOD } from '../../features/admin/adminMessages';
+import {
+  fetchModuleCatalog,
+  MODULE_CATALOG_STALE_TIME,
+  moduleCatalogKey,
+} from '../../features/modules/moduleApi';
 
 const { Title, Text } = Typography;
 
@@ -26,15 +33,10 @@ const ORG_TYPE_OPTIONS: { value: OrgType; label: string }[] = [
 ];
 
 /**
- * Danh sách module hệ thống — mã khớp với bảng `module` trong DB.
- * Chỉ hiển thị module đang active (backend sẽ validate lại phía server).
+ * Danh sách module KHÔNG hardcode trong FE nữa (`D-03`) — lấy từ
+ * `GET /api/v1/modules`. Trước đây FE tự chế danh sách và có chứa
+ * `FACILITY_MANAGEMENT` — mã KHÔNG tồn tại trong DB.
  */
-const MODULE_OPTIONS = [
-  { value: 'STUDENT_MANAGEMENT', label: 'Quản lý học sinh' },
-  { value: 'CLASS_MANAGEMENT', label: 'Quản lý lớp học' },
-  { value: 'SCHEDULE_MANAGEMENT', label: 'Quản lý thời khoá biểu' },
-  { value: 'FACILITY_MANAGEMENT', label: 'Quản lý cơ sở vật chất' },
-];
 
 /** Form values phía FE — field name có thể khác contract BE, sẽ map lại trong handleSubmit. */
 interface RegisterFormValues {
@@ -49,6 +51,17 @@ interface RegisterFormValues {
 
 export default function RegisterPage() {
   const { token } = theme.useToken();
+
+  // `D-03`: danh mục module lấy từ BE (`GET /api/v1/modules`), cache 10 phút.
+  const modulesQuery = useQuery({
+    queryKey: moduleCatalogKey,
+    queryFn: fetchModuleCatalog,
+    staleTime: MODULE_CATALOG_STALE_TIME,
+  });
+  const moduleOptions = (modulesQuery.data ?? []).map((m) => ({
+    label: m.name,
+    value: m.code,
+  }));
 
   const registerMutation = useMutation({
     mutationFn: (payload: RegisterRequest) => register(payload),
@@ -127,20 +140,27 @@ export default function RegisterPage() {
           <Select placeholder="Chọn loại tổ chức" options={ORG_TYPE_OPTIONS} />
         </Form.Item>
 
+        {modulesQuery.isPending && (
+          <Skeleton active paragraph={{ rows: 3 }} style={{ marginBottom: token.margin }} />
+        )}
+
+        {modulesQuery.isError && (
+          <Alert
+            type="error"
+            showIcon
+            role="alert"
+            message={MSG_MOD.LOAD_FAILED}
+            description="Danh mục module không tải được. Vui lòng tải lại trang rồi đăng ký."
+            style={{ marginBottom: token.margin }}
+          />
+        )}
+
         <Form.Item
           label="Module cần sử dụng"
           name="modules"
           rules={[{ required: true, type: 'array', min: 1, message: 'Vui lòng chọn ít nhất 1 module' }]}
         >
-          <Checkbox.Group>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-              {MODULE_OPTIONS.map((m) => (
-                <Checkbox key={m.value} value={m.value}>
-                  {m.label}
-                </Checkbox>
-              ))}
-            </div>
-          </Checkbox.Group>
+          <Checkbox.Group options={moduleOptions} />
         </Form.Item>
 
         <Divider />

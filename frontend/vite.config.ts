@@ -17,6 +17,16 @@ export default defineConfig({
       },
     },
   },
+  // `vite preview` (phục vụ bản build) dùng cho e2e → cần proxy giống dev server
+  // để khi nào chuyển e2e sang gọi BE thật thì không phải sửa cấu hình.
+  preview: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     // `forks` (mặc định của Vitest 5) bị treo worker trên máy Windows này; `threads` chạy được.
     pool: 'threads',
@@ -27,5 +37,7 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     css: true,
+    // E2E do PLAYWRIGHT chạy (không phải Vitest) — loại khỏi để Vitest không nhặt nhầm.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 });
