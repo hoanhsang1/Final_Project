@@ -2,7 +2,7 @@
 
 > **Base URL (qua API Gateway):** `http://localhost:8080`  
 > **Content-Type:** `application/json`  
-> **Phiên bản:** Sprint 1
+> **Phiên bản:** Sprint 1 + Sprint 2 (cập nhật 21/10/2026)
 
 ---
 
@@ -22,6 +22,7 @@
   - [GET /api/v1/organizations/{id}](#get-apiv1organizationsid)
   - [PATCH /api/v1/organizations/{id}/approve](#patch-apiv1organizationsidapprove)
   - [PATCH /api/v1/organizations/{id}/reject](#patch-apiv1organizationsidreject)
+  - [PUT /api/v1/organizations/{id}/modules](#put-apiv1organizationsidmodules) — ⚠️ **chưa có** (`D-16`)
 - [Các service khác](#các-service-khác)
 
 ---
@@ -161,9 +162,19 @@ Tất cả lỗi đều trả về cấu trúc sau:
 | Code | Ý nghĩa |
 |------|---------|
 | `STUDENT_MANAGEMENT` | Quản lý học sinh |
+| `TEACHER_MANAGEMENT` | Quản lý giáo viên |
 | `CLASS_MANAGEMENT` | Quản lý lớp học |
-| `SCHEDULE_MANAGEMENT` | Quản lý thời khoá biểu |
-| `FACILITY_MANAGEMENT` | Quản lý cơ sở vật chất |
+| `SCHEDULE_MANAGEMENT` | Quản lý lịch học |
+| `ROOM_MANAGEMENT` | Quản lý phòng học |
+| `EQUIPMENT_MANAGEMENT` | Quản lý thiết bị |
+
+> ⚠️ `SCHEDULE_MANAGEMENT` tên là **"Quản lý lịch học"** (theo seed `05_seed_admin.sql`),
+> **không phải** "Quản lý thời khoá biểu".
+> `FACILITY_MANAGEMENT` **không tồn tại** — mã thiết bị là `EQUIPMENT_MANAGEMENT`,
+> mã phòng học là `ROOM_MANAGEMENT`. FE trước đây hardcode `FACILITY_MANAGEMENT` và đã
+> đổi sang lấy danh mục từ `GET /api/v1/modules` (`D-03`).
+> `orgType` ở **request** này là CHỮ HOA (`SCHOOL`/`CENTER`), còn `org_type` ở **response**
+> của các endpoint tổ chức là CHỮ THƯỜNG (`school`/`center`) — xem `D-08`.
 
 **Response `201 Created`**
 
@@ -282,14 +293,24 @@ Lấy danh sách tất cả module đang active trong hệ thống.
 
 ```json
 [
-  { "code": "CLASS_MANAGEMENT",    "name": "Quản lý lớp học" },
-  { "code": "FACILITY_MANAGEMENT", "name": "Quản lý cơ sở vật chất" },
-  { "code": "SCHEDULE_MANAGEMENT", "name": "Quản lý thời khoá biểu" },
-  { "code": "STUDENT_MANAGEMENT",  "name": "Quản lý học sinh" }
+  { "code": "CLASS_MANAGEMENT",      "name": "Quản lý lớp học" },
+  { "code": "EQUIPMENT_MANAGEMENT", "name": "Quản lý thiết bị" },
+  { "code": "ROOM_MANAGEMENT",      "name": "Quản lý phòng học" },
+  { "code": "SCHEDULE_MANAGEMENT",  "name": "Quản lý lịch học" },
+  { "code": "STUDENT_MANAGEMENT",   "name": "Quản lý học sinh" },
+  { "code": "TEACHER_MANAGEMENT",   "name": "Quản lý giáo viên" }
 ]
 ```
 
 > Danh sách được sắp xếp theo `code` (alphabet). Chỉ trả về module có `is_active = TRUE`.
+>
+> ⚠️ **Đúng theo seed hiện tại** (`05_seed_admin.sql`) — danh mục **chỉ có 6 module**.
+> SRS §4.2 mô tả 10 module; 4 module còn thiếu (`STAFF_MANAGEMENT`,
+> `COMPUTER_ROOM_MANAGEMENT`, `TEACHER_ASSIGNMENT`, `ROOM_USAGE_MANAGEMENT`) ⇒ `D-15`.
+> Bảng `module` **không có cột `is_core`** ⇒ luật "4 module lõi không thể tắt" (`BR-06`)
+> chưa có chỗ biểu diễn ở tầng BE.
+> Lưu ý: `FACILITY_MANAGEMENT` **không tồn tại** — mã thiết bị là `EQUIPMENT_MANAGEMENT`,
+> mã phòng học là `ROOM_MANAGEMENT`.
 
 ---
 
@@ -310,13 +331,19 @@ Lấy danh sách tổ chức đang chờ duyệt.
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Trường THPT Demo",
-    "org_type": "SCHOOL",
+    "org_type": "school",
     "status": "pending",
     "owner_username": "school_owner_01",
     "owner_email": "school01@example.com"
   }
 ]
 ```
+
+> ⚠️ **`org_type` và `status` trả CHỮ THƯỜNG** (`school` / `center`, `pending` / `active` /
+> `rejected` / `suspended`) — đọc thẳng từ ENUM MySQL, không qua enum Java.
+> **Ngược lại**, `POST /auth/register` **nhận** `orgType` CHỮ HOA (`SCHOOL` / `CENTER`)
+> vì enum `OrgType` của Java khai báo chữ hoa. Hai chỗ khác nhau là cố ý, đừng "sửa cho khớp".
+> *(Cập nhật 21/10/2026 — `D-08`.)*
 
 ---
 
@@ -337,7 +364,7 @@ Lấy chi tiết một tổ chức (bao gồm danh sách module và chủ tổ c
   "organization": {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "Trường THPT Demo",
-    "org_type": "SCHOOL",
+    "org_type": "school",
     "status": "pending"
   },
   "owners": [
@@ -360,6 +387,11 @@ Lấy chi tiết một tổ chức (bao gồm danh sách module và chủ tổ c
 | HTTP | `message` | Nguyên nhân |
 |------|-----------|-------------|
 | `404` | `Organization not found` | Không tìm thấy tổ chức với ID đã cho |
+
+> ⚠️ `organization` hiện chỉ có **4 trường** (`id`, `name`, `org_type`, `status`).
+> Thiếu `contact_email`, `contact_phone`, `created_at`, `approved_by`, `approved_at`,
+> `rejection_reason` ⇒ màn chi tiết của FE chưa hiện được thông tin liên hệ và lý do từ chối
+> ⇒ `D-19`. Cần BE mở rộng trước khi nghiệm thu Sprint 2.
 
 ---
 
@@ -399,6 +431,16 @@ Từ chối đăng ký tổ chức.
 |-----------|------|-------|
 | `id` | string (UUID) | ID của tổ chức cần từ chối |
 
+**Request Body (mong đợi — BE hiện CHƯA nhận, `D-05`)**
+
+```json
+{ "reason": "Hồ sơ chưa đủ giấy tờ đăng ký doanh nghiệp." }
+```
+
+| Field | Type | Bắt buộc | Ràng buộc | Mô tả |
+|-------|------|-----------|-----------|-------|
+| `reason` | string | ✅ | 1–500 ký tự (sau khi trim) | Lý do từ chối, hiển thị cho chủ tổ chức |
+
 **Response `204 No Content`** — không có body.
 
 **Side effects khi reject:**
@@ -412,6 +454,62 @@ Từ chối đăng ký tổ chức.
 |------|-----------|-------------|
 | `404` | `Organization not found` | Không tìm thấy tổ chức |
 | `409` | `Organization has already been reviewed` | Tổ chức đã được duyệt/từ chối trước đó |
+| `400` | — | Lý do từ chối thiếu/quá 500 ký tự (**chưa có** — `D-01` lỗi validate trả 500) |
+
+> ⚠️ **BE hiện CHƯA đọc body `reason`** và **KHÔNG** ghi `rejection_reason` /
+> `approved_by` / `approved_at`, cũng **KHÔNG** ghi `audit_log` ⇒ `D-05` (**gấp**).
+> FE đã gửi body `{ "reason": … }` và bắt buộc nhập lý do, nhưng **BE chưa lưu** ⇒
+> lý do từ chối mất sạch. Cần BE sửa trước khi nghiệm thu Sprint 2.
+
+---
+
+### PUT /api/v1/organizations/{id}/modules
+
+> ⚠️ **CHƯA CÓ — BE chưa làm (`D-16`).** Mục này mô tả **contract FE đang dùng** để
+> BE cài theo, và để tester biết cần chờ gì. Hiện gọi endpoint này sẽ trả **404**.
+
+Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn chi tiết tổ chức).
+
+**Path Parameter**
+
+| Parameter | Type | Mô tả |
+|-----------|------|-------|
+| `id` | string (UUID) | ID của tổ chức cần cấu hình |
+
+**Request Body**
+
+```json
+{ "modules": ["STUDENT_MANAGEMENT", "CLASS_MANAGEMENT"] }
+```
+
+| Field | Type | Bắt buộc | Ràng buộc | Mô tã |
+|-------|------|-----------|-----------|-------|
+| `modules` | string[] | ✅ | ≥ 1 phần tử; mọi mã phải tồn tại và `is_active = TRUE` | **TẬP ĐẦY ĐỦ** module mong muốn — không phải phần tử cần thêm/bớt |
+
+> Body là **tập đầy đủ** (state hiện tại sau khi bỏ/tick) chứ không phải danh sách delta,
+> để FE không phải đối chiếu cũ/mới.
+
+**Response `204 No Content`** — không có body.
+
+**Side effects khi thành công:**
+- `organization_module` của tổ chức được đồng bộ theo body:
+  - module có trong body và đang `requested` → `active`
+  - module có trong body nhưng tổ chức chưa có → tạo dòng mới với `status = 'requested'`
+  - module **không** có trong body → `status = 'rejected'` (xoá dòng sẽ mất vết — xem `D-16`)
+- ghi 1 dòng `audit_log` loại `ORG_MODULES_UPDATED` (`NFR-LOG-001`)
+
+**Các lỗi có thể gặp**
+
+| HTTP | `message` | Nguyên nhân |
+|------|-----------|-------------|
+| `400` | `Invalid module: <code>` | Mã module không tồn tại hoặc `is_active = FALSE` |
+| `400` | — | `modules` rỗng |
+| `404` | `Organization not found` | Không tìm thấy tổ chức |
+| `409` | `Organization has already been reviewed` | Tổ chức không còn ở trạng thái `pending` |
+
+> ⚠️ **BE chưa có `is_core`** (`D-15`) ⇒ luật "4 module lõi không thể tắt" (`BR-06`)
+> hiện **chỉ chặn ở FE**. Khi BE làm xong, luật này phải có ở cả 2 tầng
+> (FE chặn cho UX, BE chặn thật — ẩn UI không phải bảo mật).
 
 ---
 

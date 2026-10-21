@@ -248,6 +248,8 @@ Mở http://localhost:5173
 | `npm run build` | Kiểm tra type rồi build bản production |
 | `npm test` | Chạy toàn bộ unit test (Vitest) |
 | `npm run test:watch` | Chạy test ở chế độ theo dõi |
+| `npm run test:e2e` | Chạy test e2e (Playwright) — tự build + bật preview server |
+| `npm run test:e2e:ui` | Mở Playwright UI để xem/chạy từng ca e2e |
 | `npm run lint` | Kiểm tra ESLint |
 | `npm run format` | Tự định dạng code bằng Prettier |
 | `npm run preview` | Xem thử bản đã build |
@@ -280,11 +282,14 @@ Final_Project/
 │   └── FacilityService/     # 8084 — chưa nối gateway
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/           # Mỗi trang 1 thư mục: LoginPage, RolePreviewPage…
+│   │   ├── pages/           # Mỗi trang 1 thư mục: LoginPage, RolePreviewPage, PendingOrganizationsPage…
 │   │   ├── features/auth/   # Gọi API + kiểu dữ liệu + ánh xạ vai trò
+│   │   ├── features/admin/  # Gọi API + câu chữ cho console quản trị (Sprint 2)
+│   │   ├── components/      # Component dùng chung (AdminGuard, AdminConsoleLayout…)
 │   │   ├── stores/          # Zustand (phiên đăng nhập)
 │   │   ├── lib/api.ts       # Axios + interceptor gắn token
 │   │   └── router.tsx
+│   ├── e2e/                 # Test e2e Playwright (mock API) cho console quản trị
 │   ├── docs/                # Tài liệu kỹ thuật của frontend
 │   └── vite.config.ts       # Cấu hình proxy
 ├── 01_identity_db.sql … 05_seed_admin.sql
@@ -325,8 +330,10 @@ Final_Project/
 
 - `frontend/docs/superpowers/plans/2026-10-14-dang-nhap-dang-ky.md` — kế hoạch Sprint 1 (đăng nhập/đăng ký).
 - `frontend/README.md` — hướng dẫn riêng cho phần frontend.
-- Các tài liệu dự án khác (SRS, ADR, biên bản họp, từ điển thuật ngữ kỹ thuật) **không**
-  nằm trong repo này.
+- `docs/api.md` — tài liệu API của backend (đã cập nhật endpoint Sprint 2).
+- Các tài liệu dự án khác (SRS, ADR, đặc tả Sprint 1 & 2, biên bản họp, từ điển thuật ngữ kỹ
+  thuật) **không** nằm trong repo này — nằm ở thư mục tài liệu dự án
+  (`../Đồ án tốt nghiệp/Tài liệu liên quan dự án/`).
 
 ---
 
@@ -346,14 +353,22 @@ Final_Project/
 
 ## 12. Hạn chế đã biết (đừng báo là lỗi)
 
-- **Chưa có endpoint đăng ký.** Trang `/dang-ky` chỉ là giao diện; bấm đăng ký sẽ không tạo
-  được tài khoản thật.
-- **Chưa có trang chủ theo vai trò.** Sau đăng nhập, hệ thống đưa tới `/xem-thu/<vai-tro>` — một
-  trang tạm hiển thị tên đăng nhập và vai trò.
+- **Trang chủ theo vai trò mới chỉ có cho `SUPER_ADMIN`.** Đăng nhập bằng `SUPER_ADMIN` sẽ vào
+  thẳng console quản trị `/quan-tri/to-chuc` (duyệt / từ chối tổ chức + cấu hình module).
+  Các vai trò khác vẫn vào `/xem-thu/<vai-tro>` — một trang tạm hiển thị tên đăng nhập và vai trò.
 - **Hai vai trò chưa có màn hình:** `ORG_ADMIN` và `FACILITY_STAFF`. Đăng nhập bằng tài khoản
   thuộc hai vai trò này sẽ hiện thông báo "vai trò chưa có màn hình" chứ không điều hướng.
-- **Chưa có guard định tuyến.** Khi refresh token hết hạn, frontend xoá token nhưng **chưa** tự
-  đẩy người dùng về trang đăng nhập.
+- **Phiên hết hạn đã tự đưa về trang đăng nhập** (Sprint 2). Refresh token thất bại → xoá token
+  khỏi `localStorage` + đá về `/dang-nhap` (`SessionWatcher`).
+- **BE chưa lưu lý do từ chối** (`D-05`). `PATCH /organizations/{id}/reject` chưa đọc body
+  `reason` và chưa ghi `rejection_reason` / `approved_by` / `approved_at` / `audit_log`.
+  FE đã bắt buộc nhập lý do và đã gửi body, nhưng **BE chưa lưu ⇒ lý do mất sạch**.
+- **BE chưa có endpoint cấu hình module** (`D-16`). `PUT /organizations/{id}/modules` chưa tồn tại
+  ⇒ khối "Cấu hình module" trên màn chi tiết chưa lưu được. Contract mong đợi đã mô tả trong
+  `docs/api.md`.
+- **Danh mục module thiếu so với SRS** (`D-15`). Seed hiện chỉ có 6 module, thiếu 4 module của
+  SRS §4.2, và bảng `module` **không có cột `is_core`** ⇒ luật "4 module lõi không thể tắt"
+  (`BR-06`) mới chỉ được chặn ở FE, chưa có ở tầng BE.
 - **Chưa phát OpenAPI** từ backend, nên kiểu dữ liệu (DTO) ở frontend đang viết tay — có nguy cơ
   lệch với backend khi backend đổi.
 - **Bundle frontend còn lớn:** bản build ra ~1 MB (gzip ~319 kB), Vite có cảnh báo. Nên tách nhỏ
