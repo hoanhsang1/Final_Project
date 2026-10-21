@@ -24,6 +24,7 @@ import { adminKeys } from '../../features/admin/adminKeys';
 import { MSG_ORG, msgApproved, msgRejected } from '../../features/admin/adminMessages';
 import {
   accountStatusLabel,
+  isPendingStatus,
   organizationStatusLabel,
   orgTypeLabel,
 } from '../../features/admin/statusLabels';
@@ -67,24 +68,28 @@ export default function OrganizationDetailPage() {
 
   const orgName = detailQuery.data?.organization.name ?? '';
   const moduleCount = detailQuery.data?.modules.length ?? 0;
-  const isPendingOrg = detailQuery.data?.organization.status === 'pending';
+  // So sánh không phân biệt hoa/thường — BE trả chữ thường nhưng `docs/api.md` có sai lệch (`D-08`).
+  const isPendingOrg = isPendingStatus(detailQuery.data?.organization.status);
 
   /** Xử lý lỗi chung cho duyệt / từ chối — `NFR-REL-001`: lỗi KHÔNG báo thành công. */
   const handleMutationError = (error: unknown) => {
     const status = error instanceof AdminApiError ? error.status : null;
 
     if (status === 409) {
-      // Tổ chức đã được xử lý ở tab/máy khác → đóng modal, tải lại danh sách.
+      // Tổ chức đã được xử lý ở tab/máy khác → đóng modal, tải lại danh sách + chi tiết
+      // (nếu không invalidate detail thì nút "Duyệt"/"Từ chối" còn hiện → bấm lại mới 409).
       message.warning(MSG_ORG.ALREADY_REVIEWED);
       setApproveOpen(false);
       setRejectOpen(false);
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       return;
     }
     if (status === 404) {
       message.error(MSG_ORG.NOT_FOUND);
       setApproveOpen(false);
       setRejectOpen(false);
+      void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       return;
     }
     if (status === 403) {
@@ -100,6 +105,7 @@ export default function OrganizationDetailPage() {
     onSuccess: () => {
       message.success(msgApproved(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setApproveOpen(false);
       navigate('/quan-tri/to-chuc');
     },
@@ -111,6 +117,7 @@ export default function OrganizationDetailPage() {
     onSuccess: () => {
       message.success(msgRejected(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setRejectOpen(false);
       navigate('/quan-tri/to-chuc');
     },

@@ -57,13 +57,13 @@ test.describe('Danh sách tổ chức chờ duyệt', () => {
 
     await page.goto('/quan-tri/to-chuc');
 
-    // Đang tải: có spinner của Table, KHÔNG hiện Empty.
-    await expect(page.locator('.ant-spin')).toBeVisible();
+    // Đang tải: có Skeleton, KHÔNG hiện Empty.
+    await expect(page.locator('.ant-skeleton').first()).toBeVisible();
     await expect(page.getByText('Không có tổ chức nào đang chờ duyệt')).toBeHidden();
 
-    // Tải xong: dữ liệu hiện, spinner biến mất.
+    // Tải xong: dữ liệu hiện, Skeleton biến mất.
     await expect(page.getByText(ORG_A.name)).toBeVisible();
-    await expect(page.locator('.ant-spin')).toBeHidden();
+    await expect(page.locator('.ant-skeleton')).toHaveCount(0);
   });
 
   test('TC-ORG-15 — mọi dòng có Tag trạng thái kèm chữ "Chờ duyệt" (BR-08)', async ({ page }) => {

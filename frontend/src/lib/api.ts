@@ -43,6 +43,19 @@ export function onUnauthorized(handler: UnauthorizedHandler | null): void {
   unauthorizedHandler = handler;
 }
 
+/**
+ * Callback gọi sau khi refresh token thành công.
+ *
+ * JWT mới có thể mang claim khác (vd role bị thu hồi ở BE) → store phải đọc lại
+ * claim thay vì giữ claim cũ. Đăng ký handler ở `SessionWatcher`.
+ */
+type TokenRefreshedHandler = () => void;
+let tokenRefreshedHandler: TokenRefreshedHandler | null = null;
+
+export function onTokenRefreshed(handler: TokenRefreshedHandler | null): void {
+  tokenRefreshedHandler = handler;
+}
+
 /** Xoá token và báo cho app biết phiên đã hết hạn. */
 function handleSessionExpired(): void {
   clearTokens();
@@ -98,6 +111,9 @@ apiClient.interceptors.response.use(
 
     if (isRefreshing) {
       // Có request khác đang refresh → xếp hàng, đợi xong rồi chạy tiếp.
+      // ⚠️ Đánh dấu `_retry` TRƯỚC khi xếp hàng: nếu không, request đã xếp hàng
+      // sẽ không bị chặn ở nhánh "đã refresh rồi" → có thể vào vòng refresh lần 2.
+      original.config._retry = true;
       return new Promise<void>((resolve) => {
         pendingQueue.push(resolve);
       }).then(() => apiClient(original.config!));
@@ -116,6 +132,8 @@ apiClient.interceptors.response.use(
         { refreshToken },
       );
       setTokens(data.accessToken, data.refreshToken);
+      // Token mới có thể mang claim khác (vd role bị thu hồi) → store phải theo kịp.
+      tokenRefreshedHandler?.();
 
       // Gắn token mới vào header rồi replay request gốc.
       original.config.headers = { ...original.config.headers, Authorization: `Bearer ${data.accessToken}` };

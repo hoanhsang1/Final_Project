@@ -125,6 +125,23 @@ test.describe('Khung console quản trị', () => {
     expect(token).toBeNull();
   });
 
+  test('TC-ADM-08b — logout phải gửi body { refreshToken } (BE @NotBlank)', async ({ page }) => {
+    await loginAs(page);
+    const log = await mockAdminApi(page);
+
+    await page.goto('/quan-tri/to-chuc');
+    await page.getByRole('button', { name: 'Đăng xuất' }).click();
+
+    await expect(page).toHaveURL(/\/dang-nhap$/);
+    const logoutBody = log.bodies.find((b) => b.url.includes('/api/v1/auth/logout'));
+    expect(logoutBody).toBeDefined();
+    // Body phải có `refreshToken` KHÔNG rỗng (BE `@NotBlank` → thiếu là 400).
+    // Giá trị cụ thể có thể là token mới sau khi đã refresh ('r-2' trong mock).
+    const body = logoutBody!.body as { refreshToken?: unknown };
+    expect(typeof body.refreshToken).toBe('string');
+    expect((body.refreshToken as string).length).toBeGreaterThan(0);
+  });
+
   test('TC-ADM-09 — logout lỗi 500 thì vẫn xoá phiên và về /dang-nhap', async ({ page }) => {
     await loginAs(page);
     await mockAdminApi(page, { logoutStatus: 500 });
@@ -156,8 +173,7 @@ test.describe('Khung console quản trị', () => {
 
   test('TC-ADM-11 — bàn phím: Tab tới nút Xem, bấm Enter thì mở được chi tiết', async ({
     page,
-  }) => {
-    await loginAs(page);
+  }) => {    await loginAs(page);
     await mockAdminApi(page);
 
     await page.goto('/quan-tri/to-chuc');
@@ -192,5 +208,31 @@ test.describe('Khung console quản trị', () => {
 
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(new RegExp(`/quan-tri/to-chuc/${ORG_A.id}$`));
+  });
+
+  test('TC-ADM-12 — đăng nhập bằng SUPER_ADMIN thì vào thẳng console quản trị', async ({ page }) => {
+    await mockAdminApi(page, { loginRoles: ['SUPER_ADMIN'] });
+
+    await page.goto('/dang-nhap');
+    await page.getByLabel('Tên đăng nhập').fill('platform_admin');
+    await page.getByLabel('Mật khẩu').fill('MatKhau@123456');
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+
+    await expect(page).toHaveURL(/\/quan-tri\/to-chuc$/);
+    await expect(page.getByRole('heading', { name: 'Tổ chức chờ duyệt' })).toBeVisible();
+  });
+
+  test('TC-ADM-13 — tài khoản nhiều role thì ưu tiên role quyền cao, không vào màn xem thử', async ({
+    page,
+  }) => {
+    // Thứ tự role trong JWT do BE quyết định — FE phải ưu tiên `SUPER_ADMIN`.
+    await mockAdminApi(page, { loginRoles: ['TEACHER', 'SUPER_ADMIN'] });
+
+    await page.goto('/dang-nhap');
+    await page.getByLabel('Tên đăng nhập').fill('multi_role');
+    await page.getByLabel('Mật khẩu').fill('MatKhau@123456');
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+
+    await expect(page).toHaveURL(/\/quan-tri\/to-chuc$/);
   });
 });

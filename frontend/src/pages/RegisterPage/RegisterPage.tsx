@@ -160,7 +160,16 @@ export default function RegisterPage() {
           name="modules"
           rules={[{ required: true, type: 'array', min: 1, message: 'Vui lòng chọn ít nhất 1 module' }]}
         >
-          <Checkbox.Group options={moduleOptions} />
+          {/* Danh sách DỌC — dễ đọc và dễ bấm trên màn hình 320px. */}
+          <Checkbox.Group>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+              {moduleOptions.map((m) => (
+                <Checkbox key={m.value} value={m.value}>
+                  {m.label}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
         </Form.Item>
 
         <Divider />

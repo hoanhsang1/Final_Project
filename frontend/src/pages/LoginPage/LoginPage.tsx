@@ -34,7 +34,14 @@ export default function LoginPage() {
       setSession(res);
 
       // Đọc role MỚI NHẤT từ store (setSession đã cập nhật xong).
-      const role = useAuthStore.getState().role;
+      const state = useAuthStore.getState();
+      // `SUPER_ADMIN` đã có màn riêng (console quản trị Sprint 2) → vào thẳng.
+      // Kiểm tra `backendRoles` (role gốc từ JWT) vì `role` chỉ chứa MỘT slug.
+      if (state.backendRoles.includes('SUPER_ADMIN')) {
+        navigate('/quan-tri');
+        return;
+      }
+      const role = state.role;
       if (role) {
         navigate(rolePreviewPath(role));
       } else {

@@ -113,15 +113,25 @@ export async function loginAs(page: Page, roles: string[] = ['SUPER_ADMIN']): Pr
 /** Các endpoint mà e2e theo dõi để assert "không gọi API nào" (TC-ADM-01/02). */
 export interface RequestLog {
   urls: string[];
+  /** Body của các request có body — assert contract (vd `logout` phải có `refreshToken`). */
+  bodies: Array<{ url: string; body: unknown }>;
 }
 
 /** Bắt đầu ghi lại mọi request API đi ra. */
 export function trackApiRequests(page: Page): RequestLog {
-  const log: RequestLog = { urls: [] };
+  const log: RequestLog = { urls: [], bodies: [] };
   page.on('request', (request) => {
     const url = request.url();
     if (url.includes('/api/v1/')) {
       log.urls.push(url);
+      const data = request.postData();
+      if (data) {
+        try {
+          log.bodies.push({ url, body: JSON.parse(data) });
+        } catch {
+          log.bodies.push({ url, body: data });
+        }
+      }
     }
   });
   return log;
@@ -153,6 +163,11 @@ export interface MockAdminOptions {
   rejectStatus?: 204 | 409 | 500;
   /** Kết quả `POST /auth/logout`: 204 | 500. */
   logoutStatus?: 204 | 500;
+  /**
+   * Nếu có, `POST /auth/login` trả token chứa đúng các role này.
+   * Không có ⇒ endpoint login KHÔNG được mock (test phải tự đăng nhập giả qua `loginAs`).
+   */
+  loginRoles?: string[];
   /** Kết quả `PUT …/modules`: 204 | 400 | 409 | 500. */
   modulesStatus?: 204 | 400 | 409 | 500;
   /** Cơ chế 401 → refresh: 'ok' | 'fail' | 'none' (không trả 401 lần nào). */
@@ -215,8 +230,40 @@ export async function mockAdminApi(
     const empty = (status: number) => route.fulfill({ status, body: '' });
 
     // --- Auth ---
+    if (path === '/api/v1/auth/login' && method === 'POST') {
+      if (!options.loginRoles) {
+        return json(404, { success: false, message: 'Login chưa được mock', data: null });
+      }
+      // Contract: BE trả thẳng 4 field (KHÔNG bọc ApiResponse) — xem `authApi.ts`.
+      return json(200, {
+        accessToken: fakeJwt(options.loginRoles),
+        refreshToken: 'refresh-token-gia',
+        tokenType: 'Bearer',
+        expiresIn: 900,
+      });
+    }
+
     if (path === '/api/v1/auth/logout') {
-      return empty(options.logoutStatus ?? 204);
+      if (options.logoutStatus === 500) {
+        return empty(500);
+      }
+      // BE dùng `@Valid @RequestBody LogoutRequest` với `@NotBlank String refreshToken`
+      // → thiếu body là 400 và refresh token KHÔNG bị thu hồi.
+      // Mock kiểm tra đúng contract để e2e bắt được lỗi FE gửi thiếu body.
+      let body: { refreshToken?: unknown } | null = null;
+      try {
+        body = request.postDataJSON() as { refreshToken?: unknown };
+      } catch {
+        body = null;
+      }
+      if (typeof body?.refreshToken !== 'string' || body.refreshToken.trim() === '') {
+        return json(400, {
+          success: false,
+          message: 'refreshToken: must not be blank',
+          data: null,
+        });
+      }
+      return empty(204);
     }
 
     if (path === '/api/v1/auth/refresh') {

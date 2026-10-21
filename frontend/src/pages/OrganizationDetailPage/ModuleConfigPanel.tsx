@@ -143,12 +143,15 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
     saveMutation.mutate(selected);
   };
 
+  // Danh mục chưa tải xong / tải lỗi → KHÔNG cho lưu (lưu lên tập thiếu = mất module).
+  const catalogNotReady = catalogQuery.isPending || catalogQuery.isError;
+
   const saveButton = editable ? (
     <Button
       type="primary"
       onClick={handleSave}
       loading={saveMutation.isPending}
-      disabled={!hasChanges}
+      disabled={!hasChanges || catalogNotReady}
     >
       {MSG_MOD.SAVE}
     </Button>
@@ -156,18 +159,6 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
 
   return (
     <Card title={MSG_MOD.TITLE} extra={saveButton}>
-      {catalogQuery.isPending && <Skeleton active paragraph={{ rows: 4 }} />}
-
-      {catalogQuery.isError && (
-        <Alert
-          type="warning"
-          showIcon
-          role="alert"
-          message={MSG_MOD.LOAD_FAILED}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
-
       {formError && (
         <Alert
           type="error"
@@ -178,39 +169,68 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
         />
       )}
 
-      <Flex vertical gap={token.marginSM}>
-        {rows.map((row) => {
-          const locked = isLockedCore(row.code);
-          const status = row.orgModule ? moduleStatusLabel(row.orgModule.status) : null;
-          const checkbox = (
-            <Checkbox
-              checked={selected.includes(row.code)}
-              disabled={locked || !editable}
-              onChange={(event) => handleToggle(row.code, event.target.checked)}
-            >
-              {row.name}
-            </Checkbox>
-          );
+      {/* Trạng thái loading của danh mục — `Skeleton`, không hiện danh sách rỗng. */}
+      {catalogQuery.isPending ? (
+        <Skeleton active paragraph={{ rows: 4 }} />
+      ) : (
+        <>
+          {catalogQuery.isError && (
+            <Alert
+              type="warning"
+              showIcon
+              role="alert"
+              message={MSG_MOD.LOAD_FAILED}
+              description="Danh mục module chưa tải được nên chưa thể lưu cấu hình. Hãy thử lại."
+              action={
+                <Button onClick={() => catalogQuery.refetch()} loading={catalogQuery.isFetching}>
+                  {MSG_ORG.RETRY}
+                </Button>
+              }
+              style={{ marginBottom: token.margin }}
+            />
+          )}
 
-          return (
-            <Flex key={row.code} justify="space-between" align="center" gap={token.marginSM} wrap>
-              <Flex align="center" gap={token.marginXS} wrap>
-                {locked ? (
-                  // Tooltip cần bọc trong <span> vì phần tử disabled không bắt sự kiện chuột.
-                  <Tooltip title={msgCoreLocked(row.name)}>
-                    <span>{checkbox}</span>
-                  </Tooltip>
-                ) : (
-                  checkbox
-                )}
-                {/* Mã module hiện mờ — giúp tester đối chiếu với DB. */}
-                <Text type="secondary">({row.code})</Text>
-              </Flex>
-              {status && <Tag color={status.color}>{status.label}</Tag>}
-            </Flex>
-          );
-        })}
-      </Flex>
+          <Flex vertical gap={token.marginSM}>
+            {rows.map((row) => {
+              const locked = isLockedCore(row.code);
+              const status = row.orgModule ? moduleStatusLabel(row.orgModule.status) : null;
+              const checkbox = (
+                <Checkbox
+                  checked={selected.includes(row.code)}
+                  disabled={locked || !editable}
+                  onChange={(event) => handleToggle(row.code, event.target.checked)}
+                >
+                  {row.name}
+                </Checkbox>
+              );
+
+              return (
+                <Flex
+                  key={row.code}
+                  justify="space-between"
+                  align="center"
+                  gap={token.marginSM}
+                  wrap
+                >
+                  <Flex align="center" gap={token.marginXS} wrap>
+                    {locked ? (
+                      // Tooltip cần bọc trong <span> vì phần tử disabled không bắt sự kiện chuột.
+                      <Tooltip title={msgCoreLocked(row.name)}>
+                        <span>{checkbox}</span>
+                      </Tooltip>
+                    ) : (
+                      checkbox
+                    )}
+                    {/* Mã module hiện mờ — giúp tester đối chiếu với DB. */}
+                    <Text type="secondary">({row.code})</Text>
+                  </Flex>
+                  {status && <Tag color={status.color}>{status.label}</Tag>}
+                </Flex>
+              );
+            })}
+          </Flex>
+        </>
+      )}
     </Card>
   );
 }

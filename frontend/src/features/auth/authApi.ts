@@ -1,4 +1,4 @@
-import { apiClient } from '../../lib/api';
+import { apiClient, REFRESH_TOKEN_KEY } from '../../lib/api';
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from './types';
 
 /**
@@ -142,9 +142,17 @@ function getRegisterErrorMessage(error: unknown): string {
  * `D-13`: Sprint 1 mới chỉ xoá token phía client, refresh token vẫn sống ở BE tới 7 ngày.
  * Sprint 2 (console quản trị) gọi API này để BE thu hồi refresh token.
  *
+ * ⚠️ **Body BẮT BUỘC** `{ refreshToken }` — BE dùng `@Valid @RequestBody LogoutRequest`
+ * với `@NotBlank String refreshToken` (`AuthController.logout`, `LogoutRequest.java`).
+ * Gửi body rỗng → Spring ném `HttpMessageNotReadableException` → 400/500 → BE KHÔNG
+ * thu hồi token, trong khi FE đã xoá token local → refresh token vẫn dùng được.
+ *
  * Cố ý KHÔNG bọc lỗi thành `Error` tiếng Việt: lỗi logout không được chặn người dùng
  * thoát phiên — caller vẫn phải xoá session và điều hướng về trang đăng nhập.
  */
 export async function logout(): Promise<void> {
-  await apiClient.post('/api/v1/auth/logout');
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  // Không có refresh token → không có gì để thu hồi ở BE.
+  if (!refreshToken) return;
+  await apiClient.post('/api/v1/auth/logout', { refreshToken });
 }

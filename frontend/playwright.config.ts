@@ -17,7 +17,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list']],
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never' }]]
+    : [['list'], ['html', { open: 'never' }]],
   // Máy dev chạy song song Vite + nhiều worker → thời gian load trang có thể vượt
   // 30s. Nới timeout để tránh đỏ giả (ca đỏ vì hết thời gian, không phải vì lỗi).
   timeout: 60_000,
@@ -25,7 +27,7 @@ export default defineConfig({
   // Giới hạn số worker để máy không quá tải.
   workers: 4,
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
     // Tiếng Việt có dấu → kiểm tra text dễ đọc.
     locale: 'vi-VN',
@@ -43,10 +45,13 @@ export default defineConfig({
     //
     // `--host 127.0.0.1` là BẮT BUỘC trên máy này: Vite mặc định bind `localhost`
     // (IPv6 ::1) nên `127.0.0.1` không kết nối được → Playwright chờ webServer vô hạn.
+    //
+    // Cổng 4173 (mặc định của `vite preview`) — KHÁC cổng dev server 5173 để không
+    // đụng nhau. `reuseExistingServer: false` để không bao giờ test nhầm bundle cũ.
     command:
-      'npm run build && npm run preview -- --host 127.0.0.1 --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+      'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+    url: 'http://127.0.0.1:4173',
+    reuseExistingServer: false,
     timeout: 300_000,
   },
 });

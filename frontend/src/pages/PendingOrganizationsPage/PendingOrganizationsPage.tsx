@@ -1,5 +1,6 @@
-import { Alert, Button, Empty, Flex, Table, Tag, Typography, theme } from 'antd';
+import { Alert, Button, Empty, Flex, Skeleton, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MSG_ORG } from '../../features/admin/adminMessages';
 import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/statusLabels';
@@ -21,53 +22,57 @@ export default function PendingOrganizationsPage() {
   const navigate = useNavigate();
   const query = usePendingOrganizations();
 
-  const columns: TableProps<PendingOrganization>['columns'] = [
-    {
-      title: 'Tên tổ chức',
-      dataIndex: 'name',
-      key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name, 'vi'),
-    },
-    {
-      title: 'Loại',
-      dataIndex: 'org_type',
-      key: 'org_type',
-      render: (value: string) => orgTypeLabel(value),
-    },
-    {
-      title: 'Người đại diện',
-      dataIndex: 'owner_username',
-      key: 'owner_username',
-    },
-    {
-      title: 'Email',
-      dataIndex: 'owner_email',
-      key: 'owner_email',
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      // BR-08: Tag luôn kèm CHỮ, không chỉ dựa vào màu.
-      render: (value: string) => {
-        const status = organizationStatusLabel(value);
-        return <Tag color={status.color}>{status.label}</Tag>;
+  // Cột bảng không phụ thuộc state → dựng 1 lần, tránh dựng lại mỗi render.
+  const columns = useMemo<TableProps<PendingOrganization>['columns']>(
+    () => [
+      {
+        title: 'Tên tổ chức',
+        dataIndex: 'name',
+        key: 'name',
+        sorter: (a, b) => a.name.localeCompare(b.name, 'vi'),
       },
-    },
-    {
-      title: 'Hành động',
-      key: 'action',
-      render: (_value, record) => (
-        <Button
-          type="link"
-          aria-label={`Xem chi tiết tổ chức ${record.name}`}
-          onClick={() => navigate(`/quan-tri/to-chuc/${record.id}`)}
-        >
-          {MSG_ORG.VIEW}
-        </Button>
-      ),
-    },
-  ];
+      {
+        title: 'Loại',
+        dataIndex: 'org_type',
+        key: 'org_type',
+        render: (value: string) => orgTypeLabel(value),
+      },
+      {
+        title: 'Người đại diện',
+        dataIndex: 'owner_username',
+        key: 'owner_username',
+      },
+      {
+        title: 'Email',
+        dataIndex: 'owner_email',
+        key: 'owner_email',
+      },
+      {
+        title: 'Trạng thái',
+        dataIndex: 'status',
+        key: 'status',
+        // BR-08: Tag luôn kèm CHỮ, không chỉ dựa vào màu.
+        render: (value: string) => {
+          const status = organizationStatusLabel(value);
+          return <Tag color={status.color}>{status.label}</Tag>;
+        },
+      },
+      {
+        title: 'Hành động',
+        key: 'action',
+        render: (_value, record) => (
+          <Button
+            type="link"
+            aria-label={`Xem chi tiết tổ chức ${record.name}`}
+            onClick={() => navigate(`/quan-tri/to-chuc/${record.id}`)}
+          >
+            {MSG_ORG.VIEW}
+          </Button>
+        ),
+      },
+    ],
+    [navigate],
+  );
 
   if (query.isError) {
     return (
@@ -95,22 +100,27 @@ export default function PendingOrganizationsPage() {
         <Text type="secondary">{MSG_ORG.LIST_SUBTITLE}</Text>
       </div>
 
-      <Table<PendingOrganization>
-        rowKey="id"
-        columns={columns}
-        dataSource={query.data ?? []}
-        loading={query.isPending}
-        // Trạng thái empty — KHÔNG để bảng trắng (TC-ORG-12).
-        locale={{ emptyText: <Empty description={MSG_ORG.EMPTY} /> }}
-        // Phân trang phía client (NFR-PER-001); `showTotal` tiếng Việt nhờ locale vi_VN.
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: false,
-          showTotal: (total) => `Tổng ${total} tổ chức`,
-        }}
-        // Ở màn hình 320px bảng cuộn ngang thay vì vỡ layout (TC-ADM-10).
-        scroll={{ x: 860 }}
-      />
+      {/* Trạng thái loading — `Skeleton` (NFR-PER-001, `TC-ORG-14`).
+          KHÔNG render bảng rỗng lúc đang tải để tránh nhấp nháy "không có dữ liệu". */}
+      {query.isPending ? (
+        <Skeleton active paragraph={{ rows: 8 }} />
+      ) : (
+        <Table<PendingOrganization>
+          rowKey="id"
+          columns={columns}
+          dataSource={query.data ?? []}
+          // Trạng thái empty — KHÔNG để bảng trắng (TC-ORG-12).
+          locale={{ emptyText: <Empty description={MSG_ORG.EMPTY} /> }}
+          // Phân trang phía client (NFR-PER-001); `showTotal` tiếng Việt nhờ locale vi_VN.
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: false,
+            showTotal: (total) => `Tổng ${total} tổ chức`,
+          }}
+          // Ở màn hình 320px bảng cuộn ngang thay vì vỡ layout (TC-ADM-10).
+          scroll={{ x: 860 }}
+        />
+      )}
     </Flex>
   );
 }
