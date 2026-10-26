@@ -1,5 +1,6 @@
 import { Button, Card, Flex, Result, Space, Tag, theme, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
+import { logout } from '../../features/auth/authApi';
 import { findRole } from '../../features/auth/roles';
 import { useAuthStore } from '../../stores/authStore';
 import { cardStyle, layoutBackground } from '../../theme';
@@ -28,9 +29,15 @@ export default function RolePreviewPage() {
   const username = useAuthStore((s) => s.username);
   const clearSession = useAuthStore((s) => s.clearSession);
 
-  const handleLogout = () => {
-    // TODO(Sprint sau): gọi luôn POST /api/v1/auth/logout để thu hồi refresh token ở BE.
-    // Hiện chỉ xoá phiên phía client — refresh token vẫn còn hiệu lực ở BE tới 7 ngày.
+  const handleLogout = async () => {
+    // `D-13`: gọi `POST /api/v1/auth/logout` để BE thu hồi refresh token
+    // (Sprint 1 chỉ xoá token phía client → refresh token còn sống tới 7 ngày).
+    // Lỗi KHÔNG được chặn người dùng thoát phiên → vẫn xoá session phía client.
+    try {
+      await logout();
+    } catch {
+      // Bỏ qua lỗi mạng — phiên vẫn phải được xoá ở client.
+    }
     clearSession();
     navigate('/dang-nhap');
   };
@@ -58,7 +65,7 @@ export default function RolePreviewPage() {
             )}
 
             <Text type="secondary">{isAuthenticated ? 'Xin chào' : 'Bạn đang là'}</Text>
-            <Title level={3} style={{ margin: 0 }}>
+            <Title level={1} style={{ margin: 0 }}>
               {isAuthenticated ? (username ?? role.label) : role.label}
             </Title>
             <Text type="secondary" style={{ textAlign: 'center' }}>

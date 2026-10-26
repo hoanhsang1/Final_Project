@@ -1,4 +1,4 @@
-export type RoleId = 'platform-admin' | 'academic-staff' | 'teacher' | 'student';
+export type RoleId = 'platform-admin' | 'org-owner' | 'academic-staff' | 'teacher' | 'student';
 
 export interface Role {
   id: RoleId;
@@ -7,16 +7,24 @@ export interface Role {
 }
 
 /**
- * Bốn tác nhân của hệ thống. Thứ tự trong mảng này chính là thứ tự hiển thị trên UI.
+ * Tác nhân của hệ thống. Thứ tự trong mảng này chính là thứ tự hiển thị trên UI.
  *
  * Đây là nguồn sự thật duy nhất: nút chọn tác nhân ở trang đăng nhập và trang xem thử
  * đều đọc từ đây, nên không thể lệch nhau.
+ *
+ * `org-owner` thêm vào ở Sprint 2 (`D-06`): role backend `ORG_OWNER` trước đây không
+ * có slug FE nên chủ tổ chức đăng nhập xong không vào được màn nào.
  */
 export const ROLES: readonly Role[] = [
   {
     id: 'platform-admin',
     label: 'Admin hệ thống',
     description: 'Quản trị toàn nền tảng',
+  },
+  {
+    id: 'org-owner',
+    label: 'Chủ tổ chức',
+    description: 'Quản lý tài khoản của tổ chức',
   },
   {
     id: 'academic-staff',

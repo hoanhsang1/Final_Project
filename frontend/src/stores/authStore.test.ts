@@ -15,6 +15,7 @@ beforeEach(() => {
     userId: null,
     username: null,
     role: null,
+    backendRoles: [],
     isAuthenticated: false,
   });
 });
@@ -43,6 +44,8 @@ describe('useAuthStore', () => {
     expect(s.isAuthenticated).toBe(true);
     expect(s.username).toBe('platform_admin');
     expect(s.role).toBe('platform-admin');
+    // Role backend GỐC giữ lại để guard kiểm quyền chặt (UC-ADMIN-01).
+    expect(s.backendRoles).toEqual(['SUPER_ADMIN']);
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBe(jwt);
     expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh-xyz');
   });
@@ -61,6 +64,7 @@ describe('useAuthStore', () => {
     const s = useAuthStore.getState();
     expect(s.isAuthenticated).toBe(false);
     expect(s.role).toBeNull();
+    expect(s.backendRoles).toEqual([]);
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
     expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBeNull();
   });

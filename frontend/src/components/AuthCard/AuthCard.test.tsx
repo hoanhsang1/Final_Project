@@ -17,25 +17,30 @@ function renderCard(activeTab: AuthTab) {
   );
 }
 
-it('đánh dấu tab đang mở cho trình đọc màn hình', () => {
+it('không còn cặp tab Đăng nhập / Đăng ký ở đầu thẻ', () => {
   renderCard('login');
 
-  expect(screen.getByRole('link', { name: 'Đăng nhập' })).toHaveAttribute('aria-current', 'page');
-  expect(screen.getByRole('link', { name: 'Đăng ký' })).not.toHaveAttribute('aria-current');
+  // Đã thay bằng liên kết ở chân thẻ (xem `RegisterPage`), tránh trùng với dòng
+  // "Chưa có tổ chức? Đăng ký tổ chức".
+  expect(screen.queryByRole('link', { name: 'Đăng nhập' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Đăng ký' })).not.toBeInTheDocument();
 });
 
-it('đổi dấu tab khi mở trang đăng ký', () => {
-  renderCard('register');
+it('thẻ đăng ký rộng hơn thẻ đăng nhập để chứa form 2 cột', () => {
+  const { unmount } = renderCard('register');
+  expect(document.querySelector<HTMLElement>('.ant-card')?.style.maxWidth).toBe('720px');
+  unmount();
 
-  expect(screen.getByRole('link', { name: 'Đăng ký' })).toHaveAttribute('aria-current', 'page');
-  expect(screen.getByRole('link', { name: 'Đăng nhập' })).not.toHaveAttribute('aria-current');
+  renderCard('login');
+  expect(document.querySelector<HTMLElement>('.ant-card')?.style.maxWidth).toBe('520px');
 });
 
-it('tab trỏ tới đúng đường dẫn để nút Back của trình duyệt hoạt động', () => {
+it('luôn có lối liên hệ quản trị ở chân thẻ', () => {
   renderCard('login');
 
-  expect(screen.getByRole('link', { name: 'Đăng ký' })).toHaveAttribute('href', '/dang-ky');
-  expect(screen.getByRole('link', { name: 'Đăng nhập' })).toHaveAttribute('href', '/dang-nhap');
+  expect(
+    screen.getByText('Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.'),
+  ).toBeInTheDocument();
 });
 
 it('hiện tiêu đề, phụ đề và nội dung con', () => {

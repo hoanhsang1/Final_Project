@@ -29,6 +29,39 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+/**
+ * Callback gọi khi phiên đăng nhập KHÔNG cứu được (refresh token hết hạn / bị thu hồi).
+ *
+ * Interceptor nằm ngoài React nên không tự điều hướng được; app đăng ký handler
+ * vào đây để xoá nốt phiên trong store và đưa người dùng về `/dang-nhap`
+ * (ADR-FE-003 #3 — "refresh thất bại → xoá token + đá về trang đăng nhập").
+ */
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function onUnauthorized(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+/**
+ * Callback gọi sau khi refresh token thành công.
+ *
+ * JWT mới có thể mang claim khác (vd role bị thu hồi ở BE) → store phải đọc lại
+ * claim thay vì giữ claim cũ. Đăng ký handler ở `SessionWatcher`.
+ */
+type TokenRefreshedHandler = () => void;
+let tokenRefreshedHandler: TokenRefreshedHandler | null = null;
+
+export function onTokenRefreshed(handler: TokenRefreshedHandler | null): void {
+  tokenRefreshedHandler = handler;
+}
+
+/** Xoá token và báo cho app biết phiên đã hết hạn. */
+function handleSessionExpired(): void {
+  clearTokens();
+  unauthorizedHandler?.();
+}
+
 /** Đánh dấu request đang chờ refresh để tránh refresh song song nhiều request 401 cùng lúc. */
 let isRefreshing = false;
 /** Hàng đợi các request bị kẹt chờ refresh xong. */
@@ -53,8 +86,8 @@ apiClient.interceptors.request.use((config) => {
  * - 401 → {"success":false,"message":"Invalid or expired refresh token",...}
  * Refresh token là chuỗi ngẫu nhiên 32 byte (KHÔNG phải JWT), sống 7 ngày.
  *
- * Lưu ý: nếu refresh thất bại thì xoá token nhưng chưa tự điều hướng —
- * phần điều hướng về /dang-nhap thuộc router/guard (việc Sprint sau).
+ * Lưu ý: khi refresh thất bại, token đã bị xoá và app được báo qua `onUnauthorized`
+ * để tự đưa người dùng về /dang-nhap (xem `SessionWatcher`).
  */
 apiClient.interceptors.response.use(
   (response) => response,
@@ -72,12 +105,15 @@ apiClient.interceptors.response.use(
 
     // Đã thử refresh rồi mà vẫn 401 → dừng, không lặp.
     if (original.config._retry) {
-      clearTokens();
+      handleSessionExpired();
       return Promise.reject(error);
     }
 
     if (isRefreshing) {
       // Có request khác đang refresh → xếp hàng, đợi xong rồi chạy tiếp.
+      // ⚠️ Đánh dấu `_retry` TRƯỚC khi xếp hàng: nếu không, request đã xếp hàng
+      // sẽ không bị chặn ở nhánh "đã refresh rồi" → có thể vào vòng refresh lần 2.
+      original.config._retry = true;
       return new Promise<void>((resolve) => {
         pendingQueue.push(resolve);
       }).then(() => apiClient(original.config!));
@@ -96,13 +132,15 @@ apiClient.interceptors.response.use(
         { refreshToken },
       );
       setTokens(data.accessToken, data.refreshToken);
+      // Token mới có thể mang claim khác (vd role bị thu hồi) → store phải theo kịp.
+      tokenRefreshedHandler?.();
 
       // Gắn token mới vào header rồi replay request gốc.
       original.config.headers = { ...original.config.headers, Authorization: `Bearer ${data.accessToken}` };
       return apiClient(original.config!);
     } catch {
       // Refresh thất bại → xoá token, đá về đăng nhập.
-      clearTokens();
+      handleSessionExpired();
       return Promise.reject(error);
     } finally {
       isRefreshing = false;
