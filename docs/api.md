@@ -556,6 +556,18 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 | Collection — `/organizations`, `/organizations/options`, `/audit-logs`, `/accounts` | BE **chưa làm** endpoint | `Alert` "Tính năng đang chờ backend (`D-nn`)" + nút Thử lại |
 | Item — `/organizations/{id}`, `/accounts/{id}` | Đối tượng **không tồn tại** | `Result 404` + "Không tìm thấy …" |
 
+### Quên / đặt lại mật khẩu (màn công khai)
+
+| Mã | Method & Path | Body | Thành công | Trạng thái |
+|---|---|---|---|---|
+| `D-32` | `POST /api/v1/auth/forgot-password` | `{ email }` | `202` — **luôn 202**, kể cả email không tồn tại (chống dò tài khoản, cùng lý do với message gộp ở `/auth/login`) | ❌ chưa có |
+| `D-33` | `POST /api/v1/auth/reset-password` | `{ token, new_password }` — `new_password` 8–72 ký tự | `204` · `400` khi token sai/hết hạn/đã dùng | ❌ chưa có |
+
+- Dùng bảng **`password_reset_token` đã có sẵn** trong `mems_identity_db` (`token_hash`, `expires_at`, `used_at`) →
+  chỉ cần service + 2 endpoint; đề xuất token hiệu lực **30 phút**, dùng **1 lần**.
+- Liên kết gửi trong email trỏ tới `{FE_ORIGIN}/dat-lai-mat-khau?token=…`.
+- FE đã code xong + e2e mock (`e2e/auth-password-reset.spec.ts`); gặp `404` hiện *"chức năng chưa sẵn sàng"*.
+
 ---
 
 ## Các service khác

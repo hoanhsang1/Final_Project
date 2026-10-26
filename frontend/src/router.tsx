@@ -8,7 +8,9 @@ import DocumentTitle from './components/DocumentTitle/DocumentTitle';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
+import ResetPasswordPage from './pages/ResetPasswordPage/ResetPasswordPage';
 import RolePreviewPage from './pages/RolePreviewPage/RolePreviewPage';
 
 const { Text } = Typography;
@@ -92,6 +94,18 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/dang-nhap" replace /> },
       { path: 'dang-nhap', element: <LoginPage />, handle: { title: 'Đăng nhập' } },
       { path: 'dang-ky', element: <RegisterPage />, handle: { title: 'Đăng ký tổ chức' } },
+      {
+        // Hai bước của luồng quên mật khẩu: xin liên kết qua email → đặt mật khẩu
+        // mới bằng token trong liên kết (`?token=…`).
+        path: 'quen-mat-khau',
+        element: <ForgotPasswordPage />,
+        handle: { title: 'Quên mật khẩu' },
+      },
+      {
+        path: 'dat-lai-mat-khau',
+        element: <ResetPasswordPage />,
+        handle: { title: 'Đặt lại mật khẩu' },
+      },
       {
         path: 'xem-thu/:vaiTro',
         element: <RolePreviewPage />,

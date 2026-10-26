@@ -54,6 +54,18 @@ src/
 e2e/                # Test e2e Playwright cho console quản trị
 ```
 
+## Quên / đặt lại mật khẩu
+
+| Đường dẫn | Màn | Ai được vào |
+|---|---|---|
+| `/quen-mat-khau` | Nhập email → gửi liên kết đặt lại | Công khai |
+| `/dat-lai-mat-khau?token=…` | Đặt mật khẩu mới bằng token trong email | Công khai (cần token) |
+
+- Thông báo sau khi gửi là **trung tính** ("Nếu email đã đăng ký…") để không ai dùng màn này
+  dò email nào có trong hệ thống.
+- BE chưa có `D-32`/`D-33` (`docs/api.md`) → bấm gửi hiện *"chức năng chưa sẵn sàng"*,
+  **không** giả thành công (`NFR-REL-001`).
+
 ## Console quản trị (Sprint 2)
 
 | Đường dẫn | Màn | Ai được vào |

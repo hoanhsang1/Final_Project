@@ -137,6 +137,115 @@ function getRegisterErrorMessage(error: unknown): string {
 }
 
 /**
+ * Lỗi của luồng quên / đặt lại mật khẩu — tách `kind` để màn hình biết có nên
+ * mời người dùng "yêu cầu liên kết mới" hay không.
+ *
+ * - `expired`: token sai/hết hạn (HTTP 400) → phải xin liên kết khác.
+ * - `unavailable`: endpoint chưa có ở BE (HTTP 404) → nói thật là chưa dùng được,
+ *   KHÔNG giả thành công (`NFR-REL-001`).
+ * - `rate-limited`: quá nhiều yêu cầu (HTTP 429).
+ * - `network`: không kết nối được máy chủ.
+ */
+export class PasswordResetError extends Error {
+  readonly kind: 'expired' | 'unavailable' | 'rate-limited' | 'network' | 'unknown';
+
+  constructor(
+    kind: PasswordResetError['kind'],
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PasswordResetError';
+    this.kind = kind;
+  }
+}
+
+/** Trạng thái HTTP của lỗi axios (không có response → null). */
+function httpStatusOf(error: unknown): number | null {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  return typeof status === 'number' ? status : null;
+}
+
+function hasResponse(error: unknown): boolean {
+  return Boolean((error as { request?: unknown })?.request);
+}
+
+/** Dịch lỗi 2 endpoint mật khẩu sang tiếng Việt + phân loại để UI xử lý. */
+function toPasswordResetError(error: unknown): PasswordResetError {
+  const status = httpStatusOf(error);
+
+  if (status === 404) {
+    return new PasswordResetError(
+      'unavailable',
+      'Chức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản trị viên hệ thống.',
+    );
+  }
+  if (status === 429) {
+    return new PasswordResetError(
+      'rate-limited',
+      'Bạn đã yêu cầu quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.',
+    );
+  }
+  if (status === 400) {
+    return new PasswordResetError(
+      'expired',
+      'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới.',
+    );
+  }
+  if (status === null && hasResponse(error)) {
+    return new PasswordResetError(
+      'network',
+      'Không kết nối được máy chủ. Vui lòng kiểm tra mạng rồi thử lại.',
+    );
+  }
+  if (status !== null && status >= 500) {
+    return new PasswordResetError(
+      'unknown',
+      'Máy chủ đang gặp sự cố. Vui lòng thử lại sau ít phút.',
+    );
+  }
+  // Message lạ (tiếng Anh chưa đối chiếu) → không hiện thẳng cho người dùng cuối.
+  return new PasswordResetError(
+    'unknown',
+    'Đã xảy ra lỗi. Vui lòng thử lại.',
+  );
+}
+
+/**
+ * Yêu cầu gửi liên kết đặt lại mật khẩu — `POST /api/v1/auth/forgot-password`.
+ *
+ * Contract đề xuất cho BE (`D-32`): body `{ email }` → **202** kể cả khi email
+ * không tồn tại (chống dò tài khoản). FE vì thế luôn hiện cùng một thông báo
+ * trung tính, không xác nhận email có trong hệ thống hay không.
+ *
+ * BE chưa có endpoint → 404 → `PasswordResetError.kind = 'unavailable'`.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  try {
+    await apiClient.post('/api/v1/auth/forgot-password', { email });
+  } catch (error) {
+    throw toPasswordResetError(error);
+  }
+}
+
+/**
+ * Đặt mật khẩu mới bằng token trong email — `POST /api/v1/auth/reset-password`.
+ *
+ * Contract đề xuất cho BE (`D-33`): body `{ token, new_password }` → **204**;
+ * token sai/hết hạn/dùng rồi → **400** (BE lưu `token_hash` + `expires_at` +
+ * `used_at` trong bảng `password_reset_token`).
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  try {
+    await apiClient.post('/api/v1/auth/reset-password', {
+      token,
+      new_password: newPassword,
+    });
+  } catch (error) {
+    throw toPasswordResetError(error);
+  }
+}
+
+/**
  * Đăng xuất — `POST /api/v1/auth/logout` (204, không body).
  *
  * `D-13`: Sprint 1 mới chỉ xoá token phía client, refresh token vẫn sống ở BE tới 7 ngày.
