@@ -65,7 +65,7 @@ export default function RolePreviewPage() {
             )}
 
             <Text type="secondary">{isAuthenticated ? 'Xin chào' : 'Bạn đang là'}</Text>
-            <Title level={3} style={{ margin: 0 }}>
+            <Title level={1} style={{ margin: 0 }}>
               {isAuthenticated ? (username ?? role.label) : role.label}
             </Title>
             <Text type="secondary" style={{ textAlign: 'center' }}>

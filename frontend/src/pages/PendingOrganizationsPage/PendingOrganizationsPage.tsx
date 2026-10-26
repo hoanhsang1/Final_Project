@@ -94,7 +94,7 @@ export default function PendingOrganizationsPage() {
   return (
     <Flex vertical gap={token.marginMD}>
       <div>
-        <Title level={3} style={{ margin: 0 }}>
+        <Title level={1} style={{ margin: 0 }}>
           {MSG_ORG.LIST_TITLE}
         </Title>
         <Text type="secondary">{MSG_ORG.LIST_SUBTITLE}</Text>

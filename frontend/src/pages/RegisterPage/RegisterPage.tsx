@@ -4,6 +4,7 @@ import {
   Button,
   Checkbox,
   Divider,
+  Flex,
   Form,
   Input,
   Result,
@@ -12,6 +13,7 @@ import {
   Typography,
   theme,
 } from 'antd';
+import { Link } from 'react-router-dom';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { register } from '../../features/auth/authApi';
 import type { OrgType, RegisterRequest } from '../../features/auth/types';
@@ -86,6 +88,7 @@ export default function RegisterPage() {
         <Result
           status="success"
           title="Gửi đăng ký thành công!"
+          extra={<Link to="/dang-nhap">Về trang đăng nhập</Link>}
           subTitle={
             <Text>
               Tổ chức của bạn đang ở trạng thái{' '}
@@ -120,7 +123,7 @@ export default function RegisterPage() {
         disabled={registerMutation.isPending}
       >
         {/* ── Thông tin tổ chức ── */}
-        <Title level={5} style={{ marginTop: 0 }}>
+        <Title level={2} style={{ marginTop: 0 }}>
           Thông tin tổ chức
         </Title>
 
@@ -175,7 +178,7 @@ export default function RegisterPage() {
         <Divider />
 
         {/* ── Tài khoản quản trị ── */}
-        <Title level={5}>Tài khoản quản trị</Title>
+        <Title level={2}>Tài khoản quản trị</Title>
 
         <Form.Item
           label="Tên đăng nhập"
@@ -251,6 +254,13 @@ export default function RegisterPage() {
           </Button>
         </Form.Item>
       </Form>
+
+      {/* Lối quay lại đăng nhập — trước đây nằm ở cặp tab trên đầu card, nay bỏ tab
+          để không lặp với dòng "Chưa có tổ chức? Đăng ký tổ chức" ở màn đăng nhập. */}
+      <Flex justify="center" gap={token.marginXXS} style={{ marginTop: token.marginLG }}>
+        <Text type="secondary">Đã có tài khoản?</Text>
+        <Link to="/dang-nhap">Đăng nhập</Link>
+      </Flex>
     </AuthCard>
   );
 }
