@@ -561,12 +561,14 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 | Mã | Method & Path | Body | Thành công | Trạng thái |
 |---|---|---|---|---|
 | `D-32` | `POST /api/v1/auth/forgot-password` | `{ email }` | `202` — **luôn 202**, kể cả email không tồn tại (chống dò tài khoản, cùng lý do với message gộp ở `/auth/login`) | ❌ chưa có |
-| `D-33` | `POST /api/v1/auth/reset-password` | `{ token, new_password }` — `new_password` 8–72 ký tự | `204` · `400` khi token sai/hết hạn/đã dùng | ❌ chưa có |
+| `D-33` | `POST /api/v1/auth/reset-password` | `{ token, new_password }` — `new_password` 8–72 ký tự (**tạm thời**, xem `Q-38`: độ dài chưa chốt, đăng ký đang bắt 12) | `204` · `400` khi token sai/hết hạn/đã dùng | ❌ chưa có |
 
 - Dùng bảng **`password_reset_token` đã có sẵn** trong `mems_identity_db` (`token_hash`, `expires_at`, `used_at`) →
   chỉ cần service + 2 endpoint; đề xuất token hiệu lực **30 phút**, dùng **1 lần**.
 - Liên kết gửi trong email trỏ tới `{FE_ORIGIN}/dat-lai-mat-khau?token=…`.
 - FE đã code xong + e2e mock (`e2e/auth-password-reset.spec.ts`); gặp `404` hiện *"chức năng chưa sẵn sàng"*.
+- ⚠️ **Chính sách độ dài mật khẩu chưa chốt** (`Q-38`): đăng ký ≥ 12, modal admin reset ≥ 8, màn này 8–72, BE chỉ `@NotBlank`.
+  Khi chốt thì sửa **cả 3 chỗ + BE** một lượt, không sửa lẻ.
 
 ---
 
