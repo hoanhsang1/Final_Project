@@ -18,17 +18,25 @@ import {
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AdminApiError, approveOrganization, rejectOrganization } from '../../features/admin/adminApi';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
+import {
+  AdminApiError,
+  approveOrganization,
+  rejectOrganization,
+} from '../../features/admin/adminApi';
 import { adminKeys } from '../../features/admin/adminKeys';
-import { MSG_ORG, msgApproved, msgRejected } from '../../features/admin/adminMessages';
+import { MSG_ORG, msgApproved, msgBackendPending, msgRejected, msgReactivated, msgSuspended } from '../../features/admin/adminMessages';
+import { backToListPath } from '../../features/admin/consoleMenu';
 import {
   accountStatusLabel,
   isPendingStatus,
   organizationStatusLabel,
   orgTypeLabel,
 } from '../../features/admin/statusLabels';
-import type { OrganizationOwner } from '../../features/admin/types';
+import { useSuspendOrganization } from '../../features/admin/use-suspend-organization';
+import type { OrganizationAction } from '../../features/admin/use-suspend-organization';
+import type { OrganizationOwner, OrgStatus } from '../../features/admin/types';
 import ApproveOrganizationModal from './ApproveOrganizationModal';
 import ModuleConfigPanel from './ModuleConfigPanel';
 import RejectOrganizationModal from './RejectOrganizationModal';
@@ -58,18 +66,48 @@ export default function OrganizationDetailPage() {
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { id = '' } = useParams<{ id: string }>();
 
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [suspendAction, setSuspendAction] = useState<OrganizationAction | null>(null);
+  /**
+   * Lỗi của thao tác cuối (duyệt / từ chối / vô hiệu hoá).
+   *
+   * `NFR-REL-001`: lỗi hoặc timeout KHÔNG được hiện thành công. Hiển thị bằng
+   * `Alert` thay cho toast — toast tự biến mất và bị modal che nên người dùng
+   * không đọc được lý do thất bại.
+   */
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Modal đang mở thì lỗi phải nằm TRONG modal; modal đã đóng (404/409) thì lỗi
+  // hiện ở trang — tránh cùng một câu xuất hiện 2 lần trong DOM.
+  const isAnyModalOpen = approveOpen || rejectOpen || suspendAction !== null;
+
+  /**
+   * Đường về danh sách — đọc `?from=` để quay về đúng nhóm mà Admin đã tới:
+   * tới từ "Tất cả tổ chức" → về đó, không thì về "Tổ chức chờ duyệt".
+   * Áp dụng cho breadcrumb, link "Quay lại" và CẢ sau khi duyệt/từ chối xong.
+   */
+  const backPath = backToListPath(location.search, '/quan-tri/to-chuc');
 
   const detailQuery = useOrganizationDetail(id);
+  const suspendMutation = useSuspendOrganization(id);
 
   const orgName = detailQuery.data?.organization.name ?? '';
   const moduleCount = detailQuery.data?.modules.length ?? 0;
   // So sánh không phân biệt hoa/thường — BE trả chữ thường nhưng `docs/api.md` có sai lệch (`D-08`).
   const isPendingOrg = isPendingStatus(detailQuery.data?.organization.status);
+  const currentStatus: OrgStatus = detailQuery.data?.organization.status ?? 'pending';
+
+  // Ma trận đặc tả §3.3 — nút trạng thái tổ chức.
+  // `pending` → Duyệt/Từ chối · `active`/`rejected` → Vô hiệu hoá · `suspended` → Kích hoạt lại.
+  const nextSuspendAction: OrganizationAction | null =
+    currentStatus === 'suspended' ? 'reactivate' : currentStatus === 'pending' ? null : 'suspend';
+  const nextSuspendLabel =
+    nextSuspendAction === 'suspend' ? MSG_ORG.SUSPEND : MSG_ORG.REACTIVATE;
 
   /** Xử lý lỗi chung cho duyệt / từ chối — `NFR-REL-001`: lỗi KHÔNG báo thành công. */
   const handleMutationError = (error: unknown) => {
@@ -86,40 +124,42 @@ export default function OrganizationDetailPage() {
       return;
     }
     if (status === 404) {
-      message.error(MSG_ORG.NOT_FOUND);
+      // Modal đóng → lỗi hiện ở trang (Alert phía trên nội dung).
+      setActionError(MSG_ORG.NOT_FOUND);
       setApproveOpen(false);
       setRejectOpen(false);
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       return;
     }
     if (status === 403) {
-      message.error(MSG_ORG.FORBIDDEN);
+      setActionError(MSG_ORG.FORBIDDEN);
       return;
     }
     // Lỗi mạng / timeout / lỗi lạ: giữ modal mở, KHÔNG điều hướng.
-    message.error(MSG_ORG.SAVE_FAILED);
+    setActionError(MSG_ORG.SAVE_FAILED);
   };
 
   const approveMutation = useMutation({
-    mutationFn: () => approveOrganization(id),
+    mutationFn: (notifyEmail: boolean) => approveOrganization(id, notifyEmail),
     onSuccess: () => {
       message.success(msgApproved(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setApproveOpen(false);
-      navigate('/quan-tri/to-chuc');
+      navigate(backPath);
     },
     onError: handleMutationError,
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (reason: string) => rejectOrganization(id, reason),
+    mutationFn: ({ reason, notifyEmail }: { reason: string; notifyEmail: boolean }) =>
+      rejectOrganization(id, reason, notifyEmail),
     onSuccess: () => {
       message.success(msgRejected(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setRejectOpen(false);
-      navigate('/quan-tri/to-chuc');
+      navigate(backPath);
     },
     onError: handleMutationError,
   });
@@ -152,9 +192,9 @@ export default function OrganizationDetailPage() {
           title={MSG_ORG.NOT_FOUND}
           subTitle="Tổ chức không tồn tại hoặc đã bị gỡ khỏi hệ thống."
           extra={
-            <Button type="primary" onClick={() => navigate('/quan-tri/to-chuc')}>
-              {MSG_ORG.BACK_TO_LIST}
-            </Button>
+            <Link to={backPath}>
+              <Button type="primary">{MSG_ORG.BACK_TO_LIST}</Button>
+            </Link>
           }
         />
       );
@@ -177,18 +217,38 @@ export default function OrganizationDetailPage() {
   const { organization, owners, modules } = detailQuery.data;
   const orgStatus = organizationStatusLabel(organization.status);
 
+  const handleSuspendError = (error: unknown) => {
+    const status = error instanceof AdminApiError ? error.status : null;
+    if (status === 404) {
+      setActionError(msgBackendPending('D-21'));
+      return;
+    }
+    if (status === 403) {
+      setActionError(MSG_ORG.FORBIDDEN);
+      return;
+    }
+    // NFR-REL-001: lỗi/timeout thì báo lỗi rõ, KHÔNG hiện thành công.
+    setActionError(MSG_ORG.SAVE_FAILED);
+  };
+
   return (
     <Flex vertical gap={token.marginLG}>
       <Breadcrumb
         items={[
-          { title: <Link to="/quan-tri/to-chuc">{MSG_ORG.LIST_TITLE}</Link> },
+          { title: <Link to={backPath}>{MSG_ORG.LIST_TITLE}</Link> },
           { title: organization.name },
         ]}
       />
 
+      {/* Lỗi thao tác — hiện ở đây CHỈ KHI không có modal nào đang mở (modal đã
+          đóng vì 404); lỗi khi modal còn mở nằm trong chính modal đó. */}
+      {actionError && !isAnyModalOpen && (
+        <Alert type="error" showIcon role="alert" message={actionError} />
+      )}
+
       <Flex justify="space-between" align="center" wrap gap={token.margin}>
         <Flex align="center" gap={token.marginSM} wrap>
-          <Title level={2} style={{ margin: 0 }}>
+          <Title level={1} style={{ margin: 0 }}>
             {organization.name}
           </Title>
           <Tag color={orgStatus.color}>{orgStatus.label}</Tag>
@@ -197,17 +257,59 @@ export default function OrganizationDetailPage() {
         <Flex align="center" gap={token.marginSM} wrap>
           {isPendingOrg ? (
             <>
-              <Button type="primary" onClick={() => setApproveOpen(true)}>
+              <Button
+                type="primary"
+                onClick={() => {
+                  setActionError(null);
+                  setApproveOpen(true);
+                }}
+              >
                 {MSG_ORG.APPROVE_TITLE}
               </Button>
-              <Button danger onClick={() => setRejectOpen(true)}>
+              <Button
+                danger
+                onClick={() => {
+                  setActionError(null);
+                  setRejectOpen(true);
+                }}
+              >
                 {MSG_ORG.REJECT_TITLE}
               </Button>
             </>
           ) : (
-            <Alert type="info" showIcon message={MSG_ORG.ALREADY_REVIEWED} />
+            <>
+              {/* Trạng thái KHÔNG phải pending → nói rõ "đã được xử lý" (e2e cũ assert câu này),
+                  kèm nút đổi trạng thái theo ma trận đặc tả §3.3. */}
+              <Alert type="info" showIcon message={MSG_ORG.ALREADY_REVIEWED} />
+              {/* `C1` — `BR-04`: chữ là "Vô hiệu hoá", không phải "Xoá". */}
+              {nextSuspendAction && (
+                <Button
+                  danger={nextSuspendAction === 'suspend'}
+                  onClick={() => {
+                    setActionError(null);
+                    setSuspendAction(nextSuspendAction);
+                  }}
+                  aria-label={`${nextSuspendLabel} tổ chức ${organization.name}`}
+                >
+                  {nextSuspendLabel}
+                </Button>
+              )}
+              {currentStatus === 'rejected' && (
+                // `Q-18`: BE chưa cho duyệt lại tổ chức đã từ chối → nút tạm khoá,
+                // hiện rõ lý do thay vì ẩn đi (người dùng tự hỏi đi đâu mất).
+                <Button disabled title={MSG_ORG.REAPPROVE_DISABLED}>
+                  {MSG_ORG.APPROVE_TITLE}
+                </Button>
+              )}
+            </>
           )}
-          <Link to="/quan-tri/to-chuc">{MSG_ORG.BACK_TO_LIST}</Link>
+          <Button
+            type="link"
+            onClick={() => navigate(`/quan-tri/to-chuc/${organization.id}/lich-su?from=to-chuc`)}
+          >
+            {MSG_ORG.HISTORY}
+          </Button>
+          <Link to={backPath}>{MSG_ORG.BACK_TO_LIST}</Link>
         </Flex>
       </Flex>
 
@@ -266,23 +368,58 @@ export default function OrganizationDetailPage() {
       </Card>
 
       {/* Khối 3 — Module đã đăng ký + cấu hình module */}
-      <ModuleConfigPanel orgId={organization.id} modules={modules} editable={isPendingOrg} />
+      {/*
+        C2 — cấu hình module **sau khi duyệt** (§3.3 + `D-26`): chỉ `suspended`
+        là không sửa được, thay cho "chỉ khi còn `pending`" của Sprint 2 gốc
+        (`Q-16`). BE chưa làm `D-16` → lưu ở org active sẽ hiện lỗi/409.
+      */}
+      <ModuleConfigPanel
+        orgId={organization.id}
+        modules={modules}
+        editable={organization.status !== 'suspended'}
+      />
 
       <ApproveOrganizationModal
         open={approveOpen}
         orgName={organization.name}
         moduleCount={moduleCount}
         loading={approveMutation.isPending}
+        error={actionError}
         onCancel={() => setApproveOpen(false)}
-        onConfirm={() => approveMutation.mutate()}
+        onConfirm={(notifyEmail) => approveMutation.mutate(notifyEmail)}
       />
 
       <RejectOrganizationModal
         open={rejectOpen}
         orgName={organization.name}
         loading={rejectMutation.isPending}
+        error={actionError}
         onCancel={() => setRejectOpen(false)}
-        onConfirm={(reason) => rejectMutation.mutate(reason)}
+        onConfirm={(reason, notifyEmail) => rejectMutation.mutate({ reason, notifyEmail })}
+      />
+
+      <SuspendOrganizationModal
+        open={suspendAction !== null}
+        mode={suspendAction ?? 'suspend'}
+        orgName={organization.name}
+        loading={suspendMutation.isPending}
+        error={actionError}
+        onCancel={() => setSuspendAction(null)}
+        onConfirm={(reason) =>
+          suspendMutation.mutate(
+            { action: suspendAction ?? 'suspend', reason },
+            {
+              onSuccess: () => {
+                message.success(
+                  suspendAction === 'suspend' ? msgSuspended(orgName) : msgReactivated(orgName),
+                );
+                setActionError(null);
+                setSuspendAction(null);
+              },
+              onError: handleSuspendError,
+            },
+          )
+        }
       />
     </Flex>
   );

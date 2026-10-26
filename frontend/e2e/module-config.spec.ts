@@ -97,16 +97,37 @@ test.describe('Cấu hình module', () => {
     await expect(page.getByRole('checkbox', { name: 'Quản lý thiết bị' })).not.toBeChecked();
   });
 
-  test('TC-MOD-08 — tổ chức đã duyệt thì không có nút Lưu', async ({ page }) => {
+  // §3.3 C2 (mở rộng): `suspended` mới là trạng thái không sửa được — thay cho
+  // quy tắc cũ "chỉ khi còn pending" của Sprint 2 gốc (Q-16).
+  test('TC-MOD-08 — tổ chức bị vô hiệu hoá thì không có nút Lưu', async ({ page }) => {
     await loginAs(page);
     await mockAdminApi(page, {
-      pending: [{ ...ORG_A, status: 'active' }],
-      details: { [ORG_A.id]: { ...ORG_A, status: 'active' } },
+      pending: [],
+      details: { [ORG_A.id]: { ...ORG_A, status: 'suspended' } },
     });
 
     await page.goto(`/quan-tri/to-chuc/${ORG_A.id}`);
 
     await expect(page.getByRole('button', { name: 'Lưu cấu hình module' })).toBeHidden();
+    await expect(page.getByRole('checkbox', { name: 'Quản lý thiết bị' })).toBeDisabled();
+  });
+
+  test('TC-MOD-15 — C2: tổ chức đã duyệt vẫn cấu hình được module', async ({ page }) => {
+    await loginAs(page);
+    await mockAdminApi(page, {
+      pending: [],
+      details: { [ORG_A.id]: { ...ORG_A, status: 'active' } },
+    });
+
+    await page.goto(`/quan-tri/to-chuc/${ORG_A.id}`);
+
+    await expect(page.getByRole('button', { name: 'Lưu cấu hình module' })).toBeVisible();
+    // ORG_A chưa có module này → tick vào là có thay đổi để lưu.
+    await page.getByRole('checkbox', { name: 'Quản lý thiết bị' }).check();
+    await page.getByRole('button', { name: 'Lưu cấu hình module' }).click();
+
+    await expect(page.getByText('Đã lưu cấu hình module.')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Quản lý thiết bị' })).toBeChecked();
   });
 
   test('TC-MOD-11 — BE trả 400 (module không hợp lệ) thì FE hiện MSG-MOD-06', async ({ page }) => {

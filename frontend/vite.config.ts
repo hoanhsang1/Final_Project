@@ -1,6 +1,18 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+/**
+ * Đích của proxy `/api` khi dev/preview.
+ *
+ * Mặc định là gateway chạy máy (`127.0.0.1:8080`). Khi cần trỏ sang BE đã deploy
+ * (tunnel/remote) thì đặt biến môi trường, KHÔNG sửa file:
+ *
+ *   VITE_API_TARGET=https://xxx.trycloudflare.com npm run dev
+ *
+ * Nhờ vậy không hardcode URL tunnel (URL đổi mỗi lần restart tunnel) vào repo.
+ */
+const apiTarget = process.env.VITE_API_TARGET ?? 'http://127.0.0.1:8080';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -12,7 +24,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // Dùng 127.0.0.1 cho chắc chắn (không phụ thuộc thứ tự resolve IPv4/IPv6 của Node).
-        target: 'http://127.0.0.1:8080',
+        target: apiTarget,
         changeOrigin: true,
       },
     },
@@ -22,7 +34,7 @@ export default defineConfig({
   preview: {
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: apiTarget,
         changeOrigin: true,
       },
     },

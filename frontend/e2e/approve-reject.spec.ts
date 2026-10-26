@@ -134,7 +134,9 @@ test.describe('Từ chối tổ chức', () => {
 
     await page.getByRole('button', { name: 'Từ chối tổ chức', exact: true }).click();
     const textarea = page.getByRole('textbox', { name: 'Lý do từ chối' });
-    const counter = page.locator('.ant-input-data-count');
+    // Trang chi tiết có 2 modal cùng có ô lý do (Từ chối + Vô hiệu hoá) — cả 2 đều
+    // `forceRender` nên mount sẵn cả khi đóng → phải scope theo modal ĐANG THẤY.
+    const counter = page.locator('.ant-modal-content:visible .ant-input-data-count');
 
     // Đã đủ 500 ký tự → bộ đếm hiện 500 / 500.
     await textarea.fill('a'.repeat(500));

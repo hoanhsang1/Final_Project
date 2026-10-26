@@ -58,14 +58,26 @@ e2e/                # Test e2e Playwright cho console quản trị
 
 | Đường dẫn | Màn | Ai được vào |
 |---|---|---|
-| `/quan-tri` | tự chuyển → `/quan-tri/to-chuc` | `SUPER_ADMIN` |
+| `/quan-tri` | Tổng quan (số liệu chờ duyệt + danh mục module) | `SUPER_ADMIN` |
 | `/quan-tri/to-chuc` | Danh sách tổ chức chờ duyệt | `SUPER_ADMIN` |
-| `/quan-tri/to-chuc/:id` | Chi tiết tổ chức + duyệt/từ chối + cấu hình module | `SUPER_ADMIN` |
+| `/quan-tri/to-chuc/:id` | Chi tiết tổ chức + duyệt/từ chối + cấu hình module + vô hiệu hoá | `SUPER_ADMIN` |
+| `/quan-tri/to-chuc/tat-ca` | Tất cả tổ chức (bộ lọc theo trạng thái/loại/từ khoá) | `SUPER_ADMIN` |
+| `/quan-tri/to-chuc/:id/lich-su` | Lịch sử duyệt của 1 tổ chức | `SUPER_ADMIN` |
+| `/quan-tri/module` | Danh mục module (lõi / mở rộng) | `SUPER_ADMIN` |
+| `/quan-tri/tai-khoan` | Quản lý tài khoản | `SUPER_ADMIN` |
+| `/quan-tri/tai-khoan/:id` | Chi tiết tài khoản + đổi trạng thái + nhật ký | `SUPER_ADMIN` |
+| `/quan-tri/nhat-ky` | Nhật ký hệ thống (audit log) | `SUPER_ADMIN` |
 
+- Khung console: **Sider ≥1024px**, **Drawer + nút hamburger <1024px** (menu dùng chung
+  component `ConsoleMenu`). Chi tiết: đặc tả *Sprint 2 — Mở rộng console* §5.2.
+- Bộ lọc và trang của màn "Tất cả tổ chức" / "Tài khoản" / "Nhật ký" lưu **trong URL**
+  (`?status=`, `?page=`, `?q=`) → deep-link được, quay lại giữ nguyên bộ lọc.
 - `AdminGuard` chặn route: chưa đăng nhập → `/dang-nhap`; sai vai trò → màn 403 tại chỗ.
-  **Ẩn UI không phải bảo mật** — backend vẫn phải chặn (`SUPER_ADMIN` trên cả 4 endpoint).
-- Đăng nhập bằng `SUPER_ADMIN` sẽ vào thẳng console. Tài khoản nhiều role thì lấy role
-  quyền cao nhất, không phụ thuộc thứ tự role trong JWT.
+  **Ẩn UI không phải bảo mật** — backend vẫn phải chặn (`SUPER_ADMIN` trên các endpoint quản trị).
+- Đăng nhập bằng `SUPER_ADMIN` sẽ vào thẳng **Tổng quan** `/quan-tri`. Tài khoản nhiều role thì
+  lấy role quyền cao nhất, không phụ thuộc thứ tự role trong JWT.
+- E2E của các màn mới chạy được **không cần backend** (mock trong `e2e/helpers.ts`), vì
+  `GET /organizations`, `/audit-logs`, `/accounts`… (`D-20`–`D-28`) chưa có ở BE.
 
 ## Gọi backend
 

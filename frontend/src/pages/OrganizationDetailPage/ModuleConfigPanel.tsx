@@ -12,11 +12,19 @@ import {
   Typography,
   theme,
 } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { AdminApiError, updateOrganizationModules } from '../../features/admin/adminApi';
 import { adminKeys } from '../../features/admin/adminKeys';
 import { MSG_MOD, MSG_ORG, msgCoreLocked } from '../../features/admin/adminMessages';
 import { isCoreModule } from '../../features/admin/coreModules';
+import {
+  clearDraft,
+  readDraft,
+  writeDraft,
+  type ModuleConfigDraft,
+} from '../../features/admin/moduleConfigDraft';
 import { moduleStatusLabel } from '../../features/admin/statusLabels';
 import type { OrganizationModule } from '../../features/admin/types';
 import {
@@ -31,7 +39,10 @@ interface ModuleConfigPanelProps {
   orgId: string;
   /** Module tổ chức hiện đang có (từ `GET /organizations/{id}`). */
   modules: OrganizationModule[];
-  /** Chỉ sửa được khi tổ chức còn `pending`. */
+  /**
+   * Chỉ `suspended` là không sửa được (§3.3 C2) — `pending`/`active`/`rejected`
+   * đều sửa được, kể cả khi tổ chức đã duyệt.
+   */
   editable: boolean;
 }
 
@@ -57,7 +68,7 @@ function sameCodes(a: string[], b: string[]): boolean {
  */
 export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleConfigPanelProps) {
   const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
 
   const catalogQuery = useQuery({
@@ -72,6 +83,16 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
 
   const [selected, setSelected] = useState<string[]>(currentCodes);
   const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * Bản nháp cấu hình — giữ lại lựa chọn khi người dùng rời trang chưa lưu.
+   * Đọc 1 lần lúc mount (hoặc khi đổi `orgId`), cập nhật khi lưu/bỏ nháp.
+   */
+  const [draft, setDraft] = useState<ModuleConfigDraft | null>(() => readDraft(orgId));
+  /**
+   * Vừa lưu thành công mà refetch còn chạy → lựa chọn vẫn "khác tập gốc",
+   * nếu chặn lúc này sẽ hiện hộp thoại "thay đổi chưa lưu" sai.
+   */
+  const suppressBlockRef = useRef(false);
 
   // Đồng bộ lựa chọn khi server trả về tập module mới (sau khi lưu thành công).
   useEffect(() => {
@@ -83,6 +104,11 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
     mutationFn: (codes: string[]) => updateOrganizationModules(orgId, codes),
     onSuccess: () => {
       message.success(MSG_MOD.SAVED);
+      // Đã lên server → nháp không còn giá trị, xoá để không hỏi "áp dụng nháp" nữa.
+      clearDraft(orgId);
+      setDraft(null);
+      // Refetch còn đang chạy → đừng chặn người dùng rời trang với "thay đổi chưa lưu".
+      suppressBlockRef.current = true;
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(orgId) });
     },
     onError: (error) => {
@@ -93,12 +119,13 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
         return;
       }
       if (status === 400) {
-        message.error(MSG_MOD.INVALID_MODULE);
+        setFormError(MSG_MOD.INVALID_MODULE);
         return;
       }
       // NFR-REL-001: lỗi/timeout ⇒ KHÔNG báo thành công, giữ nguyên lựa chọn để
       // người dùng thử lại (trạng thái tick KHÔNG bị coi là đã lưu).
-      message.error(MSG_MOD.SAVE_FAILED);
+      // Lỗi hiện bằng `Alert` gắn với biểu mẫu thay cho toast dễ bị bỏ lỡ.
+      setFormError(MSG_MOD.SAVE_FAILED);
     },
   });
 
@@ -127,10 +154,99 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
   const isLockedCore = (code: string) => isCoreModule(code) && currentCodes.includes(code);
 
   const hasChanges = !sameCodes(selected, currentCodes);
+  /**
+   * Khi `editable = false` (tổ chức không còn `pending`) không có nút Lưu, nên
+   * hai thứ sau phải tắt theo — nếu không: bấm "Áp dụng nháp" ⇒ `hasChanges`
+   * thật nhưng lưu được đâu ⇒ bị hỏi "chưa lưu" ở mọi lần rời trang, mà nút
+   * "Bỏ nháp" lại ẩn theo `!hasChanges` → kẹt cứng.
+   */
+  /** Cảnh báo chỉ khi đang sửa được, ĐANG có thay đổi và vừa rồi chưa lưu xong. */
+  const shouldWarnUnsaved = editable && hasChanges && !suppressBlockRef.current;
+  /** Nháp chỉ mời áp dụng khi đang sửa được, chưa sửa gì và nháp khác tập đang lưu. */
+  const draftToRestore =
+    editable && draft && !hasChanges && !sameCodes(draft.codes, currentCodes) ? draft : null;
+
+  // Tổ chức khác → đọc nháp của tổ chức đó (nháp không được rò sang nhau).
+  useEffect(() => {
+    setDraft(readDraft(orgId));
+  }, [orgId]);
+
+  // Còn thay đổi mà đang sửa được thì ghi nháp liên tục — mất điện/đóng tab vẫn lấy lại được.
+  useEffect(() => {
+    if (editable && hasChanges) {
+      writeDraft(orgId, selected);
+    }
+  }, [editable, hasChanges, orgId, selected]);
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      shouldWarnUnsaved && currentLocation.pathname !== nextLocation.pathname,
+  );
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
+  /** Chống mở trùng hộp thoại khi effect chạy lại khi `modal` đổi tham chiếu. */
+  const confirmOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      confirmOpenRef.current = false;
+      return;
+    }
+    if (confirmOpenRef.current) {
+      return;
+    }
+    confirmOpenRef.current = true;
+    modal.confirm({
+      title: MSG_MOD.UNSAVED_TITLE,
+      content: MSG_MOD.UNSAVED_CONTENT,
+      okText: MSG_MOD.UNSAVED_LEAVE,
+      okButtonProps: { danger: true },
+      cancelText: MSG_MOD.UNSAVED_STAY,
+      onOk: () => {
+        confirmOpenRef.current = false;
+        // `state === 'blocked'` nên `proceed` luôn có — gọi phòng hờ theo type.
+        blockerRef.current.proceed?.();
+      },
+      onCancel: () => {
+        confirmOpenRef.current = false;
+        blockerRef.current.reset?.();
+      },
+    });
+  }, [blocker.state, modal]);
+
+  // Đóng tab / F5 / gõ URL — trình duyệt hỏi trước khi xoá mất lựa chọn.
+  useEffect(() => {
+    if (!shouldWarnUnsaved) {
+      return;
+    }
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Trình duyệt cũ chỉ hiện hộp thoại khi `returnValue` được gán.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [shouldWarnUnsaved]);
 
   const handleToggle = (code: string, checked: boolean) => {
+    suppressBlockRef.current = false;
     setSelected((prev) => (checked ? [...prev, code] : prev.filter((c) => c !== code)));
     setFormError(null);
+  };
+
+  const handleApplyDraft = () => {
+    if (!draft) {
+      return;
+    }
+    suppressBlockRef.current = false;
+    setSelected(draft.codes);
+    setFormError(null);
+    message.success(MSG_MOD.DRAFT_APPLIED);
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft(orgId);
+    setDraft(null);
   };
 
   const handleSave = () => {
@@ -165,6 +281,32 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
           showIcon
           role="alert"
           message={formError}
+          style={{ marginBottom: token.margin }}
+        />
+      )}
+
+      {/* Nháp từ lần chỉnh sửa trước — chỉ mời khi người dùng chưa sửa gì. */}
+      {draftToRestore && (
+        <Alert
+          type="info"
+          showIcon
+          role="status"
+          message={MSG_MOD.DRAFT_FOUND}
+          description={
+            draftToRestore.savedAt
+              ? `Ghi lúc ${dayjs(draftToRestore.savedAt).format('HH:mm DD/MM/YYYY')} — áp dụng để làm tiếp phần đang dở.`
+              : 'Áp dụng để làm tiếp phần đang dở.'
+          }
+          action={
+            <Flex gap={token.paddingXS}>
+              <Button size="small" onClick={handleApplyDraft}>
+                {MSG_MOD.DRAFT_APPLY}
+              </Button>
+              <Button size="small" onClick={handleDiscardDraft}>
+                {MSG_MOD.DRAFT_DISCARD}
+              </Button>
+            </Flex>
+          }
           style={{ marginBottom: token.margin }}
         />
       )}

@@ -23,7 +23,7 @@ export interface FakeOrg {
   id: string;
   name: string;
   org_type: 'school' | 'center';
-  status: 'pending' | 'active' | 'rejected';
+  status: 'pending' | 'active' | 'rejected' | 'suspended';
   owner_username: string;
   owner_email: string;
   modules?: Array<{ code: string; name: string; status: string }>;
@@ -74,6 +74,223 @@ export const ORG_C: FakeOrg = {
     { code: 'EQUIPMENT_MANAGEMENT', name: 'Quản lý thiết bị', status: 'requested' },
   ],
 };
+
+/* -------------------------------------------------------------------------- */
+/*  Mở rộng console Super Admin (Đặc tả "Sprint 2 — Mở rộng console")          */
+/* -------------------------------------------------------------------------- */
+
+/** Một dòng trong danh sách TẤT CẢ tổ chức — `GET /organizations` (`D-20`). */
+export interface FakeOrgListRow {
+  id: string;
+  name: string;
+  org_type: 'school' | 'center';
+  status: 'pending' | 'active' | 'rejected' | 'suspended';
+  owner_username: string;
+  owner_email: string;
+  created_at?: string | null;
+}
+
+/** Một dòng tài khoản — `GET /accounts` (`D-24`). */
+export interface FakeAccount {
+  id: string;
+  username: string;
+  email: string;
+  full_name?: string | null;
+  organization_id?: string | null;
+  organization_name?: string | null;
+  role: string;
+  status: 'pending' | 'active' | 'locked' | 'disabled';
+  created_at?: string | null;
+  last_login_at?: string | null;
+}
+
+/** Một dòng nhật ký — `GET /audit-logs` (`D-22`). */
+export interface FakeAuditLog {
+  id: string;
+  created_at: string;
+  action: string;
+  actor_username: string;
+  target_type: 'ORGANIZATION' | 'ACCOUNT';
+  target_id: string;
+  target_name: string;
+  description?: string | null;
+}
+
+/** Tổ chức trong danh sách "Tất cả tổ chức" — đủ 4 trạng thái để kiểm Tag (BR-08). */
+export const ORG_ALL_ROWS: FakeOrgListRow[] = [
+  {
+    id: ORG_A.id,
+    name: ORG_A.name,
+    org_type: 'school',
+    status: 'pending',
+    owner_username: ORG_A.owner_username,
+    owner_email: ORG_A.owner_email,
+    created_at: '2026-01-05 09:15:00',
+  },
+  {
+    id: '44444444-4444-4444-4444-444444444444',
+    name: 'Trường THCS Lê Quý Đôn',
+    org_type: 'school',
+    status: 'active',
+    owner_username: 'lequydon',
+    owner_email: 'lequydon@example.edu.vn',
+    created_at: '2025-11-20 08:00:00',
+  },
+  {
+    id: '55555555-5555-5555-5555-555555555555',
+    name: 'Trung tâm Anh ngữ Aurora',
+    org_type: 'center',
+    status: 'suspended',
+    owner_username: 'aurora',
+    owner_email: 'aurora@example.com',
+    created_at: '2025-09-01 07:30:00',
+  },
+  {
+    id: ORG_B.id,
+    name: ORG_B.name,
+    org_type: 'center',
+    status: 'rejected',
+    owner_username: ORG_B.owner_username,
+    owner_email: ORG_B.owner_email,
+    created_at: '2025-12-12 14:45:00',
+  },
+];
+
+/** Danh sách tài khoản — đủ 4 trạng thái + 2 role khác nhau. */
+export const ACCOUNTS: FakeAccount[] = [
+  {
+    id: 'acc-1',
+    username: 'platform_admin',
+    email: 'admin@example.com',
+    full_name: 'Quản trị viên hệ thống',
+    organization_id: null,
+    organization_name: null,
+    role: 'SUPER_ADMIN',
+    status: 'active',
+    created_at: '2025-08-01 07:00:00',
+    last_login_at: '2026-10-21 08:05:00',
+  },
+  {
+    id: 'acc-2',
+    username: 'lequydon',
+    email: 'lequydon@example.edu.vn',
+    full_name: 'Ngô Thị Hoa',
+    organization_id: '44444444-4444-4444-4444-444444444444',
+    organization_name: 'Trường THCS Lê Quý Đôn',
+    role: 'ORG_OWNER',
+    status: 'active',
+    created_at: '2025-11-20 08:05:00',
+    last_login_at: null,
+  },
+  {
+    id: 'acc-3',
+    username: 'aurora',
+    email: 'aurora@example.com',
+    full_name: 'Trần Văn Bình',
+    organization_id: '55555555-5555-5555-5555-555555555555',
+    organization_name: 'Trung tâm Anh ngữ Aurora',
+    role: 'ORG_OWNER',
+    status: 'disabled',
+    created_at: '2025-09-01 07:35:00',
+    last_login_at: '2026-02-14 10:00:00',
+  },
+  {
+    id: 'acc-4',
+    username: 'giao_vien_01',
+    email: 'gv01@example.edu.vn',
+    full_name: 'Lê Văn Cường',
+    organization_id: '44444444-4444-4444-4444-444444444444',
+    organization_name: 'Trường THCS Lê Quý Đôn',
+    role: 'TEACHER',
+    status: 'locked',
+    created_at: '2025-12-01 09:00:00',
+    last_login_at: '2026-05-03 11:20:00',
+  },
+];
+
+/** Nhật ký hệ thống — 7 dòng phủ đủ `AuditAction`. */
+export const AUDIT_LOGS: FakeAuditLog[] = [
+  {
+    id: 'log-1',
+    created_at: '2026-10-21 08:10:00',
+    action: 'ORG_APPROVED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: '44444444-4444-4444-4444-444444444444',
+    target_name: 'Trường THCS Lê Quý Đôn',
+  },
+  {
+    id: 'log-2',
+    created_at: '2026-10-21 08:12:00',
+    action: 'ORG_REJECTED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: ORG_B.id,
+    target_name: ORG_B.name,
+    description: 'Thiếu giấy phép hoạt động',
+  },
+  {
+    id: 'log-3',
+    created_at: '2026-10-20 17:40:00',
+    action: 'ORG_SUSPENDED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: '55555555-5555-5555-5555-555555555555',
+    target_name: 'Trung tâm Anh ngữ Aurora',
+  },
+  {
+    id: 'log-4',
+    created_at: '2026-10-19 09:00:00',
+    action: 'ACCOUNT_STATUS_CHANGED',
+    actor_username: 'platform_admin',
+    target_type: 'ACCOUNT',
+    target_id: 'acc-3',
+    target_name: 'aurora',
+  },
+  {
+    id: 'log-5',
+    created_at: '2026-10-18 15:25:00',
+    action: 'ORG_MODULES_UPDATED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: '44444444-4444-4444-4444-444444444444',
+    target_name: 'Trường THCS Lê Quý Đôn',
+  },
+  {
+    id: 'log-6',
+    created_at: '2026-10-17 11:05:00',
+    action: 'ORG_REACTIVATED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: '66666666-6666-6666-6666-666666666666',
+    target_name: 'Trường Tiểu học Nguyễn Trãi',
+  },
+  {
+    id: 'log-7',
+    created_at: '2026-01-05 09:20:00',
+    action: 'ORG_MODULES_UPDATED',
+    actor_username: 'platform_admin',
+    target_type: 'ORGANIZATION',
+    target_id: ORG_A.id,
+    target_name: ORG_A.name,
+  },
+];
+
+/**
+ * Gói mảng thành envelope phân trang (`D-20`, `D-22`, `D-24`).
+ *
+ * `page` là **1-based** — slice tương ứng để bảng chỉ hiện `size` dòng/trang.
+ */
+export function pageResponse<T>(
+  items: T[],
+  pageParam: string | null,
+  sizeParam: string | null,
+): { items: T[]; total: number; page: number; size: number } {
+  const page = Math.max(1, Number(pageParam ?? '1') || 1);
+  const size = Math.max(1, Number(sizeParam ?? '20') || 20);
+  const start = (page - 1) * size;
+  return { items: items.slice(start, start + size), total: items.length, page, size };
+}
 
 /** Sinh N tổ chức giả (dùng cho ca kiểm phân trang). */
 export function makeOrgs(count: number): FakeOrg[] {
@@ -172,6 +389,31 @@ export interface MockAdminOptions {
   modulesStatus?: 204 | 400 | 409 | 500;
   /** Cơ chế 401 → refresh: 'ok' | 'fail' | 'none' (không trả 401 lần nào). */
   refreshMode?: 'ok' | 'fail' | 'none';
+  /* --- Mở rộng console (Đặc tả Sprint 2 — Mở rộng) --- */
+  /** Dữ liệu `GET /organizations` (`D-20`). Mặc định `ORG_ALL_ROWS`. */
+  organizations?: FakeOrgListRow[];
+  /** `false` → `GET /organizations` trả 404 (BE chưa làm endpoint `D-20`). */
+  organizationsMissing?: boolean;
+  /** Kết quả `PATCH …/suspend`: 204 | 404 | 409 | 500. */
+  suspendStatus?: 204 | 404 | 409 | 500;
+  /** Kết quả `PATCH …/reactivate`: 204 | 404 | 500. */
+  reactivateStatus?: 204 | 404 | 500;
+  /** Dữ liệu `GET /accounts` (`D-24`). Mặc định `ACCOUNTS`. */
+  accounts?: FakeAccount[];
+  /** `false` → `GET /accounts` trả 404 (BE chưa làm endpoint `D-24`). */
+  accountsMissing?: boolean;
+  /** Kết quả `PATCH …/accounts/{id}/status`: 204 | 404 | 409 | 500. */
+  accountStatusResult?: 204 | 404 | 409 | 500;
+  /** Kết quả `POST /accounts` (`D-29`): 201 | 400 | 403 | 409 | 404. */
+  accountCreateResult?: 201 | 400 | 403 | 404 | 409;
+  /** Kết quả `PATCH …/accounts/{id}/role` (`D-30`): 204 | 403 | 404 | 409 | 500. */
+  accountRoleResult?: 204 | 403 | 404 | 409 | 500;
+  /** Kết quả `POST …/accounts/{id}/reset-password` (`D-31`): 204 | 400 | 403 | 404 | 500. */
+  accountResetResult?: 204 | 400 | 403 | 404 | 500;
+  /** Dữ liệu `GET /audit-logs` (`D-22`). Mặc định `AUDIT_LOGS`. */
+  auditLogs?: FakeAuditLog[];
+  /** `false` → `GET /audit-logs` trả 404 (BE chưa làm endpoint `D-22`). */
+  auditLogsMissing?: boolean;
 }
 
 /** Clone 1 tổ chức — mock sẽ MUTATE (`status`, `modules`) nên phải copy trước. */
@@ -201,6 +443,13 @@ export async function mockAdminApi(
   for (const org of pending) {
     details[org.id] ??= org;
   }
+
+  // ⚠️ Clone sâu như `pending`: fixture ở module scope phải giữ nguyên giữa các ca.
+  const orgRows: FakeOrgListRow[] = (options.organizations ?? ORG_ALL_ROWS).map((o) => ({
+    ...o,
+  }));
+  const accounts: FakeAccount[] = (options.accounts ?? ACCOUNTS).map((a) => ({ ...a }));
+  const auditLogs: FakeAuditLog[] = options.auditLogs ?? AUDIT_LOGS;
 
   /** Đã duyệt/từ chối → biến mất khỏi danh sách chờ duyệt. */
   const reviewed = new Set<string>();
@@ -283,6 +532,174 @@ export async function mockAdminApi(
     // --- Danh mục module ---
     if (path === '/api/v1/modules' && method === 'GET') {
       return json(200, options.modules ?? MODULE_CATALOG);
+    }
+
+    /* --- Mở rộng console Super Admin (Đặc tả "Sprint 2 — Mở rộng") --- */
+
+    // Nhật ký hệ thống (`D-22`) — 1 endpoint duy nhất, FE lọc bằng query param.
+    if (path === '/api/v1/audit-logs' && method === 'GET') {
+      if (options.auditLogsMissing) {
+        return json(404, { success: false, message: 'Endpoint chưa được cài đặt', data: null });
+      }
+      let logs = auditLogs;
+      const organizationId = url.searchParams.get('organizationId');
+      const accountId = url.searchParams.get('accountId');
+      if (organizationId) {
+        logs = logs.filter((log) => log.target_type === 'ORGANIZATION' && log.target_id === organizationId);
+      }
+      if (accountId) {
+        logs = logs.filter((log) => log.target_type === 'ACCOUNT' && log.target_id === accountId);
+      }
+      return json(200, pageResponse(logs, url.searchParams.get('page'), url.searchParams.get('size')));
+    }
+
+    // Danh sách TẤT CẢ tổ chức (`D-20`) — phải check TRƯỚC regex `/organizations/{id}`.
+    if (path === '/api/v1/organizations' && method === 'GET') {
+      if (options.organizationsMissing) {
+        return json(404, { success: false, message: 'Endpoint chưa được cài đặt', data: null });
+      }
+      // FE gửi `status` (csv), `orgType`, `keyword` — mock phải lọc THẬT thì
+      // test bộ lọc mới có ý nghĩa (nếu lọc phía client thì test sẽ luôn "pass").
+      const statusFilter = (url.searchParams.get('status') ?? '').split(',').filter(Boolean);
+      const orgTypeFilter = url.searchParams.get('orgType') ?? '';
+      const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase();
+      const filtered = orgRows.filter((org) => {
+        if (statusFilter.length > 0 && !statusFilter.includes(org.status)) return false;
+        if (orgTypeFilter && org.org_type !== orgTypeFilter) return false;
+        if (keyword && !org.name.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      return json(
+        200,
+        pageResponse(filtered, url.searchParams.get('page'), url.searchParams.get('size')),
+      );
+    }
+
+    // Dropdown tổ chức (`D-20b`) — mảng phẳng, không phân trang.
+    if (path === '/api/v1/organizations/options' && method === 'GET') {
+      return json(
+        200,
+        orgRows.map((org) => ({ id: org.id, name: org.name })),
+      );
+    }
+
+    // Danh sách tài khoản (`D-24`) — check TRƯỚC regex `/accounts/{id}`.
+    if (path === '/api/v1/accounts' && method === 'GET') {
+      if (options.accountsMissing) {
+        return json(404, { success: false, message: 'Endpoint chưa được cài đặt', data: null });
+      }
+      return json(
+        200,
+        pageResponse(accounts, url.searchParams.get('page'), url.searchParams.get('size')),
+      );
+    }
+
+    // Tạo tài khoản (`D-29`) — check TRƯỚC regex `/accounts/{id}`.
+    if (path === '/api/v1/accounts' && method === 'POST') {
+      const result = options.accountCreateResult ?? 201;
+      if (result !== 201) {
+        const message =
+          result === 409 ? 'Email hoặc tên đăng nhập đã tồn tại' : 'Lỗi hệ thống';
+        return json(result, { success: false, message, data: null });
+      }
+      const body = request.postDataJSON() as {
+        email?: string;
+        full_name?: string;
+        role?: string;
+        organization_id?: string;
+      };
+      const org = orgRows.find((o) => o.id === body?.organization_id);
+      const created: FakeAccount = {
+        id: `acc-new-${accounts.length}`,
+        username: (body?.email ?? '').split('@')[0] || 'nguoidungmoi',
+        email: body?.email ?? '',
+        full_name: body?.full_name ?? '',
+        organization_id: body?.organization_id ?? null,
+        organization_name: org?.name ?? null,
+        role: body?.role ?? 'TEACHER',
+        status: 'pending',
+        created_at: '2026-10-22 08:00:00',
+        last_login_at: null,
+      };
+      accounts.push(created);
+      return json(201, created);
+    }
+
+    // Đổi vai trò tài khoản (`D-30`).
+    const accountRoleMatch = path.match(/^\/api\/v1\/accounts\/([^/]+)\/role$/);
+    if (accountRoleMatch && method === 'PATCH') {
+      const result = options.accountRoleResult ?? 204;
+      if (result !== 204) {
+        return json(result, { success: false, message: 'Lỗi hệ thống', data: null });
+      }
+      const account = accounts.find((a) => a.id === accountRoleMatch[1]);
+      const body = request.postDataJSON() as { role?: string };
+      if (account && body?.role) {
+        account.role = body.role;
+      }
+      return empty(204);
+    }
+
+    // Đặt lại mật khẩu (`D-31`).
+    const accountResetMatch = path.match(/^\/api\/v1\/accounts\/([^/]+)\/reset-password$/);
+    if (accountResetMatch && method === 'POST') {
+      const result = options.accountResetResult ?? 204;
+      if (result !== 204) {
+        return json(result, { success: false, message: 'Lỗi hệ thống', data: null });
+      }
+      // Validate như BE: mật khẩu thủ công < 8 ký tự → 400.
+      const body = request.postDataJSON() as { new_password?: string } | null;
+      if (body?.new_password && body.new_password.length < 8) {
+        return json(400, { success: false, message: 'Mật khẩu tối thiểu 8 ký tự', data: null });
+      }
+      return empty(204);
+    }
+
+    // Đổi trạng thái tài khoản (`D-24c`).
+    const accountStatusMatch = path.match(/^\/api\/v1\/accounts\/([^/]+)\/status$/);
+    if (accountStatusMatch && method === 'PATCH') {
+      const status = options.accountStatusResult ?? 204;
+      if (status !== 204) {
+        return json(status, { success: false, message: 'Lỗi hệ thống', data: null });
+      }
+      const account = accounts.find((a) => a.id === accountStatusMatch[1]);
+      const body = request.postDataJSON() as { status?: string };
+      if (account && body?.status) {
+        account.status = body.status as FakeAccount['status'];
+      }
+      return empty(204);
+    }
+
+    // Chi tiết tài khoản (`D-24b`).
+    const accountMatch = path.match(/^\/api\/v1\/accounts\/([^/]+)$/);
+    if (accountMatch && method === 'GET') {
+      const account = accounts.find((a) => a.id === accountMatch[1]);
+      if (!account) {
+        return json(404, { success: false, message: 'Account not found', data: null });
+      }
+      return json(200, account);
+    }
+
+    // Vô hiệu hoá / kích hoạt lại tổ chức (`D-21`, `D-21b`).
+    const lifecycleMatch = path.match(/^\/api\/v1\/organizations\/([^/]+)\/(suspend|reactivate)$/);
+    if (lifecycleMatch && method === 'PATCH') {
+      const status =
+        lifecycleMatch[2] === 'suspend'
+          ? (options.suspendStatus ?? 204)
+          : (options.reactivateStatus ?? 204);
+      if (status !== 204) {
+        return json(status, { success: false, message: 'Lỗi hệ thống', data: null });
+      }
+      const nextStatus = lifecycleMatch[2] === 'suspend' ? 'suspended' : 'active';
+      const org = orgRows.find((o) => o.id === lifecycleMatch[1]);
+      if (org) {
+        org.status = nextStatus;
+      }
+      const detail = details[lifecycleMatch[1]];
+      if (detail) {
+        detail.status = nextStatus;
+      }
+      return empty(204);
     }
 
     // --- Danh sách tổ chức chờ duyệt ---

@@ -32,7 +32,7 @@ test.describe('Khung console quản trị', () => {
     expect(log.urls.filter((u) => u.includes('/organizations/pending'))).toHaveLength(0);
   });
 
-  test('TC-ADM-03 — SUPER_ADMIN mở /quan-tri thì tự chuyển sang /quan-tri/to-chuc', async ({
+  test('TC-ADM-03 — SUPER_ADMIN mở /quan-tri thì thấy màn Tổng quan (không redirect)', async ({
     page,
   }) => {
     await loginAs(page);
@@ -40,7 +40,11 @@ test.describe('Khung console quản trị', () => {
 
     await page.goto('/quan-tri');
 
-    await expect(page).toHaveURL(/\/quan-tri\/to-chuc$/);
+    // `Q-34` (đã chốt): `/quan-tri` là màn Tổng quan thật, không còn redirect
+    // sang danh sách chờ duyệt như trước.
+    await expect(page).toHaveURL(/\/quan-tri$/);
+    await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible();
+    await expect(page.getByText('Tổ chức chờ duyệt').first()).toBeVisible();
   });
 
   test('TC-ADM-04 — mở /quan-tri/to-chuc thì ra bảng danh sách, có tiêu đề', async ({ page }) => {
@@ -210,7 +214,7 @@ test.describe('Khung console quản trị', () => {
     await expect(page).toHaveURL(new RegExp(`/quan-tri/to-chuc/${ORG_A.id}$`));
   });
 
-  test('TC-ADM-12 — đăng nhập bằng SUPER_ADMIN thì vào thẳng console quản trị', async ({ page }) => {
+  test('TC-ADM-12 — đăng nhập bằng SUPER_ADMIN thì vào thẳng Tổng quan', async ({ page }) => {
     await mockAdminApi(page, { loginRoles: ['SUPER_ADMIN'] });
 
     await page.goto('/dang-nhap');
@@ -218,8 +222,9 @@ test.describe('Khung console quản trị', () => {
     await page.getByLabel('Mật khẩu').fill('MatKhau@123456');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
 
-    await expect(page).toHaveURL(/\/quan-tri\/to-chuc$/);
-    await expect(page.getByRole('heading', { name: 'Tổ chức chờ duyệt' })).toBeVisible();
+    // `Q-34` (đã chốt): điểm vào là Tổng quan `/quan-tri`.
+    await expect(page).toHaveURL(/\/quan-tri$/);
+    await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible();
   });
 
   test('TC-ADM-13 — tài khoản nhiều role thì ưu tiên role quyền cao, không vào màn xem thử', async ({
@@ -233,6 +238,8 @@ test.describe('Khung console quản trị', () => {
     await page.getByLabel('Mật khẩu').fill('MatKhau@123456');
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
 
-    await expect(page).toHaveURL(/\/quan-tri\/to-chuc$/);
+    // `Q-34` (đã chốt): về Tổng quan `/quan-tri`, KHÔNG về màn xem thử giáo viên.
+    await expect(page).toHaveURL(/\/quan-tri$/);
+    await expect(page.getByRole('heading', { name: 'Tổng quan' })).toBeVisible();
   });
 });

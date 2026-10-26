@@ -2,7 +2,7 @@
 
 > **Base URL (qua API Gateway):** `http://localhost:8080`  
 > **Content-Type:** `application/json`  
-> **Phiên bản:** Sprint 1 + Sprint 2 (cập nhật 21/10/2026)
+> **Phiên bản:** Sprint 1 + Sprint 2 (cập nhật 22/10/2026)
 
 ---
 
@@ -23,6 +23,7 @@
   - [PATCH /api/v1/organizations/{id}/approve](#patch-apiv1organizationsidapprove)
   - [PATCH /api/v1/organizations/{id}/reject](#patch-apiv1organizationsidreject)
   - [PUT /api/v1/organizations/{id}/modules](#put-apiv1organizationsidmodules) — ⚠️ **chưa có** (`D-16`)
+- [Endpoint chưa cài đặt — Console Super Admin mở rộng](#endpoint-chưa-cài-ặt--console-super-admin-mở-rộng) — ⚠️ `D-20`…`D-31`
 - [Các service khác](#các-service-khác)
 
 ---
@@ -510,6 +511,50 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 > ⚠️ **BE chưa có `is_core`** (`D-15`) ⇒ luật "4 module lõi không thể tắt" (`BR-06`)
 > hiện **chỉ chặn ở FE**. Khi BE làm xong, luật này phải có ở cả 2 tầng
 > (FE chặn cho UX, BE chặn thật — ẩn UI không phải bảo mật).
+
+---
+
+## Endpoint chưa cài đặt — Console Super Admin mở rộng
+
+> Nguồn contract: đặc tả **"Sprint 2 — Mở rộng console Super Admin"** §4 (ngoài repo).
+> Frontend **đã code xong và có e2e pass với mock** — bảng dưới đây là thứ Sang cần cài.
+> Khi endpoint trả **404**, FE phân biệt theo dạng path — xem [Quy ước 404](#lưu-ý-phân-biệt-404) ở cuối mục này.
+
+| Mã | Method & Path | Query / Body | Thành công | Trạng thái |
+|---|---|---|---|---|
+| `D-20` | `GET /api/v1/organizations` | `page`, `size`, `status` (csv), `orgType`, `keyword`, `sort` | 200 envelope. Item: `id, name, org_type, status, owner_username, owner_email, created_at`. `sort` mặc định `name,asc` | ❌ chưa có |
+| `D-20b` | `GET /api/v1/organizations/options` | — | 200 **mảng phẳng** `[{ id, name }]` (dropdown, không phân trang) | ❌ chưa có |
+| `D-21` | `PATCH /api/v1/organizations/{id}/suspend` | Body `{ reason }` — **bắt buộc**, 1–500 ký tự | `204` | ❌ chưa có |
+| `D-21b` | `PATCH /api/v1/organizations/{id}/reactivate` | Body `{ reason? }` — tuỳ chọn | `204` | ❌ chưa có |
+| `D-22` | `GET /api/v1/audit-logs` | `page`, `size`, `action` (csv), `organizationId`, `accountId`, `from`, `to`, `keyword`, `sort` | 200 envelope. Item: `id, created_at, action, actor_username, target_type, target_id, target_name, description`. `sort` mặc định `created_at,desc` | ❌ chưa có |
+| `D-24` | `GET /api/v1/accounts` | `page`, `size`, `organizationId`, `role`, `status` (csv), `keyword`, `sort` | 200 envelope. Item: `id, username, email, full_name, organization_id, organization_name, role, status, created_at, last_login_at`. `sort` mặc định `username,asc` | ❌ chưa có |
+| `D-24b` | `GET /api/v1/accounts/{id}` | — | 200 — 1 item như trên | ❌ chưa có |
+| `D-24c` | `PATCH /api/v1/accounts/{id}/status` | Body `{ status: active \| locked \| disabled, reason? }` | `204` | ❌ chưa có |
+| `D-26` | `PUT /api/v1/organizations/{id}/modules` *(mở rộng)* | Body `{ modules: string[] }` | `204` — **bỏ điều kiện "chỉ khi org còn `pending`"**: cho phép `active`/`rejected`, trả `409` khi `suspended` | ❌ chưa có |
+| `D-27` | `PATCH .../approve` \| `.../reject` *(mở rộng)* | approve `{ notifyEmail? }` · reject `{ reason, notifyEmail? }` | `204` | ⚠️ có nhưng **chưa** đọc `reason`/`notifyEmail` |
+| `D-28` | `GET /api/v1/modules` *(mở rộng)* | — | 200 — thêm `description?`. **Khuyến nghị thêm `is_core: boolean`** (`Q-32`) | ⚠️ thiếu `is_core` |
+| `D-29` | `POST /api/v1/accounts` | Body `{ email, full_name, role, organization_id }` — BE sinh `username` + mật khẩu tạm, gửi email | `201` item vừa tạo · `409` trùng email/username · `400` · `403` | ❌ chưa có |
+| `D-30` | `PATCH /api/v1/accounts/{id}/role` | Body `{ role }` — không nhận `SUPER_ADMIN` | `204` · `409` khi tự đổi vai trò chính mình | ❌ chưa có |
+| `D-31` | `POST /api/v1/accounts/{id}/reset-password` | Body `{}` → sinh mật khẩu tạm + gửi email · `{ new_password }` → đặt thẳng (≥ 8 ký tự) | `204` · `400` khi mật khẩu ngắn hơn 8 | ❌ chưa có |
+| `D-16` | `PUT /api/v1/organizations/{id}/modules` | — | `204` | ❌ chưa có |
+
+**Quy ước chung cho các endpoint mới**
+
+- Phân trang 1-based, `size` mặc định 20, envelope `{ items, total, page, size }` — cùng shape với
+  `GET /organizations/pending` hiện tại (`Q-30` chờ xác nhận).
+- ENUM: `organization.status` ∈ `pending|active|rejected|suspended` · `account.status` ∈
+  `pending|active|locked|disabled` · `audit_log.action` ∈ `ORG_APPROVED|ORG_REJECTED|ORG_SUSPENDED|ORG_REACTIVATED|ORG_MODULES_UPDATED|ACCOUNT_STATUS_CHANGED` ·
+  `audit_log.target_type` ∈ `ORGANIZATION|ACCOUNT`.
+- `role` của tài khoản trả **role backend gốc** (`SUPER_ADMIN`, `ORG_OWNER`, …) — FE tự map sang
+  nhãn tiếng Việt.
+
+<a id="lưu-ý-phân-biệt-404"></a>
+**Lưu ý phân biệt 404** (cả hai đều trả `404`, FE phải hiện khác nhau):
+
+| Dạng path | Nghĩa | FE hiện |
+|---|---|---|
+| Collection — `/organizations`, `/organizations/options`, `/audit-logs`, `/accounts` | BE **chưa làm** endpoint | `Alert` "Tính năng đang chờ backend (`D-nn`)" + nút Thử lại |
+| Item — `/organizations/{id}`, `/accounts/{id}` | Đối tượng **không tồn tại** | `Result 404` + "Không tìm thấy …" |
 
 ---
 
