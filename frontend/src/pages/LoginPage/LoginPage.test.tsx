@@ -24,7 +24,13 @@ function fakeJwt(payload: Record<string, unknown>): string {
 beforeEach(() => {
   localStorage.clear();
   mockLogin.mockReset();
-  useAuthStore.setState({ userId: null, username: null, role: null, isAuthenticated: false });
+  useAuthStore.setState({
+    userId: null,
+    username: null,
+    role: null,
+    backendRoles: [],
+    isAuthenticated: false,
+  });
 });
 
 function renderLogin(path = '/dang-nhap') {

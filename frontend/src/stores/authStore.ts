@@ -3,6 +3,7 @@ import { clearTokens, getAccessToken, setTokens } from '../lib/api';
 import type { LoginResponse } from '../features/auth/types';
 import type { RoleId } from '../features/auth/roles';
 import { mapBackendRole } from '../features/auth/backendRoles';
+import { decodeJwtClaims, isTokenExpired, normalizeRoles } from '../features/auth/jwt';
 
 /**
  * Phiên đăng nhập phía client (Zustand — client state).
@@ -18,33 +19,40 @@ interface AuthSession {
   username: string | null;
   /** Slug vai trò phía FE, đã ánh xạ từ role backend. */
   role: RoleId | null;
+  /**
+   * Danh sách role backend GỐC lấy từ JWT (vd: `["SUPER_ADMIN"]`).
+   *
+   * Giữ riêng vì `role` chỉ chứa MỘT slug đã ánh xạ — không đủ để chặn quyền:
+   * tài khoản có nhiều role sẽ bị mất thông tin. Guard khu vực quản trị kiểm
+   * `backendRoles.includes('SUPER_ADMIN')`.
+   */
+  backendRoles: string[];
   isAuthenticated: boolean;
   setSession: (res: LoginResponse) => void;
   clearSession: () => void;
 }
 
-/** Đọc claim từ JWT (chỉ decode base64 để hiển thị — KHÔNG verify chữ ký, không dùng để bảo mật). */
-function decodeJwtPayload(token: string): { userId?: string; username?: string; roles?: string[] } {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    return JSON.parse(atob(padded));
-  } catch {
-    return {};
-  }
-}
-
-/** Khôi phục phiên từ localStorage khi app khởi động (reload trang không bị đá ra). */
-function restoreSession(): Pick<AuthSession, 'userId' | 'username' | 'role' | 'isAuthenticated'> {
+/**
+ * Khôi phục phiên từ localStorage khi app khởi động (reload trang không bị đá ra).
+ *
+ * Token đã hết hạn → coi như chưa đăng nhập, tránh hiện "nháy" console quản trị
+ * rồi mới bị đá ra khi API trả 401.
+ */
+function restoreSession(): Pick<
+  AuthSession,
+  'userId' | 'username' | 'role' | 'backendRoles' | 'isAuthenticated'
+> {
   const token = getAccessToken();
-  if (!token) {
-    return { userId: null, username: null, role: null, isAuthenticated: false };
+  if (!token || isTokenExpired(token)) {
+    return { userId: null, username: null, role: null, backendRoles: [], isAuthenticated: false };
   }
-  const payload = decodeJwtPayload(token);
+  const payload = decodeJwtClaims(token);
+  const roles = normalizeRoles(payload.roles);
   return {
     userId: payload.userId ?? null,
     username: payload.username ?? null,
-    role: mapBackendRole(payload.roles ?? []),
+    role: mapBackendRole(roles),
+    backendRoles: roles,
     isAuthenticated: true,
   };
 }
@@ -54,16 +62,47 @@ export const useAuthStore = create<AuthSession>((set) => ({
   setSession: (res) => {
     // Lưu token vào localStorage để sống sót qua reload.
     setTokens(res.accessToken, res.refreshToken);
-    const payload = decodeJwtPayload(res.accessToken);
+    const payload = decodeJwtClaims(res.accessToken);
+    const roles = normalizeRoles(payload.roles);
     set({
       userId: payload.userId ?? null,
       username: payload.username ?? null,
-      role: mapBackendRole(payload.roles ?? []),
+      role: mapBackendRole(roles),
+      backendRoles: roles,
       isAuthenticated: true,
     });
   },
   clearSession: () => {
     clearTokens();
-    set({ userId: null, username: null, role: null, isAuthenticated: false });
+    set({
+      userId: null,
+      username: null,
+      role: null,
+      backendRoles: [],
+      isAuthenticated: false,
+    });
   },
 }));
+
+/**
+ * Đồng bộ lại phiên từ access token trong localStorage.
+ *
+ * Gọi sau khi interceptor refresh token thành công: JWT mới có thể mang claim
+ * khác (vd role bị thu hồi) → store phải theo kịp, không giữ claim cũ.
+ */
+export function syncSessionFromToken(): void {
+  const token = getAccessToken();
+  if (!token) {
+    useAuthStore.getState().clearSession();
+    return;
+  }
+  const payload = decodeJwtClaims(token);
+  const roles = normalizeRoles(payload.roles);
+  useAuthStore.setState({
+    userId: payload.userId ?? null,
+    username: payload.username ?? null,
+    role: mapBackendRole(roles),
+    backendRoles: roles,
+    isAuthenticated: true,
+  });
+}
