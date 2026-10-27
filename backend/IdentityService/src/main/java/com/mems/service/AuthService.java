@@ -33,19 +33,22 @@ public class AuthService implements IAuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final AccessProfileService accessProfiles;
 
     public AuthService(
             IAccountRepository accountRepository,
             IOrganizationRepository organizationRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            RefreshTokenService refreshTokenService
+            RefreshTokenService refreshTokenService,
+            AccessProfileService accessProfiles
     ) {
         this.accountRepository = accountRepository;
         this.organizationRepository = organizationRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.accessProfiles = accessProfiles;
     }
 
     // Kiem tra trang thai account, role va organization
@@ -146,7 +149,9 @@ public class AuthService implements IAuthService {
                 acc.getId(),
                 acc.getUsername(),
                 acc.getOrgId(),
-                roles
+                roles,
+                accessProfiles.resolve(acc, roles),
+                acc.isMustChangePassword()
         );
 
         // 5. Tao Refresh Token
@@ -164,7 +169,7 @@ public class AuthService implements IAuthService {
                 accessToken,
                 refreshToken,
                 "Bearer",
-                900
+                jwtService.accessTokenSeconds()
         );
     }
 
@@ -193,7 +198,9 @@ public class AuthService implements IAuthService {
                 acc.getId(),
                 acc.getUsername(),
                 acc.getOrgId(),
-                roles
+                roles,
+                accessProfiles.resolve(acc, roles),
+                acc.isMustChangePassword()
         );
 
         // 5. Thu hoi Refresh Token cu va tao token moi
@@ -204,7 +211,7 @@ public class AuthService implements IAuthService {
                 accessToken,
                 newRefreshToken,
                 "Bearer",
-                900
+                jwtService.accessTokenSeconds()
         );
     }
 

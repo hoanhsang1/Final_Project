@@ -29,17 +29,25 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
+            HttpSecurity http, com.fasterxml.jackson.databind.ObjectMapper mapper, @Value("${INTERNAL_API_KEY:}") String internalKey
     ) throws Exception {
 
         http
+            .cors(org.springframework.security.config.Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
+            .addFilterBefore(new InternalApiFilter(internalKey,mapper),
+                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
+            .addFilterAfter(new PasswordChangeRequiredFilter(mapper,java.util.Set.of(
+                "/api/v1/auth/change-password","/api/v1/auth/refresh","/api/v1/auth/logout")),
+                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
                 )
             )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/internal/**").permitAll()
 
                 // Danh sach module cong khai
                 .requestMatchers(
@@ -86,13 +94,13 @@ public class SecurityConfig {
             roles = List.of();
         }
 
-        var authorities = roles.stream()
-                .filter(Objects::nonNull)
-                .map(role ->
-                    new SimpleGrantedAuthority("ROLE_" + role)
-                )
-                .toList();
-
+        var authorities = new java.util.HashSet<SimpleGrantedAuthority>();
+        roles.stream().filter(Objects::nonNull).forEach(role -> {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+            if ("ORG_OWNER".equals(role)) authorities.add(new SimpleGrantedAuthority("ROLE_OWNER"));
+        });
+        var permissions = jwt.getClaimAsStringList("permissions");
+        if (permissions != null) permissions.forEach(p -> authorities.add(new SimpleGrantedAuthority(p)));
         return new JwtAuthenticationToken(jwt, authorities);
     }
 
