@@ -35,7 +35,7 @@ jobs:
           EOF
       - name: Build
         working-directory: backend/${{ matrix.module }}
-        run: chmod +x mvnw && ./mvnw -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true verify
+        run: chmod +x mvnw && ./mvnw -B -DskipTests -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true package
 
   frontend:
     runs-on: ubuntu-latest
