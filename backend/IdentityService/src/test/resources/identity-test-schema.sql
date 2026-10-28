@@ -29,3 +29,12 @@ CREATE TABLE IF NOT EXISTS refresh_token (
  FOREIGN KEY(account_id) REFERENCES account(id),FOREIGN KEY(replaced_by) REFERENCES refresh_token(id)
 );
 CREATE TABLE IF NOT EXISTS module (code VARCHAR(60) PRIMARY KEY,name VARCHAR(150),is_active BOOLEAN);
+CREATE TABLE IF NOT EXISTS organization_module (
+ org_id VARCHAR(36) NOT NULL,module_code VARCHAR(60) NOT NULL,status VARCHAR(20) NOT NULL,
+ PRIMARY KEY(org_id, module_code),FOREIGN KEY(org_id) REFERENCES organization(id)
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+ id VARCHAR(36) PRIMARY KEY,org_id VARCHAR(36),actor_account_id VARCHAR(36),
+ action VARCHAR(100) NOT NULL,entity_type VARCHAR(100) NOT NULL,entity_id VARCHAR(36),
+ old_value VARCHAR(1000),new_value VARCHAR(1000),created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

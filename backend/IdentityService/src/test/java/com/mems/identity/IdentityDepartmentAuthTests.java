@@ -6,9 +6,12 @@ import com.mems.config.IdentityDataInitializer;
 import com.mems.dto.AccessProfile;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration;
+import org.springframework.cloud.netflix.eureka.EurekaDiscoveryClientConfiguration;
 import org.springframework.core.env.Environment;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,6 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@EnableAutoConfiguration(exclude = {
+    EurekaClientAutoConfiguration.class,
+    EurekaDiscoveryClientConfiguration.class
+})
 class IdentityDepartmentAuthTests {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;

@@ -37,9 +37,6 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .addFilterBefore(new InternalApiFilter(internalKey,mapper),
                 org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
-            .addFilterAfter(new PasswordChangeRequiredFilter(mapper,java.util.Set.of(
-                "/api/v1/auth/change-password","/api/v1/auth/refresh","/api/v1/auth/logout")),
-                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
@@ -71,7 +68,9 @@ public class SecurityConfig {
 
                 // Chi SUPER_ADMIN duoc quan ly phe duyet
                 .requestMatchers(
-                    "/api/v1/organizations/**"
+                    "/api/v1/organizations/**",
+                    "/api/v1/accounts/**",
+                    "/api/v1/audit-logs/**"
                 ).hasRole("SUPER_ADMIN")
 
                 .anyRequest().authenticated()

@@ -16,3 +16,28 @@ spring:
           uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/organizations/**
+
+        - id: identity-accounts
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/accounts/**,/api/v1/accounts
+
+        - id: identity-audit-logs
+          uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/audit-logs/**,/api/v1/audit-logs
+
+        - id: people-departments
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/departments/**
+
+        - id: people-positions
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/positions/**
+
+        - id: people-permissions
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/permissions/**

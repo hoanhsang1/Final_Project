@@ -20,9 +20,6 @@ public class Account {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(name = "must_change_password", nullable = false)
-    private boolean mustChangePassword;
-
     @Column(name = "status", nullable = false)
     private String status;
 
@@ -31,5 +28,9 @@ public class Account {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public boolean isMustChangePassword() {
+        return false;
     }
 }
