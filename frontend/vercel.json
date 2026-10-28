@@ -1,6 +1,12 @@
 {
-    "rewrites": [
-    { "source": "/api/:path*", "destination": "https://apigateway-2ptf.onrender.com:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-    ]
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
