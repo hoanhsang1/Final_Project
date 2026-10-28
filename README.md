@@ -33,7 +33,8 @@ copy .env.example .env        # Windows;  macOS/Linux: cp .env.example .env
 
 # 3) Build backend
 cd backend
-mvn package -DskipTests
+mvn -f IdentityService/pom.xml package -DskipTests
+mvn -f APIGateway/pom.xml package -DskipTests
 
 # 4) Chạy IdentityService (cửa sổ 1)
 java -jar IdentityService/target/IdentityService-0.0.1-SNAPSHOT.jar
@@ -188,7 +189,8 @@ Chạy trực tiếp bằng `java -jar`, **không cần Docker lẫn Eureka**.
 
 ```bash
 cd backend
-mvn package -DskipTests
+mvn -f IdentityService/pom.xml package -DskipTests
+mvn -f APIGateway/pom.xml package -DskipTests
 ```
 
 Kết quả: `IdentityService/target/IdentityService-0.0.1-SNAPSHOT.jar` và
@@ -273,7 +275,6 @@ Nhờ vậy **không vướng CORS** — backend hiện **chưa** cấu hình CO
 ```
 Final_Project/
 ├── backend/
-│   ├── pom.xml              # Maven cha — CHỈ gồm IdentityService + APIGateway
 │   ├── IdentityService/     # Xác thực, tổ chức, tài khoản (cổng 8081)
 │   ├── APIGateway/          # Cổng vào duy nhất (8080)
 │   ├── EurekaServer/        # Đăng ký service (8761)
@@ -297,8 +298,9 @@ Final_Project/
 └── .env.example             # Mẫu biến môi trường (KHÔNG chứa giá trị thật)
 ```
 
-> Lưu ý: `backend/pom.xml` chỉ khai báo 2 module. Muốn build cả People/Schedule/Facility
-> phải thêm chúng vào mục `<modules>` trước.
+Mỗi service có `pom.xml` và Maven Wrapper riêng, build độc lập. Ví dụ, từ thư mục
+gốc repo: `mvn -f backend/PeopleService/pom.xml verify`. CI cũng chạy riêng từng
+service; không dùng POM chung trong thư mục backend.
 
 ---
 

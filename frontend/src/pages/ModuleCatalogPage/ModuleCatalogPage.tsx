@@ -143,8 +143,6 @@ export default function ModuleCatalogPage() {
         <Text type="secondary">{MSG_MDL.SUBTITLE}</Text>
       </div>
 
-      {/* `D-15`: chưa có cột `is_core` trong DB → phân loại lõi do FE quy định, nói rõ với người dùng. */}
-      <Alert type="info" showIcon message={MSG_MDL.IS_CORE_NOTICE} />
 
       <Flex gap={token.marginSM} wrap>
         <Select

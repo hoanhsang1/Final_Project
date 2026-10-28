@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Nhãn vai trò backend trên UI — dùng cho màn Quản lý tài khoản (`UC-19`).
  *
  * Backend có **7 role** (kiểm chứng trong bảng `role` của DB — `01_identity_db.sql`
@@ -14,6 +14,9 @@
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: 'Admin hệ thống',
   ORG_OWNER: 'Chủ tổ chức',
+  OWNER: 'Chủ tổ chức',
+  MANAGER: 'Quản lý phòng ban',
+  STAFF: 'Nhân viên phòng ban',
   ORG_ADMIN: 'Quản trị tổ chức',
   ACADEMIC_STAFF: 'Cán bộ quản lý',
   FACILITY_STAFF: 'Nhân viên phòng / thiết bị',

@@ -29,4 +29,8 @@ public class Account {
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
     }
+
+    public boolean isMustChangePassword() {
+        return false;
+    }
 }

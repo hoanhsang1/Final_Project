@@ -14,7 +14,10 @@ import type { RoleId } from './roles';
  */
 const ROLE_MAP: Record<string, RoleId> = {
   SUPER_ADMIN: 'platform-admin',
+  OWNER: 'org-owner',
   ORG_OWNER: 'org-owner',
+  MANAGER: 'academic-staff',
+  STAFF: 'academic-staff',
   ACADEMIC_STAFF: 'academic-staff',
   TEACHER: 'teacher',
   STUDENT: 'student',
@@ -31,8 +34,11 @@ const ROLE_MAP: Record<string, RoleId> = {
  */
 const ROLE_PRIORITY: readonly string[] = [
   'SUPER_ADMIN',
+  'OWNER',
   'ORG_OWNER',
+  'MANAGER',
   'ACADEMIC_STAFF',
+  'STAFF',
   'TEACHER',
   'STUDENT',
 ];

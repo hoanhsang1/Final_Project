@@ -21,7 +21,7 @@ jobs:
           cache: maven
       - name: Build
         working-directory: backend/${{ matrix.module }}
-        run: chmod +x mvnw && ./mvnw -B package -DskipTests
+        run: chmod +x mvnw && ./mvnw -B verify
 
   frontend:
     runs-on: ubuntu-latest
