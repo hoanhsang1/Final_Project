@@ -22,6 +22,18 @@ describe('mapBackendRole', () => {
     expect(mapBackendRole(['ORG_OWNER'])).toBe('org-owner');
   });
 
+  it('ánh xạ OWNER → org-owner', () => {
+    expect(mapBackendRole(['OWNER'])).toBe('org-owner');
+  });
+
+  it('ánh xạ MANAGER → academic-staff', () => {
+    expect(mapBackendRole(['MANAGER'])).toBe('academic-staff');
+  });
+
+  it('ánh xạ STAFF → academic-staff', () => {
+    expect(mapBackendRole(['STAFF'])).toBe('academic-staff');
+  });
+
   it('trả về null với role chưa có màn hình ở Sprint 1 (FACILITY_STAFF)', () => {
     expect(mapBackendRole(['FACILITY_STAFF'])).toBeNull();
   });

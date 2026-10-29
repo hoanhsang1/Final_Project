@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS class (id VARCHAR(36) PRIMARY KEY,org_id VARCHAR(36),deleted_at TIMESTAMP);
+CREATE TABLE IF NOT EXISTS session (
+ id VARCHAR(36) PRIMARY KEY,class_id VARCHAR(36),department_id VARCHAR(36),teacher_id VARCHAR(36),room_id VARCHAR(36),
+ start_time TIMESTAMP,end_time TIMESTAMP,status VARCHAR(20),deleted_at TIMESTAMP
+);

@@ -19,18 +19,24 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Run tests and build
+      - name: Set up Maven mirror
+        run: |
+          mkdir -p ~/.m2
+          cat << 'EOF' > ~/.m2/settings.xml
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.2.0">
+              <mirrors>
+                  <mirror>
+                      <id>google-maven-central</id>
+                      <mirrorOf>central</mirrorOf>
+                      <url>https://maven-central.storage-download.googleapis.com/maven2/</url>
+                  </mirror>
+              </mirrors>
+          </settings>
+          EOF
+      - name: Build
         working-directory: backend/${{ matrix.module }}
-        run: chmod +x mvnw && ./mvnw -B verify
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ matrix.module }}
-          path: |
-            backend/${{ matrix.module }}/target/surefire-reports/
-            backend/${{ matrix.module }}/target/failsafe-reports/
-          if-no-files-found: ignore
+        run: chmod +x mvnw && ./mvnw -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true verify
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
