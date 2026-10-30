@@ -213,7 +213,7 @@ export default function ClassDetailPage() {
         <Table<StudentItem>
           rowKey="id"
           columns={columns}
-          dataSource={classStudents ?? []}
+          dataSource={Array.isArray(classStudents) ? classStudents : []}
           loading={isStudentsLoading}
           pagination={{ pageSize: 20 }}
         />

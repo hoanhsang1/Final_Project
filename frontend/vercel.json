@@ -5,6 +5,46 @@
       "destination": "https://apigateway-2ptf.onrender.com/api/:path*"
     },
     {
+      "source": "/departments/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/departments/:path*"
+    },
+    {
+      "source": "/departments",
+      "destination": "https://apigateway-2ptf.onrender.com/departments"
+    },
+    {
+      "source": "/positions/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/positions/:path*"
+    },
+    {
+      "source": "/positions",
+      "destination": "https://apigateway-2ptf.onrender.com/positions"
+    },
+    {
+      "source": "/permissions/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/permissions/:path*"
+    },
+    {
+      "source": "/permissions",
+      "destination": "https://apigateway-2ptf.onrender.com/permissions"
+    },
+    {
+      "source": "/students/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/students/:path*"
+    },
+    {
+      "source": "/students",
+      "destination": "https://apigateway-2ptf.onrender.com/students"
+    },
+    {
+      "source": "/classes/:path*",
+      "destination": "https://apigateway-2ptf.onrender.com/classes/:path*"
+    },
+    {
+      "source": "/classes",
+      "destination": "https://apigateway-2ptf.onrender.com/classes"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

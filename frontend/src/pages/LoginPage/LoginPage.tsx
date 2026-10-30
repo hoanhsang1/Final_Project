@@ -72,7 +72,11 @@ export default function LoginPage() {
     },
     onError: (error: Error) => {
       // NFR-REL-001: lỗi thì hiển thị rõ, KHÔNG điều hướng, KHÔNG hiện thành công.
-      setFormError(error.message);
+      if (error.message.includes('429') || error.message.toLowerCase().includes('too many')) {
+        setFormError('Bạn đã gửi quá nhiều yêu cầu đăng nhập. Vui lòng đợi 1 phút rồi thử lại.');
+      } else {
+        setFormError(error.message);
+      }
     },
   });
 
@@ -139,6 +143,7 @@ export default function LoginPage() {
           block
           size="large"
           loading={loginMutation.isPending}
+          disabled={loginMutation.isPending}
           style={{ marginBottom: token.margin }}
         >
           Đăng nhập

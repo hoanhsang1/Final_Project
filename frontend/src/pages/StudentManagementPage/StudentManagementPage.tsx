@@ -301,7 +301,7 @@ export default function StudentManagementPage() {
         <Table<StudentItem>
           rowKey="id"
           columns={columns}
-          dataSource={data?.items ?? []}
+          dataSource={Array.isArray(data?.items) ? data.items : []}
           loading={isLoading}
           pagination={{
             current: page,

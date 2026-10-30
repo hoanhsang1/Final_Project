@@ -60,6 +60,9 @@ export async function fetchStudents(query: StudentListQuery = {}): Promise<PageR
     const { data } = await apiClient.get<PageResponse<StudentItem>>('/students', {
       params: query,
     });
+    if (typeof data === 'string' || !data || !Array.isArray(data.items)) {
+      return { items: [], total: 0, page: query.page ?? 1, size: query.size ?? 20 };
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -109,6 +112,9 @@ export async function fetchClasses(query: SchoolClassListQuery = {}): Promise<Pa
     const { data } = await apiClient.get<PageResponse<SchoolClassItem>>('/classes', {
       params: query,
     });
+    if (typeof data === 'string' || !data || !Array.isArray(data.items)) {
+      return { items: [], total: 0, page: query.page ?? 1, size: query.size ?? 20 };
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -153,6 +159,9 @@ export async function deleteClass(id: string): Promise<void> {
 export async function fetchClassStudents(classId: string): Promise<StudentItem[]> {
   try {
     const { data } = await apiClient.get<StudentItem[]>(`/classes/${classId}/students`);
+    if (typeof data === 'string' || !Array.isArray(data)) {
+      return [];
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -181,6 +190,9 @@ export async function removeStudentFromClass(classId: string, studentId: string)
 export async function fetchDepartments(): Promise<DepartmentItem[]> {
   try {
     const { data } = await apiClient.get<DepartmentItem[]>('/departments');
+    if (typeof data === 'string' || !Array.isArray(data)) {
+      return [];
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -219,6 +231,9 @@ export async function deleteDepartment(id: string): Promise<void> {
 export async function fetchPermissions(): Promise<PermissionItem[]> {
   try {
     const { data } = await apiClient.get<PermissionItem[]>('/permissions');
+    if (typeof data === 'string' || !Array.isArray(data)) {
+      return [];
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -228,6 +243,9 @@ export async function fetchPermissions(): Promise<PermissionItem[]> {
 export async function fetchPositions(): Promise<PositionItem[]> {
   try {
     const { data } = await apiClient.get<PositionItem[]>('/positions');
+    if (typeof data === 'string' || !Array.isArray(data)) {
+      return [];
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);
@@ -266,6 +284,9 @@ export async function deletePosition(id: string): Promise<void> {
 export async function fetchDepartmentMembers(departmentId: string): Promise<DepartmentMemberItem[]> {
   try {
     const { data } = await apiClient.get<DepartmentMemberItem[]>(`/departments/${departmentId}/members`);
+    if (typeof data === 'string' || !Array.isArray(data)) {
+      return [];
+    }
     return data;
   } catch (error) {
     throw toPortalError(error);

@@ -194,7 +194,7 @@ export default function DepartmentManagementPage() {
         <Table<DepartmentItem>
           rowKey="id"
           columns={columns}
-          dataSource={departments ?? []}
+          dataSource={Array.isArray(departments) ? departments : []}
           loading={isLoading}
           pagination={false}
         />
