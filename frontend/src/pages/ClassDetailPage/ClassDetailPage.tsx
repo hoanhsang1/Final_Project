@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -24,6 +25,7 @@ import {
   removeStudentFromClass,
 } from '../../features/organization/organizationPortalApi';
 import type { StudentItem } from '../../features/organization/types';
+import { useAuthStore } from '../../stores/authStore';
 
 const { Title, Text } = Typography;
 
@@ -32,6 +34,8 @@ export default function ClassDetailPage() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
+  const backendRoles = useAuthStore((s) => s.backendRoles);
+  const isOwner = backendRoles.includes('OWNER') || backendRoles.includes('ORG_OWNER');
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -148,16 +152,20 @@ export default function ClassDetailPage() {
         </Tag>
       ),
     },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      width: 120,
-      render: (_, record) => (
-        <Button danger size="small" type="link" onClick={() => handleRemove(record)}>
-          Gỡ khỏi lớp
-        </Button>
-      ),
-    },
+    ...(!isOwner
+      ? [
+          {
+            title: 'Thao tác',
+            key: 'action',
+            width: 120,
+            render: (_: unknown, record: StudentItem) => (
+              <Button danger size="small" type="link" onClick={() => handleRemove(record)}>
+                Gỡ khỏi lớp
+              </Button>
+            ),
+          },
+        ]
+      : []),
   ];
 
   // Lọc danh sách sinh viên chưa thuộc lớp này
@@ -166,6 +174,16 @@ export default function ClassDetailPage() {
 
   return (
     <div>
+      {isOwner && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ xem Quản trị viên (Read-only)"
+          description="Chủ tổ chức theo dõi danh sách sinh viên đã được phân vào lớp. Thao tác xếp sinh viên vào lớp hoặc gỡ sinh viên do Nhân viên phòng Đào tạo (STAFF) phụ trách."
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
         <Space align="center">
           <Button onClick={() => navigate('/to-chuc/lop-hoc')}>← Quay lại</Button>
@@ -173,9 +191,11 @@ export default function ClassDetailPage() {
             Chi tiết lớp: {classDetail?.name}
           </Title>
         </Space>
-        <Button type="primary" onClick={() => setAddModalOpen(true)}>
-          + Xếp sinh viên vào lớp
-        </Button>
+        {!isOwner && (
+          <Button type="primary" onClick={() => setAddModalOpen(true)}>
+            + Xếp sinh viên vào lớp
+          </Button>
+        )}
       </Flex>
 
       <Card style={{ marginBottom: 20 }} loading={isClassLoading}>

@@ -1,6 +1,6 @@
 import { Button, Drawer, Flex, Layout, Menu, Space, Tag, Typography, theme } from 'antd';
 import type { MenuProps } from 'antd';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../../features/auth/authApi';
 import { useAuthStore } from '../../stores/authStore';
@@ -8,12 +8,6 @@ import { useMediaQuery } from '../AdminConsoleLayout/use-media-query';
 
 const { Header, Content, Sider } = Layout;
 const { Text, Title } = Typography;
-
-const PORTAL_MENU = [
-  { key: 'sinh-vien', label: 'Quản lý Sinh viên', path: '/to-chuc/sinh-vien' },
-  { key: 'lop-hoc', label: 'Quản lý Lớp học', path: '/to-chuc/lop-hoc' },
-  { key: 'phong-ban', label: 'Quản lý Phòng ban', path: '/to-chuc/phong-ban' },
-];
 
 export default function OrganizationPortalLayout() {
   const { token } = theme.useToken();
@@ -26,7 +20,31 @@ export default function OrganizationPortalLayout() {
   const backendRoles = useAuthStore((s) => s.backendRoles);
   const clearSession = useAuthStore((s) => s.clearSession);
 
-  const activeKey = PORTAL_MENU.find((m) => location.pathname.startsWith(m.path))?.key ?? 'sinh-vien';
+  const isOwner = backendRoles.includes('OWNER') || backendRoles.includes('ORG_OWNER');
+  const isManager = backendRoles.includes('MANAGER');
+
+  const portalMenu = useMemo(() => {
+    if (isOwner) {
+      return [
+        { key: 'phong-ban', label: 'Quản lý Phòng ban & Module', path: '/to-chuc/phong-ban' },
+        { key: 'chuc-vu', label: 'Quản lý Chức vụ', path: '/to-chuc/chuc-vu' },
+        { key: 'nhan-su', label: 'Bổ nhiệm & Quản lý Nhân sự', path: '/to-chuc/nhan-su' },
+      ];
+    }
+
+    // Nhân viên (STAFF) và Trưởng phòng (MANAGER)
+    const items = [
+      { key: 'sinh-vien', label: 'Quản lý Sinh viên', path: '/to-chuc/sinh-vien' },
+      { key: 'lop-hoc', label: 'Quản lý Lớp học', path: '/to-chuc/lop-hoc' },
+    ];
+    if (isManager) {
+      items.push({ key: 'nhan-su', label: 'Nhân sự Phòng ban', path: '/to-chuc/nhan-su' });
+    }
+    return items;
+  }, [isOwner, isManager]);
+
+  const activeKey =
+    portalMenu.find((m) => location.pathname.startsWith(m.path))?.key ?? portalMenu[0]?.key ?? '';
 
   const handleLogout = async () => {
     try {
@@ -38,7 +56,7 @@ export default function OrganizationPortalLayout() {
     navigate('/dang-nhap');
   };
 
-  const menuItems: MenuProps['items'] = PORTAL_MENU.map((item) => ({
+  const menuItems: MenuProps['items'] = portalMenu.map((item) => ({
     key: item.key,
     label: (
       <Link to={item.path} onClick={() => setMobileDrawerOpen(false)}>
@@ -47,11 +65,11 @@ export default function OrganizationPortalLayout() {
     ),
   }));
 
-  const roleLabel = backendRoles.includes('OWNER') || backendRoles.includes('ORG_OWNER')
-    ? 'Chủ tổ chức'
-    : backendRoles.includes('MANAGER')
-    ? 'Quản lý phòng ban'
-    : 'Nhân viên giáo vụ';
+  const roleLabel = isOwner
+    ? 'Chủ tổ chức (OWNER)'
+    : isManager
+    ? 'Quản lý phòng ban (MANAGER)'
+    : 'Nhân viên giáo vụ (STAFF)';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -78,7 +96,7 @@ export default function OrganizationPortalLayout() {
           <Title level={4} style={{ margin: 0, color: token.colorPrimary }}>
             MEMS Portal
           </Title>
-          <Tag color="blue">{roleLabel}</Tag>
+          <Tag color={isOwner ? 'gold' : isManager ? 'purple' : 'blue'}>{roleLabel}</Tag>
         </Flex>
 
         <Space size="middle">
@@ -90,7 +108,7 @@ export default function OrganizationPortalLayout() {
       <Layout>
         {isDesktop ? (
           <Sider
-            width={240}
+            width={260}
             style={{
               background: token.colorBgContainer,
               borderRight: `1px solid ${token.colorBorderSecondary}`,
@@ -134,4 +152,3 @@ export default function OrganizationPortalLayout() {
     </Layout>
   );
 }
-

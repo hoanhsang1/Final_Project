@@ -1,8 +1,14 @@
 import { apiClient } from '../../lib/api';
 import type {
+  CreateMemberPayload,
+  CreatedMemberResult,
   DepartmentItem,
+  DepartmentMemberItem,
   DepartmentPayload,
   PageResponse,
+  PermissionItem,
+  PositionItem,
+  PositionPayload,
   SchoolClassItem,
   SchoolClassListQuery,
   SchoolClassPayload,
@@ -206,4 +212,100 @@ export async function deleteDepartment(id: string): Promise<void> {
     throw toPortalError(error);
   }
 }
+
+// ========================
+// Quyền & Chức vụ (Permissions & Positions)
+// ========================
+export async function fetchPermissions(): Promise<PermissionItem[]> {
+  try {
+    const { data } = await apiClient.get<PermissionItem[]>('/permissions');
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function fetchPositions(): Promise<PositionItem[]> {
+  try {
+    const { data } = await apiClient.get<PositionItem[]>('/positions');
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function createPosition(payload: PositionPayload): Promise<PositionItem> {
+  try {
+    const { data } = await apiClient.post<PositionItem>('/positions', payload);
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function updatePosition(id: string, payload: PositionPayload): Promise<PositionItem> {
+  try {
+    const { data } = await apiClient.put<PositionItem>(`/positions/${id}`, payload);
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function deletePosition(id: string): Promise<void> {
+  try {
+    await apiClient.delete(`/positions/${id}`);
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+// ========================
+// Nhân sự phòng ban (Department Members)
+// ========================
+export async function fetchDepartmentMembers(departmentId: string): Promise<DepartmentMemberItem[]> {
+  try {
+    const { data } = await apiClient.get<DepartmentMemberItem[]>(`/departments/${departmentId}/members`);
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function createDepartmentMember(
+  departmentId: string,
+  payload: CreateMemberPayload,
+): Promise<CreatedMemberResult> {
+  try {
+    const { data } = await apiClient.post<CreatedMemberResult>(`/departments/${departmentId}/members`, payload);
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function updateDepartmentMemberPositions(
+  departmentId: string,
+  userId: string,
+  positionIds: string[],
+): Promise<DepartmentMemberItem> {
+  try {
+    const { data } = await apiClient.put<DepartmentMemberItem>(
+      `/departments/${departmentId}/members/${userId}/positions`,
+      { positionIds },
+    );
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function removeDepartmentMember(departmentId: string, userId: string): Promise<void> {
+  try {
+    await apiClient.delete(`/departments/${departmentId}/members/${userId}`);
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
 

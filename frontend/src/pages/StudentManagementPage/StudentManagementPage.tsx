@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -27,12 +28,15 @@ import type {
   StudentItem,
   StudentUpdatePayload,
 } from '../../features/organization/types';
+import { useAuthStore } from '../../stores/authStore';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function StudentManagementPage() {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
+  const backendRoles = useAuthStore((s) => s.backendRoles);
+  const isOwner = backendRoles.includes('OWNER') || backendRoles.includes('ORG_OWNER');
 
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
@@ -213,32 +217,55 @@ export default function StudentManagementPage() {
         return <Tag color="error">Đình chỉ</Tag>;
       },
     },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      width: 150,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => handleOpenEdit(record)}>
-            Sửa
-          </Button>
-          <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
-            Xóa
-          </Button>
-        </Space>
-      ),
-    },
+    ...(!isOwner
+      ? [
+          {
+            title: 'Thao tác',
+            key: 'actions',
+            width: 150,
+            render: (_: unknown, record: StudentItem) => (
+              <Space>
+                <Button type="link" size="small" onClick={() => handleOpenEdit(record)}>
+                  Sửa
+                </Button>
+                <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
+                  Xóa
+                </Button>
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div>
+      {isOwner && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ xem Quản trị viên (Read-only)"
+          description="Chủ tổ chức xem dữ liệu tổng quan sinh viên của trường. Việc thêm mới, cập nhật hồ sơ và xóa sinh viên do Nhân viên phòng Đào tạo (STAFF) phụ trách."
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          Quản lý Sinh viên
-        </Title>
-        <Button type="primary" onClick={handleOpenCreate}>
-          + Thêm sinh viên
-        </Button>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            Quản lý Sinh viên
+          </Title>
+          <Text type="secondary">
+            {isOwner
+              ? 'Theo dõi danh sách sinh viên thuộc các khoa/lớp trong tổ chức'
+              : 'Tiếp nhận hồ sơ, chỉnh sửa thông tin và theo dõi tình trạng học tập của sinh viên'}
+          </Text>
+        </div>
+        {!isOwner && (
+          <Button type="primary" onClick={handleOpenCreate}>
+            + Thêm sinh viên
+          </Button>
+        )}
       </Flex>
 
       <Card style={{ marginBottom: 16 }}>
