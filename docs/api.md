@@ -567,7 +567,7 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
   chỉ cần service + 2 endpoint; đề xuất token hiệu lực **30 phút**, dùng **1 lần**.
 - Liên kết gửi trong email trỏ tới `{FE_ORIGIN}/dat-lai-mat-khau?token=…`.
 - FE đã code xong + e2e mock (`e2e/auth-password-reset.spec.ts`); gặp `404` hiện *"chức năng chưa sẵn sàng"*.
-- ⚠️ **Chính sách độ dài mật khẩu chưa chốt** (`Q-38`): đăng ký ≥ 12, modal admin reset ≥ 8, màn này 8–72, BE chỉ `@NotBlank`.
+- ⚠️ **Chính sách độ dài mật khẩu chưa chốt** (`Q-38`): đăng ký ≥ 12 (BE đã `@Size(min = 12)` nhưng trả 500 khi sai — `D-01`), modal admin reset ≥ 8, màn này 8–72; chưa có cận trên 72 byte.
   Khi chốt thì sửa **cả 3 chỗ + BE** một lượt, không sửa lẻ.
 
 ---

@@ -118,8 +118,7 @@ it('nhập sai mật khẩu thì hiện lỗi, KHÔNG điều hướng (NFR-REL-
   expect(useAuthStore.getState().isAuthenticated).toBe(false);
 });
 
-it('đăng nhập thành công nhưng vai trò chưa có trang thì hiện thông báo, không crash', async () => {
-  mockLogin.mockResolvedValue({
+it('đăng nhập thành công nhưng vai trò chưa có trang thì hiện thông báo, không crash', async () => {  mockLogin.mockResolvedValue({
     accessToken: fakeJwt({ userId: 'u2', username: 'kt', roles: ['FACILITY_STAFF'] }),
     refreshToken: 'r2',
     tokenType: 'Bearer',
@@ -136,4 +135,22 @@ it('đăng nhập thành công nhưng vai trò chưa có trang thì hiện thôn
   // Vẫn coi là đã đăng nhập, chỉ là chưa biết vào trang nào.
   expect(useAuthStore.getState().isAuthenticated).toBe(true);
   expect(useAuthStore.getState().role).toBeNull();
+});
+
+it('OWNER đăng nhập thành công thì vào thẳng /to-chuc', async () => {
+  mockLogin.mockResolvedValue({
+    accessToken: fakeJwt({ userId: 'u3', username: 'owner', roles: ['OWNER'] }),
+    refreshToken: 'r3',
+    tokenType: 'Bearer',
+    expiresIn: 900,
+  });
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'owner');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), '123456');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  expect(await screen.findByRole('heading', { name: 'Phòng ban' })).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe('/to-chuc');
+  expect(useAuthStore.getState().backendRoles).toContain('OWNER');
 });

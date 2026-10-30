@@ -5,6 +5,8 @@ import type { RouteObject } from 'react-router-dom';
 import AdminConsoleLayout from './components/AdminConsoleLayout/AdminConsoleLayout';
 import AdminGuard from './components/AdminGuard/AdminGuard';
 import DocumentTitle from './components/DocumentTitle/DocumentTitle';
+import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayout';
+import OwnerGuard from './components/OwnerGuard/OwnerGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
@@ -45,6 +47,11 @@ const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
 const PendingOrganizationsPage = lazy(
   () => import('./pages/PendingOrganizationsPage/PendingOrganizationsPage'),
 );
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage/DepartmentsPage'));
+const DepartmentDetailPage = lazy(
+  () => import('./pages/DepartmentDetailPage/DepartmentDetailPage'),
+);
+const PositionsPage = lazy(() => import('./pages/PositionsPage/PositionsPage'));
 
 /** Màn chờ trong lúc tải chunk của route — chữ kết bằng "…" (quy ước loading). */
 function RouteFallback() {
@@ -160,6 +167,29 @@ export const routes: RouteObject[] = [
             handle: { title: 'Chi tiết tài khoản' },
           },
           { path: 'nhat-ky', element: <AuditLogPage />, handle: { title: 'Nhật ký hệ thống' } },
+        ],
+      },
+      {
+        // Khu vực của chủ tổ chức (Sprint 3) — song song với `/quan-tri` nhưng
+        // dành cho role `OWNER`, dùng chung khung `ConsoleShell`.
+        //
+        // Thứ tự route con: `chuc-vu` phải khai TRƯỚC `phong-ban/:id` để không bị
+        // nuốt; màn chi tiết phòng ban nằm dưới `phong-ban/:id`.
+        path: 'to-chuc',
+        element: (
+          <OwnerGuard>
+            <OwnerConsoleLayout />
+          </OwnerGuard>
+        ),
+        handle: { title: 'Khu vực tổ chức' },
+        children: [
+          { index: true, element: <DepartmentsPage />, handle: { title: 'Phòng ban' } },
+          { path: 'chuc-vu', element: <PositionsPage />, handle: { title: 'Chức vụ' } },
+          {
+            path: 'phong-ban/:id',
+            element: <DepartmentDetailPage />,
+            handle: { title: 'Chi tiết phòng ban' },
+          },
         ],
       },
       { path: '*', element: <NotFoundPage />, handle: { title: 'Không tìm thấy trang' } },

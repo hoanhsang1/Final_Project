@@ -41,6 +41,11 @@ export default function LoginPage() {
         navigate('/quan-tri');
         return;
       }
+      // `OWNER` có console riêng từ Sprint 3 → vào thẳng danh sách phòng ban.
+      if (state.backendRoles.includes('OWNER') || state.backendRoles.includes('ORG_OWNER')) {
+        navigate('/to-chuc');
+        return;
+      }
       const role = state.role;
       if (role) {
         navigate(rolePreviewPath(role));
