@@ -44,8 +44,37 @@ function toPortalError(error: unknown): PortalApiError {
   const serverMessage = err?.response?.data?.message;
 
   if (typeof serverMessage === 'string' && serverMessage.length > 0) {
+    if (status === 403) {
+      if (code === 'PASSWORD_CHANGE_REQUIRED' || serverMessage.includes('temporary password')) {
+        return new PortalApiError('Tài khoản dùng mật khẩu tạm thời. Vui lòng đổi mật khẩu trước khi thao tác.', status, code);
+      }
+      return new PortalApiError(
+        serverMessage === 'Access denied'
+          ? 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho Chủ tổ chức - OWNER).'
+          : serverMessage,
+        status,
+        code,
+      );
+    }
     return new PortalApiError(serverMessage, status, code);
   }
+
+  if (status === 403) {
+    return new PortalApiError(
+      'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho Chủ tổ chức - OWNER).',
+      status,
+      code,
+    );
+  }
+
+  if (status === 502 || status === 503) {
+    return new PortalApiError(
+      'Dịch vụ máy chủ đang khởi động hoặc tạm thời gián đoạn. Vui lòng thử lại sau giây lát.',
+      status,
+      code,
+    );
+  }
+
   if (err?.request) {
     return new PortalApiError('Không thể kết nối tới máy chủ.', status);
   }
