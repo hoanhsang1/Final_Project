@@ -41,11 +41,23 @@ export default function LoginPage() {
         navigate('/quan-tri');
         return;
       }
+
+      // Chủ tổ chức (OWNER / ORG_OWNER) và cán bộ quản lý (MANAGER / STAFF)
+      // có phân hệ quản lý Sinh viên, Lớp học & Phòng ban:
+      if (
+        state.backendRoles.some((r) =>
+          ['OWNER', 'ORG_OWNER', 'MANAGER', 'STAFF'].includes(r),
+        )
+      ) {
+        navigate('/to-chuc/sinh-vien');
+        return;
+      }
+
       const role = state.role;
       if (role) {
         navigate(rolePreviewPath(role));
       } else {
-        // Đăng nhập được nhưng vai trò chưa có màn hình ở Sprint này.
+        // Đăng nhập được nhưng vai trò chưa có màn hình ở giai đoạn này.
         setNotice(
           'Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau.',
         );
@@ -59,7 +71,6 @@ export default function LoginPage() {
 
   const handleSubmit = (values: LoginFormValues) => {
     setNotice(null);
-    // Backend không có trường "remember" — chỉ gửi 2 field contract yêu cầu.
     loginMutation.mutate({ username: values.username, password: values.password });
   };
 
@@ -103,37 +114,45 @@ export default function LoginPage() {
             showIcon
             message={formError}
             style={{ marginBottom: token.margin }}
-            role="alert"
           />
         )}
+
         {notice && (
           <Alert
-            type="warning"
+            type="info"
             showIcon
             message={notice}
             style={{ marginBottom: token.margin }}
-            role="status"
           />
         )}
 
-        <Form.Item style={{ marginBottom: token.margin }}>
-          <Button type="primary" htmlType="submit" block loading={loginMutation.isPending}>
-            Đăng nhập
-          </Button>
-        </Form.Item>
+        <Button
+          type="primary"
+          htmlType="submit"
+          block
+          size="large"
+          loading={loginMutation.isPending}
+          style={{ marginBottom: token.margin }}
+        >
+          Đăng nhập
+        </Button>
+
+        <Flex justify="center" align="center" gap={token.marginXXS}>
+          <Text type="secondary">Chưa có tổ chức?</Text>
+          <Link to="/dang-ky">Đăng ký tổ chức</Link>
+        </Flex>
       </Form>
 
-      <Divider plain>hoặc xem thử theo vai trò</Divider>
+      <Divider plain style={{ marginBlock: token.margin }}>
+        <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          Hoặc xem thử theo vai trò
+        </Text>
+      </Divider>
 
       <Flex vertical gap={token.marginXS}>
         {ROLES.map((role) => (
           <RoleButton key={role.id} role={role} onSelect={handleSelectRole} />
         ))}
-      </Flex>
-
-      <Flex justify="center" gap={token.marginXXS} style={{ marginTop: token.marginLG }}>
-        <Text type="secondary">Chưa có tổ chức?</Text>
-        <Link to="/dang-ky">Đăng ký tổ chức</Link>
       </Flex>
     </AuthCard>
   );
