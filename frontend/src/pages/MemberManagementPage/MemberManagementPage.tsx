@@ -294,7 +294,7 @@ export default function MemberManagementPage() {
             value={selectedDeptId || undefined}
             onChange={(val) => setSelectedDeptId(val)}
             loading={isLoadingDepts}
-            options={departments.map((d: DepartmentItem) => ({
+            options={(Array.isArray(departments) ? departments : []).map((d: DepartmentItem) => ({
               label: `${d.name} ${d.modules && d.modules.length > 0 ? `(${d.modules.join(', ')})` : ''}`,
               value: d.id,
             }))}
@@ -309,7 +309,7 @@ export default function MemberManagementPage() {
         <Table<DepartmentMemberItem>
           rowKey="userId"
           columns={columns}
-          dataSource={members}
+          dataSource={Array.isArray(members) ? members : []}
           loading={isLoadingMembers}
           pagination={false}
           locale={{ emptyText: selectedDeptId ? 'Chưa có nhân sự trong phòng ban này' : 'Vui lòng chọn phòng ban' }}

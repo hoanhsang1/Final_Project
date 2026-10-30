@@ -199,7 +199,7 @@ export default function PositionManagementPage() {
         <Table<PositionItem>
           rowKey="id"
           columns={columns}
-          dataSource={positions}
+          dataSource={Array.isArray(positions) ? positions : []}
           loading={isLoading}
           pagination={false}
         />
