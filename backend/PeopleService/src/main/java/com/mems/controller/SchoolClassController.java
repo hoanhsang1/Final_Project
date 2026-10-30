@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/classes")
+@RequestMapping({"/classes", "/classes/"})
 public class SchoolClassController {
     private final SchoolClassService service;
 

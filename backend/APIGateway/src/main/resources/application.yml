@@ -48,24 +48,24 @@ spring:
         - id: people-departments
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/departments/**,/departments
+            - Path=/departments/**,/departments,/departments/
 
         - id: people-positions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/positions/**,/positions
+            - Path=/positions/**,/positions,/positions/
 
         - id: people-permissions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/permissions/**,/permissions
+            - Path=/permissions/**,/permissions,/permissions/
 
         - id: people-students
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/students/**,/students
+            - Path=/students/**,/students,/students/
 
         - id: people-classes
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/classes/**,/classes
+            - Path=/classes/**,/classes,/classes/
