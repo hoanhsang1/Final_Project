@@ -1,6 +1,24 @@
 spring:
   cloud:
     gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+              - "https://*.vercel.app"
+              - "https://final-project-psi-lemon.vercel.app"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: false
+            maxAge: 3600
       routes:
         - id: identity-auth
           uri: ${IDENTITY_SERVICE_URL:http://localhost:8081}
@@ -30,14 +48,24 @@ spring:
         - id: people-departments
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/departments/**
+            - Path=/departments/**,/departments
 
         - id: people-positions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/positions/**
+            - Path=/positions/**,/positions
 
         - id: people-permissions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/permissions/**
+            - Path=/permissions/**,/permissions
+
+        - id: people-students
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/students/**,/students
+
+        - id: people-classes
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/classes/**,/classes
