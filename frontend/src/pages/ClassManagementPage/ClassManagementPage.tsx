@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -26,13 +27,16 @@ import type {
   SchoolClassItem,
   SchoolClassUpdatePayload,
 } from '../../features/organization/types';
+import { useAuthStore } from '../../stores/authStore';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function ClassManagementPage() {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const backendRoles = useAuthStore((s) => s.backendRoles);
+  const isOwner = backendRoles.includes('OWNER') || backendRoles.includes('ORG_OWNER');
 
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(20);
@@ -196,7 +200,7 @@ export default function ClassManagementPage() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 220,
+      width: isOwner ? 140 : 220,
       render: (_, record) => (
         <Space>
           <Button
@@ -206,12 +210,16 @@ export default function ClassManagementPage() {
           >
             Danh sách SV
           </Button>
-          <Button type="link" size="small" onClick={() => handleOpenEdit(record)}>
-            Sửa
-          </Button>
-          <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
-            Xóa
-          </Button>
+          {!isOwner && (
+            <>
+              <Button type="link" size="small" onClick={() => handleOpenEdit(record)}>
+                Sửa
+              </Button>
+              <Button type="link" danger size="small" onClick={() => handleDelete(record)}>
+                Xóa
+              </Button>
+            </>
+          )}
         </Space>
       ),
     },
@@ -219,13 +227,32 @@ export default function ClassManagementPage() {
 
   return (
     <div>
+      {isOwner && (
+        <Alert
+          type="info"
+          showIcon
+          message="Chế độ xem Quản trị viên (Read-only)"
+          description="Chủ tổ chức theo dõi danh sách lớp học và số lượng sinh viên. Việc tạo lớp, sửa đổi hoặc xóa lớp do Nhân viên phòng Đào tạo (STAFF) phụ trách."
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
-        <Title level={3} style={{ margin: 0 }}>
-          Quản lý Lớp học
-        </Title>
-        <Button type="primary" onClick={handleOpenCreate}>
-          + Thêm lớp học
-        </Button>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            Quản lý Lớp học
+          </Title>
+          <Text type="secondary">
+            {isOwner
+              ? 'Theo dõi danh sách các lớp học và sĩ số sinh viên'
+              : 'Tổ chức các lớp học theo niên khóa và phân bổ sinh viên vào lớp'}
+          </Text>
+        </div>
+        {!isOwner && (
+          <Button type="primary" onClick={handleOpenCreate}>
+            + Thêm lớp học
+          </Button>
+        )}
       </Flex>
 
       <Card style={{ marginBottom: 16 }}>

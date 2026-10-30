@@ -94,3 +94,47 @@ export interface PageResponse<T> {
   size: number;
 }
 
+export interface PermissionItem {
+  code: string;
+  description: string;
+  moduleCode?: string | null;
+}
+
+export interface PositionItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+  permissions: string[];
+}
+
+export interface PositionPayload {
+  name: string;
+  description?: string | null;
+  permissions: string[];
+}
+
+export interface DepartmentMemberItem {
+  userId: string;
+  departmentId: string;
+  role: 'MANAGER' | 'STAFF';
+  appointedBy: string;
+  appointedAt: string;
+  positionIds: string[];
+  permissions: string[];
+}
+
+export interface CreateMemberPayload {
+  username: string;
+  email: string;
+  role: 'MANAGER' | 'STAFF';
+  positionIds: string[];
+}
+
+export interface CreatedMemberResult {
+  member: DepartmentMemberItem;
+  temporaryPassword?: string;
+  mustChangePassword?: boolean;
+}
+
+

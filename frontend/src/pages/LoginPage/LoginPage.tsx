@@ -42,12 +42,19 @@ export default function LoginPage() {
         return;
       }
 
-      // Chủ tổ chức (OWNER / ORG_OWNER) và cán bộ quản lý (MANAGER / STAFF)
-      // có phân hệ quản lý Sinh viên, Lớp học & Phòng ban:
+      // Chủ tổ chức (OWNER / ORG_OWNER) quản trị cơ cấu: Phòng ban, Chức vụ & Nhân sự
       if (
-        state.backendRoles.some((r) =>
-          ['OWNER', 'ORG_OWNER', 'MANAGER', 'STAFF'].includes(r),
-        )
+        state.backendRoles.includes('OWNER') ||
+        state.backendRoles.includes('ORG_OWNER')
+      ) {
+        navigate('/to-chuc/phong-ban');
+        return;
+      }
+
+      // Cán bộ tác nghiệp (MANAGER / STAFF) quản lý Sinh viên & Lớp học
+      if (
+        state.backendRoles.includes('MANAGER') ||
+        state.backendRoles.includes('STAFF')
       ) {
         navigate('/to-chuc/sinh-vien');
         return;

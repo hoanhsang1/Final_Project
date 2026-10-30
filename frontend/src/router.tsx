@@ -47,6 +47,12 @@ const ClassDetailPage = lazy(
 const DepartmentManagementPage = lazy(
   () => import('./pages/DepartmentManagementPage/DepartmentManagementPage'),
 );
+const PositionManagementPage = lazy(
+  () => import('./pages/PositionManagementPage/PositionManagementPage'),
+);
+const MemberManagementPage = lazy(
+  () => import('./pages/MemberManagementPage/MemberManagementPage'),
+);
 
 function RouteFallback() {
   const { token } = theme.useToken();
@@ -172,6 +178,16 @@ export const routes: RouteObject[] = [
             path: 'phong-ban',
             element: <DepartmentManagementPage />,
             handle: { title: 'Quản lý Phòng ban & Module' },
+          },
+          {
+            path: 'chuc-vu',
+            element: <PositionManagementPage />,
+            handle: { title: 'Quản lý Chức vụ' },
+          },
+          {
+            path: 'nhan-su',
+            element: <MemberManagementPage />,
+            handle: { title: 'Bổ nhiệm & Quản lý Nhân sự' },
           },
         ],
       },

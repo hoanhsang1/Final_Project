@@ -58,7 +58,12 @@ export default function RolePreviewPage() {
             </Text>
 
             <Space style={{ marginTop: token.margin }} wrap>
-              {(role.id === 'org-owner' || role.id === 'academic-staff') && (
+              {role.id === 'org-owner' && (
+                <Button type="primary" onClick={() => navigate('/to-chuc/phong-ban')}>
+                  Vào Cổng Quản trị Tổ chức (Phòng ban, Chức vụ)
+                </Button>
+              )}
+              {role.id === 'academic-staff' && (
                 <Button type="primary" onClick={() => navigate('/to-chuc/sinh-vien')}>
                   Vào Cổng Quản lý Sinh viên & Lớp học
                 </Button>
