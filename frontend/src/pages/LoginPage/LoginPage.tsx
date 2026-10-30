@@ -94,10 +94,7 @@ export default function LoginPage() {
           <Form.Item name="remember" valuePropName="checked" noStyle>
             <Checkbox>Ghi nhớ đăng nhập</Checkbox>
           </Form.Item>
-          <Button type="link" htmlType="button" style={{ padding: 0 }}>
-            {/* TODO(Sprint sau): trang quên mật khẩu chưa có. */}
-            Quên mật khẩu?
-          </Button>
+          <Link to="/quen-mat-khau">Quên mật khẩu?</Link>
         </Flex>
 
         {formError && (
