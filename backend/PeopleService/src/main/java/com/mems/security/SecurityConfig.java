@@ -1,4 +1,5 @@
 package com.mems.security;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.dto.ApiError;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/students/**", "/classes/**").authenticated()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();
