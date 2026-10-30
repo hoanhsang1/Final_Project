@@ -7,6 +7,8 @@
 @departmentId = REPLACE_WITH_DEPARTMENT_ID
 @positionId = REPLACE_WITH_POSITION_ID
 @userId = REPLACE_WITH_USER_ID
+@studentId = REPLACE_WITH_STUDENT_ID
+@classId = REPLACE_WITH_CLASS_ID
 
 ### Login: 200 {accessToken,refreshToken,tokenType,expiresIn}
 POST {{identity}}/api/v1/auth/login
@@ -14,45 +16,54 @@ Content-Type: application/json
 
 {"username":"owner@example.com","password":"REPLACE_WITH_PRIVATE_PASSWORD"}
 
-### Create department: 201 {id,name,description,createdAt}
+### Create department with module: 201 {id,name,description,createdAt,modules}
 POST {{people}}/departments
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"name":"Phòng đào tạo","description":"Quản lý đào tạo"}
+{
+  "name": "Phòng Đào tạo & Quản lý Sinh viên",
+  "description": "Phụ trách quản lý sinh viên và lớp học",
+  "moduleCodes": ["STUDENT_MANAGEMENT"]
+}
 
 ### List departments: 200 array
 GET {{people}}/departments
 Authorization: Bearer {{token}}
 
-### Update department: 200
+### Get department details: 200
+GET {{people}}/departments/{{departmentId}}
+Authorization: Bearer {{token}}
+
+### Update department: 200 (thay đổi toàn bộ danh sách module)
 PUT {{people}}/departments/{{departmentId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"name":"Phòng đào tạo","description":"Thông tin mới"}
+{
+  "name": "Phòng Đào tạo & Quản lý Sinh viên",
+  "description": "Cập nhật mô tả mới",
+  "moduleCodes": ["STUDENT_MANAGEMENT"]
+}
 
-### Permission catalog: 200 [{code,description}]
+### Permission catalog: 200 [{code,description,moduleCode}]
 GET {{people}}/permissions
 Authorization: Bearer {{token}}
 
-### Create position: 201 {id,name,description,createdAt,permissions}
+### Create position with student management permissions: 201
 POST {{people}}/positions
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"name":"Quản lý nhân sự","permissions":["PEOPLE_VIEW","PEOPLE_EDIT"]}
+{
+  "name": "Giáo vụ Quản lý Sinh viên",
+  "description": "Xem và chỉnh sửa sinh viên, lớp học",
+  "permissions": ["STUDENT_VIEW", "STUDENT_CREATE", "STUDENT_EDIT", "CLASS_VIEW", "CLASS_CREATE", "CLASS_EDIT"]
+}
 
 ### List positions: 200 array
 GET {{people}}/positions
 Authorization: Bearer {{token}}
-
-### Update position: 200; changes rights for every assignee
-PUT {{people}}/positions/{{positionId}}
-Authorization: Bearer {{token}}
-Content-Type: application/json
-
-{"name":"Quản lý nhân sự","permissions":["PEOPLE_VIEW","PEOPLE_EDIT"]}
 
 ### OWNER creates MANAGER: 201 {member,temporaryPassword,mustChangePassword}
 POST {{people}}/departments/{{departmentId}}/members
@@ -68,46 +79,92 @@ Content-Type: application/json
 
 {"currentPassword":"REPLACE_WITH_TEMPORARY_PASSWORD","newPassword":"REPLACE_WITH_NEW_PRIVATE_PASSWORD"}
 
-### MANAGER creates STAFF: 201; use manager token after password change
-POST {{people}}/departments/{{departmentId}}/members
+### ==========================================
+### Module STUDENT_MANAGEMENT: Sinh viên & Lớp học
+### ==========================================
+
+### Create Student: 201
+POST {{people}}/students
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"username":"staff01","email":"staff@example.com","role":"STAFF","positionIds":["{{positionId}}"]}
+{
+  "studentCode": "SV2026001",
+  "fullName": "Nguyễn Văn A",
+  "dateOfBirth": "2004-05-15",
+  "email": "nguyenvana@example.com",
+  "phone": "0912345678",
+  "status": "active"
+}
 
-### Members: 200 [{userId,departmentId,role,appointedBy,appointedAt,positionIds,permissions}]
-GET {{people}}/departments/{{departmentId}}/members
+### List Students: 200 (phân trang, tìm kiếm)
+GET {{people}}/students?page=1&size=20&q=Nguyễn
 Authorization: Bearer {{token}}
 
-### Change positions: 200 member
-PUT {{people}}/departments/{{departmentId}}/members/{{userId}}/positions
+### Get Student Detail: 200
+GET {{people}}/students/{{studentId}}
+Authorization: Bearer {{token}}
+
+### Update Student: 200
+PUT {{people}}/students/{{studentId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"positionIds":["{{positionId}}"]}
+{
+  "fullName": "Nguyễn Văn A (Cập nhật)",
+  "dateOfBirth": "2004-05-15",
+  "email": "nguyenvana_new@example.com",
+  "phone": "0987654321",
+  "status": "active"
+}
 
-### Refresh after changed rights: 200 auth response; replace BOTH tokens
-POST {{identity}}/api/v1/auth/refresh
+### Delete Student (xóa mềm): 204
+DELETE {{people}}/students/{{studentId}}
+Authorization: Bearer {{token}}
+
+### Create School Class: 201
+POST {{people}}/classes
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{"refreshToken":"{{refresh}}"}
+{
+  "classCode": "CNTT-K18A",
+  "name": "Công nghệ thông tin K18 Lớp A",
+  "academicYear": "2024-2028",
+  "status": "active"
+}
 
-### Facility read: 200 array (FACILITY_MANAGE or OWNER)
-GET {{facility}}/departments/{{departmentId}}/facilities
+### List School Classes: 200
+GET {{people}}/classes?page=1&size=20&q=CNTT
 Authorization: Bearer {{token}}
 
-### Schedule read: 200 array (SCHEDULE_VIEW or OWNER)
-GET {{schedule}}/departments/{{departmentId}}/schedules
+### Get School Class Detail: 200
+GET {{people}}/classes/{{classId}}
 Authorization: Bearer {{token}}
 
-### Remove appointment: 204; account remains
-DELETE {{people}}/departments/{{departmentId}}/members/{{userId}}
+### Update School Class: 200
+PUT {{people}}/classes/{{classId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Công nghệ thông tin K18 Lớp A (Phòng mới)",
+  "academicYear": "2024-2028",
+  "status": "active"
+}
+
+### Enroll Student into Class: 204
+PUT {{people}}/classes/{{classId}}/students/{{studentId}}
 Authorization: Bearer {{token}}
 
-### Delete position: 204 or 409 POSITION_IN_USE
-DELETE {{people}}/positions/{{positionId}}
+### List Students in Class: 200
+GET {{people}}/classes/{{classId}}/students
 Authorization: Bearer {{token}}
 
-### Delete department: 204 or 409 DEPARTMENT_NOT_EMPTY
-DELETE {{people}}/departments/{{departmentId}}
+### Remove Student from Class: 204
+DELETE {{people}}/classes/{{classId}}/students/{{studentId}}
+Authorization: Bearer {{token}}
+
+### Delete Class (phải gỡ hết sinh viên trước): 204
+DELETE {{people}}/classes/{{classId}}
 Authorization: Bearer {{token}}
