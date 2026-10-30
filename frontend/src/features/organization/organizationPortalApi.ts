@@ -35,33 +35,32 @@ function toPortalError(error: unknown): PortalApiError {
   const err = error as {
     response?: {
       status?: number;
-      data?: { message?: string; code?: string } | null;
+      data?: { message?: string; code?: string; error?: string } | null;
     };
     request?: unknown;
   };
   const status = err?.response?.status ?? null;
   const code = err?.response?.data?.code ?? null;
-  const serverMessage = err?.response?.data?.message;
+  const rawMsg = err?.response?.data?.message || err?.response?.data?.error;
 
-  if (typeof serverMessage === 'string' && serverMessage.length > 0) {
-    if (status === 403) {
-      if (code === 'PASSWORD_CHANGE_REQUIRED' || serverMessage.includes('temporary password')) {
-        return new PortalApiError('Tài khoản dùng mật khẩu tạm thời. Vui lòng đổi mật khẩu trước khi thao tác.', status, code);
-      }
+  if (typeof rawMsg === 'string' && rawMsg.length > 0) {
+    if (code === 'PASSWORD_CHANGE_REQUIRED' || rawMsg.includes('temporary password')) {
       return new PortalApiError(
-        serverMessage === 'Access denied'
-          ? 'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho Chủ tổ chức - OWNER).'
-          : serverMessage,
+        'Tài khoản đang mang mật khẩu tạm thời. Vui lòng đổi mật khẩu trước khi thao tác nghiệp vụ.',
         status,
         code,
       );
     }
-    return new PortalApiError(serverMessage, status, code);
+    return new PortalApiError(
+      code ? `[${code}] ${rawMsg}` : rawMsg,
+      status,
+      code,
+    );
   }
 
   if (status === 403) {
     return new PortalApiError(
-      'Bạn không có quyền thực hiện thao tác này (Chỉ dành cho Chủ tổ chức - OWNER).',
+      'Bạn không có quyền thực hiện thao tác này (403 Forbidden). Vui lòng kiểm tra lại quyền của tài khoản.',
       status,
       code,
     );

@@ -58,6 +58,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       IDENTITY_SERVICE_URL: http://identity-org-service:8081
+      PEOPLE_SERVICE_URL: http://people-service:8082
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -119,6 +120,7 @@ services:
       - ~/.m2:/root/.m2
     environment:
       IDENTITY_SERVICE_URL: http://identity-org-service:8081
+      PEOPLE_SERVICE_URL: http://people-service:8082
       SPRING_CLOUD_DISCOVERY_ENABLED: "true"
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
