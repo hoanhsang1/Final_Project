@@ -5,12 +5,15 @@ import {
   Card,
   Checkbox,
   Col,
+  Divider,
+  Empty,
   Flex,
   Form,
   Input,
   Modal,
   Popconfirm,
   Row,
+  Select,
   Space,
   Table,
   Tag,
@@ -19,15 +22,17 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   createPosition,
   deletePosition,
+  fetchDepartments,
   fetchPermissions,
   fetchPositions,
   updatePosition,
 } from '../../features/organization/organizationPortalApi';
 import type {
+  DepartmentItem,
   PermissionItem,
   PositionItem,
   PositionPayload,
@@ -42,11 +47,17 @@ export default function PositionManagementPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<PositionItem | null>(null);
+  const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [form] = Form.useForm<PositionPayload>();
 
   const { data: positions = [], isLoading } = useQuery({
     queryKey: ['positions'],
     queryFn: fetchPositions,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: fetchDepartments,
   });
 
   const { data: permissions = [] } = useQuery({
@@ -85,6 +96,7 @@ export default function PositionManagementPage() {
   const handleOpenModal = (pos?: PositionItem) => {
     if (pos) {
       setEditingPosition(pos);
+      setSelectedDeptIds([]);
       form.setFieldsValue({
         name: pos.name,
         description: pos.description ?? '',
@@ -92,6 +104,12 @@ export default function PositionManagementPage() {
       });
     } else {
       setEditingPosition(null);
+      // Mặc định chọn phòng ban đầu tiên nếu có
+      if (departments.length > 0) {
+        setSelectedDeptIds([departments[0].id]);
+      } else {
+        setSelectedDeptIds([]);
+      }
       form.resetFields();
       form.setFieldsValue({ permissions: [] });
     }
@@ -101,15 +119,64 @@ export default function PositionManagementPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingPosition(null);
+    setSelectedDeptIds([]);
     form.resetFields();
   };
 
-  const studentPermissions = permissions.filter(
-    (p) => p.moduleCode === 'STUDENT_MANAGEMENT' || p.code.startsWith('STUDENT_') || p.code.startsWith('CLASS_'),
+  // Tính toán các module thuộc các phòng ban đã chọn
+  const activeModulesFromSelectedDepts = useMemo(() => {
+    if (selectedDeptIds.length === 0) return [];
+    const mods = new Set<string>();
+    departments
+      .filter((d: DepartmentItem) => selectedDeptIds.includes(d.id))
+      .forEach((d: DepartmentItem) => {
+        d.modules?.forEach((m) => mods.add(m));
+      });
+    return Array.from(mods);
+  }, [departments, selectedDeptIds]);
+
+  // Lọc quyền hiển thị theo phòng ban được chọn:
+  // Nếu chưa chọn phòng ban nào -> Hiển thị tất cả quyền
+  // Nếu đã chọn phòng ban -> Hiển thị các quyền thuộc module của các phòng ban đó + quyền cơ bản
+  const filteredPermissions = useMemo(() => {
+    if (selectedDeptIds.length === 0) {
+      return permissions;
+    }
+    return permissions.filter((p: PermissionItem) => {
+      if (!p.moduleCode) {
+        // Quyền dùng chung không phụ thuộc module
+        return true;
+      }
+      return activeModulesFromSelectedDepts.includes(p.moduleCode);
+    });
+  }, [permissions, selectedDeptIds, activeModulesFromSelectedDepts]);
+
+  const studentPermissions = useMemo(
+    () =>
+      filteredPermissions.filter(
+        (p) => p.moduleCode === 'STUDENT_MANAGEMENT' || p.code.startsWith('STUDENT_') || p.code.startsWith('CLASS_'),
+      ),
+    [filteredPermissions],
   );
-  const otherPermissions = permissions.filter(
-    (p) => !studentPermissions.some((sp) => sp.code === p.code),
+
+  const otherPermissions = useMemo(
+    () => filteredPermissions.filter((p) => !studentPermissions.some((sp) => sp.code === p.code)),
+    [filteredPermissions, studentPermissions],
   );
+
+  const handleSelectAllFiltered = () => {
+    const current = form.getFieldValue('permissions') || [];
+    const allFilteredCodes = filteredPermissions.map((p) => p.code);
+    const merged = Array.from(new Set([...current, ...allFilteredCodes]));
+    form.setFieldsValue({ permissions: merged });
+  };
+
+  const handleDeselectFiltered = () => {
+    const current: string[] = form.getFieldValue('permissions') || [];
+    const allFilteredCodes = new Set(filteredPermissions.map((p) => p.code));
+    const remaining = current.filter((code) => !allFilteredCodes.has(code));
+    form.setFieldsValue({ permissions: remaining });
+  };
 
   const columns: ColumnsType<PositionItem> = [
     {
@@ -211,7 +278,7 @@ export default function PositionManagementPage() {
         onCancel={handleCloseModal}
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
-        width={720}
+        width={760}
         destroyOnClose
       >
         <Form<PositionPayload> form={form} layout="vertical" onFinish={(vals) => saveMutation.mutate(vals)}>
@@ -234,50 +301,112 @@ export default function PositionManagementPage() {
             <TextArea rows={2} placeholder="Mô tả vai trò và trách nhiệm của chức vụ này" />
           </Form.Item>
 
+          {/* Chọn phòng ban để lọc quyền */}
+          <Card
+            size="small"
+            style={{ marginBottom: 16, backgroundColor: '#f9f9f9', borderColor: '#d9d9d9' }}
+          >
+            <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
+              <Text strong>🏢 Chọn Phòng ban để hiển thị danh sách quyền tương ứng:</Text>
+              <Space>
+                <Button size="small" onClick={() => setSelectedDeptIds(departments.map((d: DepartmentItem) => d.id))}>
+                  Chọn tất cả phòng
+                </Button>
+                <Button size="small" onClick={() => setSelectedDeptIds([])}>
+                  Bỏ lọc (Hiện toàn bộ)
+                </Button>
+              </Space>
+            </Flex>
+            <Select
+              mode="multiple"
+              style={{ width: '100%' }}
+              placeholder="Chọn 1 hoặc nhiều phòng ban (ví dụ: Phòng 1, Phòng 2...)"
+              value={selectedDeptIds}
+              onChange={(val) => setSelectedDeptIds(val)}
+              options={departments.map((d: DepartmentItem) => ({
+                label: `${d.name} ${d.modules && d.modules.length > 0 ? `[Module: ${d.modules.join(', ')}]` : '(Chưa gắn module)'}`,
+                value: d.id,
+              }))}
+            />
+            {activeModulesFromSelectedDepts.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Module phụ trách:{' '}
+                </Text>
+                {activeModulesFromSelectedDepts.map((m) => (
+                  <Tag color="cyan" key={m} style={{ fontSize: 12 }}>
+                    {m}
+                  </Tag>
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Form.Item
-            label="Danh sách quyền được gán"
+            label={
+              <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+                <span>Danh sách quyền được gán cho Chức vụ</span>
+                <Space>
+                  <Button type="link" size="small" onClick={handleSelectAllFiltered}>
+                    Chọn tất cả quyền hiển thị
+                  </Button>
+                  <Button type="link" size="small" danger onClick={handleDeselectFiltered}>
+                    Bỏ chọn quyền hiển thị
+                  </Button>
+                </Space>
+              </Flex>
+            }
             name="permissions"
             rules={[{ required: true, message: 'Vui lòng chọn ít nhất một quyền' }]}
           >
             <Checkbox.Group style={{ width: '100%' }}>
-              <div style={{ marginBottom: 16 }}>
-                <Text strong style={{ color: '#52c41a', display: 'block', marginBottom: 8 }}>
-                  📌 Quyền thuộc Module Quản lý Sinh viên & Lớp học (STUDENT_MANAGEMENT):
-                </Text>
-                <Row gutter={[12, 10]}>
-                  {studentPermissions.map((perm: PermissionItem) => (
-                    <Col span={12} key={perm.code}>
-                      <Checkbox value={perm.code}>
-                        <Text strong>{perm.code}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {perm.description}
-                        </Text>
-                      </Checkbox>
-                    </Col>
-                  ))}
-                </Row>
-              </div>
+              {filteredPermissions.length === 0 ? (
+                <Empty description="Không có quyền nào phù hợp với phòng ban đã chọn" />
+              ) : (
+                <>
+                  {studentPermissions.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <Text strong style={{ color: '#52c41a', display: 'block', marginBottom: 8 }}>
+                        📌 Quyền thuộc Module Quản lý Sinh viên & Lớp học (STUDENT_MANAGEMENT):
+                      </Text>
+                      <Row gutter={[12, 10]}>
+                        {studentPermissions.map((perm: PermissionItem) => (
+                          <Col span={12} key={perm.code}>
+                            <Checkbox value={perm.code}>
+                              <Text strong>{perm.code}</Text>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {perm.description}
+                              </Text>
+                            </Checkbox>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
 
-              {otherPermissions.length > 0 && (
-                <div>
-                  <Text strong style={{ color: '#1677ff', display: 'block', marginBottom: 8 }}>
-                    ⚙️ Quyền Hệ thống & Phòng ban chung:
-                  </Text>
-                  <Row gutter={[12, 10]}>
-                    {otherPermissions.map((perm: PermissionItem) => (
-                      <Col span={12} key={perm.code}>
-                        <Checkbox value={perm.code}>
-                          <Text strong>{perm.code}</Text>
-                          <br />
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {perm.description}
-                          </Text>
-                        </Checkbox>
-                      </Col>
-                    ))}
-                  </Row>
-                </div>
+                  {otherPermissions.length > 0 && (
+                    <div>
+                      {studentPermissions.length > 0 && <Divider style={{ margin: '12px 0' }} />}
+                      <Text strong style={{ color: '#1677ff', display: 'block', marginBottom: 8 }}>
+                        ⚙️ Quyền Hệ thống & Phòng ban chung:
+                      </Text>
+                      <Row gutter={[12, 10]}>
+                        {otherPermissions.map((perm: PermissionItem) => (
+                          <Col span={12} key={perm.code}>
+                            <Checkbox value={perm.code}>
+                              <Text strong>{perm.code}</Text>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {perm.description}
+                              </Text>
+                            </Checkbox>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
+                </>
               )}
             </Checkbox.Group>
           </Form.Item>
@@ -285,12 +414,11 @@ export default function PositionManagementPage() {
           <Alert
             type="info"
             showIcon
-            message="Lưu ý về Quyền hiệu lực"
-            description="Chức vụ có thể bao gồm nhiều quyền, nhưng khi gán cho nhân viên thuộc một phòng ban, chỉ các quyền phù hợp với module mà phòng ban đó phụ trách mới có hiệu lực."
+            message="Cơ chế Quyền hiệu lực"
+            description="Chức vụ có thể bao gồm nhiều quyền, nhưng khi gán cho nhân viên thuộc một phòng ban, chỉ các quyền phù hợp với module của phòng ban đó mới có hiệu lực hoạt động."
           />
         </Form>
       </Modal>
     </div>
   );
 }
-
