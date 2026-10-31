@@ -81,7 +81,9 @@ export default function DepartmentManagementPage() {
   const handleOpenCreate = () => {
     setEditingDept(null);
     form.resetFields();
-    form.setFieldsValue({ moduleCodes: ['STUDENT_MANAGEMENT'] });
+    // Mặc định không chọn module để tránh gọi IdentityService validate
+    // User có thể chọn module sau khi phòng ban được tạo
+    form.setFieldsValue({ moduleCodes: [] });
     setModalOpen(true);
   };
 
@@ -221,7 +223,11 @@ export default function DepartmentManagementPage() {
             <Input.TextArea rows={3} placeholder="Mô tả chức năng của phòng ban..." />
           </Form.Item>
 
-          <Form.Item label="Module chuyên trách" name="moduleCodes">
+          <Form.Item
+            label="Module chuyên trách"
+            name="moduleCodes"
+            extra="Lưu ý: Chọn module yêu cầu dịch vụ xác thực nội bộ hoạt động. Nếu gặp lỗi, hãy để trống và thêm module sau."
+          >
             <Checkbox.Group
               options={[
                 {
