@@ -43,10 +43,26 @@ function toPortalError(error: unknown): PortalApiError {
   const code = err?.response?.data?.code ?? null;
   const rawMsg = err?.response?.data?.message || err?.response?.data?.error;
 
+  // Xử lý riêng lỗi IDENTITY_UNAVAILABLE (PeopleService không gọi được IdentityService)
+  if (code === 'IDENTITY_UNAVAILABLE') {
+    return new PortalApiError(
+      'Dịch vụ xác thực nội bộ chưa sẵn sàng (cold start trên Render). Vui lòng thử lại sau 30 giây, hoặc tạo phòng ban mà không chọn module.',
+      status,
+      code,
+    );
+  }
+
   if (typeof rawMsg === 'string' && rawMsg.length > 0) {
     if (code === 'PASSWORD_CHANGE_REQUIRED' || rawMsg.includes('temporary password')) {
       return new PortalApiError(
         'Tài khoản đang mang mật khẩu tạm thời. Vui lòng đổi mật khẩu trước khi thao tác nghiệp vụ.',
+        status,
+        code,
+      );
+    }
+    if (code === 'MODULE_NOT_ENABLED') {
+      return new PortalApiError(
+        'Module chưa được kích hoạt cho tổ chức này. Hãy để trống module hoặc liên hệ quản trị hệ thống.',
         status,
         code,
       );
