@@ -4,6 +4,8 @@ import com.mems.dto.PermissionResponse;
 import com.mems.dto.MemberRequest;
 import java.util.Map;
 import com.mems.exception.ApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Environment;
@@ -15,10 +17,13 @@ import java.util.List;
 
 @Component
 public class IdentityClient {
+    private static final Logger log = LoggerFactory.getLogger(IdentityClient.class);
     private final RestTemplate http;
 
     public IdentityClient(RestTemplateBuilder builder, Environment env) {
-        http = builder.rootUri(env.getProperty("IDENTITY_SERVICE_URL", "http://localhost:8081"))
+        String baseUrl = env.getProperty("IDENTITY_SERVICE_URL", "http://localhost:8081");
+        log.info("IdentityService base URL: {}", baseUrl);
+        http = builder.rootUri(baseUrl)
             .defaultHeader("X-Internal-Api-Key", env.getProperty("INTERNAL_API_KEY", ""))
             .setConnectTimeout(Duration.ofSeconds(3)).setReadTimeout(Duration.ofSeconds(5)).build();
     }
@@ -27,10 +32,10 @@ public class IdentityClient {
         try {
             var response = http.exchange("/internal/permissions", HttpMethod.GET, null,
                 new ParameterizedTypeReference<List<PermissionResponse>>() {});
-            if (response.getBody() == null) throw unavailable();
+            if (response.getBody() == null) throw unavailable(null);
             return response.getBody();
         } catch (RestClientException ex) {
-            throw unavailable();
+            throw unavailable(ex);
         }
     }
 
@@ -43,10 +48,10 @@ public class IdentityClient {
                 new ParameterizedTypeReference<List<String>>() {},
                 orgId
             );
-            if (response.getBody() == null) throw unavailable();
+            if (response.getBody() == null) throw unavailable(null);
             return response.getBody();
         } catch (RestClientException ex) {
-            throw unavailable();
+            throw unavailable(ex);
         }
     }
 
@@ -58,7 +63,7 @@ public class IdentityClient {
         } catch (HttpClientErrorException.Conflict ex) {
             throw new ApiException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS", "Account already exists or organization is inactive");
         } catch (RestClientException ex) {
-            throw unavailable();
+            throw unavailable(ex);
         }
     }
 
@@ -66,7 +71,12 @@ public class IdentityClient {
         http.delete("/internal/accounts/{id}?orgId={orgId}", id, orgId);
     }
 
-    private ApiException unavailable() {
+    private ApiException unavailable(RestClientException cause) {
+        if (cause != null) {
+            log.warn("IdentityService call failed: {}", cause.toString());
+        } else {
+            log.warn("IdentityService returned an empty body");
+        }
         return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "IDENTITY_UNAVAILABLE", "Identity service unavailable");
     }
 }
