@@ -71,6 +71,20 @@ public class IdentityClient {
         http.delete("/internal/accounts/{id}?orgId={orgId}", id, orgId);
     }
 
+    public String resetPassword(String id, String orgId) {
+        try {
+            var response = http.postForEntity(
+                "/internal/accounts/{id}/reset-password?orgId={orgId}", null, Map.class, id, orgId);
+            Object password = response.getBody() == null ? null : response.getBody().get("temporaryPassword");
+            if (password == null) throw unavailable(null);
+            return password.toString();
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "Identity account not found");
+        } catch (RestClientException ex) {
+            throw unavailable(ex);
+        }
+    }
+
     private ApiException unavailable(RestClientException cause) {
         if (cause != null) {
             log.warn("IdentityService call failed: {}", cause.toString());

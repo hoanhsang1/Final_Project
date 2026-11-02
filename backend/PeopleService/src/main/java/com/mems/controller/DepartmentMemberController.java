@@ -22,6 +22,10 @@ public class DepartmentMemberController {
     @PutMapping("/{userId}/positions") @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
     public MemberResponse positions(@PathVariable String departmentId,@PathVariable String userId,
             @Valid @RequestBody MemberPositionsRequest request) { return service.updatePositions(departmentId,userId,request); }
+    @PostMapping("/{userId}/reset-password") @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
+    public ResetPasswordResponse resetPassword(@PathVariable String departmentId,@PathVariable String userId) {
+        return service.resetPassword(departmentId,userId);
+    }
     @DeleteMapping("/{userId}") @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String departmentId,@PathVariable String userId) { service.remove(departmentId,userId); }

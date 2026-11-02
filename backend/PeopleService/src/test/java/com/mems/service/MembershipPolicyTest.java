@@ -56,7 +56,7 @@ class MembershipPolicyTest {
         when(actor.owner()).thenReturn(false);
 
         MemberResponse managerMember = new MemberResponse(
-            "manager-user-id", "dept-1", "MANAGER", "owner-id", Instant.now(),
+            "manager-user-id", "manager01", "dept-1", "MANAGER", "owner-id", Instant.now(),
             Set.of("pos-manager"), Set.of("PEOPLE_EDIT", "PEOPLE_VIEW")
         );
         when(members.require("manager-user-id", "org-1", "dept-1", true)).thenReturn(managerMember);
@@ -99,7 +99,7 @@ class MembershipPolicyTest {
         when(actor.owner()).thenReturn(false);
 
         MemberResponse managerMember = new MemberResponse(
-            "manager-user-id", "dept-1", "MANAGER", "owner-id", Instant.now(),
+            "manager-user-id", "manager01", "dept-1", "MANAGER", "owner-id", Instant.now(),
             Set.of("pos-manager"), Set.of("PEOPLE_VIEW") // No PEOPLE_EDIT
         );
         when(members.require("manager-user-id", "org-1", "dept-1", true)).thenReturn(managerMember);

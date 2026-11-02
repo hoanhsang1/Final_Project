@@ -116,6 +116,7 @@ export interface PositionPayload {
 
 export interface DepartmentMemberItem {
   userId: string;
+  username: string | null;
   departmentId: string;
   role: 'MANAGER' | 'STAFF';
   appointedBy: string;
@@ -135,6 +136,10 @@ export interface CreatedMemberResult {
   member: DepartmentMemberItem;
   temporaryPassword?: string;
   mustChangePassword?: boolean;
+}
+
+export interface ResetPasswordResult {
+  temporaryPassword: string;
 }
 
 
