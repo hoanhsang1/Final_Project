@@ -24,6 +24,7 @@ import {
   fetchDepartments,
   fetchPositions,
   removeDepartmentMember,
+  resetDepartmentMemberPassword,
   updateDepartmentMemberPositions,
 } from '../../features/organization/organizationPortalApi';
 import type {
@@ -96,7 +97,7 @@ export default function MemberManagementPage() {
         content: (
           <div>
             <Paragraph>
-              Thành viên <strong>{result.member.userId}</strong> đã được thêm vào phòng ban với vai trò{' '}
+              Thành viên <strong>{result.member.username ?? result.member.userId}</strong> đã được thêm vào phòng ban với vai trò{' '}
               <Tag color={result.member.role === 'MANAGER' ? 'purple' : 'green'}>
                 {result.member.role === 'MANAGER' ? 'Trưởng phòng (MANAGER)' : 'Nhân viên (STAFF)'}
               </Tag>
@@ -144,6 +145,41 @@ export default function MemberManagementPage() {
     },
   });
 
+  // Mutation cấp lại mật khẩu tạm thời
+  const resetPasswordMutation = useMutation({
+    mutationFn: (member: DepartmentMemberItem) =>
+      resetDepartmentMemberPassword(selectedDeptId, member.userId),
+    onSuccess: (result, member) => {
+      modal.success({
+        title: 'Đã cấp lại mật khẩu tạm thời',
+        content: (
+          <div>
+            <Paragraph>
+              Mật khẩu mới cho <strong>{member.username ?? member.userId}</strong>:
+            </Paragraph>
+            <Alert
+              type="warning"
+              message="Mật khẩu tạm thời"
+              description={
+                <div>
+                  <Paragraph copyable style={{ fontSize: 16, fontWeight: 'bold', margin: '8px 0' }}>
+                    {result.temporaryPassword}
+                  </Paragraph>
+                  <Text type="secondary">
+                    Mật khẩu chỉ hiển thị một lần. Người dùng sẽ phải đổi mật khẩu trong lần đăng nhập tiếp theo.
+                  </Text>
+                </div>
+              }
+            />
+          </div>
+        ),
+      });
+    },
+    onError: (err: Error) => {
+      message.error(err.message || 'Không thể cấp lại mật khẩu.');
+    },
+  });
+
   // Mutation xóa thành viên
   const removeMutation = useMutation({
     mutationFn: (userId: string) => removeDepartmentMember(selectedDeptId, userId),
@@ -167,9 +203,9 @@ export default function MemberManagementPage() {
   const columns: ColumnsType<DepartmentMemberItem> = [
     {
       title: 'Tài khoản (Username)',
-      dataIndex: 'userId',
-      key: 'userId',
-      render: (text) => <Text strong>{text}</Text>,
+      dataIndex: 'username',
+      key: 'username',
+      render: (text, record) => <Text strong>{text ?? record.userId}</Text>,
     },
     {
       title: 'Vai trò',
@@ -232,12 +268,23 @@ export default function MemberManagementPage() {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 180,
+      width: 320,
       render: (_, record) => (
         <Space>
           <Button type="link" onClick={() => handleOpenPositionsModal(record)}>
             Đổi chức vụ
           </Button>
+          <Popconfirm
+            title="Cấp lại mật khẩu"
+            description="Mật khẩu mới sẽ được tạo và người dùng phải đổi ở lần đăng nhập tiếp theo. Tiếp tục?"
+            okText="Cấp lại"
+            cancelText="Hủy"
+            onConfirm={() => resetPasswordMutation.mutate(record)}
+          >
+            <Button type="link" loading={resetPasswordMutation.isPending}>
+              Cấp lại mật khẩu
+            </Button>
+          </Popconfirm>
           <Popconfirm
             title="Gỡ khỏi phòng ban"
             description="Bạn có chắc chắn muốn gỡ thành viên này khỏi phòng không?"
@@ -388,7 +435,7 @@ export default function MemberManagementPage() {
 
       {/* Modal Đổi Chức vụ */}
       <Modal
-        title={`Cập nhật Chức vụ cho: ${editingMember?.userId}`}
+        title={`Cập nhật Chức vụ cho: ${editingMember?.username ?? editingMember?.userId}`}
         open={positionModalOpen}
         onCancel={() => setPositionModalOpen(false)}
         onOk={() => positionForm.submit()}

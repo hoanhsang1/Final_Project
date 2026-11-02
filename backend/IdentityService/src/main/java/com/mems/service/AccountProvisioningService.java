@@ -6,12 +6,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Map;
 
 @Service
 public class AccountProvisioningService {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
+    private final SecureRandom random=new SecureRandom();
     public AccountProvisioningService(JdbcTemplate jdbc,PasswordEncoder encoder) { this.jdbc=jdbc;this.encoder=encoder; }
     @Transactional(timeout=15)
     public Map<String,String> create(ProvisionAccountRequest request) {
@@ -31,6 +34,15 @@ public class AccountProvisioningService {
             request.userId(),request.role());
         if(assigned!=1) throw new IllegalStateException("Department roles have not been seeded");
         return Map.of("userId",request.userId());
+    }
+    @Transactional
+    public Map<String,String> resetPassword(String id,String orgId) {
+        byte[] bytes=new byte[24];random.nextBytes(bytes);
+        String password=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
+            encoder.encode(password),id,orgId);
+        if(updated!=1) throw new ApiException(HttpStatus.NOT_FOUND,"Account not found");
+        return Map.of("temporaryPassword",password);
     }
     @Transactional
     public void compensate(String id,String orgId) {

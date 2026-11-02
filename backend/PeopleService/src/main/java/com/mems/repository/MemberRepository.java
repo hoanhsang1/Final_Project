@@ -31,7 +31,7 @@ public class MemberRepository {
 
     public MemberResponse require(String id, String orgId, String departmentId, boolean lock) {
         var rows = jdbc.query("""
-            SELECT user_id, department_id, role, appointed_by, appointed_at
+            SELECT user_id, username, department_id, role, appointed_by, appointed_at
             FROM department_member WHERE user_id=? AND org_id=? AND department_id=?
             """ + (lock ? " FOR UPDATE" : ""),
             (rs, n) -> {
@@ -39,6 +39,7 @@ public class MemberRepository {
                 Set<String> effective = effectivePermissions.compute(orgId, departmentId, raw);
                 return new MemberResponse(
                     rs.getString("user_id"),
+                    rs.getString("username"),
                     rs.getString("department_id"),
                     rs.getString("role"),
                     rs.getString("appointed_by"),
@@ -67,10 +68,10 @@ public class MemberRepository {
             """, String.class, id));
     }
 
-    public void create(String userId, String orgId, String departmentId, String role, String appointedBy) {
+    public void create(String userId, String orgId, String departmentId, String role, String appointedBy, String username) {
         jdbc.update(
-            "INSERT INTO department_member(user_id, org_id, department_id, role, appointed_by, appointed_at) VALUES (?, ?, ?, ?, ?, ?)",
-            userId, orgId, departmentId, role, appointedBy, Timestamp.from(Instant.now())
+            "INSERT INTO department_member(user_id, org_id, department_id, role, appointed_by, appointed_at, username) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            userId, orgId, departmentId, role, appointedBy, Timestamp.from(Instant.now()), username
         );
     }
 

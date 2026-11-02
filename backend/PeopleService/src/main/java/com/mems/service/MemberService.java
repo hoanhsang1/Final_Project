@@ -46,7 +46,7 @@ public class MemberService {
             MemberResponse result=tx.execute(status -> {
                 compensation.lock(userId);
                 validate(departmentId,request.role(),request.positionIds());
-                members.create(userId,orgId,departmentId,request.role(),actorId);
+                members.create(userId,orgId,departmentId,request.role(),actorId,request.username().trim());
                 members.assign(userId,orgId,request.positionIds());
                 var member=members.require(userId,orgId,departmentId,false);
                 audit.record(orgId,actorId,"MEMBER_APPOINTED",userId,member);
@@ -72,6 +72,15 @@ public class MemberService {
         var after=members.require(userId,actor.orgId(),departmentId,false);
         audit.record(actor.orgId(),actor.userId(),"MEMBER_POSITIONS_CHANGED",userId,Map.of("before",before,"after",after));
         return after;
+    }
+    public ResetPasswordResponse resetPassword(String departmentId,String userId) {
+        policy.protectOwner(userId);
+        departments.require(departmentId,actor.orgId(),false);
+        var member=members.require(userId,actor.orgId(),departmentId,false);
+        if("OWNER".equals(member.role())) throw actor.forbidden("Owner passwords cannot be reset here");
+        String password=identity.resetPassword(userId,actor.orgId());
+        audit.record(actor.orgId(),actor.userId(),"MEMBER_PASSWORD_RESET",userId,Map.of("role",member.role()));
+        return new ResetPasswordResponse(password);
     }
     @Transactional
     public void remove(String departmentId,String userId) {

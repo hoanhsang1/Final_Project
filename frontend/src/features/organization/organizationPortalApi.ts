@@ -9,6 +9,7 @@ import type {
   PermissionItem,
   PositionItem,
   PositionPayload,
+  ResetPasswordResult,
   SchoolClassItem,
   SchoolClassListQuery,
   SchoolClassPayload,
@@ -358,6 +359,20 @@ export async function updateDepartmentMemberPositions(
     const { data } = await apiClient.put<DepartmentMemberItem>(
       `/departments/${departmentId}/members/${userId}/positions`,
       { positionIds },
+    );
+    return data;
+  } catch (error) {
+    throw toPortalError(error);
+  }
+}
+
+export async function resetDepartmentMemberPassword(
+  departmentId: string,
+  userId: string,
+): Promise<ResetPasswordResult> {
+  try {
+    const { data } = await apiClient.post<ResetPasswordResult>(
+      `/departments/${departmentId}/members/${userId}/reset-password`,
     );
     return data;
   } catch (error) {

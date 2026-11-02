@@ -13,6 +13,10 @@ public class InternalAccountController {
     public InternalAccountController(AccountProvisioningService service) { this.service=service; }
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
     public Map<String,String> create(@Valid @RequestBody ProvisionAccountRequest request) { return service.create(request); }
+    @PostMapping("/{id}/reset-password")
+    public Map<String,String> resetPassword(@PathVariable String id,@RequestParam String orgId) {
+        return service.resetPassword(id,orgId);
+    }
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id,@RequestParam String orgId) { service.compensate(id,orgId); }
 }
