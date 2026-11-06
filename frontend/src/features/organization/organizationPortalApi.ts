@@ -47,7 +47,7 @@ function toPortalError(error: unknown): PortalApiError {
   // Xử lý riêng lỗi IDENTITY_UNAVAILABLE (PeopleService không gọi được IdentityService)
   if (code === 'IDENTITY_UNAVAILABLE') {
     return new PortalApiError(
-      'Dịch vụ xác thực nội bộ chưa sẵn sàng (cold start trên Render). Vui lòng thử lại sau 30 giây, hoặc tạo phòng ban mà không chọn module.',
+      'Dịch vụ xác thực nội bộ chưa sẵn sàng (máy chủ hoặc tunnel có thể vừa khởi động). Vui lòng thử lại sau 30 giây, hoặc tạo phòng ban mà không chọn module.',
       status,
       code,
     );

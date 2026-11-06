@@ -2,47 +2,47 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://apigateway-2ptf.onrender.com/api/:path*"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/api/:path*"
     },
     {
       "source": "/departments",
-      "destination": "https://apigateway-2ptf.onrender.com/departments"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/departments"
     },
     {
       "source": "/departments/:path+",
-      "destination": "https://apigateway-2ptf.onrender.com/departments/:path+"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/departments/:path+"
     },
     {
       "source": "/positions",
-      "destination": "https://apigateway-2ptf.onrender.com/positions"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/positions"
     },
     {
       "source": "/positions/:path+",
-      "destination": "https://apigateway-2ptf.onrender.com/positions/:path+"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/positions/:path+"
     },
     {
       "source": "/permissions",
-      "destination": "https://apigateway-2ptf.onrender.com/permissions"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/permissions"
     },
     {
       "source": "/permissions/:path+",
-      "destination": "https://apigateway-2ptf.onrender.com/permissions/:path+"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/permissions/:path+"
     },
     {
       "source": "/students",
-      "destination": "https://apigateway-2ptf.onrender.com/students"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/students"
     },
     {
       "source": "/students/:path+",
-      "destination": "https://apigateway-2ptf.onrender.com/students/:path+"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/students/:path+"
     },
     {
       "source": "/classes",
-      "destination": "https://apigateway-2ptf.onrender.com/classes"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/classes"
     },
     {
       "source": "/classes/:path+",
-      "destination": "https://apigateway-2ptf.onrender.com/classes/:path+"
+      "destination": "https://gdp-hawaii-proteins-himself.trycloudflare.com/classes/:path+"
     },
     {
       "source": "/(.*)",
