@@ -23,12 +23,15 @@ public class DepartmentService {
     private final Actor actor;
     private final IdentityClient identityClient;
     private final PeopleAuditService audit;
+    private final DefaultPositionSeeder positionSeeder;
 
-    public DepartmentService(DepartmentRepository repository, Actor actor, IdentityClient identityClient, PeopleAuditService audit) {
+    public DepartmentService(DepartmentRepository repository, Actor actor, IdentityClient identityClient,
+                             PeopleAuditService audit, DefaultPositionSeeder positionSeeder) {
         this.repository = repository;
         this.actor = actor;
         this.identityClient = identityClient;
         this.audit = audit;
+        this.positionSeeder = positionSeeder;
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +51,7 @@ public class DepartmentService {
         validateModules(orgId, request.moduleCodes());
 
         DepartmentResponse created = repository.create(orgId, request.name().trim(), request.description());
+        positionSeeder.ensureForOrg(orgId);
         repository.setModules(created.id(), orgId, request.moduleCodes());
 
         audit.record(orgId, actor.userId(), "DEPARTMENT_MODULES_CHANGED", created.id(),

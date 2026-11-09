@@ -16,11 +16,15 @@ public class OrganizationModuleGuard {
     }
 
     public void requireModule(String orgId, String moduleCode) {
-        List<String> activeModules = identityClient.activeModules(orgId);
-        if (activeModules == null || !activeModules.contains(moduleCode)) {
+        if (!isActive(orgId, moduleCode)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "MODULE_NOT_ENABLED",
                 "Module " + moduleCode + " is not enabled for organization");
         }
+    }
+
+    public boolean isActive(String orgId, String moduleCode) {
+        List<String> activeModules = identityClient.activeModules(orgId);
+        return activeModules != null && activeModules.contains(moduleCode);
     }
 }
 

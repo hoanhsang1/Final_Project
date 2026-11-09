@@ -25,12 +25,23 @@ public class PositionRepository {
     }
 
     public PositionResponse require(String id, String orgId, boolean lock) {
-        var rows = jdbc.query("SELECT id, name, description, created_at FROM `position` WHERE id=? AND org_id=?"
+        var rows = jdbc.query("SELECT id, name, description, created_at, profile_type FROM `position` WHERE id=? AND org_id=?"
             + (lock ? " FOR UPDATE" : ""),
             (rs, n) -> new PositionResponse(rs.getString("id"), rs.getString("name"), rs.getString("description"),
-                rs.getTimestamp("created_at").toInstant(), permissions(id)), id, orgId);
+                rs.getTimestamp("created_at").toInstant(), permissions(id), rs.getString("profile_type")), id, orgId);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "POSITION_NOT_FOUND", "Position not found");
         return rows.get(0);
+    }
+
+    public Set<String> profileTypes(String orgId, Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) return Set.of();
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        List<Object> params = new ArrayList<>();
+        params.add(orgId);
+        params.addAll(ids);
+        return new HashSet<>(jdbc.queryForList(
+            "SELECT DISTINCT profile_type FROM `position` WHERE org_id=? AND id IN (" + placeholders + ")",
+            String.class, params.toArray()));
     }
 
     public Set<String> permissions(String id) {

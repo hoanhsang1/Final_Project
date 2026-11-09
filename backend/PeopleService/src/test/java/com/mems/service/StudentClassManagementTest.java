@@ -5,6 +5,7 @@ import com.mems.dto.*;
 import com.mems.exception.ApiException;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,12 @@ class StudentClassManagementTest {
     @Mock
     private JdbcTemplate jdbc;
 
+    @Mock
+    private TeacherRepository teacherRepository;
+
+    @Mock
+    private ClassStatusService classStatusService;
+
     private OrganizationModuleGuard moduleGuard;
     private StudentService studentService;
     private SchoolClassService classService;
@@ -59,7 +66,8 @@ class StudentClassManagementTest {
     void setUp() {
         moduleGuard = new OrganizationModuleGuard(identityClient);
         studentService = new StudentService(studentRepository, actor, moduleGuard, audit);
-        classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit);
+        classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit,
+            teacherRepository, classStatusService, "TEACHER_ASSIGNMENT");
         effectivePermissions = new EffectivePermissionsService(jdbc, identityClient);
     }
 
@@ -77,7 +85,7 @@ class StudentClassManagementTest {
                 assertThat(apiEx.getCode()).isEqualTo("MODULE_NOT_ENABLED");
             });
 
-        assertThatThrownBy(() -> classService.list(1, 20, null, null))
+        assertThatThrownBy(() -> classService.list(1, 20, null, null, false))
             .isInstanceOf(ApiException.class)
             .satisfies(ex -> {
                 ApiException apiEx = (ApiException) ex;
@@ -172,7 +180,7 @@ class StudentClassManagementTest {
             .when(classRepository).checkClassCodeAvailable("org-1", "CLS001");
 
         StudentRequest stuReq = new StudentRequest("STU001", "John", LocalDate.of(2000, 1, 1), null, null, "active");
-        SchoolClassRequest clsReq = new SchoolClassRequest("CLS001", "Class 1", "2026", "active");
+        SchoolClassRequest clsReq = new SchoolClassRequest("CLS001", "Class 1", "2026", null, null, "active");
 
         assertThatThrownBy(() -> studentService.create(stuReq))
             .isInstanceOf(ApiException.class)
@@ -190,7 +198,8 @@ class StudentClassManagementTest {
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
 
         SchoolClassResponse classMock = new SchoolClassResponse(
-            "class-1", "org-1", "CLS001", "Math 101", "2026", "active", 5, "actor-1", Instant.now(), null
+            "class-1", "org-1", "CLS001", "Math 101", "2026", null, null, "CHUA_BAT_DAU",
+            null, "NONE", 0, 5, "actor-1", Instant.now(), null
         );
         when(classRepository.require("class-1", "org-1", true)).thenReturn(classMock);
         doThrow(new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_EMPTY", "Cannot delete class with enrolled students"))
@@ -212,7 +221,8 @@ class StudentClassManagementTest {
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
 
         SchoolClassResponse classMock = new SchoolClassResponse(
-            "class-2", "org-1", "CLS002", "Physics 101", "2026", "active", 0, "actor-1", Instant.now(), null
+            "class-2", "org-1", "CLS002", "Physics 101", "2026", null, null, "CHUA_BAT_DAU",
+            null, "NONE", 0, 0, "actor-1", Instant.now(), null
         );
         when(classRepository.require("class-2", "org-1", true)).thenReturn(classMock);
         when(studentRepository.require("student-1", "org-1", true)).thenReturn(null);

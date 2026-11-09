@@ -18,6 +18,11 @@ public final class PermissionCatalog {
         new PermissionDefinition("CLASS_VIEW", "View classes", "STUDENT_MANAGEMENT"),
         new PermissionDefinition("CLASS_CREATE", "Create classes", "STUDENT_MANAGEMENT"),
         new PermissionDefinition("CLASS_EDIT", "Edit classes", "STUDENT_MANAGEMENT"),
-        new PermissionDefinition("CLASS_DELETE", "Delete classes", "STUDENT_MANAGEMENT")
+        new PermissionDefinition("CLASS_DELETE", "Delete classes", "STUDENT_MANAGEMENT"),
+        new PermissionDefinition("CLASS_ASSIGN_TEACHER", "Assign teachers to classes", "STUDENT_MANAGEMENT"),
+        new PermissionDefinition("CLASS_CANCEL", "Cancel classes", "STUDENT_MANAGEMENT"),
+        new PermissionDefinition("CLASS_CLOSE_REQUEST", "Request class closure", "STUDENT_MANAGEMENT"),
+        new PermissionDefinition("CLASS_CLOSE_APPROVE", "Approve class closure", "STUDENT_MANAGEMENT"),
+        new PermissionDefinition("CLASS_REOPEN", "Reopen closed classes", "STUDENT_MANAGEMENT")
     );
 }

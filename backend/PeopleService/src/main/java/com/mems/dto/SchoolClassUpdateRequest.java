@@ -1,12 +1,16 @@
 package com.mems.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
 
 public record SchoolClassUpdateRequest(
     @NotBlank @Size(max = 200) String name,
     @Size(max = 50) String academicYear,
-    @Pattern(regexp = "active|inactive|archived") String status
+    LocalDate startDate,
+    LocalDate endDate,
+    @NotNull @PositiveOrZero Long version
 ) {}
-

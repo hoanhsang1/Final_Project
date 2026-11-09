@@ -40,11 +40,14 @@ class DepartmentModuleTest {
     @Mock
     private PeopleAuditService audit;
 
+    @Mock
+    private DefaultPositionSeeder positionSeeder;
+
     private DepartmentService departmentService;
 
     @BeforeEach
     void setUp() {
-        departmentService = new DepartmentService(repository, actor, identityClient, audit);
+        departmentService = new DepartmentService(repository, actor, identityClient, audit, positionSeeder);
         when(actor.orgId()).thenReturn("org-test");
         when(actor.userId()).thenReturn("actor-test");
     }

@@ -1,0 +1,203 @@
+# Sprint 4 — Kịch bản chạy thử tay qua API Gateway (8080)
+#
+# Thứ tự: Nhân sự phòng ban → tạo chuyên môn → tạo giáo viên → Giáo vụ gán giáo viên
+#         → hủy một lớp → yêu cầu đóng lớp → Trưởng phòng ban duyệt → mở lại.
+#
+# Điều kiện: đã nạp 15_sprint4_sample.sql và các service đang chạy qua Docker Compose.
+# Mật khẩu mọi tài khoản mẫu: Sample@123456
+# Ghi chú: các mã lớp S4A-DEMO-01/S4B-DEMO-01 chỉ dùng một lần. Chạy lại thì đổi mã
+#          hoặc xóa 2 lớp demo cũ.
+
+@gateway = http://localhost:8080
+@orgId = 11111111-1111-4111-8111-111111111111
+@departmentId = 44444444-4444-4444-8444-444444444001
+@teacherPositionId = 33333333-3333-4333-8333-333333333003
+
+### 1. Nhân sự phòng ban đăng nhập → 200 {accessToken,...}
+# Copy accessToken vào @hrToken
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "sample_hr",
+  "password": "Sample@123456"
+}
+
+@hrToken = REPLACE_WITH_HR_ACCESS_TOKEN
+
+### 2. Tạo chuyên môn → 201 {id,name,...}
+# Copy id vào @specialtyId
+POST {{gateway}}/api/specialties
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "name": "Sinh học"
+}
+
+@specialtyId = REPLACE_WITH_SPECIALTY_ID
+
+### 3. Tạo giáo viên → 201 {userId,username,temporaryPassword,...}
+# Nếu chạy lại: 409 EMAIL_EXISTS/STAFF_CODE_EXISTS; dùng GET /api/teachers?q=<staffCode> để lấy userId.
+# Copy userId vào @teacherId
+POST {{gateway}}/api/teachers
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "departmentId": "{{departmentId}}",
+  "username": "sample_teacher_demo",
+  "email": "teacher.demo@sample-mems.example",
+  "role": "STAFF",
+  "positionIds": ["{{teacherPositionId}}"],
+  "staffCode": "GV-DEMO-01",
+  "fullName": "  Đỗ Thị Giáo  ",
+  "phone": "0900000007",
+  "teacherProfile": {
+    "specialtyIds": ["{{specialtyId}}"],
+    "contractType": "CO_HUU"
+  }
+}
+
+@teacherId = REPLACE_WITH_TEACHER_USER_ID
+
+### 3b. Kiểm tra hồ sơ: fullName đã trim, email lowercase, có chuyên môn → 200
+GET {{gateway}}/api/teachers/{{teacherId}}
+Authorization: Bearer {{hrToken}}
+
+### 4. Giáo vụ đăng nhập → 200
+# Copy accessToken vào @academicToken
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "sample_academic",
+  "password": "Sample@123456"
+}
+
+@academicToken = REPLACE_WITH_ACADEMIC_ACCESS_TOKEN
+
+### 5. Tạo lớp A (ngày bắt đầu ở tương lai để không tự chuyển trạng thái) → 201
+# Copy id và version vào @classAId / @classAVersion
+POST {{gateway}}/api/classes
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "classCode": "S4A-DEMO-01",
+  "name": "Lớp demo gán giáo viên",
+  "academicYear": "2026-2027",
+  "startDate": "2027-01-10",
+  "endDate": "2027-10-30"
+}
+
+@classAId = REPLACE_WITH_CLASS_A_ID
+@classAVersion = REPLACE_WITH_CLASS_A_VERSION
+
+### 6. Gán giáo viên cho lớp A → 200 {teacher:{id,...}}
+# Dùng đúng version vừa nhận; version cũ → 409 DATA_CHANGED.
+PUT {{gateway}}/api/classes/{{classAId}}/teacher
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "teacherId": "{{teacherId}}",
+  "version": {{classAVersion}}
+}
+
+### 7. Tạo lớp B → 201
+# Copy id và version vào @classBId / @classBVersion
+POST {{gateway}}/api/classes
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "classCode": "S4B-DEMO-01",
+  "name": "Lớp demo hủy",
+  "academicYear": "2026-2027",
+  "startDate": "2027-01-10",
+  "endDate": "2027-10-30"
+}
+
+@classBId = REPLACE_WITH_CLASS_B_ID
+@classBVersion = REPLACE_WITH_CLASS_B_VERSION
+
+### 8. Hủy lớp B → 200 {status:"DA_HUY"}
+POST {{gateway}}/api/classes/{{classBId}}/cancel
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "reason": "Trùng lịch khai giảng",
+  "version": {{classBVersion}}
+}
+
+### 8b. Hủy lại lớp B → 409 STATUS_CHANGED
+POST {{gateway}}/api/classes/{{classBId}}/cancel
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "reason": "Thử lại",
+  "version": {{classBVersion}}
+}
+
+### 9. Yêu cầu đóng lớp A → 200 {closeState:"PENDING"}
+POST {{gateway}}/api/classes/{{classAId}}/close-requests
+Authorization: Bearer {{academicToken}}
+Content-Type: application/json
+
+{
+  "note": "Đã hết khoá học"
+}
+
+### 9b. Giáo vụ tự duyệt → 403 SELF_APPROVAL_NOT_ALLOWED
+POST {{gateway}}/api/classes/{{classAId}}/close-requests/approve
+Authorization: Bearer {{academicToken}}
+
+### 9c. Nhân sự phòng ban hủy lớp (không có CLASS_CANCEL) → 403 FORBIDDEN
+POST {{gateway}}/api/classes/{{classBId}}/cancel
+Authorization: Bearer {{hrToken}}
+Content-Type: application/json
+
+{
+  "reason": "Thử quyền",
+  "version": 1
+}
+
+### 10. Trưởng phòng ban đăng nhập → 200
+# Copy accessToken vào @headToken
+POST {{gateway}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "sample_head",
+  "password": "Sample@123456"
+}
+
+@headToken = REPLACE_WITH_HEAD_ACCESS_TOKEN
+
+### 11. Duyệt đóng lớp A → 200 {closeState:"CLOSED"}
+POST {{gateway}}/api/classes/{{classAId}}/close-requests/approve
+Authorization: Bearer {{headToken}}
+
+### 12. Mở lại lớp A → 200 {closeState:"NONE"}
+POST {{gateway}}/api/classes/{{classAId}}/reopen
+Authorization: Bearer {{headToken}}
+Content-Type: application/json
+
+{
+  "reason": "Bổ sung hồ sơ"
+}
+
+### 13. Sự kiện đóng lớp → 200 [{action:"REQUESTED"},{action:"APPROVED"},{action:"REOPENED"}]
+GET {{gateway}}/api/classes/{{classAId}}/close-events
+Authorization: Bearer {{headToken}}
+
+### 14. Lịch sử trạng thái lớp → 200 (mảng, có thể rỗng nếu lớp chưa đổi trạng thái)
+GET {{gateway}}/api/classes/{{classAId}}/status-logs
+Authorization: Bearer {{headToken}}
+
+### 15. Tìm kiếm không dấu, không phân biệt hoa thường → 200
+GET {{gateway}}/api/classes?q=demo
+Authorization: Bearer {{headToken}}

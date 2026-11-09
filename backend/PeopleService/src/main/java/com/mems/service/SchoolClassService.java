@@ -1,16 +1,23 @@
 package com.mems.service;
 
+import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.SchoolClassRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.SchoolClassUpdateRequest;
 import com.mems.dto.StudentResponse;
+import com.mems.exception.ApiException;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,27 +29,38 @@ public class SchoolClassService {
     private final Actor actor;
     private final OrganizationModuleGuard moduleGuard;
     private final PeopleAuditService audit;
+    private final TeacherRepository teacherRepository;
+    private final ClassStatusService classStatusService;
+    private final String teacherAssignmentModuleCode;
 
     public SchoolClassService(SchoolClassRepository repository, StudentRepository studentRepository,
-                              Actor actor, OrganizationModuleGuard moduleGuard, PeopleAuditService audit) {
+                              Actor actor, OrganizationModuleGuard moduleGuard, PeopleAuditService audit,
+                              TeacherRepository teacherRepository, ClassStatusService classStatusService,
+                              @Value("${TEACHER_ASSIGNMENT_MODULE_CODE:TEACHER_ASSIGNMENT}")
+                              String teacherAssignmentModuleCode) {
         this.repository = repository;
         this.studentRepository = studentRepository;
         this.actor = actor;
         this.moduleGuard = moduleGuard;
         this.audit = audit;
+        this.teacherRepository = teacherRepository;
+        this.classStatusService = classStatusService;
+        this.teacherAssignmentModuleCode = teacherAssignmentModuleCode;
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Object> list(int page, int size, String q, String status) {
+    @Transactional
+    public Map<String, Object> list(int page, int size, String q, String status, boolean selectable) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
-        return repository.list(orgId, page, size, q, status);
+        classStatusService.refreshOrganization(orgId);
+        return repository.list(orgId, page, size, q, status, selectable);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public SchoolClassResponse get(String id) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        classStatusService.refreshOrganization(orgId);
         return repository.require(id, orgId, false);
     }
 
@@ -50,6 +68,7 @@ public class SchoolClassService {
     public SchoolClassResponse create(SchoolClassRequest request) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        validateDates(request.startDate(), request.endDate());
 
         repository.checkClassCodeAvailable(orgId, request.classCode().trim());
 
@@ -57,7 +76,7 @@ public class SchoolClassService {
         SchoolClassResponse created = repository.create(
             id, orgId, request.classCode().trim(), request.name().trim(),
             request.academicYear() != null ? request.academicYear().trim() : null,
-            request.status(), actor.userId()
+            request.startDate(), request.endDate(), null, actor.userId()
         );
 
         audit.record(orgId, actor.userId(), "CLASS_CREATED", id, created);
@@ -68,16 +87,25 @@ public class SchoolClassService {
     public SchoolClassResponse update(String id, SchoolClassUpdateRequest request) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        classStatusService.refreshOrganization(orgId);
 
         SchoolClassResponse before = repository.require(id, orgId, true);
-        SchoolClassResponse updated = repository.update(
+        ensureEditable(before);
+        validateDates(request.startDate(), request.endDate());
+
+        int updated = repository.update(
             id, orgId, request.name().trim(),
             request.academicYear() != null ? request.academicYear().trim() : null,
-            request.status()
+            request.startDate(), request.endDate(), request.version()
         );
+        if (updated == 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "STATUS_CHANGED",
+                "Class status was changed by another request");
+        }
 
-        audit.record(orgId, actor.userId(), "CLASS_UPDATED", id, Map.of("before", before, "after", updated));
-        return updated;
+        SchoolClassResponse after = repository.require(id, orgId, false);
+        audit.record(orgId, actor.userId(), "CLASS_UPDATED", id, Map.of("before", before, "after", after));
+        return after;
     }
 
     @Transactional
@@ -89,6 +117,46 @@ public class SchoolClassService {
         repository.delete(id, orgId);
 
         audit.record(orgId, actor.userId(), "CLASS_DELETED", id, before);
+    }
+
+    @Transactional
+    public SchoolClassResponse assignTeacher(String classId, ClassTeacherAssignRequest request) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        classStatusService.refreshOrganization(orgId);
+
+        SchoolClassResponse before = repository.require(classId, orgId, true);
+        if ("DA_KET_THUC".equals(before.status()) || "DA_HUY".equals(before.status())
+                || "CLOSED".equals(before.closeState())) {
+            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE",
+                "Teacher cannot be assigned to a finished, cancelled or closed class");
+        }
+
+        var teacher = teacherRepository.requireTeacher(request.teacherId(), orgId, false);
+        if (!"DANG_DAY".equals(teacher.teachingStatus())
+                || !teacherRepository.hasTeacherPosition(teacher.userId(), orgId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "TEACHER_NOT_AVAILABLE",
+                "Teacher is not currently teaching");
+        }
+
+        if (moduleGuard.isActive(orgId, teacherAssignmentModuleCode)) {
+            throw new ApiException(HttpStatus.CONFLICT, "TEACHER_ASSIGNMENT_MODULE_ACTIVE",
+                "Direct assignment is disabled while the teacher assignment module is enabled; "
+                    + "use the assignment workflow instead");
+        }
+
+        int updated = repository.assignTeacher(classId, orgId, teacher.userId(), request.version());
+        if (updated == 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "DATA_CHANGED",
+                "Class was changed by another request");
+        }
+
+        SchoolClassResponse after = repository.require(classId, orgId, false);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("before", before.teacher());
+        details.put("after", after.teacher());
+        audit.record(orgId, actor.userId(), "CLASS_TEACHER_ASSIGNED", classId, details);
+        return after;
     }
 
     @Transactional(readOnly = true)
@@ -103,8 +171,10 @@ public class SchoolClassService {
     public void addStudent(String classId, String studentId) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        classStatusService.refreshOrganization(orgId);
 
-        repository.require(classId, orgId, true);
+        SchoolClassResponse schoolClass = repository.require(classId, orgId, true);
+        ensureEditable(schoolClass);
         studentRepository.require(studentId, orgId, true);
 
         repository.enrollStudent(classId, studentId, orgId);
@@ -117,14 +187,31 @@ public class SchoolClassService {
     public void removeStudent(String classId, String studentId) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        classStatusService.refreshOrganization(orgId);
 
-        repository.require(classId, orgId, true);
+        SchoolClassResponse schoolClass = repository.require(classId, orgId, true);
+        ensureEditable(schoolClass);
         studentRepository.require(studentId, orgId, false);
 
         repository.removeStudent(classId, studentId, orgId);
 
         audit.record(orgId, actor.userId(), "CLASS_STUDENT_REMOVED", classId,
             Map.of("classId", classId, "studentId", studentId));
+    }
+
+    private void ensureEditable(SchoolClassResponse schoolClass) {
+        if ("DA_KET_THUC".equals(schoolClass.status()) || "DA_HUY".equals(schoolClass.status())
+                || "CLOSED".equals(schoolClass.closeState())) {
+            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_EDITABLE",
+                "A finished, cancelled or closed class is read-only");
+        }
+    }
+
+    private void validateDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "endDate: must not be before startDate");
+        }
     }
 }
 
