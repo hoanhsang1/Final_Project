@@ -1,3 +1,12 @@
+import { createElement, type ReactNode } from 'react';
+import {
+  AppstoreOutlined,
+  AuditOutlined,
+  BankOutlined,
+  DashboardOutlined,
+  FileSearchOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { MSG_ADM } from './adminMessages';
 
 /**
@@ -14,6 +23,8 @@ export interface ConsoleMenuItem {
   label: string;
   /** Đường dẫn React Router. */
   path: string;
+  /** Icon điều hướng (tùy chọn, dùng cho shell Odoo-style). */
+  icon?: ReactNode;
   /**
    * Chỉ match đúng đường dẫn này (không match đường dẫn con).
    *
@@ -25,12 +36,12 @@ export interface ConsoleMenuItem {
 }
 
 export const CONSOLE_MENU: readonly ConsoleMenuItem[] = [
-  { key: 'tong-quan', label: MSG_ADM.MENU_OVERVIEW, path: '/quan-tri', exact: true },
-  { key: 'to-chuc', label: 'Tổ chức chờ duyệt', path: '/quan-tri/to-chuc', exact: true },
-  { key: 'to-chuc-tat-ca', label: MSG_ADM.MENU_ORG_ALL, path: '/quan-tri/to-chuc/tat-ca', exact: true },
-  { key: 'module', label: MSG_ADM.MENU_MODULES, path: '/quan-tri/module' },
-  { key: 'tai-khoan', label: MSG_ADM.MENU_ACCOUNTS, path: '/quan-tri/tai-khoan' },
-  { key: 'nhat-ky', label: MSG_ADM.MENU_AUDIT, path: '/quan-tri/nhat-ky' },
+  { key: 'tong-quan', label: MSG_ADM.MENU_OVERVIEW, path: '/quan-tri', exact: true, icon: createElement(DashboardOutlined) },
+  { key: 'to-chuc', label: 'Tổ chức chờ duyệt', path: '/quan-tri/to-chuc', exact: true, icon: createElement(AuditOutlined) },
+  { key: 'to-chuc-tat-ca', label: MSG_ADM.MENU_ORG_ALL, path: '/quan-tri/to-chuc/tat-ca', exact: true, icon: createElement(BankOutlined) },
+  { key: 'module', label: MSG_ADM.MENU_MODULES, path: '/quan-tri/module', icon: createElement(AppstoreOutlined) },
+  { key: 'tai-khoan', label: MSG_ADM.MENU_ACCOUNTS, path: '/quan-tri/tai-khoan', icon: createElement(TeamOutlined) },
+  { key: 'nhat-ky', label: MSG_ADM.MENU_AUDIT, path: '/quan-tri/nhat-ky', icon: createElement(FileSearchOutlined) },
 ];
 
 /**

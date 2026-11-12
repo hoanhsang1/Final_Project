@@ -1,39 +1,35 @@
 ﻿import type { ThemeConfig } from 'antd';
 
 /**
- * Token thiết kế — trích từ Figma `MEMS — Registration UI & Design System`
- * (frame `01 · Design System`: Brand/600, Brand/700, Text/Primary, Surface/Canvas…).
+ * Token thiết kế — MEMS (Layer 1+2: blue enterprise, Odoo-clean).
+ * Nguồn duy nhất màu/bo góc/font/motion cho toàn repo (ConfigProvider, main.tsx).
+ * Component KHÔNG hardcode hex/px (AGENTS.md). Đổi giao diện tại đây.
  *
- * Đây là nguồn duy nhất của màu sắc / bo góc / font trong toàn repo.
- * Component KHÔNG được hardcode hex hay px (AGENTS.md mục 2) — muốn đổi giao diện
- * thì sửa ở đây rồi nó lan ra qua `ConfigProvider` ở `src/main.tsx`.
- *
- * Lệch có chủ đích so với Figma (xem `Design-System-Figma-Mapping.md` §7):
- * - `borderInput` đậm hơn `#D6DFED` để viền field đạt 3:1 (WCAG 1.4.11).
+ * Tương phản (AA): brand #155EEF trên trắng ~4.6:1; borderInput đủ 3:1 (WCAG 1.4.11).
  */
 export const color = {
-  /** Brand / 600 */
-  brand: '#215CE8',
-  /** Brand / 700 — trạng thái nhấn */
-  brandActive: '#1747C2',
-  /** Nhấn/hover sáng hơn Brand 600 */
-  brandHover: '#3B70EB',
-  /** Brand / 050 — nền nhấn nhẹ */
-  brandSoft: '#EBF2FF',
-  /** Text / Primary */
-  text: '#142447',
-  /** Text / Secondary */
-  textSecondary: '#63718F',
-  /** Surface / Canvas */
-  canvas: '#F5F7FB',
+  /** Brand chủ đạo (enterprise blue) — CTA, link, selected */
+  brand: '#155EEF',
+  /** Nhấn */
+  brandActive: '#1849A9',
+  /** Hover */
+  brandHover: '#2970FF',
+  /** Nền nhấn nhẹ */
+  brandSoft: '#EFF4FF',
+  /** Text chính */
+  text: '#101828',
+  /** Text phụ */
+  textSecondary: '#475467',
+  /** Canvas nền trang */
+  canvas: '#F8FAFC',
   surface: '#FFFFFF',
-  /** Border / Default — card, divider */
-  border: '#D6DFED',
-  /** Viền field: đậm hơn Figma để đạt 3:1 trên nền trắng (3.23) và trên canvas (3.01) */
-  borderInput: '#8290A9',
-  error: '#BF2936',
-  warning: '#A66B09',
-  success: '#15803D',
+  /** Border nhẹ — card, divider, table */
+  border: '#EAECF0',
+  /** Viền field: đủ 3:1 trên nền trắng/canvas */
+  borderInput: '#667085',
+  error: '#D92D20',
+  warning: '#DC6803',
+  success: '#079455',
 } as const;
 
 /** Inter là font của design system; fallback về system stack khi offline. */
@@ -41,11 +37,10 @@ export const fontFamily =
   'Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 /**
- * Thang chữ của design system (px). Component dùng các mốc này thay vì tự đặt số
- * — đổi thiết kế chỉ sửa một chỗ.
+ * Thang chữ của design system (px). Component dùng các mốc này thay vì tự đặt số.
  */
 export const typeScale = {
-  /** Hero màn đăng nhập/đăng ký (Figma ~46px) */
+  /** Hero màn đăng nhập/đăng ký */
   hero: 46,
   /** Heading trang */
   h1: 30,
@@ -83,7 +78,6 @@ export const themeToken: ThemeConfig['token'] = {
   fontSize: 15,
   lineHeight: 1.5,
 
-  // Thang heading theo design system: trang 30, section 20, phụ 18/16.
   fontSizeHeading1: 30,
   fontSizeHeading2: 20,
   fontSizeHeading3: 18,
@@ -97,79 +91,102 @@ export const themeToken: ThemeConfig['token'] = {
   borderRadiusSM: 6,
   borderRadiusXS: 4,
 
-  // Input/Button cao 44 (Figma), các control khác 40.
   controlHeight: 40,
   controlHeightLG: 48,
 
   sizeUnit: 4,
   sizeStep: 4,
 
-  boxShadow: '0 8px 30px rgba(20, 36, 71, 0.08)',
-  boxShadowSecondary: '0 4px 16px rgba(20, 36, 71, 0.06)',
+  boxShadow: '0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06)',
+  boxShadowSecondary: '0 1px 2px rgba(16, 24, 40, 0.06)',
+
+  // Motion tinh tế 150–200ms (Layer 2); vẫn tôn trọng prefers-reduced-motion (index.css).
+  motion: true,
+  motionDurationFast: '0.1s',
+  motionDurationMid: '0.15s',
+  motionDurationSlow: '0.2s',
 };
 
-/** Token riêng của component — cùng nguồn Figma, gắn ở `ConfigProvider`. */
+/** Token riêng của component — Odoo-clean enterprise, gắn ở `ConfigProvider`. */
 export const themeComponents: ThemeConfig['components'] = {
   Button: {
-    controlHeight: 44,
-    controlHeightLG: 48,
-    controlHeightSM: 32,
-    borderRadius: 12,
-    fontWeight: 500,
-    paddingInline: 20,
+    controlHeight: 40,
+    controlHeightLG: 44,
+    controlHeightSM: 30,
+    borderRadius: 8,
+    fontWeight: 600,
+    paddingInline: 16,
     primaryShadow: 'none',
     defaultShadow: 'none',
     dangerShadow: 'none',
   },
   Input: {
-    controlHeight: 44,
-    controlHeightLG: 48,
-    borderRadius: 10,
-    paddingInline: 14,
+    controlHeight: 40,
+    controlHeightLG: 44,
+    borderRadius: 8,
+    paddingInline: 12,
     activeShadow: `0 0 0 2px ${color.brandSoft}`,
   },
+  InputNumber: {
+    controlHeight: 40,
+    borderRadius: 8,
+  },
   Select: {
-    controlHeight: 44,
-    borderRadius: 10,
+    controlHeight: 40,
+    borderRadius: 8,
+    optionSelectedBg: color.brandSoft,
+  },
+  DatePicker: {
+    controlHeight: 40,
+    borderRadius: 8,
   },
   Card: {
-    borderRadiusLG: 20,
-    paddingLG: 24,
+    borderRadiusLG: 10,
+    paddingLG: 20,
     headerBg: 'transparent',
   },
   Modal: {
-    borderRadiusLG: 20,
+    borderRadiusLG: 12,
   },
   Table: {
-    headerBg: color.canvas,
+    headerBg: '#F9FAFB',
     headerColor: color.text,
     headerSplitColor: 'transparent',
-    rowHoverBg: color.brandSoft,
+    rowHoverBg: '#F9FAFB',
+    rowSelectedBg: color.brandSoft,
+    rowSelectedHoverBg: '#D1E0FF',
     borderColor: color.border,
+    cellPaddingBlock: 12,
+    cellPaddingInline: 14,
   },
   Menu: {
-    itemBorderRadius: 10,
-    itemHeight: 44,
+    itemBorderRadius: 8,
+    itemHeight: 40,
     itemMarginInline: 8,
+    itemMarginBlock: 2,
     itemSelectedBg: color.brandSoft,
     itemSelectedColor: color.brand,
-    itemHoverBg: color.canvas,
+    itemHoverBg: '#F9FAFB',
+    itemHoverColor: color.text,
+    activeBarBorderWidth: 0,
+    iconSize: 16,
   },
   Layout: {
     headerBg: color.surface,
     siderBg: color.surface,
     bodyBg: color.canvas,
+    headerPadding: '0 20px',
   },
   Tabs: {
     itemSelectedColor: color.brand,
     inkBarColor: color.brand,
-    titleFontSize: 15,
+    titleFontSize: 14,
   },
   Alert: {
-    borderRadiusLG: 12,
+    borderRadiusLG: 8,
   },
   Tag: {
-    borderRadiusSM: 8,
+    borderRadiusSM: 6,
   },
   Divider: {
     colorSplit: color.border,
@@ -178,6 +195,13 @@ export const themeComponents: ThemeConfig['components'] = {
     labelColor: color.text,
     labelFontSize: 14,
     verticalLabelPadding: '0 0 6px',
+    itemMarginBottom: 16,
+  },
+  Breadcrumb: {
+    fontSize: 13,
+  },
+  Drawer: {
+    paddingLG: 16,
   },
 };
 
@@ -188,7 +212,7 @@ export const layoutBackground = themeToken.colorBgLayout;
 export const cardStyle = {
   width: '100%',
   maxWidth: 420,
-  borderRadius: 20,
+  borderRadius: 10,
   borderColor: color.border,
-  boxShadow: '0 8px 30px rgba(20, 36, 71, 0.08)',
+  boxShadow: '0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06)',
 } as const;

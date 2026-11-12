@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
@@ -150,7 +150,7 @@ it('OWNER đăng nhập thành công thì vào thẳng /to-chuc', async () => {
   await userEvent.type(screen.getByLabelText('Mật khẩu'), '123456');
   await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
+  await waitFor(() => expect(router.state.location.pathname).toBe('/to-chuc'));
   expect(await screen.findByRole('heading', { name: 'Phòng ban' })).toBeInTheDocument();
-  expect(router.state.location.pathname).toBe('/to-chuc');
   expect(useAuthStore.getState().backendRoles).toContain('OWNER');
 });

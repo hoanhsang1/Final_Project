@@ -8,11 +8,11 @@ import {
   Skeleton,
   Table,
   Tag,
-  Typography,
   theme,
 } from 'antd';
 import type { TableProps } from 'antd';
 import { useMemo } from 'react';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import { MSG_MDL } from '../../features/admin/adminMessages';
 import { CORE_MODULES } from '../../features/admin/coreModules';
 import type { ModuleCatalogItem } from '../../features/modules/moduleApi';
@@ -21,8 +21,6 @@ import {
   MODULE_SEARCH_PARAM,
   useModuleCatalogPage,
 } from './use-module-catalog';
-
-const { Text, Title } = Typography;
 
 /** Giá trị hiển thị khi BE chưa trả (`D-28`). */
 const EMPTY_VALUE = '—';
@@ -136,31 +134,25 @@ export default function ModuleCatalogPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      <div>
-        <Title level={1} style={{ margin: 0 }}>
-          {MSG_MDL.TITLE}
-        </Title>
-        <Text type="secondary">{MSG_MDL.SUBTITLE}</Text>
-      </div>
-
-
-      <Flex gap={token.marginSM} wrap>
-        <Select
-          aria-label={MSG_MDL.CATEGORY}
-          value={category ?? ''}
-          options={CATEGORY_OPTIONS}
-          style={{ minWidth: 180 }}
-          onChange={(value) => setParam(MODULE_CATEGORY_PARAM, value || null)}
-        />
-        <Input.Search
-          allowClear
-          aria-label="Tìm module"
-          placeholder="Tìm theo mã hoặc tên module"
-          value={keyword}
-          onChange={(event) => setParam(MODULE_SEARCH_PARAM, event.target.value || null)}
-          style={{ maxWidth: 320 }}
-        />
-      </Flex>
+      <PageHeader title={MSG_MDL.TITLE} subtitle={MSG_MDL.SUBTITLE}>
+        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
+          <Select
+            aria-label={MSG_MDL.CATEGORY}
+            value={category ?? ''}
+            options={CATEGORY_OPTIONS}
+            style={{ minWidth: 180 }}
+            onChange={(value) => setParam(MODULE_CATEGORY_PARAM, value || null)}
+          />
+          <Input.Search
+            allowClear
+            aria-label="Tìm module"
+            placeholder="Tìm theo mã hoặc tên module"
+            value={keyword}
+            onChange={(event) => setParam(MODULE_SEARCH_PARAM, event.target.value || null)}
+            style={{ maxWidth: 320 }}
+          />
+        </Flex>
+      </PageHeader>
 
       {query.isPending ? (
         <Skeleton active paragraph={{ rows: 8 }} />

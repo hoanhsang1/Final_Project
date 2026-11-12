@@ -7,6 +7,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import 'antd/dist/reset.css';
+import './index.css';
+import LiveAnnouncer from './components/LiveAnnouncer/LiveAnnouncer';
 import { router } from './router';
 import { fontFamily, themeComponents, themeToken } from './theme';
 
@@ -34,6 +36,8 @@ createRoot(container).render(
       {/* `App` của antd: để `message`/`notification` đi qua ConfigProvider (đúng token/theme). */}
       <ConfigProvider locale={viVN} theme={{ token: themeToken, components: themeComponents }}>
         <App>
+          {/* Vùng aria-live dùng chung: mọi toast của useNotify đều được đọc to. */}
+          <LiveAnnouncer />
           <RouterProvider router={router} />
         </App>
       </ConfigProvider>

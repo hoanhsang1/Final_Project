@@ -30,6 +30,7 @@ export default function ConsoleMenu({
 }: ConsoleMenuProps) {
   const menuItems: MenuProps['items'] = items.map((item) => ({
     key: item.key,
+    icon: item.icon,
     label: (
       <Link to={item.path} aria-current={selectedKey === item.key ? 'page' : undefined}>
         {item.label}

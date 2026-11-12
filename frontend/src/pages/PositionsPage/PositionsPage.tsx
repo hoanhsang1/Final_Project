@@ -2,6 +2,7 @@ import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Tag, Typogra
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import PositionFormModal from '../../components/PositionFormModal/PositionFormModal';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
 import { MSG_OWNER, MSG_POS } from '../../features/owner/ownerMessages';
@@ -9,7 +10,7 @@ import { permissionLabel } from '../../features/owner/permissionLabels';
 import type { Position, PositionPayload } from '../../features/owner/types';
 import { usePositionsPage } from './use-positions';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const EMPTY_VALUE = '—';
 
@@ -135,31 +136,21 @@ export default function PositionsPage() {
   const isEmpty = list.isSuccess && (list.data?.length ?? 0) === 0;
 
   return (
-    <div>
-      <Flex justify="space-between" align="flex-start" gap={token.margin} wrap>
-        <div>
-          <Title level={2} style={{ marginBottom: token.marginXS }}>
-            {MSG_POS.TITLE}
-          </Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {MSG_POS.SUBTITLE}
-          </Paragraph>
-        </div>
-        {!isEmpty && (
-          <Button type="primary" onClick={openCreate}>
-            {MSG_POS.CREATE}
-          </Button>
-        )}
-      </Flex>
+    <Flex vertical gap={token.marginMD}>
+      <PageHeader
+        title={MSG_POS.TITLE}
+        subtitle={MSG_POS.SUBTITLE}
+        extra={
+          !isEmpty ? (
+            <Button type="primary" onClick={openCreate}>
+              {MSG_POS.CREATE}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {actionError && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={actionError}
-          style={{ marginTop: token.margin }}
-        />
+        <Alert type="error" showIcon role="alert" message={actionError} />
       )}
 
       {permissions.isError && (
@@ -168,7 +159,6 @@ export default function PositionsPage() {
           showIcon
           role="alert"
           message={MSG_POS.PERMISSIONS_LOAD_ERROR}
-          style={{ marginTop: token.margin }}
           action={<Button onClick={() => void permissions.refetch()}>{MSG_OWNER.RETRY}</Button>}
         />
       )}
@@ -179,7 +169,6 @@ export default function PositionsPage() {
           showIcon
           role="alert"
           message={MSG_POS.LOAD_ERROR}
-          style={{ marginTop: token.margin }}
           action={<Button onClick={() => void list.refetch()}>{MSG_OWNER.RETRY}</Button>}
         />
       )}
@@ -198,8 +187,8 @@ export default function PositionsPage() {
           columns={columns}
           dataSource={list.data ?? []}
           loading={list.isPending}
-          style={{ marginTop: token.margin }}
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
+          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
+          size="middle"
         />
       )}
 
@@ -212,6 +201,6 @@ export default function PositionsPage() {
         onCancel={closeForm}
         onSubmit={(payload) => void handleSubmit(payload)}
       />
-    </div>
+    </Flex>
   );
 }

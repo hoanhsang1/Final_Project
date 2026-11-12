@@ -10,13 +10,13 @@ import {
   Skeleton,
   Table,
   Tag,
-  Typography,
   theme,
 } from 'antd';
 import type { SelectProps, TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import AccountCreateModal from '../../components/AccountCreateModal/AccountCreateModal';
 import {
   AdminApiError,
@@ -29,8 +29,6 @@ import { ROLE_OPTIONS, roleLabel } from '../../features/admin/roleLabels';
 import { accountStatusLabel } from '../../features/admin/statusLabels';
 import type { AccountCreatePayload, AccountItem } from '../../features/admin/types';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, useAccountsPage } from './use-accounts';
-
-const { Text, Title } = Typography;
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-24';
@@ -226,19 +224,10 @@ export default function AccountsPage() {
   const isEndpointMissing =
     result.isError && result.error instanceof AdminApiError && result.error.status === 404;
 
-  const header = (
-    <div>
-      <Title level={1} style={{ margin: 0 }}>
-        {MSG_ACC.LIST_TITLE}
-      </Title>
-      <Text type="secondary">{MSG_ACC.LIST_SUBTITLE}</Text>
-    </div>
-  );
-
   if (isEndpointMissing) {
     return (
       <Flex vertical gap={token.marginMD}>
-        {header}
+        <PageHeader title={MSG_ACC.LIST_TITLE} subtitle={MSG_ACC.LIST_SUBTITLE} />
         <Alert
           type="info"
           showIcon
@@ -274,51 +263,54 @@ export default function AccountsPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      <Flex justify="space-between" align="flex-start" gap={token.marginSM} wrap>
-        {header}
-        <Button
-          type="primary"
-          onClick={() => {
-            setCreateError(null);
-            setCreateOpen(true);
-          }}
-        >
-          {MSG_ACC.CREATE_TITLE}
-        </Button>
-      </Flex>
-
-      <Flex gap={token.marginSM} wrap>
-        <Input.Search
-          allowClear
-          aria-label={MSG_ACC.SEARCH}
-          placeholder="Tìm theo tên đăng nhập, email hoặc họ tên"
-          defaultValue={keyword}
-          onSearch={(value) => updateParams({ q: value.trim() || null })}
-          style={{ maxWidth: 320 }}
-        />
-        <Select
-          aria-label={MSG_ACC.FILTER_ORG}
-          value={organizationId ?? ''}
-          options={orgFilterOptions}
-          loading={orgOptionsQuery.isFetching}
-          style={{ minWidth: 200 }}
-          onChange={(value) => updateParams({ organizationId: value || null })}
-        />
-        <Select
-          aria-label={MSG_ACC.FILTER_ROLE}
-          value={role ?? ''}
-          options={ROLE_FILTER_OPTIONS}
-          style={{ minWidth: 180 }}
-          onChange={(value) => updateParams({ role: value || null })}
-        />
-        <Select
-          aria-label={MSG_ACC.FILTER_STATUS}
-          value={status?.[0] ?? ''}
-          options={STATUS_OPTIONS}
-          style={{ minWidth: 170 }}
-          onChange={(value) => updateParams({ status: value || null })}
-        />
-      </Flex>
+      <PageHeader
+        title={MSG_ACC.LIST_TITLE}
+        subtitle={MSG_ACC.LIST_SUBTITLE}
+        extra={
+          <Button
+            type="primary"
+            onClick={() => {
+              setCreateError(null);
+              setCreateOpen(true);
+            }}
+          >
+            {MSG_ACC.CREATE_TITLE}
+          </Button>
+        }
+      >
+        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
+          <Input.Search
+            allowClear
+            aria-label={MSG_ACC.SEARCH}
+            placeholder="Tìm theo tên đăng nhập, email hoặc họ tên"
+            defaultValue={keyword}
+            onSearch={(value) => updateParams({ q: value.trim() || null })}
+            style={{ maxWidth: 320 }}
+          />
+          <Select
+            aria-label={MSG_ACC.FILTER_ORG}
+            value={organizationId ?? ''}
+            options={orgFilterOptions}
+            loading={orgOptionsQuery.isFetching}
+            style={{ minWidth: 200 }}
+            onChange={(value) => updateParams({ organizationId: value || null })}
+          />
+          <Select
+            aria-label={MSG_ACC.FILTER_ROLE}
+            value={role ?? ''}
+            options={ROLE_FILTER_OPTIONS}
+            style={{ minWidth: 180 }}
+            onChange={(value) => updateParams({ role: value || null })}
+          />
+          <Select
+            aria-label={MSG_ACC.FILTER_STATUS}
+            value={status?.[0] ?? ''}
+            options={STATUS_OPTIONS}
+            style={{ minWidth: 170 }}
+            onChange={(value) => updateParams({ status: value || null })}
+          />
+        </Flex>
+      </PageHeader>
 
       {result.isPending ? (
         <Skeleton active paragraph={{ rows: 8 }} />

@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, Typography, theme } from 'antd';
 import { useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
 import { AdminApiError } from '../../features/admin/adminApi';
 import { MSG_HIS, msgBackendPending } from '../../features/admin/adminMessages';
@@ -11,7 +12,7 @@ import {
   useOrganizationAudit,
 } from './use-organization-audit';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-22';
@@ -39,25 +40,6 @@ export default function OrganizationAuditPage() {
   const auditQuery = useOrganizationAudit(orgId, page);
 
   const orgName = detailQuery.data?.organization?.name ?? '';
-  const header = (
-    <div>
-      <Link to={backPath} aria-label="Quay lại danh sách tổ chức">
-        ← Quay lại danh sách
-      </Link>
-      <Title level={1} style={{ marginBlock: token.marginXS, marginBlockStart: token.marginSM }}>
-        {MSG_HIS.TITLE}
-      </Title>
-      <Text type="secondary">
-        {orgName ? (
-          <>
-            Tổ chức <Text strong>{orgName}</Text>
-          </>
-        ) : (
-          `Tổ chức ${orgId}`
-        )}
-      </Text>
-    </div>
-  );
 
   // 404 từ endpoint COLLECTION = BE chưa làm endpoint → hiện "chờ backend".
   const isEndpointMissing =
@@ -65,10 +47,26 @@ export default function OrganizationAuditPage() {
     auditQuery.error instanceof AdminApiError &&
     auditQuery.error.status === 404;
 
+  const pageHeader = (
+    <PageHeader
+      breadcrumb={[{ title: 'Tổ chức', href: backPath }, { title: MSG_HIS.TITLE }]}
+      title={MSG_HIS.TITLE}
+      subtitle={
+        orgName ? (
+          <Text type="secondary">
+            Tổ chức <Text strong>{orgName}</Text>
+          </Text>
+        ) : (
+          <Text type="secondary">Tổ chức {orgId}</Text>
+        )
+      }
+    />
+  );
+
   if (isEndpointMissing) {
     return (
       <Flex vertical gap={token.marginMD}>
-        {header}
+        {pageHeader}
         <Alert
           type="info"
           showIcon
@@ -87,7 +85,7 @@ export default function OrganizationAuditPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      {header}
+      {pageHeader}
       <AuditLogTable
         query={auditQuery}
         page={page}

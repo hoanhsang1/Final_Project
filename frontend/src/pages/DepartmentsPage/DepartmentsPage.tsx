@@ -1,15 +1,14 @@
-import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Popconfirm, Space, Table, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DepartmentFormModal from '../../components/DepartmentFormModal/DepartmentFormModal';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
 import { MSG_DEPT, MSG_OWNER } from '../../features/owner/ownerMessages';
 import type { Department, DepartmentPayload } from '../../features/owner/types';
 import { useDepartmentsPage } from './use-departments';
-
-const { Title, Text, Paragraph } = Typography;
 
 /** Giá trị hiển thị khi BE trả `null` — không để ô trống, không hiện `null`. */
 const EMPTY_VALUE = '—';
@@ -139,21 +138,17 @@ export default function DepartmentsPage() {
 
   return (
     <div>
-      <Flex justify="space-between" align="flex-start" gap={token.margin} wrap>
-        <div>
-          <Title level={2} style={{ marginBottom: token.marginXS }}>
-            {MSG_DEPT.TITLE}
-          </Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {MSG_DEPT.SUBTITLE}
-          </Paragraph>
-        </div>
-        {!isEmpty && (
-          <Button type="primary" onClick={openCreate}>
-            {MSG_DEPT.CREATE}
-          </Button>
-        )}
-      </Flex>
+      <PageHeader
+        title={MSG_DEPT.TITLE}
+        subtitle={MSG_DEPT.SUBTITLE}
+        extra={
+          !isEmpty ? (
+            <Button type="primary" onClick={openCreate}>
+              {MSG_DEPT.CREATE}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {actionError && (
         <Alert
@@ -178,10 +173,10 @@ export default function DepartmentsPage() {
 
       {isEmpty && (
         <Empty
-          description={<Text type="secondary">{MSG_DEPT.EMPTY}</Text>}
-          style={{ marginTop: token.marginLG }}
+          description={<Typography.Text type="secondary">{MSG_DEPT.EMPTY}</Typography.Text>}
+          style={{ marginTop: token.marginXXL }}
         >
-          <Button type="primary" onClick={openCreate}>
+          <Button type="primary" size="large" onClick={openCreate}>
             {MSG_DEPT.CREATE}
           </Button>
         </Empty>
@@ -194,7 +189,8 @@ export default function DepartmentsPage() {
           dataSource={list.data ?? []}
           loading={list.isPending}
           style={{ marginTop: token.margin }}
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
+          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
+          size="middle"
         />
       )}
 

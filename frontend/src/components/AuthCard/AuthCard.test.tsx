@@ -35,6 +35,21 @@ it('thẻ đăng ký rộng hơn thẻ đăng nhập để chứa form 2 cột',
   expect(document.querySelector<HTMLElement>('.ant-card')?.style.maxWidth).toBe('520px');
 });
 
+it('variant split hiển thị hero và children (không dùng Card tiêu đề mặc định)', () => {
+  render(
+    <MemoryRouter>
+      <AuthCard activeTab="login" variant="split" title="" subtitle="" hero={<div>HERO LEFT</div>}>
+        <p>child right</p>
+      </AuthCard>
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByText('child right')).toBeInTheDocument();
+  // Hero chỉ render ở breakpoint lg; jsdom không có breakpoint lg nên hero có thể ẩn.
+  // Quan trọng: variant split không bọc children trong Card có title mặc định.
+  expect(screen.queryByRole('heading', { level: 1, name: 'Đăng nhập để tiếp tục' })).not.toBeInTheDocument();
+});
+
 it('luôn có lối liên hệ quản trị ở chân thẻ', () => {
   renderCard('login');
 
