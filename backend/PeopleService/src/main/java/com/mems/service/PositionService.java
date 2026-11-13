@@ -16,12 +16,18 @@ public class PositionService {
     private final Actor actor;
     private final IdentityClient identity;
     private final PeopleAuditService audit;
-    public PositionService(PositionRepository repository,Actor actor,IdentityClient identity,PeopleAuditService audit) {
-        this.repository=repository;this.actor=actor;this.identity=identity;this.audit=audit;
+    private final DefaultPositionSeeder seeder;
+    public PositionService(PositionRepository repository,Actor actor,IdentityClient identity,PeopleAuditService audit,
+            DefaultPositionSeeder seeder) {
+        this.repository=repository;this.actor=actor;this.identity=identity;this.audit=audit;this.seeder=seeder;
     }
     public List<PermissionResponse> permissions() { return identity.permissions(); }
-    @Transactional(readOnly=true)
-    public List<PositionResponse> list() { return repository.list(actor.orgId()); }
+    @Transactional
+    public List<PositionResponse> list() {
+        String orgId=actor.orgId();
+        seeder.ensureForOrg(orgId);
+        return repository.list(orgId);
+    }
     @Transactional
     public PositionResponse create(PositionRequest request) {
         validatePermissions(request);

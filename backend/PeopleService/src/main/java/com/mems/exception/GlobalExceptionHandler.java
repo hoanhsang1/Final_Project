@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -16,6 +17,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> business(ApiException ex) {
         return ResponseEntity.status(ex.getStatus()).body(new ApiError(ex.getCode(), ex.getMessage()));
+    }
+    @ExceptionHandler(SpecialtyMismatchException.class)
+    ResponseEntity<Map<String, Object>> specialtyMismatch(SpecialtyMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "code", "SPECIALTY_MISMATCH",
+            "message", "Specialties no longer match the subject of assigned classes",
+            "classes", ex.getClasses()
+        ));
     }
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiError> denied() {

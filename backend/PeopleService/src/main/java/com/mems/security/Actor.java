@@ -23,6 +23,7 @@ public class Actor {
         return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
             .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER"));
     }
+    public String departmentIdOrNull() { return jwt().getClaimAsString("departmentId"); }
     public void requireDepartment(String id) {
         orgId();
         if (!owner() && !Objects.equals(id, jwt().getClaimAsString("departmentId")))

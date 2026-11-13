@@ -67,13 +67,16 @@ export default function LoginPage() {
     },
     onError: (error: Error) => {
       // NFR-REL-001: lỗi thì hiển thị rõ, KHÔNG điều hướng, KHÔNG hiện thành công.
-      setFormError(error.message);
+      if (error.message.includes('429') || error.message.toLowerCase().includes('too many')) {
+        setFormError('Bạn đã gửi quá nhiều yêu cầu đăng nhập. Vui lòng đợi 1 phút rồi thử lại.');
+      } else {
+        setFormError(error.message);
+      }
     },
   });
 
   const handleSubmit = (values: LoginFormValues) => {
     setNotice(null);
-    // Backend không có trường "remember" — chỉ gửi 2 field contract yêu cầu.
     loginMutation.mutate({ username: values.username, password: values.password });
   };
 

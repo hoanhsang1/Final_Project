@@ -34,9 +34,9 @@ public class IdentityDataInitializer implements ApplicationRunner {
         }
         for (var permission : PermissionCatalog.ENTRIES) {
             jdbc.update("""
-                INSERT INTO permission(code,description) VALUES (?,?)
-                ON DUPLICATE KEY UPDATE description=VALUES(description)
-                """, permission.code(), permission.description());
+                INSERT INTO permission(code,description,module_code) VALUES (?,?,?)
+                ON DUPLICATE KEY UPDATE description=VALUES(description), module_code=VALUES(module_code)
+                """, permission.code(), permission.description(), permission.moduleCode());
             jdbc.update("""
                 INSERT INTO role_permission(role_id,permission_id)
                 SELECT r.id,p.id FROM role r JOIN permission p ON p.code=?

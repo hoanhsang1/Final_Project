@@ -11,11 +11,11 @@ import java.util.List;
 public class PositionController {
     private final PositionService service;
     public PositionController(PositionService service) { this.service=service; }
-    @GetMapping("/permissions") @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    @GetMapping({"/permissions", "/permissions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
     public List<PermissionResponse> permissions() { return service.permissions(); }
-    @GetMapping("/positions") @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    @GetMapping({"/positions", "/positions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
     public List<PositionResponse> list() { return service.list(); }
-    @PostMapping("/positions") @PreAuthorize("hasRole('OWNER')")
+    @PostMapping({"/positions", "/positions/"}) @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<PositionResponse> create(@Valid @RequestBody PositionRequest request) {
         var result=service.create(request);
         return ResponseEntity.created(java.net.URI.create("/positions/"+result.id())).body(result);

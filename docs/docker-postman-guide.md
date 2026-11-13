@@ -771,4 +771,88 @@ docker compose logs --tail=100 eureka-server
 
 Lượt kiểm thử code trước đó đã qua 69 test trên H2 và mock ranh giới gọi service ngoài; sáu POM độc lập đã qua validate. Chưa xác nhận lượt chạy Docker/MySQL/Postman trên máy bạn. Checklist trên là phần kiểm thử tích hợp bạn cần thực hiện, không phải kết quả đã chạy sẵn.
 
+## 23. Quản lý Sinh viên & Lớp học (module STUDENT_MANAGEMENT)
+
+Module `STUDENT_MANAGEMENT` cho phép quản lý sinh viên và lớp học thuộc phạm vi toàn tổ chức (`orgId`), phân quyền theo phòng ban.
+
+### 23.1 Điều kiện tiên quyết: Tổ chức kích hoạt module
+Tổ chức phải có module `STUDENT_MANAGEMENT` ở trạng thái `active`. Nếu tổ chức chưa có, SUPER_ADMIN có thể cập nhật qua API:
+```http
+PUT http://localhost:8081/api/v1/organizations/{{orgId}}/modules
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"modules": ["STUDENT_MANAGEMENT"]}
+```
+
+### 23.2 Tạo phòng ban gắn module
+OWNER tạo phòng ban phụ trách quản lý sinh viên:
+```http
+POST http://localhost:8082/departments
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "name": "Phòng Đào tạo",
+  "description": "Quản lý đào tạo và sinh viên",
+  "moduleCodes": ["STUDENT_MANAGEMENT"]
+}
+```
+*Lưu ý:* Nếu gửi module ngoài danh sách cho phép hoặc module chưa active tại tổ chức, API sẽ trả về `400 MODULE_NOT_ENABLED`.
+
+### 23.3 Tạo chức vụ quản lý sinh viên & lớp học
+OWNER tạo chức vụ:
+```http
+POST http://localhost:8082/positions
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "name": "Giáo vụ sinh viên",
+  "description": "Quản lý sinh viên và lớp học",
+  "permissions": [
+    "PEOPLE_VIEW", "PEOPLE_EDIT",
+    "STUDENT_VIEW", "STUDENT_CREATE", "STUDENT_EDIT", "STUDENT_DELETE",
+    "CLASS_VIEW", "CLASS_CREATE", "CLASS_EDIT", "CLASS_DELETE"
+  ]
+}
+```
+
+### 23.4 Thao tác Sinh viên & Lớp học
+1. **Tạo lớp học:**
+```http
+POST http://localhost:8082/classes
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{"classCode": "K18A", "name": "Lớp K18A", "academicYear": "2024-2028", "status": "active"}
+```
+2. **Tạo sinh viên:**
+```http
+POST http://localhost:8082/students
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{"studentCode": "SV001", "fullName": "Trần Văn B", "email": "b@example.com", "status": "active"}
+```
+3. **Xếp sinh viên vào lớp:**
+```http
+PUT http://localhost:8082/classes/{{classId}}/students/{{studentId}}
+Authorization: Bearer {{ownerToken}}
+```
+4. **Xem danh sách sinh viên trong lớp:**
+```http
+GET http://localhost:8082/classes/{{classId}}/students
+Authorization: Bearer {{ownerToken}}
+```
+
+### 23.5 Các ca kiểm thử bị chặn cần chú ý
+- **Tổ chức chưa active module:** Gọi bất kỳ API `/students/**` hoặc `/classes/**` bị trả `400 MODULE_NOT_ENABLED` (kể cả OWNER).
+- **Phòng ban không gắn module STUDENT_MANAGEMENT:** MANAGER gán chức vụ có quyền sinh viên cho STAFF sẽ bị trả `403 PERMISSION_OUT_OF_MODULE`.
+- **Gỡ module khỏi phòng:** Sau khi gỡ `STUDENT_MANAGEMENT` khỏi phòng, nhân viên trong phòng đó khi refresh token sẽ bị biến mất toàn bộ quyền sinh viên trong JWT.
+- **Xóa lớp còn sinh viên:** Bị chặn với mã lỗi `409 CLASS_NOT_EMPTY`.
+- **Xếp sinh viên vào lớp thứ hai:** Bị chặn với mã lỗi `409 STUDENT_ALREADY_IN_CLASS`.
+
+---
+
 Tài liệu kỹ thuật/API: [department-access.md](department-access.md). Request HTTP bổ sung: [department-access.http](department-access.http). Danh sách file thay đổi: [department-access-files.md](department-access-files.md).
