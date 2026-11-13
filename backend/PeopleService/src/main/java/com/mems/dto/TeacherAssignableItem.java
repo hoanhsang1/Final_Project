@@ -7,5 +7,6 @@ public record TeacherAssignableItem(
     String staffCode,
     String fullName,
     List<SpecialtyResponse> specialties,
-    long classCount
+    long classCount,
+    String teachingStatus
 ) {}

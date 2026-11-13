@@ -3,7 +3,8 @@ package com.mems.service;
 import com.mems.client.IdentityClient;
 import com.mems.dto.DepartmentRequest;
 import com.mems.dto.DepartmentResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.DepartmentRepository;
 import com.mems.security.Actor;
 import org.slf4j.Logger;
@@ -89,7 +90,7 @@ public class DepartmentService {
         // Validate against known allowed modules (no external call needed)
         for (String code : moduleCodes) {
             if (!ALLOWED_MODULES.contains(code)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "MODULE_NOT_ENABLED", "Module not permitted: " + code);
+                throw new AppException(ErrorCode.MODULE_NOT_ENABLED, "Module not permitted: " + code);
             }
         }
         // Check active modules from IdentityService.
@@ -99,7 +100,7 @@ public class DepartmentService {
         List<String> activeModules;
         try {
             activeModules = identityClient.activeModules(orgId);
-        } catch (ApiException ex) {
+        } catch (AppException ex) {
             if ("IDENTITY_UNAVAILABLE".equals(ex.getCode())) {
                 log.warn("IdentityService unavailable ({}), skipping active-module check for org={}", ex.getMessage(), orgId);
                 return; // fail-open: allow department creation/update
@@ -108,7 +109,7 @@ public class DepartmentService {
         }
         for (String code : moduleCodes) {
             if (!activeModules.contains(code)) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "MODULE_NOT_ENABLED", "Module not enabled for organization: " + code);
+                throw new AppException(ErrorCode.MODULE_NOT_ENABLED, "Module not enabled for organization: " + code);
             }
         }
     }

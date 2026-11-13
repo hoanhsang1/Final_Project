@@ -79,8 +79,6 @@ function messageForCode(code: string | null, rawMessage?: string): string | null
       return MSG_OWNER.IDENTITY_UNAVAILABLE;
     case 'UNKNOWN_PERMISSION':
       return MSG_OWNER.UNKNOWN_PERMISSION;
-    case 'VALIDATION_ERROR':
-      return MSG_OWNER.INVALID_INPUT;
     case 'DEPARTMENT_NOT_FOUND':
     case 'POSITION_NOT_FOUND':
     case 'MEMBER_NOT_FOUND':
@@ -106,6 +104,9 @@ export function ownerErrorMessage(error: unknown): string {
 
   if (apiError.status === null) {
     return MSG_OWNER.NETWORK_ERROR;
+  }
+  if (apiError.status === 400) {
+    return MSG_OWNER.INVALID_INPUT;
   }
   if (apiError.status === 403) {
     if (/owners cannot remove their own access/i.test(apiError.message)) {

@@ -1,6 +1,7 @@
 package com.mems.service;
 
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.MemberRepository;
 import com.mems.repository.PositionRepository;
 import com.mems.security.Actor;
@@ -60,7 +61,7 @@ public class MembershipPolicy {
             for (String reqPerm : requested) {
                 String mod = permModuleMap.get(reqPerm);
                 if (mod != null && !mod.isBlank() && !deptModules.contains(mod)) {
-                    throw new ApiException(HttpStatus.FORBIDDEN, "PERMISSION_OUT_OF_MODULE",
+                    throw new AppException(ErrorCode.PERMISSION_OUT_OF_MODULE,
                         "Cannot assign permission outside department modules: " + reqPerm);
                 }
             }

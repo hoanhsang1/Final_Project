@@ -100,6 +100,12 @@ export default function DepartmentDetailPage() {
 
   const columns: TableProps<Member>['columns'] = [
     {
+      title: MSG_MEM.USERNAME,
+      dataIndex: 'username',
+      key: 'username',
+      render: (value: string | null) => value || EMPTY_VALUE,
+    },
+    {
       title: MSG_MEM.USER_ID,
       dataIndex: 'userId',
       key: 'userId',
@@ -272,7 +278,7 @@ export default function DepartmentDetailPage() {
 
       <TempPasswordModal
         open={tempOpen}
-        username={tempData?.member.userId ?? ''}
+        username={tempData?.member.username ?? ''}
         password={tempData?.temporaryPassword ?? ''}
         onClose={() => {
           setTempOpen(false);

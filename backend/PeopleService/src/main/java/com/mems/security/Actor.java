@@ -1,5 +1,6 @@
 package com.mems.security;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -10,7 +11,7 @@ import java.util.Objects;
 public class Actor {
     public Jwt jwt() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof Jwt jwt)) throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Bearer token required");
+        if (!(principal instanceof Jwt jwt)) throw new AppException(ErrorCode.UNAUTHENTICATED);
         return jwt;
     }
     public String userId() { return jwt().getSubject(); }
@@ -29,7 +30,7 @@ public class Actor {
         if (!owner() && !Objects.equals(id, jwt().getClaimAsString("departmentId")))
             throw forbidden("Department access denied");
     }
-    public ApiException forbidden(String message) {
-        return new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", message);
+    public AppException forbidden(String message) {
+        return new AppException(ErrorCode.FORBIDDEN, message);
     }
 }

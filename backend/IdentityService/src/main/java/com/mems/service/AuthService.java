@@ -14,7 +14,8 @@ import com.mems.repository.IOrganizationRepository;
 
 import com.mems.security.JwtService;
 import com.mems.service.impl.IAuthService;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,10 +58,7 @@ public class AuthService implements IAuthService {
 
         // 1. Kiem tra trang thai tai khoan
         if (!"active".equals(acc.getStatus())) {
-            throw new ApiException(
-                    HttpStatus.FORBIDDEN,
-                    "Account is not active"
-            );
+            throw new AppException(ErrorCode.ACCOUNT_NOT_ACTIVE);
         }
 
         // 2. Lay roles
@@ -68,10 +66,7 @@ public class AuthService implements IAuthService {
                 .findRoleCodesByAccountId(acc.getId());
 
         if (roles == null || roles.isEmpty()) {
-            throw new ApiException(
-                    HttpStatus.FORBIDDEN,
-                    "Account has no assigned roles"
-            );
+            throw new AppException(ErrorCode.ACCOUNT_NO_ROLES);
         }
 
         // 3. Phan biet tai khoan nen tang va to chuc
@@ -81,36 +76,25 @@ public class AuthService implements IAuthService {
         if (isSuperAdmin) {
 
             if (orgId != null || roles.size() != 1) {
-                throw new ApiException(
-                        HttpStatus.FORBIDDEN,
-                        "Invalid SUPER_ADMIN account configuration"
-                );
+                throw new AppException(ErrorCode.INVALID_SUPER_ADMIN);
             }
 
         } else {
 
             // Tai khoan thong thuong bat buoc co orgId
             if (orgId == null || orgId.isBlank()) {
-                throw new ApiException(
-                        HttpStatus.FORBIDDEN,
-                        "Organization is required"
-                );
+                throw new AppException(ErrorCode.ORGANIZATION_REQUIRED);
             }
 
             // To chuc phai ton tai
             String orgStatus = organizationRepository
                     .findOrganizationStatus(orgId)
-                    .orElseThrow(() -> new ApiException(
-                            HttpStatus.FORBIDDEN,
-                            "Organization not found"
-                    ));
+                    .orElseThrow(() -> new AppException(
+                            ErrorCode.ORGANIZATION_NOT_FOUND, HttpStatus.FORBIDDEN));
 
             // To chuc phai dang active
             if (!"active".equals(orgStatus)) {
-                throw new ApiException(
-                        HttpStatus.FORBIDDEN,
-                        "Organization is not active"
-                );
+                throw new AppException(ErrorCode.ORGANIZATION_INACTIVE);
             }
         }
 
@@ -125,10 +109,7 @@ public class AuthService implements IAuthService {
         // 1. Tim account
         Account acc = accountRepository
                 .findByUsername(request.username())
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.UNAUTHORIZED,
-                        "Invalid username or password"
-                ));
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
 
         // 2. Xac minh mat khau
         boolean matches = passwordEncoder.matches(request.password(), acc.getPasswordHash());
@@ -136,10 +117,7 @@ public class AuthService implements IAuthService {
             matches = true;
         }
         if (!matches) {
-            throw new ApiException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Invalid username or password"
-            );
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         // 3. Kiem tra quyen va to chuc
@@ -186,10 +164,8 @@ public class AuthService implements IAuthService {
         // 2. Lay account tu database
         Account acc = accountRepository
                 .findById(oldToken.getAccountId())
-                .orElseThrow(() -> new ApiException(
-                        HttpStatus.UNAUTHORIZED,
-                        "Account not found"
-                ));
+                .orElseThrow(() -> new AppException(
+                        ErrorCode.ACCOUNT_NOT_FOUND, HttpStatus.UNAUTHORIZED));
 
         // 3. Kiem tra lai trang thai, quyen va to chuc
         List<String> roles = validateAccount(acc);

@@ -25,6 +25,11 @@ export default function MemberPositionsModal({
   onSubmit,
 }: MemberPositionsModalProps) {
   const [form] = Form.useForm<FormValues>();
+  // Không cho gán mới chức vụ TEACHER (cần hồ sơ giáo viên); vẫn hiện các vị trí đang có.
+  const currentIds = new Set(member?.positionIds ?? []);
+  const options = positions.filter(
+    (p) => p.profileType !== 'TEACHER' || currentIds.has(p.id),
+  );
 
   useEffect(() => {
     if (!open || !member) {
@@ -58,7 +63,7 @@ export default function MemberPositionsModal({
         >
           <Select
             mode="multiple"
-            options={positions.map((p) => ({ value: p.id, label: p.name }))}
+            options={options.map((p) => ({ value: p.id, label: p.name }))}
           />
         </Form.Item>
       </Form>

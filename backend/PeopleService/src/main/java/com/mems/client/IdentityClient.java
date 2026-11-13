@@ -3,7 +3,8 @@ package com.mems.client;
 import com.mems.dto.PermissionResponse;
 import com.mems.dto.MemberRequest;
 import java.util.Map;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -61,7 +62,7 @@ public class IdentityClient {
                 "userId", id, "orgId", orgId, "username", request.username().trim(), "email", request.email().trim(),
                 "temporaryPassword", password, "role", request.role(), "appointedBy", actorId), Void.class);
         } catch (HttpClientErrorException.Conflict ex) {
-            throw new ApiException(HttpStatus.CONFLICT, "ACCOUNT_EXISTS", "Account already exists or organization is inactive");
+            throw new AppException(ErrorCode.ACCOUNT_EXISTS);
         } catch (RestClientException ex) {
             throw unavailable(ex);
         }
@@ -69,6 +70,14 @@ public class IdentityClient {
 
     public void deleteAccount(String id, String orgId) {
         http.delete("/internal/accounts/{id}?orgId={orgId}", id, orgId);
+    }
+
+    public void disableAccount(String id, String orgId) {
+        try {
+            http.patchForObject("/internal/accounts/{id}/disable?orgId={orgId}", null, Void.class, id, orgId);
+        } catch (RestClientException ex) {
+            throw unavailable(ex);
+        }
     }
 
     public String resetPassword(String id, String orgId) {
@@ -79,18 +88,18 @@ public class IdentityClient {
             if (password == null) throw unavailable(null);
             return password.toString();
         } catch (HttpClientErrorException.NotFound ex) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "Identity account not found");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         } catch (RestClientException ex) {
             throw unavailable(ex);
         }
     }
 
-    private ApiException unavailable(RestClientException cause) {
+    private AppException unavailable(RestClientException cause) {
         if (cause != null) {
             log.warn("IdentityService call failed: {}", cause.toString());
         } else {
             log.warn("IdentityService returned an empty body");
         }
-        return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "IDENTITY_UNAVAILABLE", "Identity service unavailable");
+        return new AppException(ErrorCode.IDENTITY_UNAVAILABLE);
     }
 }

@@ -6,6 +6,7 @@ public record TeacherHistoryResponse(
     String id,
     String action,
     String actorUserId,
+    String actorName,
     Instant createdAt,
     Object details
 ) {}

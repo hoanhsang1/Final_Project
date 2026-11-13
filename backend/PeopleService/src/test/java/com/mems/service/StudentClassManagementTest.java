@@ -2,7 +2,8 @@ package com.mems.service;
 
 import com.mems.client.IdentityClient;
 import com.mems.dto.*;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.TeacherRepository;
@@ -78,17 +79,17 @@ class StudentClassManagementTest {
         when(identityClient.activeModules("org-unauthorized")).thenReturn(List.of()); // No STUDENT_MANAGEMENT
 
         assertThatThrownBy(() -> studentService.list(1, 20, null, null, null))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(apiEx.getCode()).isEqualTo("MODULE_NOT_ENABLED");
             });
 
         assertThatThrownBy(() -> classService.list(1, 20, null, null, false))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(apiEx.getCode()).isEqualTo("MODULE_NOT_ENABLED");
             });
@@ -99,12 +100,12 @@ class StudentClassManagementTest {
     void identityUnavailableThrows503() {
         when(actor.orgId()).thenReturn("org-1");
         when(identityClient.activeModules("org-1"))
-            .thenThrow(new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "IDENTITY_UNAVAILABLE", "Identity service unavailable"));
+            .thenThrow(new AppException(ErrorCode.IDENTITY_UNAVAILABLE, "Identity service unavailable"));
 
         assertThatThrownBy(() -> studentService.list(1, 20, null, null, null))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
                 assertThat(apiEx.getCode()).isEqualTo("IDENTITY_UNAVAILABLE");
             });
@@ -154,17 +155,17 @@ class StudentClassManagementTest {
         when(identityClient.activeModules("org-A")).thenReturn(List.of("STUDENT_MANAGEMENT"));
 
         when(studentRepository.require("student-B", "org-A", false))
-            .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "STUDENT_NOT_FOUND", "Student not found"));
+            .thenThrow(new AppException(ErrorCode.STUDENT_NOT_FOUND, "Student not found"));
         when(classRepository.require("class-B", "org-A", false))
-            .thenThrow(new ApiException(HttpStatus.NOT_FOUND, "CLASS_NOT_FOUND", "Class not found"));
+            .thenThrow(new AppException(ErrorCode.CLASS_NOT_FOUND, "Class not found"));
 
         assertThatThrownBy(() -> studentService.get("student-B"))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("STUDENT_NOT_FOUND"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("STUDENT_NOT_FOUND"));
 
         assertThatThrownBy(() -> classService.get("class-B"))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("CLASS_NOT_FOUND"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("CLASS_NOT_FOUND"));
     }
 
     @Test
@@ -173,22 +174,22 @@ class StudentClassManagementTest {
         when(actor.orgId()).thenReturn("org-1");
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
 
-        doThrow(new ApiException(HttpStatus.CONFLICT, "CONFLICT", "Student code already exists in organization"))
+        doThrow(new AppException(ErrorCode.CONFLICT, "Student code already exists in organization"))
             .when(studentRepository).checkStudentCodeAvailable("org-1", "STU001");
 
-        doThrow(new ApiException(HttpStatus.CONFLICT, "CONFLICT", "Class code already exists in organization"))
+        doThrow(new AppException(ErrorCode.CONFLICT, "Class code already exists in organization"))
             .when(classRepository).checkClassCodeAvailable("org-1", "CLS001");
 
         StudentRequest stuReq = new StudentRequest("STU001", "John", LocalDate.of(2000, 1, 1), null, null, "active");
         SchoolClassRequest clsReq = new SchoolClassRequest("CLS001", "Class 1", "2026", null, null, "active");
 
         assertThatThrownBy(() -> studentService.create(stuReq))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
 
         assertThatThrownBy(() -> classService.create(clsReq))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
     }
 
     @Test
@@ -202,13 +203,13 @@ class StudentClassManagementTest {
             null, "NONE", 0, 5, "actor-1", Instant.now(), null
         );
         when(classRepository.require("class-1", "org-1", true)).thenReturn(classMock);
-        doThrow(new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_EMPTY", "Cannot delete class with enrolled students"))
+        doThrow(new AppException(ErrorCode.CLASS_NOT_EMPTY, "Cannot delete class with enrolled students"))
             .when(classRepository).delete("class-1", "org-1");
 
         assertThatThrownBy(() -> classService.delete("class-1"))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(apiEx.getCode()).isEqualTo("CLASS_NOT_EMPTY");
             });
@@ -227,13 +228,13 @@ class StudentClassManagementTest {
         when(classRepository.require("class-2", "org-1", true)).thenReturn(classMock);
         when(studentRepository.require("student-1", "org-1", true)).thenReturn(null);
 
-        doThrow(new ApiException(HttpStatus.CONFLICT, "STUDENT_ALREADY_IN_CLASS", "Student is already enrolled in another class"))
+        doThrow(new AppException(ErrorCode.STUDENT_ALREADY_IN_CLASS, "Student is already enrolled in another class"))
             .when(classRepository).enrollStudent("class-2", "student-1", "org-1");
 
         assertThatThrownBy(() -> classService.addStudent("class-2", "student-1"))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(apiEx.getCode()).isEqualTo("STUDENT_ALREADY_IN_CLASS");
             });

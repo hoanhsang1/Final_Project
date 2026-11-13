@@ -246,6 +246,53 @@ export async function resetPassword(token: string, newPassword: string): Promise
 }
 
 /**
+ * Đổi mật khẩu — `POST /api/v1/auth/change-password` (204, không body).
+ *
+ * Dùng cho tài khoản vừa được cấp mật khẩu tạm (`mustChangePassword = true` trong JWT):
+ * People/Schedule/Facility trả 403 `PASSWORD_CHANGE_REQUIRED` cho mọi API nghiệp vụ
+ * cho tới khi đổi mật khẩu.
+ *
+ * BE thu hồi toàn bộ refresh token sau khi đổi → FE phải đăng nhập lại.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  try {
+    await apiClient.post('/api/v1/auth/change-password', { currentPassword, newPassword });
+  } catch (error) {
+    throw new Error(changePasswordErrorMessage(error));
+  }
+}
+
+/** Bảng dịch lỗi đổi mật khẩu theo `code` (ErrorCode của IdentityService). */
+const CHANGE_PASSWORD_MESSAGE_VI: Record<string, string> = {
+  CURRENT_PASSWORD_INCORRECT: 'Mật khẩu hiện tại không đúng.',
+  PASSWORD_UNCHANGED: 'Mật khẩu mới phải khác mật khẩu hiện tại.',
+  CURRENT_PASSWORD_REQUIRED: 'Vui lòng nhập mật khẩu hiện tại.',
+  NEW_PASSWORD_REQUIRED: 'Vui lòng nhập mật khẩu mới.',
+  NEW_PASSWORD_INVALID: 'Mật khẩu mới phải từ 12 đến 72 ký tự.',
+};
+
+/** Rút message lỗi thân thiện (tiếng Việt) cho luồng đổi mật khẩu. */
+export function changePasswordErrorMessage(error: unknown): string {
+  const err = error as {
+    response?: { data?: { code?: string; message?: string } | null };
+    request?: unknown;
+  };
+  const code = err?.response?.data?.code;
+  if (typeof code === 'string' && CHANGE_PASSWORD_MESSAGE_VI[code]) {
+    return CHANGE_PASSWORD_MESSAGE_VI[code];
+  }
+  const serverMessage = err?.response?.data?.message;
+  // Backend có thể đã trả tiếng Việt sẵn → giữ nguyên.
+  if (typeof serverMessage === 'string' && /[àáảãạăâđêôơư]/i.test(serverMessage)) {
+    return serverMessage;
+  }
+  if (err?.request) {
+    return 'Không kết nối được máy chủ. Vui lòng thử lại.';
+  }
+  return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+}
+
+/**
  * Đăng xuất — `POST /api/v1/auth/logout` (204, không body).
  *
  * `D-13`: Sprint 1 mới chỉ xoá token phía client, refresh token vẫn sống ở BE tới 7 ngày.

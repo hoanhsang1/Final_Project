@@ -31,7 +31,7 @@ export const MSG_OWNER = {
   UNKNOWN_PERMISSION: 'Có quyền không hợp lệ trong danh sách. Vui lòng tải lại trang và thử lại.',
   /** Dịch vụ tài khoản (Identity) không phản hồi (503). */
   IDENTITY_UNAVAILABLE: 'Hệ thống tài khoản đang không phản hồi. Vui lòng thử lại sau ít phút.',
-  /** Dữ liệu vi phạm ràng buộc (400 `VALIDATION_ERROR`). */
+  /** Dữ liệu vi phạm ràng buộc (mọi lỗi 400, kể cả mã theo trường). */
   INVALID_INPUT: 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại các trường đã nhập.',
   /** Nút thử lại khi tải lỗi. */
   RETRY: 'Thử lại',
@@ -51,6 +51,7 @@ export const MSG_DEPT = {
   EDIT: 'Sửa phòng ban',
   NAME: 'Tên phòng ban',
   DESCRIPTION: 'Mô tả',
+  MODULES: 'Module phụ trách',
   CREATED_AT: 'Ngày tạo',
   ACTIONS: 'Thao tác',
   NAME_REQUIRED: 'Vui lòng nhập tên phòng ban',
@@ -86,7 +87,12 @@ export const MSG_MEM = {
   NO_POSITIONS: 'Chưa gán chức vụ',
   POSITIONS_REQUIRED: 'Chọn ít nhất một chức vụ',
   NO_POSITION_CATALOG: 'Chưa có chức vụ nào trong tổ chức. Hãy tạo chức vụ trước khi thêm nhân viên.',
+  NO_ASSIGNABLE_POSITION:
+    'Các chức vụ hiện có đều dành cho giáo viên. Hãy tạo chức vụ khác, hoặc thêm giáo viên ở màn Giáo viên.',
   GO_TO_POSITIONS: 'Tới trang Chức vụ',
+  TEACHER_POSITION_HINT:
+    'Chức vụ giáo viên chỉ gán được khi tạo giáo viên (cần hồ sơ giáo viên).',
+  GO_TO_TEACHERS: 'Tới trang Giáo viên',
   USERNAME_REQUIRED: 'Vui lòng nhập tên đăng nhập',
   USERNAME_TOO_LONG: 'Tên đăng nhập tối đa 100 ký tự',
   EMAIL_REQUIRED: 'Vui lòng nhập email',

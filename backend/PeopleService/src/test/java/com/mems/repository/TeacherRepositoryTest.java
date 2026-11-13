@@ -82,7 +82,7 @@ class TeacherRepositoryTest {
     @DisplayName("Giáo viên của tổ chức khác không tra cứu được")
     void rejectsTeacherFromOtherOrganization() {
         assertThatThrownBy(() -> teachers.requireTeacher("user-1", "org-2", false))
-            .isInstanceOf(com.mems.exception.ApiException.class)
+            .isInstanceOf(com.mems.exception.AppException.class)
             .hasMessage("Teacher not found");
     }
 

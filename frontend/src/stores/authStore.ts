@@ -34,6 +34,8 @@ interface AuthSession {
   backendRoles: string[];
   /** Quyền (permissions) từ JWT — dùng cho phân quyền nghiệp vụ (Sprint 4+). Chỉ để UX. */
   permissions: string[];
+  /** Tài khoản đang dùng mật khẩu tạm — phải đổi trước khi vào console. */
+  mustChangePassword: boolean;
   isAuthenticated: boolean;
   setSession: (res: LoginResponse) => void;
   clearSession: () => void;
@@ -47,7 +49,7 @@ interface AuthSession {
  */
 function restoreSession(): Pick<
   AuthSession,
-  'userId' | 'username' | 'role' | 'backendRoles' | 'permissions' | 'isAuthenticated'
+  'userId' | 'username' | 'role' | 'backendRoles' | 'permissions' | 'mustChangePassword' | 'isAuthenticated'
 > {
   const token = getAccessToken();
   if (!token || isTokenExpired(token)) {
@@ -57,6 +59,7 @@ function restoreSession(): Pick<
       role: null,
       backendRoles: [],
       permissions: [],
+      mustChangePassword: false,
       isAuthenticated: false,
     };
   }
@@ -68,6 +71,7 @@ function restoreSession(): Pick<
     role: mapBackendRole(roles),
     backendRoles: roles,
     permissions: normalizePermissions(payload.permissions),
+    mustChangePassword: payload.mustChangePassword === true,
     isAuthenticated: true,
   };
 }
@@ -85,6 +89,7 @@ export const useAuthStore = create<AuthSession>((set) => ({
       role: mapBackendRole(roles),
       backendRoles: roles,
       permissions: normalizePermissions(payload.permissions),
+      mustChangePassword: payload.mustChangePassword === true,
       isAuthenticated: true,
     });
   },
@@ -96,6 +101,7 @@ export const useAuthStore = create<AuthSession>((set) => ({
       role: null,
       backendRoles: [],
       permissions: [],
+      mustChangePassword: false,
       isAuthenticated: false,
     });
   },
@@ -121,6 +127,7 @@ export function syncSessionFromToken(): void {
     role: mapBackendRole(roles),
     backendRoles: roles,
     permissions: normalizePermissions(payload.permissions),
+    mustChangePassword: payload.mustChangePassword === true,
     isAuthenticated: true,
   });
 }

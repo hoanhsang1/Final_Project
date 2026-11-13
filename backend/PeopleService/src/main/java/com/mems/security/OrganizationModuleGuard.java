@@ -1,7 +1,8 @@
 package com.mems.security;
 
 import com.mems.client.IdentityClient;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +18,7 @@ public class OrganizationModuleGuard {
 
     public void requireModule(String orgId, String moduleCode) {
         if (!isActive(orgId, moduleCode)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "MODULE_NOT_ENABLED",
+            throw new AppException(ErrorCode.MODULE_NOT_ENABLED,
                 "Module " + moduleCode + " is not enabled for organization");
         }
     }

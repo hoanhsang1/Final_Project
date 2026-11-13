@@ -13,6 +13,8 @@ export interface JwtClaims {
   roles?: unknown;
   /** Quyền (permissions) — dùng cho phân quyền nghiệp vụ Sprint 4+. */
   permissions?: unknown;
+  /** Tài khoản còn mật khẩu tạm, phải đổi trước khi gọi API nghiệp vụ. */
+  mustChangePassword?: unknown;
   /** Thời điểm hết hạn (giây kể từ epoch). */
   exp?: number;
 }

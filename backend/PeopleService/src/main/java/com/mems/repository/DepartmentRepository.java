@@ -1,7 +1,8 @@
 package com.mems.repository;
 
 import com.mems.dto.DepartmentResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -66,7 +67,7 @@ public class DepartmentRepository {
             ),
             id, orgId
         );
-        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "DEPARTMENT_NOT_FOUND", "Department not found");
+        if (rows.isEmpty()) throw new AppException(ErrorCode.DEPARTMENT_NOT_FOUND);
         return rows.get(0);
     }
 
@@ -87,7 +88,7 @@ public class DepartmentRepository {
         Integer members = jdbc.queryForObject("SELECT COUNT(*) FROM department_member WHERE department_id=? AND org_id=?",
             Integer.class, id, orgId);
         if (members != null && members > 0)
-            throw new ApiException(HttpStatus.CONFLICT, "DEPARTMENT_NOT_EMPTY", "Remove department members first");
+            throw new AppException(ErrorCode.DEPARTMENT_NOT_EMPTY);
         jdbc.update("DELETE FROM department_module WHERE department_id=? AND org_id=?", id, orgId);
         jdbc.update("DELETE FROM department WHERE id=? AND org_id=?", id, orgId);
     }

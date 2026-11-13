@@ -2,7 +2,8 @@ package com.mems.repository;
 
 import com.mems.dto.AuthorizationResponse;
 import com.mems.dto.MemberResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.service.EffectivePermissionsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,7 +51,7 @@ public class MemberRepository {
             },
             id, orgId, departmentId
         );
-        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Department member not found");
+        if (rows.isEmpty()) throw new AppException(ErrorCode.MEMBER_NOT_FOUND);
         return rows.get(0);
     }
 

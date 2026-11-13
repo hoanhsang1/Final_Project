@@ -2,7 +2,8 @@ package com.mems.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.dto.TeacherUpdateRequest;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.exception.SpecialtyMismatchException;
 import com.mems.repository.MemberRepository;
 import com.mems.repository.PositionRepository;
@@ -123,8 +124,8 @@ class TeacherServiceTest {
             Set.of("sp-toan"), null, 0L, null);
 
         assertThatThrownBy(() -> service.update("t001", request))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "EMAIL_EXISTS"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "EMAIL_EXISTS"));
     }
 
     @Test
@@ -145,8 +146,8 @@ class TeacherServiceTest {
             Set.of("sp-toan"), null, 7L, null);
 
         assertThatThrownBy(() -> service.update("t001", request))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "DATA_CHANGED"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "DATA_CHANGED"));
     }
 
     @Test
@@ -156,21 +157,21 @@ class TeacherServiceTest {
             Set.of("sp-toan"), null, 0L, null);
 
         assertThatThrownBy(() -> service.update("other-teacher", request))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND"));
     }
 
     @Test
     @DisplayName("AC-15.11 Người dùng bị giới hạn phòng ban khác: 403")
     void rejectsActorOutsideTeacherDepartment() {
-        doThrow(new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Department access denied"))
+        doThrow(new AppException(ErrorCode.FORBIDDEN, "Department access denied"))
             .when(actor).requireDepartment("dept-1");
         TeacherUpdateRequest request = update("Nguyễn Văn An", "an@example.com", null,
             Set.of("sp-toan"), null, 0L, null);
 
         assertThatThrownBy(() -> service.update("t001", request))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.FORBIDDEN, "FORBIDDEN"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.FORBIDDEN, "FORBIDDEN"));
     }
 
     private TeacherUpdateRequest update(String fullName, String email, String phone, Set<String> specialtyIds,
@@ -178,7 +179,7 @@ class TeacherServiceTest {
         return new TeacherUpdateRequest(fullName, email, phone, specialtyIds, contractType, version, confirm);
     }
 
-    private void assertError(ApiException ex, HttpStatus status, String code) {
+    private void assertError(AppException ex, HttpStatus status, String code) {
         assertThat(ex.getStatus()).isEqualTo(status);
         assertThat(ex.getCode()).isEqualTo(code);
     }

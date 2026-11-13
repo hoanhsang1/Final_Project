@@ -9,7 +9,7 @@ import com.mems.dto.ClassStatusLogResponse;
 import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.SchoolClassUpdateRequest;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
@@ -103,9 +103,9 @@ class ClassLifecycleTest {
         insertClass("class-1", "CHUA_BAT_DAU", "NONE", null, null, 0);
 
         assertThatThrownBy(() -> statusService.cancel("class-1", new ClassCancelRequest("   ", 0L)))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException api = (ApiException) ex;
+                AppException api = (AppException) ex;
                 assertThat(api.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(api.getCode()).isEqualTo("VALIDATION_ERROR");
             });
@@ -149,9 +149,9 @@ class ClassLifecycleTest {
         insertClass("class-1", "CHUA_BAT_DAU", "NONE", null, null, 3);
 
         assertThatThrownBy(() -> statusService.cancel("class-1", new ClassCancelRequest("Lý do", 2L)))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException api = (ApiException) ex;
+                AppException api = (AppException) ex;
                 assertThat(api.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(api.getCode()).isEqualTo("STATUS_CHANGED");
             });
@@ -203,8 +203,8 @@ class ClassLifecycleTest {
         when(actor.userId()).thenReturn("approver");
 
         assertThatThrownBy(() -> statusService.rejectClose("class-1", new ClassCloseRejectRequest("  ")))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 
         SchoolClassResponse rejected = statusService.rejectClose("class-1",
             new ClassCloseRejectRequest("Chưa đủ điều kiện"));
@@ -220,12 +220,12 @@ class ClassLifecycleTest {
         insertClass("class-cancelled", "DA_HUY", "NONE", null, null, 0);
 
         assertThatThrownBy(() -> statusService.approveClose("class-none"))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("CLOSE_STATE_CHANGED"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("CLOSE_STATE_CHANGED"));
 
         assertThatThrownBy(() -> statusService.requestClose("class-cancelled", new ClassCloseRequest(null)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("CLASS_NOT_CLOSABLE"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("CLASS_NOT_CLOSABLE"));
     }
 
     @Test
@@ -235,9 +235,9 @@ class ClassLifecycleTest {
         statusService.requestClose("class-1", new ClassCloseRequest(null));
 
         assertThatThrownBy(() -> statusService.approveClose("class-1"))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException api = (ApiException) ex;
+                AppException api = (AppException) ex;
                 assertThat(api.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
                 assertThat(api.getCode()).isEqualTo("SELF_APPROVAL_NOT_ALLOWED");
             });
@@ -252,12 +252,12 @@ class ClassLifecycleTest {
         assertThat(classes.require("class-1", "org-1", false).closeState()).isEqualTo("CLOSED");
         assertThatThrownBy(() -> classService.update("class-1",
             new SchoolClassUpdateRequest("New name", null, null, null, 0L)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("CLASS_NOT_EDITABLE"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("CLASS_NOT_EDITABLE"));
         assertThatThrownBy(() -> classService.assignTeacher("class-1",
             new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getCode()).isEqualTo("CLASS_NOT_ASSIGNABLE"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("CLASS_NOT_ASSIGNABLE"));
     }
 
     @Test
@@ -267,9 +267,9 @@ class ClassLifecycleTest {
 
         assertThatThrownBy(() -> classService.update("class-1",
             new SchoolClassUpdateRequest("Changed", null, null, null, 5L)))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException api = (ApiException) ex;
+                AppException api = (AppException) ex;
                 assertThat(api.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(api.getCode()).isEqualTo("STATUS_CHANGED");
             });
@@ -297,15 +297,15 @@ class ClassLifecycleTest {
 
         assertThatThrownBy(() -> classService.update("class-1",
             new SchoolClassUpdateRequest("Name", null, TODAY, TODAY.minusDays(1), 0L)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertThat(((ApiException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     private void assertClassNotCancellable(String id) {
         assertThatThrownBy(() -> statusService.cancel(id, new ClassCancelRequest("Lý do", 0L)))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException api = (ApiException) ex;
+                AppException api = (AppException) ex;
                 assertThat(api.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(api.getCode()).isEqualTo("CLASS_NOT_CANCELLABLE");
             });

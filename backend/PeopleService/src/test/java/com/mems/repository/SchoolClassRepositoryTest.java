@@ -1,7 +1,7 @@
 package com.mems.repository;
 
 import com.mems.dto.SchoolClassResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,7 @@ class SchoolClassRepositoryTest {
     @DisplayName("Không trả lớp của tổ chức khác")
     void isolatesOrganization() {
         assertThatThrownBy(() -> classes.require("class-1", "org-2", false))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .hasMessage("Class not found");
     }
 

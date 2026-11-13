@@ -1,6 +1,7 @@
 package com.mems.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mems.dto.ApiError;
+import com.mems.dto.ApiResponse;
+import com.mems.exception.ErrorCode;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -22,7 +23,8 @@ public class InternalApiFilter extends OncePerRequestFilter {
         if (key == null || key.length()<32 || supplied==null ||
                 !MessageDigest.isEqual(key.getBytes(StandardCharsets.UTF_8),supplied.getBytes(StandardCharsets.UTF_8))) {
             response.setStatus(401); response.setContentType("application/json");
-            mapper.writeValue(response.getOutputStream(),new ApiError("UNAUTHENTICATED","Service authentication required"));
+            mapper.writeValue(response.getOutputStream(), ApiResponse.failure(
+                ErrorCode.UNAUTHENTICATED.name(), ErrorCode.UNAUTHENTICATED.getMessage()));
             return;
         }
         chain.doFilter(request,response);

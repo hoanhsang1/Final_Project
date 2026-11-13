@@ -41,8 +41,9 @@ TEACHER_ASSIGNMENT_MODULE_CODE=TEACHER_ASSIGNMENT
 - **Cắt khoảng trắng:** mọi trường text được trim trước khi lưu. Email lưu chữ thường.
 - **Optimistic lock:** các API có trường `version` phải gửi đúng version đang đọc được. Bản ghi đã đổi → **409** `DATA_CHANGED` hoặc `STATUS_CHANGED`.
 - **Quyền:** thiếu token → **401** `UNAUTHENTICATED`; thiếu quyền → **403** `FORBIDDEN`.
-- **Module:** các API lớp yêu cầu module `STUDENT_MANAGEMENT` đang bật; nếu tắt → **400** `MODULE_NOT_ENABLED` với message `Module STUDENT_MANAGEMENT is not enabled for organization`.
-- **Định dạng lỗi:** `{ "code": "...", "message": "..." }`, riêng `SPECIALTY_MISMATCH` có thêm `classes`.
+- **Module:** mọi API lớp (`GET /classes*`, `status-logs`, `close-events`, huỷ/đóng/mở lại) yêu cầu module `STUDENT_MANAGEMENT` đang bật; nếu tắt → **400** `MODULE_NOT_ENABLED` với message `Module STUDENT_MANAGEMENT is not enabled for organization`. `/teachers*` và `/specialties*` **không** kiểm tra module.
+- **Định dạng lỗi:** mọi lỗi trả cùng một phong bì `{ "success": false, "code": "...", "message": "...", "data": null }`. `code` là tên mã lỗi (enum), `message` là câu tiếng Anh mô tả ngắn. Với `SPECIALTY_MISMATCH`, danh sách lớp nằm trong `data.classes` (FE đọc `response.data.classes`).
+- **Lỗi validate:** mỗi ràng buộc trường trả `code` riêng (ví dụ `NAME_REQUIRED`, `CODE_TOO_LONG`, `VERSION_REQUIRED`) thay vì `VALIDATION_ERROR`; `message` vẫn là câu giải thích. Response thành công giữ nguyên shape cũ (không bọc phong bì).
 
 ### Bảng quyền
 
@@ -175,7 +176,8 @@ Chỉ trả giáo viên `teachingStatus='DANG_DAY'` trong **toàn tổ chức** 
       "staffCode": "GV001",
       "fullName": "Nguyễn Văn An",
       "specialties": [{ "id": "sp-1", "name": "Toán" }],
-      "classCount": 2
+      "classCount": 2,
+      "teachingStatus": "DANG_DAY"
     }
   ],
   "total": 1, "page": 1, "size": 20, "pages": 1
@@ -213,11 +215,15 @@ Quyền: `OWNER`, `PEOPLE_VIEW` hoặc `PEOPLE_EDIT`. `staffId` là `user_id` c�
   "version": 2,
   "createdAt": "2026-11-01T08:00:00Z",
   "updatedAt": "2026-11-06T09:00:00Z",
+  "classCount": 1,
+  "noClass": false,
+  "classLabel": null,
   "history": [
     {
       "id": "audit-1",
       "action": "TEACHER_UPDATED",
       "actorUserId": "user-owner",
+      "actorName": "Nguyễn Văn Chủ",
       "createdAt": "2026-11-06T09:00:00Z",
       "details": {
         "phone": { "before": "0900000000", "after": "0901234567" }
@@ -250,9 +256,12 @@ Nếu đổi chuyên môn làm mất khớp với môn của lớp đang phụ t
 
 ```json
 {
+  "success": false,
   "code": "SPECIALTY_MISMATCH",
   "message": "Specialties no longer match the subject of assigned classes",
-  "classes": [{ "id": "class-1", "name": "Lớp 10A" }]
+  "data": {
+    "classes": [{ "id": "class-1", "name": "Lớp 10A" }]
+  }
 }
 ```
 
@@ -337,7 +346,13 @@ Quyền: `OWNER` hoặc `CLASS_VIEW`.
 
 ### GET `/classes/{id}`
 
-Quyền: `OWNER` hoặc `CLASS_VIEW`. Trả cùng cấu trúc một item ở trên. Server tự cập nhật trạng thái trước khi trả.
+Quyền: `OWNER` hoặc `CLASS_VIEW`. Trả cùng cấu trúc một item ở trên, kèm 3 field lý do được suy ra từ log (không lưu cột riêng):
+
+- `cancelReason`: `reason` của lần chuyển trạng thái `DA_HUY` gần nhất (`class_status_log`).
+- `closeRequestNote`: ghi chú của yêu cầu đóng gần nhất (`class_close_event` action `REQUESTED`).
+- `closeRejectReason`: lý do từ chối gần nhất (`class_close_event` action `REJECTED`).
+
+Cả 3 là `null` khi chưa có dữ liệu tương ứng. Ba field này chỉ có ở endpoint chi tiết, danh sách trả `null` để tránh 3 subquery mỗi dòng.
 
 - **404** `CLASS_NOT_FOUND`
 
@@ -427,7 +442,8 @@ Quyền: `OWNER` hoặc `CLASS_VIEW`.
     "toStatus": "DANG_DIEN_RA",
     "reason": "AUTO_START",
     "changedBy": null,
-    "changedAt": "2026-09-05T00:05:00Z"
+    "changedAt": "2026-09-05T00:05:00Z",
+    "actorName": null
   },
   {
     "id": "log-2",
@@ -436,12 +452,13 @@ Quyền: `OWNER` hoặc `CLASS_VIEW`.
     "toStatus": "DA_HUY",
     "reason": "Trùng lịch khai giảng",
     "changedBy": "user-owner",
-    "changedAt": "2026-09-10T03:00:00Z"
+    "changedAt": "2026-09-10T03:00:00Z",
+    "actorName": "Nguyễn Văn Chủ"
   }
 ]
 ```
 
-`changedBy=null` = hệ thống tự chuyển (`AUTO_START`, `AUTO_END`).
+`changedBy=null` = hệ thống tự chuyển (`AUTO_START`, `AUTO_END`). `actorName` lấy từ `staff_profile.full_name`, `null` nếu người thực hiện không còn hồ sơ nhân sự.
 
 ### POST `/classes/{id}/close-requests`
 
@@ -492,10 +509,14 @@ Quyền: `OWNER` hoặc `CLASS_VIEW`.
 
 ```json
 [
-  { "id": "ev-1", "classId": "class-1", "action": "REQUESTED", "actorId": "user-manager", "reason": "Đã hết khoá học", "createdAt": "2026-11-06T08:00:00Z" },
-  { "id": "ev-2", "classId": "class-1", "action": "APPROVED", "actorId": "user-owner", "reason": null, "createdAt": "2026-11-06T09:00:00Z" }
+  { "id": "ev-1", "classId": "class-1", "action": "REQUESTED", "actorId": "user-manager", "actorName": "Trần Thị Quản Lý", "reason": "Đã hết khoá học", "note": "Đã hết khoá học", "createdAt": "2026-11-06T08:00:00Z" },
+  { "id": "ev-2", "classId": "class-1", "action": "APPROVED", "actorId": "user-owner", "actorName": "Nguyễn Văn Chủ", "reason": null, "note": null, "createdAt": "2026-11-06T09:00:00Z" }
 ]
 ```
+
+- `note`: chỉ có giá trị với action `REQUESTED` (ghi chú người gửi nhập). DB hiện dùng chung cột `reason`, response tách ra thành `note` để FE hiển thị đúng cột.
+- `reason`: lý do của `REJECTED`/`REOPENED`; `null` với `REQUESTED`/`APPROVED`.
+- `actorName`: `null` nếu người thực hiện không còn hồ sơ nhân sự.
 
 ### Học sinh trong lớp (đã có)
 
@@ -538,7 +559,9 @@ Lớp có thể vừa `DANG_DIEN_RA` vừa `CLOSED`.
 
 | HTTP | `code` | Ý nghĩa / khi nào |
 |---|---|---|
-| 400 | `VALIDATION_ERROR` | sai/thiếu trường, ngày kết thúc trước ngày bắt đầu, lý do rỗng |
+| 400 | `VALIDATION_ERROR` | body không parse được, sai kiểu dữ liệu, tham số không hợp lệ |
+| 400 | mã theo trường (vd `NAME_REQUIRED`, `CODE_TOO_LONG`, `VERSION_REQUIRED`) | thiếu/sai một trường cụ thể trong body; `message` giải thích trường đó |
+| 400 | `INVALID_KEY` | message validate không map được sang mã lỗi (kèm `field: message`) |
 | 400 | `MODULE_NOT_ENABLED` | module `STUDENT_MANAGEMENT` chưa bật cho tổ chức |
 | 400 | `INVALID_POSITION` | không có chức vụ giáo viên |
 | 400 | `INVALID_SPECIALTY` | chuyên môn không tồn tại/không hoạt động/khác tổ chức |
@@ -551,7 +574,7 @@ Lớp có thể vừa `DANG_DIEN_RA` vừa `CLOSED`.
 | 409 | `DATA_CHANGED` | sửa hồ sơ giáo viên với `version` cũ |
 | 409 | `STATUS_CHANGED` | sửa/huỷ lớp với `version` cũ hoặc trạng thái vừa đổi |
 | 409 | `CLOSE_STATE_CHANGED` | thao tác đóng/mở không đúng `closeState` hiện tại |
-| 409 | `SPECIALTY_MISMATCH` | đổi chuyên môn làm mất khớp môn của lớp (kèm `classes`) |
+| 409 | `SPECIALTY_MISMATCH` | đổi chuyên môn làm mất khớp môn của lớp (danh sách ở `data.classes`) |
 | 409 | `TEACHER_NOT_AVAILABLE` | giáo viên không `DANG_DAY` |
 | 409 | `CLASS_NOT_ASSIGNABLE` | gán giáo viên cho lớp kết thúc/huỷ/đóng |
 | 409 | `CLASS_NOT_EDITABLE` | sửa/ghi danh lớp kết thúc/huỷ/đóng |
@@ -561,7 +584,7 @@ Lớp có thể vừa `DANG_DIEN_RA` vừa `CLOSED`.
 | 409 | `STUDENT_ALREADY_IN_CLASS` | học sinh đã ở lớp khác |
 | 409 | `TEACHER_ASSIGNMENT_MODULE_ACTIVE` | module phân công giáo viên Epic 12 đang bật |
 | 503 | `IDENTITY_UNAVAILABLE` | không gọi được Identity khi kiểm tra module/quyền |
-| 500 | `INTERNAL_ERROR` | lỗi không mong đợi |
+| 500 | `UNCATEGORIZED_EXCEPTION` | lỗi không mong đợi (message `Đã xảy ra lỗi hệ thống`) |
 
 ## 9. Luồng gợi ý cho frontend
 

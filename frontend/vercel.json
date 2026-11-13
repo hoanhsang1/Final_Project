@@ -2,47 +2,47 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/api/:path*"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/api/:path*"
     },
     {
       "source": "/departments",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/departments"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/departments"
     },
     {
       "source": "/departments/:path+",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/departments/:path+"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/departments/:path+"
     },
     {
       "source": "/positions",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/positions"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/positions"
     },
     {
       "source": "/positions/:path+",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/positions/:path+"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/positions/:path+"
     },
     {
       "source": "/permissions",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/permissions"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permissions"
     },
     {
       "source": "/permissions/:path+",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/permissions/:path+"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permissions/:path+"
     },
     {
       "source": "/students",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/students"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/students"
     },
     {
       "source": "/students/:path+",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/students/:path+"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/students/:path+"
     },
     {
       "source": "/classes",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/classes"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/classes"
     },
     {
       "source": "/classes/:path+",
-      "destination": "https://jews-mon-locations-das.trycloudflare.com/classes/:path+"
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/classes/:path+"
     },
     {
       "source": "/(.*)",

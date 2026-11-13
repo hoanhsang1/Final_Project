@@ -1,6 +1,7 @@
 package com.mems.client;
 import com.mems.dto.AccessProfile;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,7 @@ public class PeopleAuthorizationClient {
                 throw new IllegalStateException("Invalid authorization response");
             return profile;
         } catch(RestClientException | IllegalStateException ex) {
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"Department permissions are temporarily unavailable");
+            throw new AppException(ErrorCode.DEPARTMENT_PERMISSIONS_UNAVAILABLE);
         }
     }
 }

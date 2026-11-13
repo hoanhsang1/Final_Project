@@ -1,6 +1,7 @@
 package com.mems.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mems.dto.ApiError;
+import com.mems.dto.ApiResponse;
+import com.mems.exception.ErrorCode;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,7 +21,9 @@ public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
                 && Boolean.TRUE.equals(jwt.getClaimAsBoolean("mustChangePassword"))
                 && !allowed.contains(org.springframework.web.util.UrlPathHelper.defaultInstance.getPathWithinApplication(request))) {
             response.setStatus(403);response.setContentType("application/json");
-            mapper.writeValue(response.getOutputStream(),new ApiError("PASSWORD_CHANGE_REQUIRED","Change your temporary password first"));
+            mapper.writeValue(response.getOutputStream(), ApiResponse.failure(
+                ErrorCode.PASSWORD_CHANGE_REQUIRED.name(),
+                ErrorCode.PASSWORD_CHANGE_REQUIRED.getMessage()));
             return;
         }
         chain.doFilter(request,response);

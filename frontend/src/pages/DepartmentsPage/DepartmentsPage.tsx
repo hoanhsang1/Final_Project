@@ -1,12 +1,19 @@
-import { Alert, App, Button, Empty, Popconfirm, Space, Table, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DepartmentFormModal from '../../components/DepartmentFormModal/DepartmentFormModal';
 import PageHeader from '../../components/PageHeader/PageHeader';
-import { ownerErrorMessage } from '../../features/owner/ownerApi';
+import {
+  fetchModuleCatalog,
+  MODULE_CATALOG_STALE_TIME,
+  moduleCatalogKey,
+} from '../../features/modules/moduleApi';
+import { ownerErrorMessage, fetchPermissions } from '../../features/owner/ownerApi';
 import { MSG_DEPT, MSG_OWNER } from '../../features/owner/ownerMessages';
+import { ownerKeys } from '../../features/owner/ownerKeys';
 import type { Department, DepartmentPayload } from '../../features/owner/types';
 import { useDepartmentsPage } from './use-departments';
 
@@ -29,6 +36,20 @@ export default function DepartmentsPage() {
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const { list, create, update, remove } = useDepartmentsPage();
+  const modules = useQuery({
+    queryKey: moduleCatalogKey,
+    queryFn: fetchModuleCatalog,
+    staleTime: MODULE_CATALOG_STALE_TIME,
+  });
+  const permissions = useQuery({
+    queryKey: ownerKeys.permissions(),
+    queryFn: fetchPermissions,
+  });
+  // BE chỉ nhận module đang gate ít nhất một quyền (validateModules).
+  const allowedModuleCodes = new Set(
+    (permissions.data ?? []).map((p) => p.moduleCode).filter((code): code is string => !!code),
+  );
+  const moduleOptions = (modules.data ?? []).filter((m) => allowedModuleCodes.has(m.code));
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
@@ -94,6 +115,21 @@ export default function DepartmentsPage() {
       dataIndex: 'description',
       key: 'description',
       render: (value: string | null) => value || EMPTY_VALUE,
+    },
+    {
+      title: MSG_DEPT.MODULES,
+      dataIndex: 'modules',
+      key: 'modules',
+      render: (codes: string[] | undefined) =>
+        codes && codes.length > 0 ? (
+          <Space size={[token.marginXS, token.marginXS]} wrap>
+            {codes.map((code) => (
+              <Tag key={code}>{code}</Tag>
+            ))}
+          </Space>
+        ) : (
+          <Typography.Text type="secondary">{EMPTY_VALUE}</Typography.Text>
+        ),
     },
     {
       title: MSG_DEPT.CREATED_AT,
@@ -197,6 +233,7 @@ export default function DepartmentsPage() {
       <DepartmentFormModal
         open={formOpen}
         department={editing}
+        moduleOptions={moduleOptions}
         submitting={create.isPending || update.isPending}
         error={formError}
         onCancel={closeForm}

@@ -6,6 +6,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public record ClassTeacherAssignRequest(
-    @NotBlank @Size(max = 36) String teacherId,
-    @NotNull @PositiveOrZero Long version
+    @NotBlank(message = "TEACHER_REQUIRED")
+    @Size(max = 36, message = "ID_TOO_LONG") String teacherId,
+    @NotNull(message = "VERSION_REQUIRED")
+    @PositiveOrZero(message = "VERSION_INVALID") Long version
 ) {}

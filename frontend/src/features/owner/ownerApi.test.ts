@@ -83,7 +83,11 @@ describe('phòng ban', () => {
   it('createDepartment gửi đúng body', async () => {
     mockPost.mockResolvedValue({ data: DEPARTMENT });
 
-    const payload = { name: 'Khoa CNTT', description: 'Khoa Công nghệ thông tin' };
+    const payload = {
+      name: 'Khoa CNTT',
+      description: 'Khoa Công nghệ thông tin',
+      moduleCodes: [],
+    };
     await expect(createDepartment(payload)).resolves.toEqual(DEPARTMENT);
     expect(mockPost).toHaveBeenCalledWith('/departments', payload);
   });
@@ -91,10 +95,11 @@ describe('phòng ban', () => {
   it('updateDepartment gọi PUT /departments/{id}', async () => {
     mockPut.mockResolvedValue({ data: DEPARTMENT });
 
-    await updateDepartment('d1', { name: 'Khoa CNTT' });
+    await updateDepartment('d1', { name: 'Khoa CNTT', moduleCodes: [] });
     expect(mockPut).toHaveBeenCalledWith('/departments/d1', {
       name: 'Khoa CNTT',
       description: undefined,
+      moduleCodes: [],
     });
   });
 

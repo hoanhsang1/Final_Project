@@ -1,7 +1,8 @@
 package com.mems.service;
 import com.mems.client.IdentityClient;
 import com.mems.dto.*;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.*;
 import com.mems.security.Actor;
 import org.springframework.dao.DuplicateKeyException;
@@ -67,7 +68,7 @@ public class MemberService {
             return new CreatedMemberResponse(result,password,true);
         } catch(RuntimeException ex) {
             // A timed-out request may still finish in Identity. Keep the durable entry for the grace period.
-            if (!(ex instanceof ApiException api &&
+            if (!(ex instanceof AppException api &&
                     api.getStatus() == HttpStatus.SERVICE_UNAVAILABLE))
                 compensation.compensate(userId);
             throw ex;
@@ -104,6 +105,7 @@ public class MemberService {
         policy.check(departmentId,before.role(),Set.of());
         if("OWNER".equals(before.role())) throw actor.forbidden("Owner appointments cannot be removed");
         members.delete(userId,actor.orgId());
+        identity.disableAccount(userId,actor.orgId());
         audit.record(actor.orgId(),actor.userId(),"MEMBER_REMOVED",userId,before);
     }
     private void validate(String departmentId,MemberRequest request) {
@@ -119,9 +121,9 @@ public class MemberService {
         String orgId=actor.orgId();
         specialties.validateIds(orgId,request.teacherProfile().specialtyIds());
         if(staff.existsCode(orgId,staffCode))
-            throw new ApiException(HttpStatus.CONFLICT,"STAFF_CODE_EXISTS","Staff code already exists in organization");
+            throw new AppException(ErrorCode.STAFF_CODE_EXISTS);
         if(staff.existsEmail(orgId,request.email().trim().toLowerCase(Locale.ROOT),""))
-            throw new ApiException(HttpStatus.CONFLICT,"EMAIL_EXISTS","Email already exists in organization");
+            throw new AppException(ErrorCode.EMAIL_EXISTS);
     }
     private boolean isTeacher(MemberRequest request) {
         return positions.profileTypes(actor.orgId(),request.positionIds()).contains("TEACHER");
@@ -137,7 +139,7 @@ public class MemberService {
             staff.create(userId,orgId,staffCode,fullName,trimToNull(request.phone()),
                 request.email().trim().toLowerCase(Locale.ROOT),actorId);
         } catch(DuplicateKeyException ex) {
-            throw new ApiException(HttpStatus.CONFLICT,"STAFF_CODE_EXISTS","Staff code already exists in organization");
+            throw new AppException(ErrorCode.STAFF_CODE_EXISTS);
         }
         if(teacher) {
             teachers.createProfile(userId,orgId,request.teacherProfile().contractType(),actorId);
@@ -166,7 +168,7 @@ public class MemberService {
         String trimmed=value.trim();
         return trimmed.isEmpty()?null:trimmed;
     }
-    private ApiException invalid(String field,String message) {
-        return new ApiException(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR",field+": "+message);
+    private AppException invalid(String field,String message) {
+        return new AppException(ErrorCode.VALIDATION_ERROR, field + ": " + message);
     }
 }

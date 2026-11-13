@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { Alert, Button, Checkbox, Flex, Form, Grid, Input, Typography, theme } from 'antd';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import loginIllustration from '../../assets/auth/login-illustration.png';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { RoleButton } from '../../components/RoleButton/RoleButton';
@@ -26,12 +26,15 @@ export default function LoginPage() {
   const screens = useBreakpoint();
   const isDesktop = screens.lg;
   const navigate = useNavigate();
+  const location = useLocation();
   const setSession = useAuthStore((s) => s.setSession);
 
   /** Lỗi từ backend / lỗi mạng, hiển thị inline trong form. */
   const [formError, setFormError] = useState<string | null>(null);
   /** Thông báo khi đăng nhập OK nhưng vai trò chưa có trang tương ứng. */
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(
+    (location.state as { notice?: string } | null)?.notice ?? null,
+  );
 
   const loginMutation = useMutation({
     mutationFn: login,
@@ -41,6 +44,12 @@ export default function LoginPage() {
 
       // Đọc phiên MỚI NHẤT từ store (setSession đã cập nhật xong).
       const state = useAuthStore.getState();
+      // Tài khoản còn mật khẩu tạm → buộc đổi trước khi vào console
+      // (API nghiệp vụ trả 403 PASSWORD_CHANGE_REQUIRED).
+      if (state.mustChangePassword) {
+        navigate('/doi-mat-khau');
+        return;
+      }
       // SUPER_ADMIN → console quản trị (Sprint 2).
       if (state.backendRoles.includes('SUPER_ADMIN')) {
         navigate('/quan-tri');

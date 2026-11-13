@@ -28,17 +28,24 @@ public class ClassStatusRepository {
         rs.getString("to_status"),
         rs.getString("reason"),
         rs.getString("changed_by"),
-        rs.getTimestamp("changed_at") != null ? rs.getTimestamp("changed_at").toInstant() : null
+        rs.getTimestamp("changed_at") != null ? rs.getTimestamp("changed_at").toInstant() : null,
+        rs.getString("actor_name")
     );
 
-    private final RowMapper<ClassCloseEventResponse> eventMapper = (rs, n) -> new ClassCloseEventResponse(
-        rs.getString("id"),
-        rs.getString("class_id"),
-        rs.getString("action"),
-        rs.getString("actor_id"),
-        rs.getString("reason"),
-        rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null
-    );
+    private final RowMapper<ClassCloseEventResponse> eventMapper = (rs, n) -> {
+        String action = rs.getString("action");
+        String reason = rs.getString("reason");
+        return new ClassCloseEventResponse(
+            rs.getString("id"),
+            rs.getString("class_id"),
+            action,
+            rs.getString("actor_id"),
+            rs.getString("actor_name"),
+            reason,
+            "REQUESTED".equals(action) ? reason : null,
+            rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null
+        );
+    };
 
     public record TransitionRow(String id, String status) {}
 
@@ -84,10 +91,12 @@ public class ClassStatusRepository {
 
     public List<ClassStatusLogResponse> statusLogs(String classId, String orgId) {
         return jdbc.query("""
-            SELECT id, class_id, from_status, to_status, reason, changed_by, changed_at
-            FROM class_status_log
-            WHERE class_id = ? AND org_id = ?
-            ORDER BY changed_at ASC, id ASC
+            SELECT l.id, l.class_id, l.from_status, l.to_status, l.reason, l.changed_by, l.changed_at,
+                   sp.full_name AS actor_name
+            FROM class_status_log l
+            LEFT JOIN staff_profile sp ON sp.user_id = l.changed_by AND sp.org_id = l.org_id
+            WHERE l.class_id = ? AND l.org_id = ?
+            ORDER BY l.changed_at ASC, l.id ASC
             """, logMapper, classId, orgId);
     }
 
@@ -143,10 +152,12 @@ public class ClassStatusRepository {
 
     public List<ClassCloseEventResponse> closeEvents(String classId, String orgId) {
         return jdbc.query("""
-            SELECT id, class_id, action, actor_id, reason, created_at
-            FROM class_close_event
-            WHERE class_id = ? AND org_id = ?
-            ORDER BY created_at ASC, id ASC
+            SELECT e.id, e.class_id, e.action, e.actor_id, e.reason, e.created_at,
+                   sp.full_name AS actor_name
+            FROM class_close_event e
+            LEFT JOIN staff_profile sp ON sp.user_id = e.actor_id AND sp.org_id = e.org_id
+            WHERE e.class_id = ? AND e.org_id = ?
+            ORDER BY e.created_at ASC, e.id ASC
             """, eventMapper, classId, orgId);
     }
 

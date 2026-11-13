@@ -3,7 +3,7 @@ package com.mems.service;
 import com.mems.client.IdentityClient;
 import com.mems.dto.DepartmentRequest;
 import com.mems.dto.DepartmentResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
 import com.mems.repository.DepartmentRepository;
 import com.mems.security.Actor;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,9 +58,9 @@ class DepartmentModuleTest {
         DepartmentRequest request = new DepartmentRequest("IT Dept", "Desc", List.of("UNKNOWN_MODULE"));
 
         assertThatThrownBy(() -> departmentService.create(request))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(apiEx.getCode()).isEqualTo("MODULE_NOT_ENABLED");
             });
@@ -73,9 +73,9 @@ class DepartmentModuleTest {
         when(identityClient.activeModules("org-test")).thenReturn(List.of()); // organization hasn't activated STUDENT_MANAGEMENT
 
         assertThatThrownBy(() -> departmentService.create(request))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(apiEx.getCode()).isEqualTo("MODULE_NOT_ENABLED");
             });

@@ -1,7 +1,8 @@
 package com.mems.service;
 import com.mems.client.IdentityClient;
 import com.mems.dto.*;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.PositionRepository;
 import com.mems.security.Actor;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,6 @@ public class PositionService {
     private void validatePermissions(PositionRequest request) {
         var valid=identity.permissions().stream().map(PermissionResponse::code).collect(Collectors.toSet());
         if (!valid.containsAll(request.permissions()))
-            throw new ApiException(HttpStatus.BAD_REQUEST,"UNKNOWN_PERMISSION","Unknown permission code");
+            throw new AppException(ErrorCode.UNKNOWN_PERMISSION);
     }
 }

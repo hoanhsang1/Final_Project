@@ -9,5 +9,6 @@ public record ClassStatusLogResponse(
     String toStatus,
     String reason,
     String changedBy,
-    Instant changedAt
+    Instant changedAt,
+    String actorName
 ) {}

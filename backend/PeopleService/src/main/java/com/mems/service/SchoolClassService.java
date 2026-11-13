@@ -5,7 +5,8 @@ import com.mems.dto.SchoolClassRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.SchoolClassUpdateRequest;
 import com.mems.dto.StudentResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.TeacherRepository;
@@ -99,8 +100,7 @@ public class SchoolClassService {
             request.startDate(), request.endDate(), request.version()
         );
         if (updated == 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "STATUS_CHANGED",
-                "Class status was changed by another request");
+            throw new AppException(ErrorCode.STATUS_CHANGED);
         }
 
         SchoolClassResponse after = repository.require(id, orgId, false);
@@ -128,27 +128,22 @@ public class SchoolClassService {
         SchoolClassResponse before = repository.require(classId, orgId, true);
         if ("DA_KET_THUC".equals(before.status()) || "DA_HUY".equals(before.status())
                 || "CLOSED".equals(before.closeState())) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE",
-                "Teacher cannot be assigned to a finished, cancelled or closed class");
+            throw new AppException(ErrorCode.CLASS_NOT_ASSIGNABLE);
         }
 
         var teacher = teacherRepository.requireTeacher(request.teacherId(), orgId, false);
         if (!"DANG_DAY".equals(teacher.teachingStatus())
                 || !teacherRepository.hasTeacherPosition(teacher.userId(), orgId)) {
-            throw new ApiException(HttpStatus.CONFLICT, "TEACHER_NOT_AVAILABLE",
-                "Teacher is not currently teaching");
+            throw new AppException(ErrorCode.TEACHER_NOT_AVAILABLE);
         }
 
         if (moduleGuard.isActive(orgId, teacherAssignmentModuleCode)) {
-            throw new ApiException(HttpStatus.CONFLICT, "TEACHER_ASSIGNMENT_MODULE_ACTIVE",
-                "Direct assignment is disabled while the teacher assignment module is enabled; "
-                    + "use the assignment workflow instead");
+            throw new AppException(ErrorCode.TEACHER_ASSIGNMENT_MODULE_ACTIVE);
         }
 
         int updated = repository.assignTeacher(classId, orgId, teacher.userId(), request.version());
         if (updated == 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "DATA_CHANGED",
-                "Class was changed by another request");
+            throw new AppException(ErrorCode.DATA_CHANGED);
         }
 
         SchoolClassResponse after = repository.require(classId, orgId, false);
@@ -202,14 +197,13 @@ public class SchoolClassService {
     private void ensureEditable(SchoolClassResponse schoolClass) {
         if ("DA_KET_THUC".equals(schoolClass.status()) || "DA_HUY".equals(schoolClass.status())
                 || "CLOSED".equals(schoolClass.closeState())) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_EDITABLE",
-                "A finished, cancelled or closed class is read-only");
+            throw new AppException(ErrorCode.CLASS_NOT_EDITABLE);
         }
     }
 
     private void validateDates(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
                 "endDate: must not be before startDate");
         }
     }

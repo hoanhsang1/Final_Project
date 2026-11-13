@@ -2,7 +2,8 @@ package com.mems.repository;
 
 import com.mems.dto.PositionRequest;
 import com.mems.dto.PositionResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -29,7 +30,7 @@ public class PositionRepository {
             + (lock ? " FOR UPDATE" : ""),
             (rs, n) -> new PositionResponse(rs.getString("id"), rs.getString("name"), rs.getString("description"),
                 rs.getTimestamp("created_at").toInstant(), permissions(id), rs.getString("profile_type")), id, orgId);
-        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "POSITION_NOT_FOUND", "Position not found");
+        if (rows.isEmpty()) throw new AppException(ErrorCode.POSITION_NOT_FOUND);
         return rows.get(0);
     }
 
@@ -66,7 +67,7 @@ public class PositionRepository {
     public void delete(String id, String orgId) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM member_position WHERE position_id=?", Integer.class, id);
         if (count != null && count > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "POSITION_IN_USE", "Position is assigned to members");
+            throw new AppException(ErrorCode.POSITION_IN_USE);
         }
         jdbc.update("DELETE FROM `position` WHERE id=? AND org_id=?", id, orgId);
     }

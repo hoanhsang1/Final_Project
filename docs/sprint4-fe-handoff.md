@@ -40,7 +40,7 @@ Quy ước chung:
 - `page` bắt đầu từ **1**, `size` 1–100 (mặc định 20).
 - Không gửi `orgId` trong body/query — server lấy từ JWT.
 - Mọi API có `version` phải gửi đúng version vừa đọc.
-- Lỗi trả `{ "code": "...", "message": "..." }`; riêng `SPECIALTY_MISMATCH` có thêm `classes`.
+- Lỗi trả `{ "success": false, "code": "...", "message": "...", "data": null }`; riêng `SPECIALTY_MISMATCH` có danh sách lớp ở `data.classes`. Response thành công giữ nguyên shape cũ.
 - Route giáo viên/chuyên môn/lớp dùng prefix `/api` (gateway bỏ prefix): `/api/teachers`, `/api/specialties`, `/api/classes`.
 - Route nhân sự/chức vụ dùng path gốc: `/departments/...`, `/positions`, `/permissions`.
 
@@ -245,9 +245,12 @@ Nếu đổi chuyên môn làm lớp đang phụ trách lệch môn, server tr�
 
 ```json
 {
+  "success": false,
   "code": "SPECIALTY_MISMATCH",
   "message": "Specialties no longer match the subject of assigned classes",
-  "classes": [{ "id": "class-1", "name": "Lớp 10A" }]
+  "data": {
+    "classes": [{ "id": "class-1", "name": "Lớp 10A" }]
+  }
 }
 ```
 
@@ -396,7 +399,8 @@ Các API có `version`: sửa lớp, hủy lớp, gán giáo viên, sửa giáo 
 
 | HTTP | `code` | Thông báo FE |
 |---|---|---|
-| 400 | `VALIDATION_ERROR` | Hiển thị lỗi tại từng trường từ `message` |
+| 400 | `VALIDATION_ERROR` | Body sai định dạng — hiển thị `message` |
+| 400 | mã theo trường (vd `NAME_REQUIRED`, `CODE_TOO_LONG`) | Hiển thị lỗi tại trường tương ứng từ `message` |
 | 400 | `MODULE_NOT_ENABLED` | "Tổ chức chưa bật module Quản lý sinh viên/lớp" |
 | 400 | `INVALID_POSITION` | "Chức vụ đã chọn không phải Giáo viên" |
 | 400 | `INVALID_SPECIALTY` | "Chuyên môn không hợp lệ hoặc không thuộc tổ chức" |
@@ -417,7 +421,7 @@ Các API có `version`: sửa lớp, hủy lớp, gán giáo viên, sửa giáo 
 | 409 | `CLASS_NOT_CANCELLABLE` | "Không thể hủy lớp ở trạng thái này" |
 | 409 | `CLASS_NOT_CLOSABLE` | "Không thể yêu cầu đóng lớp đã hủy" |
 | 409 | `TEACHER_ASSIGNMENT_MODULE_ACTIVE` | "Tổ chức dùng quy trình phân công Epic 12" |
-| 500 | `INTERNAL_ERROR` | "Có lỗi xảy ra, vui lòng thử lại" |
+| 500 | `UNCATEGORIZED_EXCEPTION` | "Có lỗi xảy ra, vui lòng thử lại" |
 | 503 | `IDENTITY_UNAVAILABLE` | "Không kiểm tra được quyền, thử lại sau" |
 
 ---

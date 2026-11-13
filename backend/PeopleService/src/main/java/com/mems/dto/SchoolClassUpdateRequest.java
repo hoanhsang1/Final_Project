@@ -8,9 +8,11 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record SchoolClassUpdateRequest(
-    @NotBlank @Size(max = 200) String name,
-    @Size(max = 50) String academicYear,
+    @NotBlank(message = "NAME_REQUIRED")
+    @Size(max = 200, message = "NAME_TOO_LONG") String name,
+    @Size(max = 50, message = "ACADEMIC_YEAR_TOO_LONG") String academicYear,
     LocalDate startDate,
     LocalDate endDate,
-    @NotNull @PositiveOrZero Long version
+    @NotNull(message = "VERSION_REQUIRED")
+    @PositiveOrZero(message = "VERSION_INVALID") Long version
 ) {}

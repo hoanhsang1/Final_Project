@@ -7,11 +7,13 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record StudentRequest(
-    @NotBlank @Size(max = 100) String studentCode,
-    @NotBlank @Size(max = 200) String fullName,
+    @NotBlank(message = "CODE_REQUIRED")
+    @Size(max = 100, message = "CODE_TOO_LONG") String studentCode,
+    @NotBlank(message = "NAME_REQUIRED")
+    @Size(max = 200, message = "NAME_TOO_LONG") String fullName,
     LocalDate dateOfBirth,
-    @Email @Size(max = 255) String email,
-    @Size(max = 50) String phone,
-    @Pattern(regexp = "active|inactive|suspended") String status
+    @Email(message = "EMAIL_INVALID")
+    @Size(max = 255, message = "EMAIL_TOO_LONG") String email,
+    @Size(max = 50, message = "PHONE_TOO_LONG") String phone,
+    @Pattern(regexp = "active|inactive|suspended", message = "STATUS_INVALID") String status
 ) {}
-

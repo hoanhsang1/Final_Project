@@ -4,7 +4,7 @@ import com.mems.client.IdentityClient;
 import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.ClassTeacherInfo;
 import com.mems.dto.SchoolClassResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.TeacherRepository;
@@ -76,8 +76,8 @@ class ClassTeacherAssignmentTest {
         when(teachers.requireTeacher("teacher-1", "org-1", false)).thenReturn(teacher("teacher-1", "TAM_NGHI"));
 
         assertThatThrownBy(() -> service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "TEACHER_NOT_AVAILABLE"));
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "TEACHER_NOT_AVAILABLE"));
         verify(classes, never()).assignTeacher(anyString(), anyString(), anyString(), anyLong());
     }
 
@@ -91,8 +91,8 @@ class ClassTeacherAssignmentTest {
         when(teachers.hasTeacherPosition("teacher-1", "org-1")).thenReturn(true);
 
         assertThatThrownBy(() -> service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .isInstanceOf(ApiException.class)
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT,
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT,
                 "TEACHER_ASSIGNMENT_MODULE_ACTIVE"));
     }
 
@@ -101,15 +101,15 @@ class ClassTeacherAssignmentTest {
     void rejectsFinishedCancelledOrClosedClass() {
         when(classes.require("class-1", "org-1", true)).thenReturn(classRow("class-1", "DA_KET_THUC", "NONE", null, 0));
         assertThatThrownBy(() -> service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
 
         when(classes.require("class-2", "org-1", true)).thenReturn(classRow("class-2", "DA_HUY", "NONE", null, 0));
         assertThatThrownBy(() -> service.assignTeacher("class-2", new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
 
         when(classes.require("class-3", "org-1", true)).thenReturn(classRow("class-3", "DANG_DIEN_RA", "CLOSED", null, 0));
         assertThatThrownBy(() -> service.assignTeacher("class-3", new ClassTeacherAssignRequest("teacher-1", 0L)))
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "CLASS_NOT_ASSIGNABLE"));
     }
 
     @Test
@@ -121,10 +121,10 @@ class ClassTeacherAssignmentTest {
         when(classes.assignTeacher("class-1", "org-1", "teacher-1", 1)).thenReturn(0);
 
         assertThatThrownBy(() -> service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 1L)))
-            .satisfies(ex -> assertError((ApiException) ex, HttpStatus.CONFLICT, "DATA_CHANGED"));
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "DATA_CHANGED"));
     }
 
-    private void assertError(ApiException ex, HttpStatus status, String code) {
+    private void assertError(AppException ex, HttpStatus status, String code) {
         assertThat(ex.getStatus()).isEqualTo(status);
         assertThat(ex.getCode()).isEqualTo(code);
     }

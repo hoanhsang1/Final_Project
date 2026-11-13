@@ -1,6 +1,7 @@
 package com.mems.service;
 import com.mems.dto.ProvisionAccountRequest;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,10 +22,10 @@ public class AccountProvisioningService {
         Integer organizations=jdbc.queryForObject("SELECT COUNT(*) FROM organization WHERE id=? AND status='active'",
             Integer.class,request.orgId());
         if(organizations==null || organizations!=1)
-            throw new ApiException(HttpStatus.CONFLICT,"Organization is not active");
+            throw new AppException(ErrorCode.ORGANIZATION_INACTIVE, HttpStatus.CONFLICT);
         Integer existing=jdbc.queryForObject("SELECT COUNT(*) FROM account WHERE username=? OR id=?",
             Integer.class,request.username(),request.userId());
-        if(existing!=null && existing>0) throw new ApiException(HttpStatus.CONFLICT,"Account already exists");
+        if(existing!=null && existing>0) throw new AppException(ErrorCode.ACCOUNT_EXISTS);
         jdbc.update("""
             INSERT INTO account(id,org_id,username,email,password_hash,status,must_change_password,provisioned_by)
             VALUES (?,?,?,?,?,'active',TRUE,?)
@@ -41,16 +42,21 @@ public class AccountProvisioningService {
         String password=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
             encoder.encode(password),id,orgId);
-        if(updated!=1) throw new ApiException(HttpStatus.NOT_FOUND,"Account not found");
+        if(updated!=1) throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         return Map.of("temporaryPassword",password);
     }
+    @Transactional
+    public void disable(String id,String orgId) {
+        jdbc.update("UPDATE account SET status='disabled' WHERE id=? AND org_id=?",id,orgId);
+    }
+
     @Transactional
     public void compensate(String id,String orgId) {
         var rows=jdbc.queryForList("SELECT provisioned_by,last_login_at FROM account WHERE id=? AND org_id=? FOR UPDATE",id,orgId);
         if(rows.isEmpty()) return;
         var row=rows.get(0);
         if(row.get("provisioned_by")==null || row.get("last_login_at")!=null)
-            throw new ApiException(HttpStatus.CONFLICT,"Only unused provisioned accounts may be rolled back");
+            throw new AppException(ErrorCode.PROVISION_ROLLBACK_NOT_ALLOWED);
         jdbc.update("DELETE FROM account_role WHERE account_id=?",id);
         jdbc.update("DELETE FROM account WHERE id=? AND org_id=?",id,orgId);
     }

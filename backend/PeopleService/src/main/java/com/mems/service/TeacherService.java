@@ -1,7 +1,8 @@
 package com.mems.service;
 
 import com.mems.dto.*;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.exception.SpecialtyMismatchException;
 import com.mems.repository.*;
 import com.mems.security.Actor;
@@ -41,7 +42,7 @@ public class TeacherService {
     public CreatedTeacherResponse create(TeacherCreateRequest request) {
         String orgId = actor.orgId();
         if (!positions.profileTypes(orgId, request.positionIds()).contains("TEACHER")) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_POSITION",
+            throw new AppException(ErrorCode.INVALID_POSITION,
                 "positionIds: at least one TEACHER position is required");
         }
         MemberRequest member = new MemberRequest(request.username(), request.email(), request.role(),
@@ -90,7 +91,7 @@ public class TeacherService {
         String phone = request.phone() == null ? row.phone() : trimToNull(request.phone());
         String email = request.email() == null ? row.email() : normalizeEmail(request.email());
         if (email != null && staff.existsEmail(orgId, email, userId)) {
-            throw new ApiException(HttpStatus.CONFLICT, "EMAIL_EXISTS", "Email already exists in organization");
+            throw new AppException(ErrorCode.EMAIL_EXISTS);
         }
 
         Set<String> current = specialties.forUser(userId, orgId).stream()
@@ -106,7 +107,7 @@ public class TeacherService {
 
         int updated = staff.updateDetails(userId, orgId, fullName, phone, email, actorId, request.version());
         if (updated == 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "DATA_CHANGED", "Teacher profile was changed by another request");
+            throw new AppException(ErrorCode.DATA_CHANGED, "Teacher profile was changed by another request");
         }
         teachers.updateContract(userId, orgId, request.contractType(), actorId);
         if (specialtiesChanged) {
@@ -127,14 +128,18 @@ public class TeacherService {
     }
 
     private TeacherDetailResponse detail(TeacherRepository.TeacherRow row) {
+        List<TeacherClassResponse> classes = teachers.classes(row.userId(), row.orgId());
+        long classCount = classes.stream()
+            .filter(c -> "CHUA_BAT_DAU".equals(c.status()) || "DANG_DIEN_RA".equals(c.status()))
+            .count();
         return new TeacherDetailResponse(
             row.userId(), row.staffCode(), row.fullName(), row.email(), row.phone(), row.departmentId(),
             memberRepository.positionIds(row.userId(), false),
             specialties.forUser(row.userId(), row.orgId()),
-            row.contractType(), row.teachingStatus(),
-            teachers.classes(row.userId(), row.orgId()),
+            row.contractType(), row.teachingStatus(), classes,
             row.version(), row.createdAt(), row.updatedAt(),
-            teachers.history(row.userId(), row.orgId()));
+            teachers.history(row.userId(), row.orgId()),
+            classCount, classCount == 0, classCount == 0 ? "Chưa có lớp" : null);
     }
 
     private void recordChange(Map<String, Object> changes, String field, Object before, Object after) {

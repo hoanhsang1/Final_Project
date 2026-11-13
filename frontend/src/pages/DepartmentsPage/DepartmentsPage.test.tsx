@@ -15,6 +15,17 @@ vi.mock('../../features/owner/ownerApi', async (importOriginal) => {
     createDepartment: vi.fn(),
     updateDepartment: vi.fn(),
     deleteDepartment: vi.fn(),
+    fetchPermissions: vi.fn().mockResolvedValue([]),
+  };
+});
+
+vi.mock('../../features/modules/moduleApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../features/modules/moduleApi')>();
+  return {
+    ...actual,
+    fetchModuleCatalog: vi
+      .fn()
+      .mockResolvedValue([{ code: 'STUDENT_MANAGEMENT', name: 'Quản lý học sinh' }]),
   };
 });
 
@@ -31,6 +42,7 @@ const KHOA_CNTT = {
   name: 'Khoa CNTT',
   description: 'Khoa Công nghệ thông tin',
   createdAt: '2026-10-01T03:00:00Z',
+  modules: [],
 };
 
 const PHONG_DAO_TAO = {
@@ -38,6 +50,7 @@ const PHONG_DAO_TAO = {
   name: 'Phòng Đào tạo',
   description: null,
   createdAt: '2026-10-02T03:00:00Z',
+  modules: [],
 };
 
 function renderPage() {
@@ -122,7 +135,11 @@ describe('DepartmentsPage — tạo phòng ban', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
 
     await waitFor(() =>
-      expect(mockCreate).toHaveBeenCalledWith({ name: 'Khoa Mới', description: undefined }),
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: 'Khoa Mới',
+        description: undefined,
+        moduleCodes: [],
+      }),
     );
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
   });

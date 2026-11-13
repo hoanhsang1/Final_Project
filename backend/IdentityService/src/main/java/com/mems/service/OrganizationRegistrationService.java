@@ -3,7 +3,8 @@ package com.mems.service;
 import com.mems.dto.RegisterOrganizationRequest;
 import com.mems.entity.Organization;
 import com.mems.entity.enums.OrganizationStatus;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.IAccountRepository;
 import com.mems.repository.IModuleRepository;
 import com.mems.repository.IOrganizationRepository;
@@ -60,10 +61,7 @@ public class OrganizationRegistrationService implements IOrganizationRegistratio
         boolean exist = accountRepository.existsByUsername(username);
         
         if(exist) {
-            throw new ApiException(
-                HttpStatus.CONFLICT,
-                "Username already exists"
-            );
+            throw new AppException(ErrorCode.USERNAME_EXISTS);
         }
 
         // 2. Kiem tra tat ca module co hop le khong
@@ -71,10 +69,7 @@ public class OrganizationRegistrationService implements IOrganizationRegistratio
             boolean exists = moduleRepository.existsByCodeAndActiveTrue(module);
 
             if (!exists) {
-                throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
-                    "Invalid module: " + module
-                );
+                throw new AppException(ErrorCode.INVALID_MODULE, "Invalid module: " + module);
             }
         });
 

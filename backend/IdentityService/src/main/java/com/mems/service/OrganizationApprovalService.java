@@ -1,6 +1,7 @@
 package com.mems.service;
 
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -154,10 +155,7 @@ public class OrganizationApprovalService {
         );
 
         if (rows.isEmpty()) {
-            throw new ApiException(
-                HttpStatus.NOT_FOUND,
-                "Organization not found"
-            );
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
         }
 
         List<Map<String, Object>> modules = jdbc.queryForList(
@@ -206,17 +204,11 @@ public class OrganizationApprovalService {
         );
 
         if (statuses.isEmpty()) {
-            throw new ApiException(
-                HttpStatus.NOT_FOUND,
-                "Organization not found"
-            );
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
         }
 
         if (!"pending".equals(statuses.get(0))) {
-            throw new ApiException(
-                HttpStatus.CONFLICT,
-                "Organization has already been reviewed"
-            );
+            throw new AppException(ErrorCode.ORGANIZATION_ALREADY_REVIEWED);
         }
     }
 
@@ -308,7 +300,7 @@ public class OrganizationApprovalService {
     public void suspend(String orgId, String reason) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Organization not found");
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
         }
         jdbc.update("UPDATE organization SET status = 'suspended' WHERE id = ?", orgId);
         jdbc.update(
@@ -330,7 +322,7 @@ public class OrganizationApprovalService {
     public void reactivate(String orgId, String reason) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Organization not found");
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
         }
         jdbc.update("UPDATE organization SET status = 'active' WHERE id = ?", orgId);
         jdbc.update(
@@ -352,19 +344,19 @@ public class OrganizationApprovalService {
     public void updateModules(String orgId, List<String> modules) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Organization not found");
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
         }
         if ("suspended".equals(statuses.get(0))) {
-            throw new ApiException(HttpStatus.CONFLICT, "Organization is suspended");
+            throw new AppException(ErrorCode.ORGANIZATION_SUSPENDED);
         }
         if (modules == null || modules.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Modules list cannot be empty");
+            throw new AppException(ErrorCode.MODULES_EMPTY);
         }
 
         for (String m : modules) {
             Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM module WHERE code = ? AND is_active = TRUE", Integer.class, m);
             if (count == null || count == 0) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid module: " + m);
+                throw new AppException(ErrorCode.INVALID_MODULE, "Invalid module: " + m);
             }
         }
 

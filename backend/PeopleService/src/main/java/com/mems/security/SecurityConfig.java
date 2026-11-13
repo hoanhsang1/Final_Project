@@ -1,7 +1,8 @@
 package com.mems.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mems.dto.ApiError;
+import com.mems.dto.ApiResponse;
+import com.mems.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -43,11 +44,13 @@ public class SecurityConfig {
                 return new JwtAuthenticationToken(jwt, authorities);
             })).authenticationEntryPoint((req,res,ex) -> {
                 res.setStatus(401); res.setContentType("application/json");
-                mapper.writeValue(res.getOutputStream(), new ApiError("UNAUTHENTICATED", "Valid Bearer token required"));
+                mapper.writeValue(res.getOutputStream(), ApiResponse.failure(
+                    ErrorCode.UNAUTHENTICATED.name(), ErrorCode.UNAUTHENTICATED.getMessage()));
             }))
             .exceptionHandling(e -> e.accessDeniedHandler((req,res,ex) -> {
                 res.setStatus(403); res.setContentType("application/json");
-                mapper.writeValue(res.getOutputStream(), new ApiError("FORBIDDEN", "Access denied"));
+                mapper.writeValue(res.getOutputStream(), ApiResponse.failure(
+                    ErrorCode.FORBIDDEN.name(), ErrorCode.FORBIDDEN.getMessage()));
             }));
         return http.build();
     }

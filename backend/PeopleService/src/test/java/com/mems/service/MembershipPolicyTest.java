@@ -2,7 +2,8 @@ package com.mems.service;
 
 import com.mems.dto.MemberResponse;
 import com.mems.dto.PositionResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.MemberRepository;
 import com.mems.repository.PositionRepository;
 import com.mems.security.Actor;
@@ -83,9 +84,9 @@ class MembershipPolicyTest {
             .thenReturn(Set.of("PEOPLE_EDIT", "PEOPLE_VIEW"));
 
         assertThatThrownBy(() -> policy.check("dept-1", "STAFF", Set.of("pos-staff-student")))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
                 assertThat(apiEx.getCode()).isEqualTo("PERMISSION_OUT_OF_MODULE");
             });
@@ -120,12 +121,12 @@ class MembershipPolicyTest {
         when(effectivePermissions.compute("org-1", "dept-1", Set.of("PEOPLE_VIEW")))
             .thenReturn(Set.of("PEOPLE_VIEW"));
 
-        when(actor.forbidden(anyString())).thenReturn(new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Cannot assign permissions beyond your current permissions"));
+        when(actor.forbidden(anyString())).thenReturn(new AppException(ErrorCode.FORBIDDEN, "Cannot assign permissions beyond your current permissions"));
 
         assertThatThrownBy(() -> policy.check("dept-1", "STAFF", Set.of("pos-staff")))
-            .isInstanceOf(ApiException.class)
+            .isInstanceOf(AppException.class)
             .satisfies(ex -> {
-                ApiException apiEx = (ApiException) ex;
+                AppException apiEx = (AppException) ex;
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
                 assertThat(apiEx.getCode()).isEqualTo("FORBIDDEN");
             });

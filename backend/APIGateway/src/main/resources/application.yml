@@ -58,19 +58,46 @@ spring:
         - id: people-permissions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/permissions/**
+            - Path=/permissions/**,/permissions,/permissions/
 
-        - id: people-teachers
+        - id: people-students
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/api/teachers/**,/api/teachers
-
-        - id: people-specialties
-          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/api/specialties/**,/api/specialties
+            - Path=/students/**,/students,/students/
 
         - id: people-classes
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
+            - Path=/classes/**,/classes,/classes/
+
+        - id: people-teachers
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/teachers/**,/teachers,/teachers/
+
+        - id: people-specialties
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/specialties/**,/specialties,/specialties/
+
+        # Sprint 4 FE gọi kèm prefix /api; gateway bỏ 1 segment để khớp controller.
+        - id: people-teachers-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/teachers/**,/api/teachers
+          filters:
+            - StripPrefix=1
+
+        - id: people-specialties-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/specialties/**,/api/specialties
+          filters:
+            - StripPrefix=1
+
+        - id: people-classes-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
             - Path=/api/classes/**,/api/classes
+          filters:
+            - StripPrefix=1

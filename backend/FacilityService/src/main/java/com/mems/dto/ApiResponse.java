@@ -1,23 +1,62 @@
 package com.mems.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-@Getter @Setter 
-@NoArgsConstructor 
-@AllArgsConstructor 
 public class ApiResponse<T> {
-    
     private boolean success;
+    private String code;
     private String message;
     private T data;
 
-    public static <T> ApiResponse<T> success(String mess, T data) {
-        return new ApiResponse<>(true,mess,data);
+    public ApiResponse() {
     }
-    public static <T> ApiResponse<T> failure(String mess) {
-        return new ApiResponse<>(false,mess,null);
+
+    public ApiResponse(boolean success, String code, String message, T data) {
+        this.success = success;
+        this.code = code;
+        this.message = message;
+        this.data = data;
+    }
+
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, null, message, data);
+    }
+
+    public static <T> ApiResponse<T> failure(String code, String message) {
+        return new ApiResponse<>(false, code, message, null);
+    }
+
+    public static <T> ApiResponse<T> failure(String code, String message, T data) {
+        return new ApiResponse<>(false, code, message, data);
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public T getData() {
+        return data;
+    }
+
+    public void setData(T data) {
+        this.data = data;
     }
 }

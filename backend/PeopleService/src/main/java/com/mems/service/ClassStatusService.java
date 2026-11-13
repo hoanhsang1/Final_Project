@@ -7,7 +7,8 @@ import com.mems.dto.ClassCloseRequest;
 import com.mems.dto.ClassReopenRequest;
 import com.mems.dto.ClassStatusLogResponse;
 import com.mems.dto.SchoolClassResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
@@ -77,8 +78,7 @@ public class ClassStatusService {
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
         if (!CANCELLABLE.contains(before.status()) || !"NONE".equals(before.closeState())) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_CANCELLABLE",
-                "Only a class that has not finished, been cancelled or closed can be cancelled");
+            throw new AppException(ErrorCode.CLASS_NOT_CANCELLABLE);
         }
         if (before.version() != request.version()) {
             throw statusChanged();
@@ -109,8 +109,7 @@ public class ClassStatusService {
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
         if ("DA_HUY".equals(before.status())) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_CLOSABLE",
-                "A cancelled class cannot be closed");
+            throw new AppException(ErrorCode.CLASS_NOT_CLOSABLE);
         }
         if (!"NONE".equals(before.closeState())) {
             throw closeStateChanged();
@@ -135,8 +134,7 @@ public class ClassStatusService {
             throw closeStateChanged();
         }
         if (actor.userId().equals(repository.lastRequester(classId, orgId))) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "SELF_APPROVAL_NOT_ALLOWED",
-                "The requester cannot approve their own close request");
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         }
         if (repository.approveClose(classId, orgId) == 0) {
             throw closeStateChanged();
@@ -191,19 +189,16 @@ public class ClassStatusService {
 
     private String requireReason(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
-                field + ": must not be blank");
+            throw new AppException(ErrorCode.VALIDATION_ERROR, field + ": must not be blank");
         }
         return value.trim();
     }
 
-    private ApiException statusChanged() {
-        return new ApiException(HttpStatus.CONFLICT, "STATUS_CHANGED",
-            "Class status was changed by another request");
+    private AppException statusChanged() {
+        return new AppException(ErrorCode.STATUS_CHANGED);
     }
 
-    private ApiException closeStateChanged() {
-        return new ApiException(HttpStatus.CONFLICT, "CLOSE_STATE_CHANGED",
-            "Class close state does not allow this action");
+    private AppException closeStateChanged() {
+        return new AppException(ErrorCode.CLOSE_STATE_CHANGED);
     }
 }

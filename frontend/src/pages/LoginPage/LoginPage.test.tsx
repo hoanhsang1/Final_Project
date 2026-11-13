@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/authStore';
 /** Mock tầng gọi API để test độc lập, không cần backend chạy. */
 vi.mock('../../features/auth/authApi', () => ({
   login: vi.fn(),
+  changePassword: vi.fn(),
 }));
 const { login } = await import('../../features/auth/authApi');
 const mockLogin = vi.mocked(login);
@@ -29,6 +30,7 @@ beforeEach(() => {
     username: null,
     role: null,
     backendRoles: [],
+    mustChangePassword: false,
     isAuthenticated: false,
   });
 });
@@ -153,4 +155,26 @@ it('OWNER đăng nhập thành công thì vào thẳng /to-chuc', async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe('/to-chuc'));
   expect(await screen.findByRole('heading', { name: 'Phòng ban' })).toBeInTheDocument();
   expect(useAuthStore.getState().backendRoles).toContain('OWNER');
+});
+
+it('tài khoản còn mật khẩu tạm thì bị đưa sang /doi-mat-khau, không vào console', async () => {
+  mockLogin.mockResolvedValue({
+    accessToken: fakeJwt({
+      userId: 'u4',
+      username: 'nhanvien',
+      roles: ['OWNER'],
+      mustChangePassword: true,
+    }),
+    refreshToken: 'r4',
+    tokenType: 'Bearer',
+    expiresIn: 900,
+  });
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'nhanvien');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), 'tam123456789');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/doi-mat-khau'));
+  expect(await screen.findByRole('heading', { name: 'Đổi mật khẩu' })).toBeInTheDocument();
 });

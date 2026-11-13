@@ -8,7 +8,8 @@ import com.mems.dto.TeacherAssignableItem;
 import com.mems.dto.TeacherClassResponse;
 import com.mems.dto.TeacherHistoryResponse;
 import com.mems.dto.TeacherListItem;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.service.TextNormalizer;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -55,7 +56,7 @@ public class TeacherRepository {
                 rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null
             ), userId, orgId);
         if (rows.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND", "Teacher not found");
+            throw new AppException(ErrorCode.TEACHER_NOT_FOUND);
         }
         return rows.get(0);
     }
@@ -194,7 +195,7 @@ public class TeacherRepository {
             specialties.forUsers(orgId, raw.stream().map(RawTeacher::userId).toList());
         List<TeacherAssignableItem> items = raw.stream().map(row -> new TeacherAssignableItem(
             row.userId(), row.staffCode(), row.fullName(),
-            byUser.getOrDefault(row.userId(), List.of()), row.classCount())).toList();
+            byUser.getOrDefault(row.userId(), List.of()), row.classCount(), row.teachingStatus())).toList();
 
         return Map.of("items", items, "total", total, "page", page, "size", size,
             "pages", (total + size - 1) / size);
@@ -215,12 +216,15 @@ public class TeacherRepository {
 
     public List<TeacherHistoryResponse> history(String userId, String orgId) {
         return jdbc.query("""
-            SELECT id, action, actor_user_id, details, created_at
-            FROM people_audit_log
-            WHERE org_id=? AND target_id=? AND action IN ('TEACHER_CREATED','TEACHER_UPDATED')
-            ORDER BY created_at DESC
+            SELECT a.id, a.action, a.actor_user_id, a.details, a.created_at,
+                   sp.full_name AS actor_name
+            FROM people_audit_log a
+            LEFT JOIN staff_profile sp ON sp.user_id = a.actor_user_id AND sp.org_id = a.org_id
+            WHERE a.org_id=? AND a.target_id=? AND a.action IN ('TEACHER_CREATED','TEACHER_UPDATED')
+            ORDER BY a.created_at DESC
             """, (rs, n) -> new TeacherHistoryResponse(
                 rs.getString("id"), rs.getString("action"), rs.getString("actor_user_id"),
+                rs.getString("actor_name"),
                 rs.getTimestamp("created_at").toInstant(), parseDetails(rs.getString("details"))),
             orgId, userId);
     }

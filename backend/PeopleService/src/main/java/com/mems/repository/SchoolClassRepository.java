@@ -2,13 +2,16 @@ package com.mems.repository;
 
 import com.mems.dto.ClassTeacherInfo;
 import com.mems.dto.SchoolClassResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,7 +25,11 @@ public class SchoolClassRepository {
         this.jdbc = jdbc;
     }
 
-    private final RowMapper<SchoolClassResponse> classMapper = (rs, n) -> {
+    private final RowMapper<SchoolClassResponse> classMapper = (rs, n) -> map(rs, false);
+
+    private final RowMapper<SchoolClassResponse> detailMapper = (rs, n) -> map(rs, true);
+
+    private SchoolClassResponse map(ResultSet rs, boolean withReasons) throws SQLException {
         String teacherId = rs.getString("teacher_id");
         ClassTeacherInfo teacher = teacherId == null ? null
             : new ClassTeacherInfo(teacherId, rs.getString("teacher_code"), rs.getString("teacher_name"));
@@ -41,9 +48,12 @@ public class SchoolClassRepository {
             rs.getInt("student_count"),
             rs.getString("created_by"),
             rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
-            rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null
+            rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null,
+            withReasons ? rs.getString("cancel_reason") : null,
+            withReasons ? rs.getString("close_request_note") : null,
+            withReasons ? rs.getString("close_reject_reason") : null
         );
-    };
+    }
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable) {
@@ -114,7 +124,7 @@ public class SchoolClassRepository {
                 "SELECT id FROM school_class WHERE id = ? AND org_id = ? AND deleted_at IS NULL FOR UPDATE",
                 String.class, id, orgId);
             if (ids.isEmpty()) {
-                throw new ApiException(HttpStatus.NOT_FOUND, "CLASS_NOT_FOUND", "Class not found");
+                throw new AppException(ErrorCode.CLASS_NOT_FOUND);
             }
         }
 
@@ -124,7 +134,16 @@ public class SchoolClassRepository {
                    c.teacher_id, c.close_state, c.version,
                    t.staff_code AS teacher_code, t.full_name AS teacher_name,
                    COUNT(cs.student_id) AS student_count,
-                   c.created_by, c.created_at, c.updated_at
+                   c.created_by, c.created_at, c.updated_at,
+                   (SELECT l.reason FROM class_status_log l
+                    WHERE l.class_id = c.id AND l.org_id = c.org_id AND l.to_status = 'DA_HUY'
+                    ORDER BY l.changed_at DESC, l.id DESC LIMIT 1) AS cancel_reason,
+                   (SELECT e.reason FROM class_close_event e
+                    WHERE e.class_id = c.id AND e.org_id = c.org_id AND e.action = 'REQUESTED'
+                    ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS close_request_note,
+                   (SELECT e.reason FROM class_close_event e
+                    WHERE e.class_id = c.id AND e.org_id = c.org_id AND e.action = 'REJECTED'
+                    ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS close_reject_reason
             FROM school_class c
             LEFT JOIN class_student cs ON cs.class_id = c.id AND cs.org_id = c.org_id
             LEFT JOIN staff_profile t ON t.user_id = c.teacher_id AND t.org_id = c.org_id
@@ -135,9 +154,9 @@ public class SchoolClassRepository {
                      c.created_by, c.created_at, c.updated_at
             """;
 
-        List<SchoolClassResponse> rows = jdbc.query(sql, classMapper, id, orgId);
+        List<SchoolClassResponse> rows = jdbc.query(sql, detailMapper, id, orgId);
         if (rows.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "CLASS_NOT_FOUND", "Class not found");
+            throw new AppException(ErrorCode.CLASS_NOT_FOUND);
         }
         return rows.get(0);
     }
@@ -148,7 +167,7 @@ public class SchoolClassRepository {
             Integer.class, orgId, classCode
         );
         if (count != null && count > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "CONFLICT", "Class code already exists in organization");
+            throw new AppException(ErrorCode.CONFLICT, "Class code already exists in organization");
         }
     }
 
@@ -202,7 +221,7 @@ public class SchoolClassRepository {
             case "INACTIVE", "DA_HUY" -> "DA_HUY";
             case "ARCHIVED", "DA_KET_THUC" -> "DA_KET_THUC";
             case "DANG_DIEN_RA" -> "DANG_DIEN_RA";
-            default -> throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "status: invalid value");
+            default -> throw new AppException(ErrorCode.VALIDATION_ERROR, "status: invalid value");
         };
     }
 
@@ -212,7 +231,7 @@ public class SchoolClassRepository {
             Integer.class, id, orgId
         );
         if (students != null && students > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_EMPTY", "Cannot delete class with enrolled students");
+            throw new AppException(ErrorCode.CLASS_NOT_EMPTY);
         }
         jdbc.update(
             "UPDATE school_class SET deleted_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND org_id = ? AND deleted_at IS NULL",
@@ -229,7 +248,7 @@ public class SchoolClassRepository {
             if (currentClasses.contains(classId)) {
                 return; // already enrolled in this class
             }
-            throw new ApiException(HttpStatus.CONFLICT, "STUDENT_ALREADY_IN_CLASS", "Student is already enrolled in another class");
+            throw new AppException(ErrorCode.STUDENT_ALREADY_IN_CLASS);
         }
 
         jdbc.update(

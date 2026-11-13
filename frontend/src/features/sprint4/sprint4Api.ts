@@ -64,7 +64,7 @@ function extractError(error: unknown): {
 
 /**
  * Bảng lỗi §8.2 — mỗi `code` một câu tiếng Việt đúng nghiệp vụ.
- * `VALIDATION_ERROR` xử lý riêng (ưu tiên `message` của BE tại từng trường).
+ * Lỗi validate (400, mã theo trường) xử lý riêng: ưu tiên `message` của BE.
  */
 const CODE_MESSAGES: Record<string, string> = {
   MODULE_NOT_ENABLED: 'Tổ chức chưa bật module Quản lý sinh viên/lớp.',
@@ -90,19 +90,19 @@ const CODE_MESSAGES: Record<string, string> = {
   CLASS_NOT_CANCELLABLE: 'Không thể hủy lớp ở trạng thái này.',
   CLASS_NOT_CLOSABLE: 'Không thể yêu cầu đóng lớp đã hủy.',
   TEACHER_ASSIGNMENT_MODULE_ACTIVE: MSG_CLASS.ASSIGNMENT_BLOCKED,
-  INTERNAL_ERROR: MSG_S4.INTERNAL_ERROR,
+  UNCATEGORIZED_EXCEPTION: MSG_S4.INTERNAL_ERROR,
   IDENTITY_UNAVAILABLE: MSG_S4.IDENTITY_UNAVAILABLE,
 };
 
 function viMessage(info: { status: number | null; code: string | null; message?: string }): string {
   const { status, code, message } = info;
 
-  // Lỗi validate: BE gửi câu cụ thể cho từng trường → ưu tiên câu đó.
-  if (code === 'VALIDATION_ERROR') {
-    return message?.trim() || MSG_S4.SAVE_FAILED;
-  }
   if (code && CODE_MESSAGES[code]) {
     return CODE_MESSAGES[code];
+  }
+  // Lỗi validate: BE gửi mã theo trường (NAME_REQUIRED, …) kèm câu cụ thể.
+  if (status === 400) {
+    return message?.trim() || MSG_S4.SAVE_FAILED;
   }
 
   if (status === null) return MSG_S4.NETWORK_ERROR;
@@ -120,9 +120,13 @@ async function request<T>(fn: () => Promise<{ data: T }>): Promise<T> {
     return data;
   } catch (error) {
     const info = extractError(error);
+    const payload = (error as {
+      response?: { data?: SpecialtyMismatchPayload & { data?: SpecialtyMismatchPayload } };
+    })?.response?.data;
+    // BE bọc lỗi trong { success, code, message, data } nên `classes` nằm trong data.
     const mismatch =
       info.status === 409 && info.code === 'SPECIALTY_MISMATCH'
-        ? ((error as { response?: { data?: SpecialtyMismatchPayload } })?.response?.data?.classes ?? [])
+        ? (payload?.classes ?? payload?.data?.classes ?? [])
         : [];
     throw new Sprint4ApiError(info.status, info.code, viMessage(info), mismatch);
   }

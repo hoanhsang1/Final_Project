@@ -2,7 +2,8 @@
 package com.mems.service;
 
 import com.mems.entity.RefreshToken;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.IRefreshTokenRepository;
 import com.mems.service.impl.IRefreshTokenService;
 
@@ -109,11 +110,8 @@ public class RefreshTokenService implements IRefreshTokenService {
         repository.save(token);
     }
 
-    private ApiException invalidToken() {
-        return new ApiException(
-                HttpStatus.UNAUTHORIZED,
-                "Invalid or expired refresh token"
-        );
+    private AppException invalidToken() {
+        return new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
     }
 
     private String hashToken(String rawToken) {

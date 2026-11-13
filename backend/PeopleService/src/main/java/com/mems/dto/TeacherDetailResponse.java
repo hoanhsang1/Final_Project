@@ -19,5 +19,8 @@ public record TeacherDetailResponse(
     long version,
     Instant createdAt,
     Instant updatedAt,
-    List<TeacherHistoryResponse> history
+    List<TeacherHistoryResponse> history,
+    long classCount,
+    boolean noClass,
+    String classLabel
 ) {}

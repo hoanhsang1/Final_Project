@@ -7,6 +7,8 @@ public record ClassCloseEventResponse(
     String classId,
     String action,
     String actorId,
+    String actorName,
     String reason,
+    String note,
     Instant createdAt
 ) {}

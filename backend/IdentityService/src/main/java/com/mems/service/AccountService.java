@@ -1,6 +1,7 @@
 package com.mems.service;
 
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -125,7 +126,7 @@ public class AccountService {
         );
 
         if (items.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Account not found");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
         return items.get(0);
@@ -138,20 +139,20 @@ public class AccountService {
         String orgId = payload.get("organization_id") != null ? payload.get("organization_id").toString().trim() : null;
 
         if (email == null || email.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Email is required");
+            throw new AppException(ErrorCode.EMAIL_REQUIRED);
         }
         if (role == null || role.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Role is required");
+            throw new AppException(ErrorCode.ROLE_REQUIRED);
         }
         if ("SUPER_ADMIN".equalsIgnoreCase(role)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot assign SUPER_ADMIN role");
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE);
         }
 
         Integer existingEmail = jdbc.queryForObject(
             "SELECT COUNT(*) FROM account WHERE email = ?", Integer.class, email
         );
         if (existingEmail != null && existingEmail > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "Email already exists");
+            throw new AppException(ErrorCode.EMAIL_EXISTS);
         }
 
         // Generate username
@@ -167,7 +168,7 @@ public class AccountService {
         // Find role
         List<Long> roleIds = jdbc.queryForList("SELECT id FROM role WHERE code = ?", Long.class, role);
         if (roleIds.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid role: " + role);
+            throw new AppException(ErrorCode.INVALID_ROLE, "Invalid role: " + role);
         }
         Long roleId = roleIds.get(0);
 
@@ -190,32 +191,32 @@ public class AccountService {
     @Transactional
     public void updateStatus(String accountId, String status, String reason) {
         if (status == null || (!status.equalsIgnoreCase("active") && !status.equalsIgnoreCase("locked") && !status.equalsIgnoreCase("disabled"))) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Status must be active, locked, or disabled");
+            throw new AppException(ErrorCode.ACCOUNT_STATUS_INVALID);
         }
         int rows = jdbc.update("UPDATE account SET status = ? WHERE id = ?", status.toLowerCase(), accountId);
         if (rows == 0) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Account not found");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
     }
 
     @Transactional
     public void updateRole(String accountId, String role) {
         if (role == null || role.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Role is required");
+            throw new AppException(ErrorCode.ROLE_REQUIRED);
         }
         if ("SUPER_ADMIN".equalsIgnoreCase(role)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot assign SUPER_ADMIN role");
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE);
         }
 
         List<Long> roleIds = jdbc.queryForList("SELECT id FROM role WHERE code = ?", Long.class, role);
         if (roleIds.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid role: " + role);
+            throw new AppException(ErrorCode.INVALID_ROLE, "Invalid role: " + role);
         }
         Long roleId = roleIds.get(0);
 
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM account WHERE id = ?", Integer.class, accountId);
         if (exists == null || exists == 0) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Account not found");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
         jdbc.update("DELETE FROM account_role WHERE account_id = ?", accountId);
@@ -226,12 +227,12 @@ public class AccountService {
     public void resetPassword(String accountId, String newPassword) {
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM account WHERE id = ?", Integer.class, accountId);
         if (exists == null || exists == 0) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "Account not found");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
         if (newPassword != null && !newPassword.isBlank()) {
             if (newPassword.length() < 8) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
+                throw new AppException(ErrorCode.PASSWORD_TOO_SHORT);
             }
             jdbc.update("UPDATE account SET password_hash = ? WHERE id = ?",
                 passwordEncoder.encode(newPassword), accountId);

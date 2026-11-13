@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { logout } from '../../features/auth/authApi';
 import { useAuthStore } from '../../stores/authStore';
-import { useMediaQuery } from '../AdminConsoleLayout/use-media-query';
+import { useMediaQuery } from '../ConsoleShell/use-media-query';
 
 const { Header, Content, Sider } = Layout;
 const { Text, Title } = Typography;

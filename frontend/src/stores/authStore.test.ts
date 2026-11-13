@@ -82,4 +82,21 @@ describe('useAuthStore', () => {
     expect(s.isAuthenticated).toBe(true);
     expect(s.role).toBeNull();
   });
+
+  it('đọc claim mustChangePassword để buộc đổi mật khẩu tạm', () => {
+    const jwt = fakeJwt({
+      userId: 'u',
+      username: 'nhanvien',
+      roles: ['STAFF'],
+      mustChangePassword: true,
+    });
+    useAuthStore.getState().setSession({
+      accessToken: jwt,
+      refreshToken: 'r',
+      tokenType: 'Bearer',
+      expiresIn: 900,
+    });
+
+    expect(useAuthStore.getState().mustChangePassword).toBe(true);
+  });
 });

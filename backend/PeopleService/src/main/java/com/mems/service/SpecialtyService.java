@@ -2,7 +2,8 @@ package com.mems.service;
 
 import com.mems.dto.SpecialtyCreateRequest;
 import com.mems.dto.SpecialtyResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.SpecialtyRepository;
 import com.mems.security.Actor;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,7 +33,7 @@ public class SpecialtyService {
         String orgId = actor.orgId();
         String name = request.name().trim();
         if (name.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "name: must not be blank");
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "name: must not be blank");
         }
         String unaccented = TextNormalizer.unaccent(name);
         if (repository.existsName(orgId, unaccented)) {
@@ -49,13 +50,12 @@ public class SpecialtyService {
         Set<String> requested = new HashSet<>(ids);
         List<SpecialtyResponse> found = repository.findActiveByIds(orgId, requested);
         if (found.size() != requested.size()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_SPECIALTY",
-                "specialtyIds: must reference active specialties of the organization");
+            throw new AppException(ErrorCode.INVALID_SPECIALTY);
         }
         return found;
     }
 
-    private ApiException duplicate() {
-        return new ApiException(HttpStatus.CONFLICT, "SPECIALTY_EXISTS", "Specialty already exists in organization");
+    private AppException duplicate() {
+        return new AppException(ErrorCode.SPECIALTY_EXISTS);
     }
 }

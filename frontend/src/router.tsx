@@ -11,6 +11,7 @@ import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicCo
 import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
+import ChangePasswordPage from './pages/ChangePasswordPage/ChangePasswordPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
@@ -43,29 +44,6 @@ const TeachersPage = lazy(() => import('./pages/TeachersPage/TeachersPage'));
 const TeacherDetailPage = lazy(() => import('./pages/TeacherDetailPage/TeacherDetailPage'));
 const ClassesPage = lazy(() => import('./pages/ClassesPage/ClassesPage'));
 const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPage'));
-
-// Phân hệ Quản lý tổ chức, Sinh viên, Lớp học & Phòng ban
-const OrganizationPortalLayout = lazy(
-  () => import('./components/OrganizationPortalLayout/OrganizationPortalLayout'),
-);
-const StudentManagementPage = lazy(
-  () => import('./pages/StudentManagementPage/StudentManagementPage'),
-);
-const ClassManagementPage = lazy(
-  () => import('./pages/ClassManagementPage/ClassManagementPage'),
-);
-const ClassDetailPage = lazy(
-  () => import('./pages/ClassDetailPage/ClassDetailPage'),
-);
-const DepartmentManagementPage = lazy(
-  () => import('./pages/DepartmentManagementPage/DepartmentManagementPage'),
-);
-const PositionManagementPage = lazy(
-  () => import('./pages/PositionManagementPage/PositionManagementPage'),
-);
-const MemberManagementPage = lazy(
-  () => import('./pages/MemberManagementPage/MemberManagementPage'),
-);
 
 function RouteFallback() {
   const { token } = theme.useToken();
@@ -105,6 +83,11 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/dang-nhap" replace /> },
       { path: 'dang-nhap', element: <LoginPage />, handle: { title: 'Đăng nhập' } },
+      {
+        path: 'doi-mat-khau',
+        element: <ChangePasswordPage />,
+        handle: { title: 'Đổi mật khẩu' },
+      },
       { path: 'dang-ky', element: <RegisterPage />, handle: { title: 'Đăng ký tổ chức' } },
       {
         // Hai bước của luồng quên mật khẩu: xin liên kết qua email → đặt mật khẩu

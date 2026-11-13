@@ -1,7 +1,8 @@
 package com.mems.repository;
 
 import com.mems.dto.StudentResponse;
-import com.mems.exception.ApiException;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -106,7 +107,7 @@ public class StudentRepository {
 
         List<StudentResponse> rows = jdbc.query(sql, studentMapper, id, orgId);
         if (rows.isEmpty()) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "STUDENT_NOT_FOUND", "Student not found");
+            throw new AppException(ErrorCode.STUDENT_NOT_FOUND);
         }
         return rows.get(0);
     }
@@ -117,7 +118,7 @@ public class StudentRepository {
             Integer.class, orgId, studentCode
         );
         if (count != null && count > 0) {
-            throw new ApiException(HttpStatus.CONFLICT, "CONFLICT", "Student code already exists in organization");
+            throw new AppException(ErrorCode.CONFLICT, "Student code already exists in organization");
         }
     }
 

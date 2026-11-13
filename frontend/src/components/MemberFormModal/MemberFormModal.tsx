@@ -30,7 +30,10 @@ export default function MemberFormModal({
 }: MemberFormModalProps) {
   const { token } = theme.useToken();
   const [form] = Form.useForm<MemberFormValues>();
-  const hasPositions = positions.length > 0;
+  // Chức vụ TEACHER cần hồ sơ giáo viên — chỉ tạo được qua luồng "thêm giáo viên".
+  const assignablePositions = positions.filter((p) => p.profileType !== 'TEACHER');
+  const hasTeacherPositions = positions.some((p) => p.profileType === 'TEACHER');
+  const hasPositions = assignablePositions.length > 0;
 
   useEffect(() => {
     if (!open) {
@@ -66,8 +69,22 @@ export default function MemberFormModal({
         <Alert
           type="warning"
           showIcon
-          message={MSG_MEM.NO_POSITION_CATALOG}
-          action={<Link to="/to-chuc/chuc-vu">{MSG_MEM.GO_TO_POSITIONS}</Link>}
+          message={positions.length === 0 ? MSG_MEM.NO_POSITION_CATALOG : MSG_MEM.NO_ASSIGNABLE_POSITION}
+          action={
+            <Link to={positions.length === 0 ? '/to-chuc/chuc-vu' : '/dao-tao/giao-vien'}>
+              {positions.length === 0 ? MSG_MEM.GO_TO_POSITIONS : MSG_MEM.GO_TO_TEACHERS}
+            </Link>
+          }
+          style={{ marginBottom: token.margin }}
+        />
+      )}
+
+      {hasPositions && hasTeacherPositions && (
+        <Alert
+          type="info"
+          showIcon
+          message={MSG_MEM.TEACHER_POSITION_HINT}
+          action={<Link to="/dao-tao/giao-vien">{MSG_MEM.GO_TO_TEACHERS}</Link>}
           style={{ marginBottom: token.margin }}
         />
       )}
@@ -125,7 +142,7 @@ export default function MemberFormModal({
         >
           <Select
             mode="multiple"
-            options={positions.map((p) => ({ value: p.id, label: p.name }))}
+            options={assignablePositions.map((p) => ({ value: p.id, label: p.name }))}
             placeholder="Chọn chức vụ"
             disabled={!hasPositions}
           />
