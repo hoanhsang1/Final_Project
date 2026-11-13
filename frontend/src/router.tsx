@@ -5,6 +5,10 @@ import type { RouteObject } from 'react-router-dom';
 import AdminConsoleLayout from './components/AdminConsoleLayout/AdminConsoleLayout';
 import AdminGuard from './components/AdminGuard/AdminGuard';
 import DocumentTitle from './components/DocumentTitle/DocumentTitle';
+import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayout';
+import OwnerGuard from './components/OwnerGuard/OwnerGuard';
+import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
+import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
@@ -30,6 +34,15 @@ const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
 const PendingOrganizationsPage = lazy(
   () => import('./pages/PendingOrganizationsPage/PendingOrganizationsPage'),
 );
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage/DepartmentsPage'));
+const DepartmentDetailPage = lazy(
+  () => import('./pages/DepartmentDetailPage/DepartmentDetailPage'),
+);
+const PositionsPage = lazy(() => import('./pages/PositionsPage/PositionsPage'));
+const TeachersPage = lazy(() => import('./pages/TeachersPage/TeachersPage'));
+const TeacherDetailPage = lazy(() => import('./pages/TeacherDetailPage/TeacherDetailPage'));
+const ClassesPage = lazy(() => import('./pages/ClassesPage/ClassesPage'));
+const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPage'));
 
 // Phân hệ Quản lý tổ chức, Sinh viên, Lớp học & Phòng ban
 const OrganizationPortalLayout = lazy(
@@ -94,6 +107,8 @@ export const routes: RouteObject[] = [
       { path: 'dang-nhap', element: <LoginPage />, handle: { title: 'Đăng nhập' } },
       { path: 'dang-ky', element: <RegisterPage />, handle: { title: 'Đăng ký tổ chức' } },
       {
+        // Hai bước của luồng quên mật khẩu: xin liên kết qua email → đặt mật khẩu
+        // mới bằng token trong liên kết (`?token=…`).
         path: 'quen-mat-khau',
         element: <ForgotPasswordPage />,
         handle: { title: 'Quên mật khẩu' },
@@ -153,42 +168,48 @@ export const routes: RouteObject[] = [
         ],
       },
       {
-        // Cổng quản lý sinh viên & lớp học dành cho OWNER, MANAGER, STAFF
+        // Khu vực của chủ tổ chức (Sprint 3) — song song với `/quan-tri` nhưng
+        // dành cho role `OWNER`, dùng chung khung `ConsoleShell`.
+        //
+        // Thứ tự route con: `chuc-vu` phải khai TRƯỚC `phong-ban/:id` để không bị
+        // nuốt; màn chi tiết phòng ban nằm dưới `phong-ban/:id`.
         path: 'to-chuc',
-        element: <OrganizationPortalLayout />,
-        handle: { title: 'Cổng quản lý tổ chức' },
+        element: (
+          <OwnerGuard>
+            <OwnerConsoleLayout />
+          </OwnerGuard>
+        ),
+        handle: { title: 'Khu vực tổ chức' },
         children: [
-          { index: true, element: <Navigate to="/to-chuc/sinh-vien" replace /> },
+          { index: true, element: <DepartmentsPage />, handle: { title: 'Phòng ban' } },
+          { path: 'chuc-vu', element: <PositionsPage />, handle: { title: 'Chức vụ' } },
           {
-            path: 'sinh-vien',
-            element: <StudentManagementPage />,
-            handle: { title: 'Quản lý Sinh viên' },
+            path: 'phong-ban/:id',
+            element: <DepartmentDetailPage />,
+            handle: { title: 'Chi tiết phòng ban' },
           },
+        ],
+      },
+      {
+        // Sprint 4 (option B): khu vực Đào tạo — quyền theo PEOPLE_*/CLASS_* (và OWNER).
+        // `/to-chuc` Owner Console giữ nguyên.
+        path: 'dao-tao',
+        element: (
+          <AcademicGuard>
+            <AcademicConsoleLayout />
+          </AcademicGuard>
+        ),
+        handle: { title: 'Đào tạo' },
+        children: [
+          { index: true, element: <Navigate to="giao-vien" replace /> },
+          { path: 'giao-vien', element: <TeachersPage />, handle: { title: 'Giáo viên' } },
           {
-            path: 'lop-hoc',
-            element: <ClassManagementPage />,
-            handle: { title: 'Quản lý Lớp học' },
+            path: 'giao-vien/:id',
+            element: <TeacherDetailPage />,
+            handle: { title: 'Chi tiết giáo viên' },
           },
-          {
-            path: 'lop-hoc/:id',
-            element: <ClassDetailPage />,
-            handle: { title: 'Chi tiết Lớp học' },
-          },
-          {
-            path: 'phong-ban',
-            element: <DepartmentManagementPage />,
-            handle: { title: 'Quản lý Phòng ban & Module' },
-          },
-          {
-            path: 'chuc-vu',
-            element: <PositionManagementPage />,
-            handle: { title: 'Quản lý Chức vụ' },
-          },
-          {
-            path: 'nhan-su',
-            element: <MemberManagementPage />,
-            handle: { title: 'Bổ nhiệm & Quản lý Nhân sự' },
-          },
+          { path: 'lop-hoc', element: <ClassesPage />, handle: { title: 'Lớp học' } },
+          { path: 'lop-hoc/:id', element: <ClassDetailPage />, handle: { title: 'Chi tiết lớp học' } },
         ],
       },
       { path: '*', element: <NotFoundPage />, handle: { title: 'Không tìm thấy trang' } },

@@ -29,6 +29,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
+    // `EVIDENCE=1` chụp ảnh cuối mỗi ca để nhúng vào file test case (.xlsx).
+    screenshot: process.env.EVIDENCE === '1' ? 'on' : 'off',
     // Tiếng Việt có dấu → kiểm tra text dễ đọc.
     locale: 'vi-VN',
   },

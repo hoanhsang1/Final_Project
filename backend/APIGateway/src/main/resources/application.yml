@@ -58,46 +58,19 @@ spring:
         - id: people-permissions
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/permissions/**,/permissions,/permissions/
-
-        - id: people-students
-          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/students/**,/students,/students/
-
-        - id: people-classes
-          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/classes/**,/classes,/classes/
+            - Path=/permissions/**
 
         - id: people-teachers
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/teachers/**,/teachers,/teachers/
+            - Path=/api/teachers/**,/api/teachers
 
         - id: people-specialties
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/specialties/**,/specialties,/specialties/
-
-        # Aliases with the /api prefix used in Sprint 4 documentation.
-        - id: people-teachers-api
-          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
-          predicates:
-            - Path=/api/teachers/**,/api/teachers
-          filters:
-            - StripPrefix=1
-
-        - id: people-specialties-api
-          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
-          predicates:
             - Path=/api/specialties/**,/api/specialties
-          filters:
-            - StripPrefix=1
 
-        - id: people-classes-api
+        - id: people-classes
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/classes/**,/api/classes
-          filters:
-            - StripPrefix=1
