@@ -1,0 +1,2416 @@
+Tài liệu đặc tả yêu cầu phần mềm (SRS) — MEMS
+Hệ thống: MEMS (Modular Education Management System) · Phạm vi: Sprint 1 đến Sprint 4 · Phiên bản: 0.1 (bản nháp để nhóm rà soát) · Ngôn ngữ: tiếng Việt
+Cách đọc tài liệu
+Nguồn dữ liệu. Jira CSV (project MEMS) là nguồn chính cho yêu cầu chức năng, User Story và Acceptance Criteria (AC). Canvas MEMS là nguồn tham khảo bổ sung về màn hình. Canvas là thiết kế do nhóm dựng, không phải giao diện Google Stitch. Phần đánh giá UI/UX của Stitch chưa thực hiện (chưa có ảnh chụp hoặc file export).
+Nhãn nội dung. Mọi nội dung quan trọng mang một trong bốn nhãn:
+Nhãn
+Ý nghĩa
+[JIRA]
+Ghi rõ trong Jira, kèm mã story. Đây là yêu cầu đã viết, chưa chắc nhóm đã chốt các điểm còn mở.
+[SUY LUẬN]
+Rút ra từ nhiều story hoặc từ canvas, không có câu chữ trực tiếp trong Jira.
+[ĐỀ XUẤT]
+Do tài liệu đề xuất để developer có cơ sở làm, nhóm quyết định chấp nhận hay không.
+[CX-xx]
+CẦN XÁC NHẬN. Chưa đủ căn cứ, xem bảng ở Phần B. Developer không triển khai các điểm này khi chưa có xác nhận.
+Quy ước mã. SCR-xx là màn hình, FN-xx là chức năng, AC-xx là nhóm tiêu chí nghiệm thu, CX-xx là điểm cần xác nhận. Mã Epic, Story và ticket giữ nguyên như Jira (ví dụ US 1-1 = MEMS-28).
+Phạm vi 4 Sprint (giữ nguyên theo yêu cầu). Sprint 1: đăng nhập, đăng ký (US 1-1, 1-2, 1-3). Sprint 2: Owner, tổ chức và module (US 2-1, 2-2). Sprint 3: CRUD sinh viên và lớp học (US 3-1, 3-2, 3-3, 5-1, 5-5). Sprint 4: giáo viên và gán giáo viên vào lớp (US 4-1, 4-2, 4-3, 5-3 không gồm kiểm tra trùng lịch, 5-7, và US 1-7).
+Hai thuật ngữ Owner và Admin. Jira không có vai trò tên “Owner”. Theo nhóm, Owner chỉ Quản trị viên hệ thống, Admin chỉ Quản trị viên tổ chức. Tài liệu dùng đúng sáu tên vai trò chính thức: Quản trị viên hệ thống, Quản trị viên tổ chức, Giáo vụ, Giáo viên, Sinh viên, Nhân viên. [CX-03]
+
+Phần A. Bước 1: Đối chiếu Jira và Canvas
+A.1 Danh sách story trong phạm vi và màn hình tương ứng
+Sprint
+Story (mã Jira)
+Epic
+Chức năng
+Màn hình (mục 2)
+1
+US 1-1 (MEMS-28)
+Epic 1 (MEMS-27)
+FN-01
+SCR-01
+1
+US 1-2 (MEMS-29)
+Epic 1
+FN-02, FN-03
+SCR-02, SCR-03, SCR-07
+1
+US 1-3 (MEMS-30)
+Epic 1
+FN-04, FN-05
+SCR-04, SCR-05, SCR-06, SCR-07
+2
+US 2-1 (MEMS-65)
+Epic 2 (MEMS-64)
+FN-06, FN-07
+SCR-08, SCR-10
+2
+US 2-2 (MEMS-66)
+Epic 2
+FN-08, FN-09
+SCR-09
+3
+US 3-1 (MEMS-112)
+Epic 3 (MEMS-111)
+FN-10
+SCR-12
+3
+US 3-2 (MEMS-122)
+Epic 3
+FN-11
+SCR-11
+3
+US 3-3 (MEMS-133)
+Epic 3
+FN-12
+SCR-13
+3
+US 5-1 (MEMS-239)
+Epic 5 (MEMS-238)
+FN-13
+SCR-15
+3
+US 5-5 (MEMS-279)
+Epic 5
+FN-14
+SCR-14, SCR-16
+4
+US 4-1 (MEMS-173)
+Epic 4 (MEMS-172)
+FN-15
+SCR-18
+4
+US 4-2 (MEMS-184)
+Epic 4
+FN-16
+SCR-17
+4
+US 4-3 (MEMS-195)
+Epic 4
+FN-17
+SCR-19
+4
+US 5-3 (MEMS-261)
+Epic 5
+FN-18
+SCR-20
+4
+US 5-7 (MEMS-789)
+Epic 5
+FN-19
+SCR-21, SCR-22, SCR-23
+4
+US 1-7 (MEMS-786)
+Epic 1
+FN-20
+SCR-24
+Story nằm ngoài phạm vi nhưng các story trong phạm vi phụ thuộc vào chúng (không thiết kế chi tiết, chỉ tham chiếu): US 1-6 (MEMS-33, phân quyền), US 2-3 (MEMS-67, phụ thuộc module), US 2-4 (MEMS-68, menu theo module), US 2-6 (MEMS-783, danh sách tổ chức), US 2-8 (MEMS-785, danh mục dùng chung), US 3-4 (MEMS-143), US 4-4 (MEMS-206), US 5-6 (MEMS-290), Epic 6 (lịch học), Epic 7 (xung đột lịch), Epic 12 (phân công giáo viên). [CX-25]
+Ghi chú về US 1-7. Phạm vi nhóm ghi “US 1-7 nếu giáo viên tự đăng ký”. Đối chiếu: US 1-2 cho phép đăng ký vai trò Giáo viên và chuyển tài khoản đó sang “Chờ duyệt” (MEMS-29). Vì vậy giáo viên tự đăng ký là yêu cầu có sẵn trong Sprint 1, và US 1-7 là story duy nhất xử lý trạng thái “Chờ duyệt”. Kết luận: giữ US 1-7 trong Sprint 4. [JIRA]
+A.2 Chênh lệch giữa Jira và Canvas
+#
+Nội dung
+Jira ghi
+Canvas đang thể hiện
+Hành động
+D-01
+Trạng thái sinh viên
+4 trạng thái: đang học, bảo lưu, thôi học, tốt nghiệp (US 3-4)
+3 trạng thái, thiếu “tốt nghiệp”
+Sửa canvas. Giá trị mặc định khi tạo: [CX-17]
+D-02
+Trạng thái lớp
+US 5-7: Chưa bắt đầu, Đang diễn ra, Đã kết thúc, Đã hủy. US 5-1: “Chưa xếp lịch”
+Sprint 3 dùng “Chưa xếp lịch”, Sprint 4 dùng 4 trạng thái của US 5-7
+Thống nhất sau khi chốt [CX-12]
+D-03
+Trường “Mã tổ chức” khi tạo tổ chức
+Form US 2-1 không liệt kê trường này, nhưng AC nhắc “mã tổ chức khác”
+Canvas có ô nhập Mã tổ chức
+[CX-09]
+D-04
+“Loại hợp đồng” của giáo viên
+Trường bắt buộc của US 4-1 gồm mã, họ tên, liên hệ, chuyên môn. Loại hợp đồng có trên form nhưng không nằm trong danh sách bắt buộc
+Canvas đánh dấu * (bắt buộc)
+Sửa canvas bỏ dấu *, hoặc nhóm xác nhận
+D-05
+Các trạng thái chặn đăng nhập
+US 1-1: tài khoản vô hiệu hóa, chưa xác thực email, chờ duyệt, bị từ chối, khóa 15 phút, phiên hết hạn
+Canvas chỉ có lỗi chung “Email hoặc mật khẩu không đúng”
+Thêm màn hoặc banner cho từng trạng thái
+D-06
+Trạng thái trống của danh sách chờ duyệt
+US 1-7: “Không có tài khoản chờ duyệt”
+Chưa vẽ
+Thêm vào SCR-24
+D-07
+Cảnh báo trùng lịch giáo viên ở US 5-3
+Có trong AC của US 5-3
+Chưa vẽ (Sprint 4 loại trừ kiểm tra trùng lịch)
+[CX-06]
+D-08
+Màn Danh sách tổ chức
+US 2-1 yêu cầu “quay về danh sách tổ chức”
+Có SCR-27 nhưng story gốc là US 2-6, ngoài phạm vi
+[CX-25]
+D-09
+Màn Đổi mật khẩu lần đầu
+Chỉ có ghi chú trong US 2-1 (liên kết US 1-1, 1-3)
+Có 3 màn
+Chờ [CX-04]
+D-10
+Cột trạng thái của danh sách chờ duyệt
+US 1-7 yêu cầu: họ tên, email, ngày đăng ký
+Canvas thêm cột “Trạng thái”
+Bỏ cột thừa hoặc nhóm xác nhận
+Các màn còn lại khớp với AC của Jira về trường dữ liệu, thông báo lỗi và trạng thái trống.
+
+Phần B. Bước 2: Bảng điểm mâu thuẫn và điểm cần xác nhận
+Cột “Dùng tạm trong SRS” cho biết tài liệu hiện đang viết theo hướng nào để developer không bị chặn. Cột này không phải quyết định nghiệp vụ.
+Mã
+Vấn đề
+Bằng chứng
+Phương án và tác động
+Dùng tạm trong SRS
+CX-01
+Số vai trò trên mỗi tài khoản
+MEMS-778; US 1-1 ghi payload JWT gồm “vai trò”
+A: một vai trò. B: nhiều vai trò. Ảnh hưởng payload JWT, menu, ma trận quyền, hồ sơ
+Viết trung lập: “vai trò của tài khoản”, không giả định số lượng
+CX-02
+Giáo vụ có thuộc module Nhân viên không; tạo Giáo vụ khi tắt module Nhân viên
+MEMS-778
+A: Giáo vụ là vai trò độc lập. B: Giáo vụ là loại Nhân viên. Ảnh hưởng ai tạo được Giáo vụ
+Giáo vụ là actor chính, không quy định cách tạo
+CX-03
+Danh sách vai trò chính thức; “Nhân viên cơ sở vật chất” (MEMS-780) là vai trò riêng hay chức danh
+MEMS-778, MEMS-780
+Chốt 6 vai trò, hoặc thêm vai trò mới
+Dùng 6 vai trò
+CX-04
+Quy trình kích hoạt tài khoản thống nhất
+MEMS-779; US 2-1 (gửi thông tin đăng nhập, bắt buộc đổi mật khẩu lần đầu), US 1-2 (link xác thực email)
+A: mật khẩu tạm bắt buộc đổi. B: link kích hoạt. Ảnh hưởng FN-02, FN-06, FN-07, FN-20
+FN-07 viết theo ghi chú US 2-1, đánh dấu chờ xác nhận
+CX-05
+Quan hệ tài khoản và hồ sơ (sinh viên, giáo viên); khi duyệt giáo viên ở US 1-7 thì tạo mới hay liên kết hồ sơ
+MEMS-779; AC của US 1-7; Note của US 4-1
+A: tạo hồ sơ khi duyệt. B: liên kết hồ sơ có sẵn. C: tách tài khoản và hồ sơ. Ảnh hưởng FN-10, FN-15, FN-20
+Hồ sơ và tài khoản là hai thực thể riêng, chưa có liên kết bắt buộc
+CX-06
+Trùng lịch giáo viên: chặn hay cảnh báo
+MEMS-777; US 5-3 (cảnh báo) mâu thuẫn US 6-5, 7-1 (chặn); phạm vi Sprint 4 loại trừ kiểm tra trùng lịch
+A: chặn. B: cảnh báo, có thể vượt có lý do
+FN-18 không có kiểm tra trùng lịch
+CX-07
+Danh sách và tên chuẩn của 4 module Core
+MEMS-775
+Chốt tên chuẩn
+Tạm dùng: Sinh viên, Giáo viên, Lớp học, Lịch học [SUY LUẬN từ mô tả dự án của nhóm]
+CX-08
+Module nào điều khiển ô chọn phòng
+MEMS-776; US 5-5 ghi “module phòng đang bật”
+A: Phòng học. B: Sử dụng phòng. C: cả hai
+FN-14 chỉ ghi “module phòng”
+CX-09
+Mã tổ chức: nhập tay hay hệ thống sinh; định dạng
+US 2-1 (Notes: mã dùng để phân tách dữ liệu); US 1-2 (người dùng nhập mã khi đăng ký)
+A: nhập tay, duy nhất toàn nền tảng. B: tự sinh
+Trường Mã tổ chức do Quản trị viên hệ thống nhập, duy nhất, không đổi sau khi tạo [ĐỀ XUẤT]
+CX-10
+“Loại hình” tổ chức và “thông tin liên hệ” gồm trường nào
+US 2-1 liệt kê tên trường, không có chi tiết
+Danh mục cố định hay nhập tự do; liên hệ gồm email và số điện thoại hay thêm địa chỉ
+Loại hình chọn từ danh sách; liên hệ gồm email, số điện thoại [ĐỀ XUẤT]
+CX-11
+Tắt module phòng cuối cùng khi module khác phụ thuộc: chặn hay tắt kéo theo
+US 2-3 (Note); US 2-2 phụ thuộc US 2-3
+A: chặn. B: tắt kéo theo kèm xác nhận
+FN-09 chỉ nêu điểm gọi sang US 2-3
+CX-12
+Trạng thái lớp: “Chưa xếp lịch” (US 5-1) và “Chưa bắt đầu” (US 5-7)
+US 5-7 tự nhận là story nguồn; US 5-1 chỉ nêu “ví dụ”
+A: dùng 4 trạng thái của US 5-7, “Chưa xếp lịch” là nhãn phụ (lớp chưa có lịch). B: thêm “Chưa xếp lịch” làm trạng thái thứ 5
+Dùng 4 trạng thái của US 5-7 vì Jira ghi đó là story nguồn
+CX-13
+Đóng lớp khi còn buổi học tương lai
+MEMS-781; US 5-7; đóng lớp thủ công thuộc US 5-6 (ngoài phạm vi)
+A: hủy các buổi còn lại. B: chặn đóng lớp
+FN-19 viết cả hai phương án
+CX-14
+Hủy lớp: hủy các buổi chưa diễn ra (US 6-4) và gửi thông báo (US 2-7, 6-7)
+AC của US 5-7
+Epic 6 và cấu hình email nằm ngoài phạm vi
+FN-19 chỉ ghi “gọi sang US 6-4 khi có”
+CX-15
+Cơ chế chuyển trạng thái lớp tự động và múi giờ tổ chức
+US 5-7 (tự động khi đến ngày bắt đầu, quá ngày kết thúc); múi giờ ở US 2-7 (ngoài phạm vi)
+A: job chạy hàng ngày. B: kiểm tra khi truy cập
+Chưa chọn
+CX-16
+Trạng thái giáo viên khi tạo mới; cách đổi trạng thái
+US 4-4 ngoài phạm vi (3 trạng thái: đang dạy, tạm nghỉ, nghỉ việc); US 5-3 lọc theo “đang dạy”
+Mặc định “đang dạy” khi tạo
+Mặc định “đang dạy” [ĐỀ XUẤT]
+CX-17
+Trạng thái sinh viên khi tạo mới
+US 3-4 (4 trạng thái) ngoài phạm vi; US 3-1 không nêu
+Mặc định “đang học”
+Mặc định “đang học” [ĐỀ XUẤT]
+CX-18
+Danh mục dùng chung: chuyên môn (US 4-1), môn học (US 5-1)
+US 4-1 và 5-1 ghi “nên lấy từ danh mục”; US 2-8 chưa thuộc phạm vi
+A: xây US 2-8 trước Sprint 3, 4. B: nhập tự do tạm
+Chọn từ danh mục, chưa quy định nguồn dữ liệu
+CX-19
+Quy tắc “khớp chuyên môn” giữa giáo viên và môn học của lớp
+Note của US 4-3
+Khớp theo tên môn, theo mã môn, hay theo nhóm
+FN-17 ghi “theo quy tắc khớp, chưa chốt”
+CX-20
+Gán giáo viên trực tiếp (US 5-3) và phân công (Epic 12) có dùng chung nguồn dữ liệu không
+Note của US 5-3
+A: dùng chung. B: tách riêng
+FN-18 ghi một bảng gán lớp và giáo viên
+CX-21
+“Quyền Giáo vụ (hoặc cao hơn)” gồm vai trò nào
+US 3-1, 4-1, 5-1
+Quản trị viên tổ chức có đương nhiên được không
+Giáo vụ và Quản trị viên tổ chức [SUY LUẬN]
+CX-22
+Trang tổng quan theo vai trò sau đăng nhập
+US 1-1; Epic 14 ngoài phạm vi
+Trang đích tối thiểu cho từng vai trò
+Chưa quy định
+CX-23
+Thời hạn “Ghi nhớ tôi”, refresh token, mật khẩu tạm
+US 1-1 chỉ ghi JWT 24 giờ
+Chốt số ngày hoặc giờ
+Đặt trong cấu hình, chưa có giá trị
+CX-24
+Thao tác xóa (Delete) sinh viên, giáo viên, lớp
+Không có story xóa trong phạm vi; US 3-4 và 4-4 ghi BR-04: không xóa cứng khi đã có dữ liệu
+Có cần xóa mềm cho bản ghi chưa có dữ liệu liên quan
+Không mô tả chức năng Delete
+CX-25
+Phạm vi các màn phụ thuộc: Danh sách tổ chức (US 2-6), đăng xuất, đổi mật khẩu khi đăng nhập (US 1-8)
+US 2-1 yêu cầu quay về danh sách tổ chức
+Đưa vào Sprint 2 hoặc để sau
+SCR-27 là màn tham chiếu
+CX-26
+Thông tin liên hệ sinh viên: bắt buộc cả email và số điện thoại hay một trong hai; email sinh viên có duy nhất không
+US 3-1
+Chốt quy tắc
+Cả hai bắt buộc, email không bắt duy nhất [ĐỀ XUẤT]
+CX-27
+Số bản ghi mỗi trang
+US 3-2, 4-2 ghi “ví dụ 20”
+Chốt giá trị cố định
+20 bản ghi/trang [ĐỀ XUẤT]
+
+Chương 1. Tổng quan hệ thống
+1.1 Giới thiệu
+MEMS là hệ thống web quản lý giáo dục theo module, phục vụ nhiều tổ chức trên cùng một nền tảng. Mỗi tổ chức có dữ liệu riêng và tự bật, tắt các module Optional. Quyền truy cập của người dùng được xác định đồng thời bởi vai trò, tổ chức và module đang bật (US 1-6). [JIRA]
+1.2 Mục tiêu
+Quản lý tập trung sinh viên, giáo viên, lớp học và (ở các sprint sau) lịch học, phòng, thiết bị. [SUY LUẬN từ mô tả Epic và dự án]
+Tách dữ liệu giữa các tổ chức. Mỗi tổ chức chỉ thấy phần mình dùng (Epic 2). [JIRA]
+Đảm bảo dữ liệu nền (sinh viên, giáo viên, lớp) chính xác để làm cơ sở cho xếp lịch (Epic 3, 4, 5). [JIRA]
+1.3 Phạm vi chức năng của bản SRS này
+Nhóm
+Trong phạm vi (Sprint 1–4)
+Ngoài phạm vi (không thiết kế)
+Xác thực
+Đăng nhập, đăng ký, xác thực email, quên và đặt lại mật khẩu, duyệt giáo viên tự đăng ký
+Quản lý người dùng (US 1-4), hồ sơ cá nhân (US 1-5), đổi mật khẩu khi đăng nhập (US 1-8)
+Tổ chức và module
+Tạo tổ chức kèm Quản trị viên tổ chức đầu tiên, xem và bật, tắt module Optional
+Phụ thuộc module (US 2-3), menu theo module (US 2-4), nhật ký (US 2-5), danh sách tổ chức (US 2-6), thiết lập chung (US 2-7), danh mục dùng chung (US 2-8)
+Sinh viên
+Thêm, xem danh sách (tìm kiếm, lọc, phân trang), xem và cập nhật hồ sơ
+Đổi trạng thái (US 3-4), nhập Excel, sinh viên xem lịch
+Lớp học
+Tạo lớp, danh sách và chi tiết, gán giáo viên, vòng đời trạng thái (gồm hủy lớp và đóng lớp theo US 5-7)
+Ghi danh (US 5-2), chuyển và loại sinh viên (US 5-4), cập nhật và đóng lớp (US 5-6)
+Giáo viên
+Thêm, xem danh sách, cập nhật hồ sơ
+Đổi trạng thái (US 4-4), lịch dạy cá nhân, khung giờ bận/rảnh
+Khác
+—
+Epic 6 đến 14 (lịch, xung đột, nhân viên, phòng, thiết bị, phân công, báo cáo)
+Số chức năng “Delete”: chưa có story xóa nào trong phạm vi. [CX-24]
+1.4 Đối tượng sử dụng
+Vai trò
+Mô tả ngắn
+Nguồn
+Quản trị viên hệ thống (Owner)
+Vận hành nền tảng, tạo tổ chức. Phạm vi toàn nền tảng, không dùng chung quy tắc với vai trò trong tổ chức
+US 1-6, 2-1 [JIRA]
+Quản trị viên tổ chức (Admin)
+Cấu hình tổ chức, bật/tắt module, duyệt giáo viên tự đăng ký
+US 2-2, 1-7 [JIRA]
+Giáo vụ
+Quản lý hồ sơ sinh viên, giáo viên, lớp, gán giáo viên, đổi trạng thái lớp
+US 3-x, 4-x, 5-x [JIRA]
+Giáo viên
+Tự đăng ký (US 1-2); chức năng dành riêng trong phạm vi này: không có
+US 1-2 [JIRA]
+Sinh viên
+Tự đăng ký (US 1-2); chức năng dành riêng trong phạm vi này: không có
+US 1-2 [JIRA]
+Nhân viên
+Không có chức năng trong phạm vi này
+—
+1.5 Vai trò và quyền hạn
+Quyền = vai trò × tổ chức × module đang bật. Người dùng chỉ dùng một chức năng khi cả ba điều kiện đều thỏa. Module đang tắt được ưu tiên hơn vai trò (US 2-4). Ma trận chi tiết nằm ở Chương 6. [JIRA]
+
+Chương 2. Đặc tả giao diện
+2.1 Quy ước chung về giao diện
+Khung ứng dụng (app shell): sidebar cố định bên trái, header phía trên (tên tổ chức, vai trò), vùng nội dung. Sidebar chỉ hiện mục thuộc module đang bật và vai trò được phép. [JIRA US 2-4, 1-6]
+Khung xác thực: màn chia hai cột (bảng giới thiệu bên trái, thẻ biểu mẫu bên phải). [SUY LUẬN từ canvas]
+Design system: màu, font Inter, khoảng cách, component theo bộ spec Figma đi kèm (không lặp lại ở đây).
+Yêu cầu chung (loading, 403, responsive, chặn gửi trùng, sửa đồng thời): theo Definition of Done chung trên Confluence. Tài liệu này không đọc được trang đó, nên chỉ đề cập khi Jira nhắc tới. [CX-28: nhóm gửi nội dung Definition of Done để đối chiếu]
+Trường bắt buộc ghi dấu (*). Khoảng trắng đầu và cuối mọi trường văn bản được tự động cắt (US 3-1, 4-1, 5-1, 1-1, 1-2). Nút lưu bị vô hiệu hóa khi đang xử lý. Mọi trang lỗi và thông báo lỗi phải viết bằng ngôn ngữ đời thường: nói rõ điều gì đã xảy ra, đó không phải lỗi của người dùng, và việc tiếp theo cần làm. Mã kỹ thuật (ví dụ 403) chỉ hiện ở dòng nhỏ để người dùng gửi cho bộ phận hỗ trợ. [ĐỀ XUẤT]
+2.2 Danh sách màn hình
+Cột “Canvas” chỉ tên file màn hình tham khảo. Thông báo đánh dấu [JIRA] là câu chữ nguyên văn của Jira. Thông báo [ĐỀ XUẤT] chưa có câu chữ trong Jira.
+Nhóm Xác thực (Sprint 1)
+Mã
+Tên, người dùng, story
+Thành phần và trường dữ liệu
+Trạng thái giao diện
+Thông báo
+Canvas
+SCR-01
+Đăng nhập. Người dùng chưa đăng nhập. US 1-1
+Email*, Mật khẩu* (nút hiện/ẩn), “Ghi nhớ tôi”, liên kết “Quên mật khẩu”, nút Đăng nhập, liên kết Đăng ký
+Mặc định; lỗi từng trường (không gọi API); lỗi chung; đang xử lý; bị khóa 15 phút (hiện thời gian còn lại); vô hiệu hóa; chưa xác thực email; chờ duyệt; bị từ chối; phiên hết hạn. Người đã đăng nhập mở lại trang thì tự chuyển về tổng quan
+“Email hoặc mật khẩu không đúng”, “Tài khoản đã bị vô hiệu hóa”, “Vui lòng xác thực email trước khi đăng nhập”, “Phiên đăng nhập đã hết hạn” [JIRA]. Chờ duyệt, bị từ chối, khóa 15 phút: Jira chỉ nêu “thông báo tương ứng”. [ĐỀ XUẤT] “Tài khoản đang chờ duyệt”, “Tài khoản đã bị từ chối”
+Auth_Login (chỉ có lỗi chung, xem D-05)
+SCR-02
+Đăng ký. Người dùng mới (Sinh viên hoặc Giáo viên). US 1-2
+Họ và tên*, Email*, Mật khẩu*, Xác nhận mật khẩu*, Mã tổ chức*, Vai trò* (Sinh viên / Giáo viên), danh sách quy tắc mật khẩu
+Mặc định; lỗi từng trường; đang xử lý; vượt giới hạn 5 lần/15 phút theo IP
+“Vui lòng nhập ...”, “Email đã được sử dụng”, “Mật khẩu xác nhận không khớp”, “Mã tổ chức không hợp lệ” [JIRA]. Vượt giới hạn: Jira không nêu câu chữ
+Auth_DangKy
+SCR-03
+Chờ xác thực email. Người dùng mới. US 1-2
+Thông báo, nút “Gửi lại” (1 lần mỗi 60 giây, có đếm ngược), ghi chú giáo viên chờ duyệt
+Đếm ngược; sẵn sàng gửi lại
+“Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản” [JIRA]
+Auth_DangKyOK
+SCR-04
+Quên mật khẩu. Mọi vai trò. US 1-3
+Email*, nút Gửi hướng dẫn
+Lỗi định dạng hoặc trống; đang xử lý
+Lỗi tại trường email (câu chữ: [ĐỀ XUẤT] “Email không đúng định dạng”)
+Auth_Quen
+SCR-05
+Đã gửi yêu cầu. Mọi vai trò. US 1-3
+Thông báo chung, nút “Gửi lại” sau 60 giây
+Đếm ngược; vượt 5 yêu cầu/giờ
+“Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu”, “Vui lòng thử lại sau” [JIRA]
+Auth_QuenOK
+SCR-06
+Đặt lại mật khẩu (trang công khai). US 1-3
+Mật khẩu mới*, Xác nhận*, quy tắc mật khẩu
+Lỗi không khớp; trùng mật khẩu hiện tại; thành công chuyển về Đăng nhập
+“Mật khẩu xác nhận không khớp” [JIRA]; trùng mật khẩu cũ [ĐỀ XUẤT] “Mật khẩu mới không được trùng mật khẩu hiện tại”
+Auth_Dat
+SCR-07
+Liên kết không hợp lệ hoặc hết hạn. US 1-2, 1-3
+Thông báo; nút gửi lại email xác thực (US 1-2) hoặc yêu cầu liên kết mới (US 1-3)
+—
+“Liên kết không hợp lệ hoặc đã hết hạn” [JIRA]
+Auth_Het
+Nhóm Tổ chức và module (Sprint 2)
+Mã
+Tên, người dùng, story
+Thành phần và trường dữ liệu
+Trạng thái giao diện
+Thông báo
+Canvas
+SCR-08
+Tạo tổ chức. Quản trị viên hệ thống. US 2-1
+Phần 1: Tên tổ chức*, Mã tổ chức* [CX-09], Loại hình* [CX-10], Thông tin liên hệ*. Phần 2: Họ tên và Email của Quản trị viên tổ chức đầu tiên*. Danh sách 4 module Core “Luôn bật”
+Mặc định; lỗi từng trường; cảnh báo trùng tên (vẫn tạo được nếu mã khác); đang xử lý (nút Tạo khóa, loading); thành công quay về danh sách
+Thông báo tạo thành công (Jira không nêu câu chữ) [ĐỀ XUẤT] “Tạo tổ chức thành công”. Email trùng: [ĐỀ XUẤT] “Email đã tồn tại trong hệ thống”
+Org_OrgTao
+SCR-09
+Cấu hình module. Quản trị viên tổ chức. US 2-2
+Thẻ mỗi module: tên, mô tả ngắn, loại (Core/Optional), trạng thái (Bật/Tắt), công tắt (chỉ Optional); Core hiển thị “Luôn bật”
+Loading khi tải và khi lưu; thông báo sau mỗi lần bật/tắt; hộp xác nhận khi tắt module có dữ liệu (nêu số bản ghi bị ẩn); cảnh báo “cấu hình đã thay đổi” khi hai quản trị cùng sửa; quay về trạng thái cũ khi lưu lỗi; từ chối thao tác với Core kèm giải thích
+Jira không nêu câu chữ cho các thông báo này
+Org_Mod
+SCR-10
+Đổi mật khẩu lần đầu. Tài khoản mới tạo. US 2-1 (Notes)
+Email (chỉ xem), Mật khẩu mới*, Xác nhận*
+Lỗi không khớp; thành công; mật khẩu tạm hết hạn. [CX-04] [CX-23]
+Chưa có trong Jira
+FL_Dat, FL_OK, FL_Het
+Nhóm Sinh viên và Lớp học (Sprint 3)
+Mã
+Tên, người dùng, story
+Thành phần và trường dữ liệu
+Trạng thái giao diện
+Thông báo
+Canvas
+SCR-11
+Danh sách sinh viên. Giáo vụ. US 3-2
+Bảng: mã sinh viên, họ tên, lớp, trạng thái, liên hệ. Ô tìm theo mã hoặc họ tên (không phân biệt dấu, hoa thường). Bộ lọc trạng thái, lớp (kết hợp được). Phân trang. Nút “Thêm sinh viên”
+Loading; trống (tổ chức chưa có sinh viên, kèm nút Thêm); không có kết quả; giữ bộ lọc và số trang khi quay lại từ chi tiết
+“Không tìm thấy sinh viên” + nút “Xóa bộ lọc” [JIRA]
+S3_SV_Ds, S3_SV_TrangThai
+SCR-12
+Thêm sinh viên. Giáo vụ. US 3-1
+Mã sinh viên*, Họ tên*, Ngày sinh*, Giới tính*, Email* và Số điện thoại* [CX-26]
+Lỗi từng trường; cảnh báo trùng họ tên và ngày sinh (xác nhận mới lưu); đang xử lý
+Lỗi mã trùng, ngày sinh tương lai, định dạng email, số điện thoại: Jira chỉ nêu “báo lỗi cụ thể” (không có câu chữ)
+S3_SV_Them, S3_SV_Trung
+SCR-13
+Hồ sơ sinh viên. Giáo vụ. US 3-3
+Thông tin hồ sơ; Mã sinh viên chỉ xem; danh sách lớp của sinh viên; lịch sử thay đổi (ai, khi nào, trường nào)
+Có thay đổi chưa lưu; lỗi; dữ liệu đã bị người khác sửa; nhắc khi rời trang
+“Dữ liệu đã thay đổi” (Jira: cảnh báo dữ liệu đã thay đổi)
+S3_SV_ChiTiet, S3_SV_CanhBao
+SCR-14
+Danh sách lớp. Giáo vụ. US 5-5
+Bảng: mã lớp, tên lớp, môn/khóa học, giáo viên, sĩ số (hiện tại/tối đa), trạng thái. Tìm theo mã hoặc tên; lọc trạng thái; phân trang; nút “Tạo lớp”
+Loading; trống (kèm nút Tạo lớp); không có kết quả
+“Không tìm thấy lớp” + “Xóa bộ lọc” [JIRA]
+S3_LH_Ds, S3_LH_TrangThai
+SCR-15
+Tạo lớp. Giáo vụ. US 5-1
+Mã lớp*, Tên lớp*, Môn hoặc khóa học* [CX-18], Sĩ số tối đa*, Ngày bắt đầu*, Ngày kết thúc*
+Lỗi mã trùng; ngày kết thúc trước ngày bắt đầu; sĩ số không hợp lệ; đang xử lý
+Jira chỉ nêu “báo lỗi cụ thể”
+S3_LH_Tao
+SCR-16
+Chi tiết lớp. Giáo vụ. US 5-5
+Thông tin lớp; danh sách sinh viên; giáo viên phụ trách; lịch (cột Phòng chỉ hiện khi module phòng bật [CX-08])
+Mỗi phần có trạng thái trống kèm hướng dẫn; loading
+Chữ hướng dẫn trống: Jira không nêu câu chữ
+S3_LH_ChiTiet, S3_LH_ChiTietTrong
+Nhóm Giáo viên và trạng thái lớp (Sprint 4)
+Mã
+Tên, người dùng, story
+Thành phần và trường dữ liệu
+Trạng thái giao diện
+Thông báo
+Canvas
+SCR-17
+Danh sách giáo viên. Giáo vụ. US 4-2
+Bảng: mã giáo viên, họ tên, chuyên môn, loại hợp đồng, trạng thái, liên hệ. Tìm theo mã hoặc họ tên; lọc chuyên môn, trạng thái; phân trang
+Loading; trống (kèm nút Thêm giáo viên); không có kết quả
+“Không tìm thấy giáo viên” + “Xóa bộ lọc” [JIRA]
+S4_GV_Ds, S4_GV_TrangThai
+SCR-18
+Thêm giáo viên. Giáo vụ. US 4-1
+Mã giáo viên*, Họ tên*, Email*, Số điện thoại* (thông tin liên hệ bắt buộc), Chuyên môn* (nhiều giá trị, chọn từ danh mục [CX-18]), Loại hợp đồng (cơ hữu, thỉnh giảng)
+Lỗi mã trùng, email trùng, định dạng; đang xử lý
+Jira chỉ nêu “báo lỗi cụ thể”. Canvas có ghi chú chờ chốt tài khoản đăng nhập [CX-05]
+S4_GV_Them
+SCR-19
+Hồ sơ giáo viên. Giáo vụ. US 4-3
+Thông tin hồ sơ; Mã giáo viên chỉ xem; lớp đang phụ trách; lịch sử thay đổi
+Có thay đổi chưa lưu; cảnh báo chuyên môn mới không còn khớp lớp (nêu tên các lớp, xác nhận mới lưu) [CX-19]; dữ liệu đã thay đổi; nhắc khi rời trang
+Jira không nêu câu chữ
+S4_GV_ChiTiet, S4_GV_CanhBao
+SCR-20
+Gán giáo viên cho lớp. Giáo vụ. US 5-3
+Danh sách giáo viên có tìm kiếm (chỉ “đang dạy”), chọn một giáo viên; ghi chú đổi giáo viên chỉ áp dụng buổi tương lai
+Chưa có giáo viên; đã gán; module Phân công giáo viên đang bật (ô gán ẩn hoặc chỉ đọc kèm hướng dẫn sang Epic 12)
+Thông báo lưu thành công: Jira không nêu câu chữ. Cảnh báo trùng lịch ngoài phạm vi [CX-06]
+S4_GT_Gan, S4_GT_ModuleBat, S4_GT_ThanhCong
+SCR-21
+Hủy lớp. Giáo vụ, Quản trị viên tổ chức. US 5-7
+Hộp thoại: Lý do hủy* (bắt buộc), xác nhận
+Thiếu lý do; đang xử lý; trạng thái đã thay đổi bởi người khác
+Jira chỉ nêu “thông báo trạng thái đã thay đổi”
+S4_LC_Huy
+SCR-22
+Đóng lớp và xung đột trạng thái. Giáo vụ, Quản trị viên tổ chức. US 5-7
+Hộp thoại xác nhận đóng lớp; danh sách buổi học tương lai còn lại [CX-13]
+Phương án A, phương án B; trạng thái đã thay đổi
+Chờ chốt
+S4_LC_Dong
+SCR-23
+Lớp đã kết thúc hoặc đã hủy (chỉ xem). Giáo vụ. US 5-7
+Banner chỉ xem; nút Ghi danh, xếp buổi bị khóa; nhật ký trạng thái (thời điểm, người thực hiện, từ, sang, lý do)
+—
+—
+S4_LC_DaHuy
+SCR-24
+Duyệt giáo viên tự đăng ký. Quản trị viên tổ chức. US 1-7
+Bảng: họ tên, email, ngày đăng ký. Tìm theo tên hoặc email; phân trang; chọn nhiều; nút Duyệt, Từ chối; hộp thoại từ chối (Lý do*); hộp kết quả từng tài khoản
+Loading; trống; thiếu lý do; kết quả thành công hoặc thất bại từng dòng; tài khoản đã được xử lý
+“Không có tài khoản chờ duyệt”, “Tài khoản đã được xử lý” [JIRA]
+Epic1_Duyet, Epic1_DuyetTuChoi, Epic1_DuyetKetQua
+Nhóm dùng chung và tham chiếu
+Mã
+Tên, người dùng, story
+Thành phần
+Thông báo
+Canvas
+SCR-25
+403 Forbidden. Mọi vai trò. US 1-6 (tham chiếu)
+Tiêu đề, mô tả, nút Quay lại và Về trang chủ
+“403 Forbidden” (Jira chỉ nêu tên mã lỗi). Canvas dùng câu chữ dễ hiểu cho người không chuyên: tiêu đề “Bạn chưa thể xem trang này”, giải thích “Đây không phải lỗi của bạn” và hướng dẫn nhờ Quản trị viên của tổ chức cấp quyền, mã lỗi 403 để ở dòng nhỏ cuối trang để gửi hỗ trợ [ĐỀ XUẤT]
+Epic1_F403
+SCR-26
+Module chưa được kích hoạt. Mọi vai trò. US 1-6, 2-4 (tham chiếu)
+Tiêu đề, mô tả, nút Về tổng quan
+“Module chưa được kích hoạt” [JIRA]
+Epic1_FModule
+SCR-27
+Danh sách tổ chức. Quản trị viên hệ thống. US 2-6 (tham chiếu, [CX-25])
+Bảng tổ chức: tên, mã, loại hình, quản trị đầu tiên, trạng thái, ngày tạo
+—
+Org_Org
+Chú ý: các ô thông báo ghi “Jira chỉ nêu báo lỗi cụ thể” là nội dung nhóm phải thống nhất câu chữ trước khi dựng giao diện. Tester dùng câu chữ đã thống nhất để kiểm thử.
+
+Chương 3. Đặc tả chức năng
+3.1 Quy tắc chung áp dụng cho mọi chức năng
+Các quy tắc dưới đây được Jira nhắc lại ở nhiều story. Tài liệu gọi tắt bằng mã QC, các chức năng dưới đây chỉ viết lại khi có khác biệt.
+Mã
+Quy tắc
+Nguồn
+QC-01
+Cắt khoảng trắng đầu và cuối các trường văn bản trước khi kiểm tra và lưu
+US 1-1, 1-2, 3-1, 4-1, 5-1 [JIRA]
+QC-02
+Email không phân biệt hoa thường
+US 1-1, 1-2 [JIRA]
+QC-03
+Mọi truy vấn dữ liệu chỉ trả về dữ liệu của tổ chức người dùng đang đăng nhập. Mọi bảng dữ liệu nghiệp vụ có cột mã tổ chức
+US 1-6, 3-1, 3-2, 5-5 [JIRA]
+QC-04
+Kiểm tra vai trò, tổ chức, module ở phía server. Chưa xác thực: 401. Không đủ quyền: 403. Module tắt: “Module chưa được kích hoạt”
+US 1-6 [JIRA]
+QC-05
+Nút lưu hoặc tạo bị vô hiệu hóa khi đang xử lý, có loading state
+US 2-1, 3-1, 3-3, 4-1, 4-3, 5-1 [JIRA]
+QC-06
+Ghi người tạo, thời điểm tạo; khi sửa ghi người sửa và thời điểm sửa; hồ sơ sinh viên và giáo viên có lịch sử (ai, khi nào, trường nào)
+US 3-1, 3-3, 4-1, 4-3, 5-1 [JIRA]
+QC-07
+Tìm kiếm xử lý ở server, không phân biệt dấu tiếng Việt và hoa thường; từ khóa có ký tự đặc biệt không gây lỗi truy vấn; phân trang cố định [CX-27]
+US 3-2, 4-2, 5-5 [JIRA]
+QC-08
+Sửa đồng thời: so sánh số phiên bản hoặc thời điểm cập nhật cuối; người lưu sau nhận cảnh báo dữ liệu đã thay đổi
+US 2-2, 3-3, 4-3 [JIRA]
+QC-09
+Mật khẩu tối thiểu 8 ký tự, có chữ hoa, chữ thường, số; hash trước khi lưu; không trả về qua API
+US 1-2, 1-3 [JIRA]
+QC-10
+Người rời trang khi có thay đổi chưa lưu được nhắc xác nhận
+US 3-3, 4-3 [JIRA]
+Mỗi bảng chức năng gồm 12 mục theo yêu cầu. Mục “AC” trỏ tới nhóm tiêu chí nghiệm thu tương ứng ở Chương 9 (AC-xx.nn). Nhãn CRUD: C = tạo, R = đọc, U = sửa, D = xóa.
+3.2 Sprint 1: Xác thực
+FN-01 Đăng nhập (US 1-1) · R
+Mục
+Nội dung
+1–2. Mã, tên
+FN-01 · Đăng nhập. Màn hình SCR-01
+3. Mục đích
+Xác thực người dùng bằng email và mật khẩu, tạo phiên và đưa đến trang theo vai trò
+4. Tác nhân
+Mọi vai trò
+5. Điều kiện tiên quyết
+Tài khoản tồn tại và đã ở trạng thái Hoạt động
+6. Dữ liệu đầu vào
+email, mật khẩu, ghi nhớ tôi (có/không)
+7. Quy trình
+(1) Nhập email, mật khẩu. (2) Giao diện kiểm tra rỗng và định dạng, lỗi thì dừng, không gọi API. (3) Gửi API. (4) Server chuẩn hóa email, kiểm tra khóa theo giới hạn, xác thực, kiểm tra trạng thái tài khoản. (5) Tạo JWT và refresh token. (6) Trả về thông tin vai trò và module đang bật. (7) Chuyển đến trang tổng quan theo vai trò [CX-22]
+8. Dữ liệu đầu ra
+JWT (hết hạn sau 24 giờ; payload gồm userId, orgId, vai trò [CX-01]), refresh token, danh sách module đã bật. Ghi log đăng nhập thất bại (thời gian, email, IP; không ghi mật khẩu)
+9. Quy tắc nghiệp vụ
+Sai tối đa 5 lần trong 15 phút thì khóa 15 phút, hiện thời gian còn lại. Menu và trang tổng quan chỉ hiện module đang bật và được phép với vai trò. Người đã đăng nhập mở lại trang đăng nhập thì chuyển về tổng quan. “Ghi nhớ tôi” kéo dài phiên [CX-23]. Tài khoản Quản trị viên hệ thống có phạm vi toàn nền tảng (US 1-6)
+10. Validation
+Email bắt buộc và đúng định dạng. Mật khẩu bắt buộc. QC-01, QC-02
+11. Ngoại lệ
+Email không tồn tại hoặc sai mật khẩu: cùng một thông báo. Vô hiệu hóa. Chưa xác thực email. Chờ duyệt. Bị từ chối (US 1-7). Refresh token hết hạn: về đăng nhập
+12. Thông báo
+“Email hoặc mật khẩu không đúng”; “Tài khoản đã bị vô hiệu hóa”; “Vui lòng xác thực email trước khi đăng nhập”; “Phiên đăng nhập đã hết hạn”. AC: AC-01
+FN-02 Đăng ký tài khoản (US 1-2) · C
+Mục
+Nội dung
+1–2. Mã, tên
+FN-02 · Đăng ký. Màn hình SCR-02, SCR-03
+3. Mục đích
+Cho Sinh viên hoặc Giáo viên tự tạo tài khoản trong một tổ chức
+4. Tác nhân
+Người dùng mới (chỉ vai trò Sinh viên hoặc Giáo viên)
+5. Tiên quyết
+Tổ chức đang hoạt động và người dùng biết mã tổ chức
+6. Đầu vào
+họ và tên, email, mật khẩu, xác nhận mật khẩu, mã tổ chức, vai trò
+7. Quy trình
+(1) Điền form. (2) Kiểm tra dữ liệu. (3) Xác định tổ chức theo mã, kiểm tra tổ chức hoạt động. (4) Tạo tài khoản trạng thái Chờ xác thực, mật khẩu đã hash. (5) Tạo token ngẫu nhiên dùng một lần, gửi email liên kết. (6) Hiện thông báo thành công (SCR-03)
+8. Đầu ra
+Tài khoản trạng thái Chờ xác thực; email xác thực. Hồ sơ sinh viên hay giáo viên không được tạo ở bước này [CX-05]
+9. Quy tắc
+Chỉ cho đăng ký Sinh viên và Giáo viên; vai trò khác do Quản trị viên tổ chức tạo. Giới hạn đăng ký 5 lần/15 phút theo IP. Gửi lại email tối đa 1 lần/60 giây. QC-09
+10. Validation
+Trường bắt buộc không trống. Email đúng định dạng và chưa tồn tại. Mật khẩu đủ quy tắc. Xác nhận khớp mật khẩu. Mã tổ chức hợp lệ
+11. Ngoại lệ
+Mã tổ chức sai hoặc tổ chức không hoạt động. Email trùng. Vượt giới hạn IP. Gửi email thất bại [ĐỀ XUẤT: cho phép gửi lại, không tạo tài khoản trùng]
+12. Thông báo
+Xem SCR-02, SCR-03. AC: AC-02
+FN-03 Xác thực email (US 1-2) · U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-03 · Xác thực email. Màn hình SCR-07
+3. Mục đích
+Chuyển tài khoản từ Chờ xác thực sang trạng thái tiếp theo
+4. Tác nhân
+Người dùng đã đăng ký
+5. Tiên quyết
+Tài khoản ở trạng thái Chờ xác thực; có liên kết còn hiệu lực
+6. Đầu vào
+token trong liên kết
+7. Quy trình
+(1) Mở liên kết. (2) Server kiểm tra token còn hạn, chưa dùng. (3) Sinh viên chuyển sang Hoạt động; Giáo viên chuyển sang Chờ duyệt. (4) Vô hiệu token. (5) Chuyển đến trang đăng nhập
+8. Đầu ra
+Trạng thái tài khoản mới; token bị vô hiệu
+9. Quy tắc
+Liên kết dùng một lần, hết hạn sau 24 giờ. Tài khoản Giáo viên phải qua duyệt (FN-20)
+10. Validation
+Token tồn tại, chưa hết hạn, chưa dùng
+11. Ngoại lệ
+Liên kết hết hạn hoặc đã dùng: hiện SCR-07 kèm nút gửi lại (1 lần/60 giây)
+12. Thông báo
+“Liên kết không hợp lệ hoặc đã hết hạn”. AC: AC-03
+FN-04 Yêu cầu đặt lại mật khẩu (US 1-3) · C (token)
+Mục
+Nội dung
+1–2. Mã, tên
+FN-04 · Yêu cầu đặt lại mật khẩu. API POST /auth/forgot-password. Màn hình SCR-04, SCR-05
+3. Mục đích
+Lấy lại quyền truy cập mà không nhờ quản trị viên
+4. Tác nhân
+Mọi vai trò (dùng chung một luồng)
+5. Tiên quyết
+Không cần đăng nhập
+6. Đầu vào
+email
+7. Quy trình
+(1) Từ SCR-01 bấm “Quên mật khẩu”. (2) Nhập email. (3) Server kiểm tra giới hạn. (4) Nếu email tồn tại và tài khoản hoạt động: tạo token ngẫu nhiên (lưu bản hash và thời gian hết hạn), vô hiệu các link cũ, gửi email. (5) Luôn hiện cùng một thông báo
+8. Đầu ra
+Email chứa link (nếu đủ điều kiện); thông báo chung
+9. Quy tắc
+Link hiệu lực 15 phút, dùng một lần. Tối đa 5 yêu cầu/giờ cho mỗi email hoặc IP. Tài khoản khóa hoặc vô hiệu hóa không nhận email nhưng vẫn thấy thông báo chung. Nút “Gửi lại” sau 60 giây. Thời hạn, số lần, quy tắc mật khẩu đặt trong cấu hình. Email dùng template riêng
+10. Validation
+Email bắt buộc và đúng định dạng
+11. Ngoại lệ
+Yêu cầu nhiều lần: chỉ link mới nhất còn hiệu lực. Vượt giới hạn: báo thử lại sau
+12. Thông báo
+“Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu”; “Vui lòng thử lại sau”. AC: AC-04
+FN-05 Đặt lại mật khẩu (US 1-3) · U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-05 · Đặt lại mật khẩu. API POST /auth/reset-password. Màn hình SCR-06, SCR-07
+3. Mục đích
+Đặt mật khẩu mới thông qua link trong email
+4. Tác nhân
+Mọi vai trò
+5. Tiên quyết
+Có link còn hiệu lực (15 phút, chưa dùng). Trang là trang công khai, không bị chặn bởi phân quyền US 1-6
+6. Đầu vào
+token, mật khẩu mới, xác nhận mật khẩu
+7. Quy trình
+(1) Mở link (có thể ở thiết bị khác nơi yêu cầu). (2) Nhập mật khẩu mới và xác nhận. (3) Server kiểm tra token, quy tắc mật khẩu, không trùng mật khẩu hiện tại. (4) Cập nhật hash, vô hiệu token, đăng xuất toàn bộ phiên cũ. (5) Chuyển về đăng nhập kèm thông báo thành công
+8. Đầu ra
+Mật khẩu được đổi, mật khẩu cũ hết hiệu lực, mọi phiên cũ bị đăng xuất
+9. Quy tắc
+QC-09. Token chỉ lưu bản hash kèm thời gian hết hạn
+10. Validation
+Mật khẩu đủ quy tắc; xác nhận khớp; khác mật khẩu hiện tại
+11. Ngoại lệ
+Link hết hạn hoặc không hợp lệ: báo lỗi, cho yêu cầu link mới (SCR-07)
+12. Thông báo
+“Mật khẩu xác nhận không khớp”; “Liên kết không hợp lệ hoặc đã hết hạn”. AC: AC-05
+3.3 Sprint 2: Tổ chức và module
+FN-06 Tạo tổ chức kèm Quản trị viên tổ chức đầu tiên (US 2-1) · C
+Mục
+Nội dung
+1–2. Mã, tên
+FN-06 · Tạo tổ chức. Màn hình SCR-08
+3. Mục đích
+Tạo tổ chức mới để có thể bắt đầu dùng hệ thống
+4. Tác nhân
+Quản trị viên hệ thống (chỉ vai trò này)
+5. Tiên quyết
+Đã đăng nhập bằng Quản trị viên hệ thống
+6. Đầu vào
+tên tổ chức, mã tổ chức [CX-09], loại hình [CX-10], thông tin liên hệ, họ tên và email Quản trị viên tổ chức đầu tiên
+7. Quy trình
+(1) Mở “Tạo tổ chức”. (2) Điền form. (3) Kiểm tra dữ liệu, email quản trị chưa tồn tại, cảnh báo trùng tên. (4) Trong một giao dịch: lưu tổ chức, tạo tài khoản Quản trị viên tổ chức, bật mặc định 4 module Core. (5) Gửi email thông tin đăng nhập [CX-04]. (6) Ghi nhật ký. (7) Hiện thông báo và quay về danh sách tổ chức [CX-25]
+8. Đầu ra
+Tổ chức, tài khoản Quản trị viên tổ chức, 4 module Core đang bật, email, nhật ký tạo
+9. Quy tắc
+Một trong hai (tổ chức hoặc tài khoản) thất bại thì cả hai không được lưu. Buộc 4 module Core không tắt được [CX-07]. Mã tổ chức dùng để phân tách dữ liệu. Tài khoản quản trị mới bắt buộc đổi mật khẩu lần đầu (FN-07). QC-05
+10. Validation
+Trường bắt buộc không trống; email và thông tin liên hệ đúng định dạng; email quản trị không trùng; trùng tên tổ chức chỉ cảnh báo khi mã khác
+11. Ngoại lệ
+Người không phải Quản trị viên hệ thống vào trang hoặc gọi API: 403. Gửi email thất bại sau khi đã lưu: [CX-04]
+12. Thông báo
+Xem SCR-08. AC: AC-06
+FN-07 Đổi mật khẩu lần đầu (US 2-1 Notes) · U · [CX-04]
+Mục
+Nội dung
+1–2. Mã, tên
+FN-07 · Đổi mật khẩu lần đầu. Màn hình SCR-10
+3. Mục đích
+Buộc tài khoản mới đổi mật khẩu tạm trước khi dùng hệ thống
+4. Tác nhân
+Tài khoản Quản trị viên tổ chức vừa tạo (Jira chỉ nêu trường hợp này)
+5. Tiên quyết
+Đăng nhập lần đầu bằng mật khẩu được gửi qua email
+6. Đầu vào
+mật khẩu mới, xác nhận mật khẩu
+7. Quy trình
+[ĐỀ XUẤT, chờ CX-04] (1) Sau đăng nhập thành công, hệ thống chuyển đến SCR-10 và chặn mọi trang khác. (2) Nhập mật khẩu mới. (3) Kiểm tra QC-09. (4) Cập nhật hash, bỏ cờ bắt buộc đổi. (5) Vào trang tổng quan
+8. Đầu ra
+Mật khẩu mới, cờ “bắt buộc đổi” tắt
+9. Quy tắc
+Liên kết US 1-1, 1-3. Thời hạn mật khẩu tạm [CX-23]. Có áp dụng cho tài khoản do US 1-4 tạo hay không: [CX-04]
+10. Validation
+QC-09; không trùng mật khẩu tạm [ĐỀ XUẤT]
+11. Ngoại lệ
+Mật khẩu tạm hết hạn: liên hệ quản trị để cấp lại [CX-23]
+12. Thông báo
+Chưa có trong Jira. AC: AC-07
+FN-08 Xem cấu hình module (US 2-2) · R
+Mục
+Nội dung
+1–2. Mã, tên
+FN-08 · Xem cấu hình module. Màn hình SCR-09
+3. Mục đích
+Xem danh sách module và trạng thái của tổ chức
+4. Tác nhân
+Quản trị viên tổ chức (chỉ vai trò này)
+5. Tiên quyết
+Đã đăng nhập
+6. Đầu vào
+Không (lấy theo tổ chức của phiên)
+7. Quy trình
+Mở trang; hệ thống lấy danh sách module từ cấu hình và trạng thái của tổ chức; hiển thị loading rồi danh sách
+8. Đầu ra
+Mỗi module: tên, mô tả ngắn, loại (Core/Optional), trạng thái (Bật/Tắt)
+9. Quy tắc
+Danh sách lấy từ cấu hình, không viết cứng trong code. Module Core hiển thị “Luôn bật”, không có công tắt. Tên chuẩn [CX-07]
+10. Validation
+Không có dữ liệu nhập
+11. Ngoại lệ
+Người không phải Quản trị viên tổ chức không vào được: 403
+12. Thông báo
+Chưa có câu chữ trong Jira. AC: AC-08
+FN-09 Bật hoặc tắt module Optional (US 2-2) · U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-09 · Bật hoặc tắt module Optional. Màn hình SCR-09
+3. Mục đích
+Chỉ hiển thị chức năng tổ chức cần dùng
+4. Tác nhân
+Quản trị viên tổ chức
+5. Tiên quyết
+FN-08 đã tải xong
+6. Đầu vào
+mã module, trạng thái mong muốn (bật/tắt), phiên bản cấu hình đã xem
+7. Quy trình
+(1) Bấm công tắt. (2) Server từ chối nếu là module Core. (3) Kiểm tra phụ thuộc module (US 2-3, tham chiếu) [CX-11]. (4) Nếu tắt module đang có dữ liệu: hiện hộp xác nhận nêu số bản ghi sẽ bị ẩn. (5) Kiểm tra phiên bản cấu hình (QC-08). (6) Lưu. (7) Menu và chức năng liên quan thay đổi ngay. (8) Hiện thông báo và ghi nhật ký (US 2-5)
+8. Đầu ra
+Trạng thái module mới của tổ chức; thông báo
+9. Quy tắc
+Tắt module: dữ liệu được ẩn khỏi giao diện và API, không xóa (BR-06). Bật lại: dữ liệu cũ được khôi phục. Module tắt được ưu tiên hơn vai trò. Cấu hình chỉ áp dụng cho tổ chức của quản trị đang đăng nhập. Kiểm tra module ở server
+10. Validation
+Module tồn tại; không phải Core; phiên bản cấu hình khớp
+11. Ngoại lệ
+Tắt Core: từ chối kèm giải thích. Hai quản trị cùng sửa: người lưu sau nhận cảnh báo cấu hình đã thay đổi. Lưu lỗi giữa chừng: quay về trạng thái trước. Người đang ở trang của module vừa tắt: lần gọi API tiếp theo bị chặn và đưa về tổng quan
+12. Thông báo
+Thông báo sau mỗi lần bật, tắt thành công (Jira không nêu câu chữ). AC: AC-09
+3.4 Sprint 3: Sinh viên và lớp học
+FN-10 Thêm hồ sơ sinh viên (US 3-1) · C
+Mục
+Nội dung
+1–2. Mã, tên
+FN-10 · Thêm sinh viên. Màn hình SCR-12
+3. Mục đích
+Có dữ liệu người học để xếp lớp và lịch
+4. Tác nhân
+Giáo vụ (hoặc cao hơn [CX-21])
+5. Tiên quyết
+Đã đăng nhập, có quyền tạo sinh viên trong tổ chức
+6. Đầu vào
+mã sinh viên, họ tên, ngày sinh, giới tính, email, số điện thoại [CX-26]
+7. Quy trình
+(1) Bấm “Thêm sinh viên” từ SCR-11. (2) Điền form. (3) Cắt khoảng trắng, kiểm tra dữ liệu. (4) Server kiểm tra mã trùng trong tổ chức. (5) Nếu có sinh viên cùng họ tên và ngày sinh: hiện cảnh báo khả năng trùng hồ sơ; chỉ lưu khi người dùng xác nhận. (6) Lưu, ghi người tạo và thời điểm. (7) Thông báo thành công, hồ sơ xuất hiện trong SCR-11
+8. Đầu ra
+Hồ sơ sinh viên thuộc tổ chức; trạng thái mặc định [CX-17]
+9. Quy tắc
+Mã sinh viên duy nhất trong một tổ chức. QC-01, QC-03, QC-05, QC-06. Họ tên có dấu tiếng Việt và ký tự đặc biệt phải lưu và hiển thị đúng
+10. Validation
+Trường bắt buộc không trống. Email và số điện thoại đúng định dạng. Ngày sinh không ở tương lai
+11. Ngoại lệ
+Mã trùng: từ chối, báo lỗi cụ thể. Trùng họ tên và ngày sinh: cảnh báo. Người không có quyền: 403
+12. Thông báo
+Xem SCR-12. AC: AC-10
+FN-11 Xem danh sách sinh viên (US 3-2) · R
+Mục
+Nội dung
+1–2. Mã, tên
+FN-11 · Danh sách sinh viên. Màn hình SCR-11
+3. Mục đích
+Tìm nhanh một sinh viên và duyệt dữ liệu lớn
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Đã đăng nhập, có quyền đọc
+6. Đầu vào
+từ khóa, lọc trạng thái, lọc lớp, số trang
+7. Quy trình
+(1) Mở trang, hiển thị loading. (2) Server trả về trang dữ liệu theo từ khóa, bộ lọc, phân trang. (3) Hiển thị bảng. (4) Không có kết quả hoặc tổ chức chưa có sinh viên: hiện trạng thái tương ứng
+8. Đầu ra
+Cột: mã, họ tên, lớp, trạng thái, liên hệ; tổng số bản ghi; số trang
+9. Quy tắc
+QC-03, QC-07. Tìm không phân biệt dấu (gõ “nguyen” ra “Nguyễn”). Kết hợp nhiều bộ lọc. Đánh index cột mã và họ tên dạng không dấu. Giữ bộ lọc và số trang khi quay lại từ chi tiết. Phản hồi trong ngưỡng NFR khi có hàng nghìn bản ghi
+10. Validation
+Từ khóa chứa ký tự đặc biệt không gây lỗi truy vấn
+11. Ngoại lệ
+Sinh viên thuộc nhiều lớp hoặc chưa có lớp hiển thị ra sao: [CX-29]
+12. Thông báo
+“Không tìm thấy sinh viên”. AC: AC-11
+FN-12 Xem và cập nhật hồ sơ sinh viên (US 3-3) · R, U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-12 · Hồ sơ sinh viên. Màn hình SCR-13
+3. Mục đích
+Giữ dữ liệu sinh viên chính xác
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Hồ sơ thuộc tổ chức của người dùng
+6. Đầu vào
+mã hồ sơ; khi sửa: họ tên, ngày sinh, giới tính, email, số điện thoại, số phiên bản
+7. Quy trình
+(1) Từ SCR-11 bấm vào một sinh viên. (2) Xem hồ sơ và danh sách lớp. (3) Sửa trường cho phép. (4) Kiểm tra như FN-10 và kiểm tra phiên bản. (5) Lưu, cập nhật giao diện, ghi người sửa và lịch sử
+8. Đầu ra
+Hồ sơ đã cập nhật; dòng lịch sử (ai, khi nào, trường nào)
+9. Quy tắc
+Mã sinh viên không sửa được sau khi tạo. Trạng thái sinh viên không đổi ở đây (US 3-4, ngoài phạm vi). QC-05, QC-06, QC-08, QC-10
+10. Validation
+Cùng quy tắc FN-10 (bắt buộc, định dạng, ngày sinh). Kiểm tra trùng họ tên và ngày sinh khi sửa: Jira không nêu [SUY LUẬN: không áp dụng]
+11. Ngoại lệ
+Hai người cùng sửa: người lưu sau nhận cảnh báo dữ liệu đã thay đổi. Rời trang khi chưa lưu: nhắc xác nhận. Không có quyền: 403
+12. Thông báo
+Thông báo lưu thành công, cảnh báo dữ liệu đã thay đổi (Jira không nêu câu chữ). AC: AC-12
+FN-13 Tạo lớp học (US 5-1) · C
+Mục
+Nội dung
+1–2. Mã, tên
+FN-13 · Tạo lớp. Màn hình SCR-15
+3. Mục đích
+Có đơn vị để gắn sinh viên, giáo viên và lịch
+4. Tác nhân
+Giáo vụ (hoặc cao hơn [CX-21])
+5. Tiên quyết
+Đã đăng nhập, có quyền tạo lớp
+6. Đầu vào
+mã lớp, tên lớp, môn hoặc khóa học [CX-18], sĩ số tối đa, ngày bắt đầu, ngày kết thúc
+7. Quy trình
+(1) Bấm “Tạo lớp” từ SCR-14. (2) Điền form. (3) Cắt khoảng trắng, kiểm tra dữ liệu. (4) Server kiểm tra mã lớp trùng. (5) Lưu, ghi người tạo và thời điểm. (6) Thông báo thành công, lớp xuất hiện trong SCR-14
+8. Đầu ra
+Lớp ở trạng thái ban đầu: “Chưa bắt đầu” theo US 5-7, trong khi US 5-1 ghi “Chưa xếp lịch” [CX-12]. Ngày bắt đầu ở quá khứ thì trạng thái ban đầu là gì: [CX-30]
+9. Quy tắc
+Mã lớp duy nhất trong một tổ chức. Tạo lớp chưa có giáo viên hoặc chưa có lịch vẫn được. QC-01, QC-03, QC-05, QC-06
+10. Validation
+Trường bắt buộc không trống. Sĩ số là số nguyên lớn hơn 0. Ngày kết thúc không được trước ngày bắt đầu (Jira ghi “trước” nên hai ngày bằng nhau hợp lệ [SUY LUẬN])
+11. Ngoại lệ
+Mã trùng; ngày sai; sĩ số ≤ 0 hoặc không phải số nguyên; không có quyền: 403
+12. Thông báo
+Xem SCR-15. AC: AC-13
+FN-14 Xem danh sách lớp và chi tiết lớp (US 5-5) · R
+Mục
+Nội dung
+1–2. Mã, tên
+FN-14 · Danh sách và chi tiết lớp. Màn hình SCR-14, SCR-16
+3. Mục đích
+Nắm tình trạng lớp
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Đã đăng nhập, có quyền đọc
+6. Đầu vào
+từ khóa, lọc trạng thái, số trang; mã lớp để xem chi tiết
+7. Quy trình
+(1) Mở danh sách, tìm và lọc như FN-11. (2) Bấm vào lớp để xem chi tiết gồm: thông tin lớp, danh sách sinh viên, giáo viên phụ trách, lịch
+8. Đầu ra
+Danh sách: mã lớp, tên lớp, môn hoặc khóa học, giáo viên, sĩ số (hiện tại/tối đa), trạng thái. Chi tiết: bốn phần trên
+9. Quy tắc
+QC-03, QC-07. Phần lịch hiển thị phòng nếu module phòng đang bật, ẩn nếu tắt [CX-08]. Lớp Đã kết thúc hoặc Đã hủy vẫn xem và lọc được (US 5-7). Giữ bộ lọc khi quay lại
+10. Validation
+Từ khóa chứa ký tự đặc biệt không gây lỗi
+11. Ngoại lệ
+Lớp chưa có sinh viên hoặc lịch: vẫn hiển thị đủ khung, mỗi phần trống có hướng dẫn. Ghi danh (US 5-2) và lịch (Epic 6) nằm ngoài phạm vi, nên sĩ số hiện tại và hai phần này chưa có dữ liệu thật ở Sprint 3 [CX-31]
+12. Thông báo
+“Không tìm thấy lớp”. AC: AC-14
+3.5 Sprint 4: Giáo viên, gán giáo viên, trạng thái lớp
+FN-15 Thêm hồ sơ giáo viên (US 4-1) · C
+Mục
+Nội dung
+1–2. Mã, tên
+FN-15 · Thêm giáo viên. Màn hình SCR-18
+3. Mục đích
+Có hồ sơ để phân công giảng dạy
+4. Tác nhân
+Giáo vụ (hoặc cao hơn [CX-21])
+5. Tiên quyết
+Đã đăng nhập, có quyền; danh mục chuyên môn có dữ liệu [CX-18]
+6. Đầu vào
+mã giáo viên, họ tên, email, số điện thoại, chuyên môn (nhiều giá trị), loại hợp đồng (cơ hữu, thỉnh giảng)
+7. Quy trình
+(1) Bấm “Thêm giáo viên” từ SCR-17. (2) Điền form, chọn nhiều chuyên môn. (3) Kiểm tra dữ liệu, mã và email trùng trong tổ chức. (4) Lưu, ghi người tạo và thời điểm. (5) Thông báo thành công, hồ sơ xuất hiện trong danh sách
+8. Đầu ra
+Hồ sơ giáo viên; trạng thái mặc định “đang dạy” [CX-16]. Tài khoản đăng nhập: chưa quy định [CX-05]
+9. Quy tắc
+Mã giáo viên và email duy nhất trong một tổ chức. Giáo viên thỉnh giảng đánh dấu bằng loại hợp đồng. Chuyên môn lấy từ danh mục, không nhập tự do. QC-01, QC-03, QC-05, QC-06
+10. Validation
+Bắt buộc: mã, họ tên, thông tin liên hệ, chuyên môn (loại hợp đồng không nằm trong danh sách bắt buộc, xem D-04). Email và số điện thoại đúng định dạng
+11. Ngoại lệ
+Mã trùng; email trùng; không có quyền: 403. Họ tên có dấu và ký tự đặc biệt phải lưu đúng
+12. Thông báo
+Xem SCR-18. AC: AC-15
+FN-16 Xem và tìm kiếm danh sách giáo viên (US 4-2) · R
+Mục
+Nội dung
+1–2. Mã, tên
+FN-16 · Danh sách giáo viên. Màn hình SCR-17
+3. Mục đích
+Tìm nhanh giáo viên phù hợp
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Đã đăng nhập, có quyền đọc
+6. Đầu vào
+từ khóa, lọc chuyên môn, lọc trạng thái, số trang
+7. Quy trình
+Như FN-11 với dữ liệu giáo viên
+8. Đầu ra
+Cột: mã, họ tên, chuyên môn, loại hợp đồng, trạng thái, liên hệ; tổng số; số trang
+9. Quy tắc
+QC-03, QC-07. Giáo viên có nhiều chuyên môn xuất hiện khi lọc theo bất kỳ chuyên môn nào của họ. Index mã và họ tên không dấu
+10. Validation
+Từ khóa chứa ký tự đặc biệt không gây lỗi
+11. Ngoại lệ
+Không có kết quả; tổ chức chưa có giáo viên
+12. Thông báo
+“Không tìm thấy giáo viên”. AC: AC-16
+FN-17 Xem và cập nhật hồ sơ giáo viên (US 4-3) · R, U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-17 · Hồ sơ giáo viên. Màn hình SCR-19
+3. Mục đích
+Giữ thông tin liên hệ và chuyên môn luôn mới
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Hồ sơ thuộc tổ chức của người dùng
+6. Đầu vào
+mã hồ sơ; khi sửa: họ tên, thông tin liên hệ, chuyên môn, loại hợp đồng, số phiên bản
+7. Quy trình
+(1) Mở hồ sơ từ SCR-17. (2) Xem thông tin và danh sách lớp đang phụ trách. (3) Sửa trường cho phép. (4) Kiểm tra dữ liệu, email mới không trùng giáo viên khác, phiên bản. (5) Nếu chuyên môn mới không còn khớp với lớp đang phụ trách: hiện cảnh báo nêu tên các lớp liên quan, chỉ lưu khi xác nhận. (6) Lưu, ghi người sửa và lịch sử
+8. Đầu ra
+Hồ sơ đã cập nhật; lịch sử thay đổi
+9. Quy tắc
+Mã giáo viên không sửa được. Đổi chuyên môn không làm thay đổi các lớp đang dạy. “Khớp chuyên môn” chỉ là cảnh báo, không phải ràng buộc cứng, quy tắc khớp chưa chốt [CX-19]. QC-05, QC-06, QC-08, QC-10
+10. Validation
+Cùng quy tắc FN-15. Email mới trùng giáo viên khác: từ chối
+11. Ngoại lệ
+Hai người cùng sửa; rời trang khi chưa lưu; không có quyền: 403
+12. Thông báo
+Cảnh báo chuyên môn, dữ liệu đã thay đổi (Jira không nêu câu chữ). AC: AC-17
+FN-18 Gán giáo viên phụ trách cho lớp (US 5-3, không gồm kiểm tra trùng lịch) · U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-18 · Gán giáo viên cho lớp. Màn hình SCR-20, SCR-16
+3. Mục đích
+Lớp có người giảng dạy khi chưa dùng module Phân công giáo viên
+4. Tác nhân
+Giáo vụ
+5. Tiên quyết
+Lớp tồn tại; lớp chưa ở trạng thái chỉ xem [SUY LUẬN từ US 5-7]; có giáo viên trạng thái “đang dạy”
+6. Đầu vào
+mã lớp, mã giáo viên được chọn
+7. Quy trình
+(1) Từ SCR-16 mở hộp thoại gán. (2) Tìm và chọn một giáo viên (chỉ hiện “đang dạy”). (3) Lưu. (4) Trang chi tiết lớp hiển thị giáo viên phụ trách kèm thông báo
+8. Đầu ra
+Liên kết lớp và giáo viên phụ trách [CX-20]; lịch của lớp dùng giáo viên này làm mặc định (phần lịch thuộc Epic 6)
+9. Quy tắc
+Chỉ giáo viên “đang dạy” được chọn; tạm nghỉ và nghỉ việc không xuất hiện. Đổi giáo viên áp dụng cho buổi học tương lai, buổi đã diễn ra giữ nguyên. Module Phân công giáo viên đang bật: ô gán ẩn hoặc chỉ đọc kèm hướng dẫn sang Epic 12. Module tắt: gán trực tiếp hoạt động bình thường. Cảnh báo trùng lịch nằm ngoài phạm vi Sprint 4 [CX-06]
+10. Validation
+Giáo viên thuộc tổ chức và đang dạy; lớp thuộc tổ chức
+11. Ngoại lệ
+Không có quyền: 403. Giáo viên được gán sau đó chuyển nghỉ: xử lý ở US 4-4 (ngoài phạm vi) [CX-16]
+12. Thông báo
+Thông báo lưu thành công (Jira không nêu câu chữ). AC: AC-18
+FN-19 Chuyển trạng thái lớp học (US 5-7) · U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-19 · Vòng đời trạng thái lớp. Màn hình SCR-21, SCR-22, SCR-23
+3. Mục đích
+Mọi story về lớp, ghi danh và lịch xử lý đúng theo trạng thái của lớp
+4. Tác nhân
+Hệ thống (chuyển tự động); Giáo vụ và Quản trị viên tổ chức (chuyển thủ công)
+5. Tiên quyết
+Lớp tồn tại; trạng thái hiện tại cho phép chuyển
+6. Đầu vào
+mã lớp, trạng thái đích; khi hủy: lý do
+7. Quy trình
+(a) Tự động Chưa bắt đầu → Đang diễn ra khi đến ngày bắt đầu. (b) Đang diễn ra → Đã kết thúc: tự động khi quá ngày kết thúc, hoặc Giáo vụ đóng lớp thủ công (US 5-6) sau hộp thoại xác nhận. (c) Chưa bắt đầu hoặc Đang diễn ra → Đã hủy: Giáo vụ hủy lớp, bắt buộc nhập lý do và xác nhận. (d) Ghi nhật ký mỗi lần chuyển: ai, khi nào, từ trạng thái nào sang trạng thái nào, lý do nếu có
+8. Đầu ra
+Trạng thái lớp mới; bản ghi nhật ký; thông báo cho sinh viên và giáo viên khi hủy nếu tổ chức bật email [CX-14]
+9. Quy tắc
+Không chuyển ngược từ Đã kết thúc hoặc Đã hủy; muốn mở lại phải tạo lớp mới. Đóng lớp khi còn buổi học tương lai hoặc buổi chưa xử lý: liệt kê các buổi và xử lý theo MEMS-781 (phương án A: hủy các buổi; phương án B: chặn đóng lớp) [CX-13]. Lớp Đã kết thúc hoặc Đã hủy không xuất hiện trong danh sách chọn lớp khi ghi danh hoặc xếp lịch nhưng vẫn xem và lọc được. Cơ chế chuyển tự động và múi giờ [CX-15]
+10. Validation
+Lý do hủy bắt buộc; chuyển trạng thái phải nằm trong các cặp cho phép ở mục 7
+11. Ngoại lệ
+Vai trò khác Giáo vụ và Quản trị viên tổ chức: 403. Hai người cùng đổi: người sau nhận thông báo trạng thái đã thay đổi. Lớp tự đổi trạng thái khi đang có người mở màn hình sửa: lần lưu tiếp theo báo trạng thái đã đổi, không ghi đè
+12. Thông báo
+“Trạng thái lớp đã thay đổi” (Jira: “thông báo trạng thái đã thay đổi”); các câu khác chưa có trong Jira. AC: AC-19
+FN-20 Duyệt hoặc từ chối tài khoản giáo viên tự đăng ký (US 1-7) · R, U
+Mục
+Nội dung
+1–2. Mã, tên
+FN-20 · Duyệt giáo viên. Màn hình SCR-24
+3. Mục đích
+Chỉ giáo viên được tổ chức xác nhận mới vào được hệ thống
+4. Tác nhân
+Quản trị viên tổ chức (và vai trò được cấp quyền theo ma trận phân quyền)
+5. Tiên quyết
+Có tài khoản Giáo viên đã xác thực email, trạng thái Chờ duyệt (FN-03)
+6. Đầu vào
+danh sách mã tài khoản được chọn; hành động Duyệt hoặc Từ chối; lý do khi từ chối; từ khóa tìm kiếm, số trang
+7. Quy trình
+(1) Mở trang; danh sách chỉ gồm giáo viên của tổ chức ở trạng thái Chờ duyệt. (2) Tìm theo tên hoặc email, phân trang. (3) Chọn một hoặc nhiều tài khoản. (4) Duyệt: chuyển sang Hoạt động, gửi email thông báo. Từ chối: nhập lý do, chuyển sang Bị từ chối, gửi email nêu lý do. (5) Hệ thống trả kết quả từng tài khoản thành công hay thất bại
+8. Đầu ra
+Tài khoản đổi trạng thái; email; bảng kết quả xử lý. Khi duyệt, hồ sơ giáo viên được tạo hoặc liên kết [CX-05]
+9. Quy tắc
+Giáo viên đăng nhập khi Chờ duyệt hoặc Bị từ chối nhận thông báo tương ứng (FN-01). Phụ thuộc US 1-2, 1-6; liên quan Epic 4
+10. Validation
+Lý do từ chối bắt buộc; tài khoản thuộc tổ chức và đang ở Chờ duyệt
+11. Ngoại lệ
+Tài khoản đã được người khác xử lý: báo “Tài khoản đã được xử lý”, không xử lý lại. Không có tài khoản chờ duyệt: hiện “Không có tài khoản chờ duyệt”. Không đủ quyền: 403
+12. Thông báo
+“Không có tài khoản chờ duyệt”; “Tài khoản đã được xử lý”. AC: AC-20
+Chức năng Delete. Chưa có story nào trong phạm vi yêu cầu xóa sinh viên, giáo viên hoặc lớp. Jira chỉ ghi BR-04: không xóa cứng khi đã có dữ liệu liên quan (US 3-4, 4-4). [CX-24]
+
+Chương 4. Đặc tả luồng nghiệp vụ
+Các sơ đồ viết bằng Mermaid (dán vào mermaid.live hoặc công cụ hỗ trợ Mermaid để xem hình). Nội dung dựa trên Jira, nhãn điểm còn mở nằm trong sơ đồ.
+4.1 Luồng chính theo vai trò
+Vai trò
+Thứ tự công việc chính
+Chức năng
+Quản trị viên hệ thống
+Đăng nhập → tạo tổ chức kèm Quản trị viên tổ chức đầu tiên → quay về danh sách tổ chức
+FN-01, FN-06
+Quản trị viên tổ chức
+Nhận email → đăng nhập lần đầu → đổi mật khẩu → cấu hình module → duyệt giáo viên tự đăng ký
+FN-01, FN-07, FN-08, FN-09, FN-20
+Giáo vụ
+Đăng nhập → thêm và quản lý sinh viên → thêm và quản lý giáo viên → tạo lớp → gán giáo viên → theo dõi trạng thái, hủy hoặc đóng lớp
+FN-10 đến FN-19
+Sinh viên, Giáo viên
+Đăng ký → xác thực email → (Giáo viên) chờ duyệt → đăng nhập. Chưa có chức năng dành riêng trong phạm vi
+FN-02, FN-03, FN-01
+4.2 Điều hướng giữa các màn hình
+flowchart LR  S01["SCR-01 Đăng nhập"] --> S02["SCR-02 Đăng ký"]  S01 --> S04["SCR-04 Quên mật khẩu"]  S02 --> S03["SCR-03 Chờ xác thực email"]  S03 -->|link trong email| S01  S04 --> S05["SCR-05 Đã gửi yêu cầu"]  S05 -->|link trong email| S06["SCR-06 Đặt lại mật khẩu"]  S06 --> S01  S01 -->|Quản trị viên hệ thống| S27["SCR-27 Danh sách tổ chức"]  S27 --> S08["SCR-08 Tạo tổ chức"]  S01 -->|Quản trị viên tổ chức, lần đầu| S10["SCR-10 Đổi mật khẩu lần đầu"]  S10 --> S09["SCR-09 Cấu hình module"]  S09 --> S24["SCR-24 Duyệt giáo viên"]  S01 -->|Giáo vụ| S11["SCR-11 Danh sách sinh viên"]  S11 --> S12["SCR-12 Thêm sinh viên"]  S11 --> S13["SCR-13 Hồ sơ sinh viên"]  S01 --> S14["SCR-14 Danh sách lớp"]  S14 --> S15["SCR-15 Tạo lớp"]  S14 --> S16["SCR-16 Chi tiết lớp"]  S16 --> S20["SCR-20 Gán giáo viên"]  S16 --> S21["SCR-21 Hủy lớp"]  S16 --> S22["SCR-22 Đóng lớp"]  S01 --> S17["SCR-17 Danh sách giáo viên"]  S17 --> S18["SCR-18 Thêm giáo viên"]  S17 --> S19["SCR-19 Hồ sơ giáo viên"]
+4.3 Sơ đồ Use Case (mức tổng quát)
+flowchart LR  A1([Quản trị viên hệ thống]) --> U1(FN-06 Tạo tổ chức)  A2([Quản trị viên tổ chức]) --> U2(FN-08, FN-09 Cấu hình module)  A2 --> U3(FN-20 Duyệt giáo viên)  A2 --> U4(FN-07 Đổi mật khẩu lần đầu)  A3([Giáo vụ]) --> U5(FN-10 đến FN-12 Sinh viên)  A3 --> U6(FN-13, FN-14 Lớp học)  A3 --> U7(FN-15 đến FN-17 Giáo viên)  A3 --> U8(FN-18 Gán giáo viên)  A3 --> U9(FN-19 Trạng thái lớp)  A2 --> U9  A4([Sinh viên, Giáo viên]) --> U10(FN-02, FN-03 Đăng ký, xác thực)  A5([Mọi vai trò]) --> U11(FN-01 Đăng nhập)  A5 --> U12(FN-04, FN-05 Đặt lại mật khẩu)
+4.4 Activity: Đăng nhập (FN-01)
+flowchart TD  A([Bắt đầu]) --> B[Nhập email, mật khẩu]  B --> C{Giao diện hợp lệ?}  C -->|Không| D[Báo lỗi tại trường, không gọi API]  C -->|Có| E[Gửi API]  E --> F{Đang bị khóa 15 phút?}  F -->|Có| G[Hiện thời gian còn lại]  F -->|Không| H{Email và mật khẩu đúng?}  H -->|Không| I[Ghi log thất bại, đếm lần sai. Thông báo chung]  I --> J{Sai 5 lần trong 15 phút?}  J -->|Có| K[Khóa 15 phút]  H -->|Có| L{Trạng thái tài khoản}  L -->|Vô hiệu hóa, chưa xác thực, chờ duyệt, bị từ chối| M[Thông báo tương ứng]  L -->|Hoạt động| N[Tạo JWT 24 giờ và refresh token]  N --> O{Bắt buộc đổi mật khẩu lần đầu? CX-04}  O -->|Có| P[SCR-10]  O -->|Không| Q[Trang tổng quan theo vai trò, CX-22]
+4.5 Activity: Đăng ký, xác thực email và duyệt giáo viên (FN-02, FN-03, FN-20)
+flowchart TD  A([Người dùng đăng ký]) --> B{Vai trò}  B --> C[Tạo tài khoản Chờ xác thực, gửi email 24 giờ]  C --> D{Bấm link còn hạn?}  D -->|Không| E[SCR-07, gửi lại email tối đa 1 lần/60 giây]  D -->|Có| F{Vai trò}  F -->|Sinh viên| G[Hoạt động]  F -->|Giáo viên| H[Chờ duyệt]  H --> I{Quản trị viên tổ chức quyết định}  I -->|Duyệt| J[Hoạt động, gửi email. Hồ sơ giáo viên: CX-05]  I -->|Từ chối, lý do bắt buộc| K[Bị từ chối, gửi email nêu lý do]  I -->|Người khác đã xử lý| L[Thông báo Tài khoản đã được xử lý]
+4.6 Trạng thái lớp học (FN-19)
+stateDiagram-v2  [*] --> ChuaBatDau: Tạo lớp (CX-12: Chưa xếp lịch hay Chưa bắt đầu)  ChuaBatDau --> DangDienRa: Tự động khi đến ngày bắt đầu  DangDienRa --> DaKetThuc: Tự động quá ngày kết thúc, hoặc đóng lớp thủ công  ChuaBatDau --> DaHuy: Hủy lớp, có lý do  DangDienRa --> DaHuy: Hủy lớp, có lý do  DaKetThuc --> [*]  DaHuy --> [*]
+4.7 Sequence: Đặt lại mật khẩu (FN-04, FN-05)
+sequenceDiagram  actor U as Người dùng  participant UI as Giao diện  participant API as Server  participant DB as Cơ sở dữ liệu  participant M as Email  U->>UI: Nhập email, bấm Gửi hướng dẫn  UI->>API: POST /auth/forgot-password  API->>DB: Kiểm tra giới hạn, tìm tài khoản  API->>DB: Lưu hash token, hết hạn 15 phút, vô hiệu link cũ  API->>M: Gửi link (chỉ khi email tồn tại và tài khoản hoạt động)  API-->>UI: Thông báo chung (luôn giống nhau)  U->>UI: Mở link, nhập mật khẩu mới  UI->>API: POST /auth/reset-password  API->>DB: Kiểm tra token, cập nhật hash, vô hiệu token, đăng xuất mọi phiên  API-->>UI: Thành công, chuyển về đăng nhập
+4.8 Activity: Gán giáo viên cho lớp (FN-18)
+flowchart TD  A([Giáo vụ mở chi tiết lớp]) --> B{Module Phân công giáo viên bật?}  B -->|Bật| C[Ô gán ẩn hoặc chỉ đọc, hướng dẫn sang Epic 12. CX-20]  B -->|Tắt| D[Chọn giáo viên đang dạy từ danh sách tìm kiếm]  D --> E[Lưu]  E --> F[Hiển thị giáo viên phụ trách, thông báo]  F --> G[Đổi giáo viên: chỉ áp dụng buổi học tương lai]
+
+Chương 5. Đặc tả dữ liệu
+Phân loại độ tin cậy. Chưa có mã nguồn hoặc schema của hệ thống. Toàn bộ chương này là [ĐỀ XUẤT] dựa trên trường dữ liệu Jira và canvas, không mô tả cấu trúc database đang có. Developer đối chiếu với schema hiện tại trước khi sửa. [CX-34: nhóm gửi schema hiện tại]
+5.1 Danh sách thực thể
+Thực thể
+Thuộc tính chính (kiểu gợi ý)
+Khóa và ràng buộc
+Nguồn
+organizations
+id, code (chuỗi), name, org_type, contact_email, contact_phone, status (hoạt động, tạm ngưng), created_by, created_at
+PK id. UNIQUE code. Tên có thể trùng (chỉ cảnh báo). Không đổi code sau khi tạo
+US 2-1 [CX-09, CX-10]
+modules (cấu hình)
+code, name, type (Core, Optional), depends_on
+PK code. Lấy từ cấu hình, không viết cứng
+US 2-2, 2-3 [CX-07]
+organization_modules
+organization_id, module_code, is_enabled, version, updated_by, updated_at
+PK (organization_id, module_code). Core luôn is_enabled = true
+US 2-2
+users
+id, organization_id (rỗng với Quản trị viên hệ thống), email, password_hash, full_name, role [CX-01], status (chờ xác thực, chờ duyệt, hoạt động, bị từ chối, vô hiệu hóa), must_change_password, failed_login_count, locked_until, reviewed_by, reviewed_at, reject_reason, created_at
+PK id. Email không phân biệt hoa thường, duy nhất [CX-32]. FK organization_id. Hash mật khẩu
+US 1-1, 1-2, 1-3, 1-7, 2-1
+auth_tokens
+id, user_id, type (xác thực email, đặt lại mật khẩu), token_hash, expires_at, used_at, created_at
+PK id. FK user_id. Chỉ lưu hash; dùng một lần
+US 1-2, 1-3
+refresh_tokens
+id, user_id, token_hash, expires_at, revoked_at
+PK id. FK user_id. Dùng để đăng xuất mọi phiên [SUY LUẬN]
+US 1-1, 1-3
+login_attempts
+id, email, ip, success, created_at
+PK id. Phục vụ giới hạn 5 lần/15 phút và log thất bại (không ghi mật khẩu)
+US 1-1
+students
+id, organization_id, student_code, full_name, full_name_unaccented, dob, gender, email, phone, status [CX-17], version, created_by, created_at, updated_by, updated_at
+PK id. UNIQUE (organization_id, student_code). Index student_code, full_name_unaccented. dob không trong tương lai
+US 3-1, 3-2, 3-3
+teachers
+id, organization_id, teacher_code, full_name, full_name_unaccented, email, phone, contract_type (cơ hữu, thỉnh giảng), status [CX-16], version, created_by, created_at, updated_by, updated_at
+PK id. UNIQUE (organization_id, teacher_code). UNIQUE (organization_id, email). Index mã và tên không dấu
+US 4-1, 4-2, 4-3
+specialties và teacher_specialties
+specialties(id, organization_id, name, is_active); teacher_specialties(teacher_id, specialty_id)
+PK kép. Danh mục dùng chung [CX-18]
+US 4-1, 2-8
+subjects (môn, khóa học)
+id, organization_id, name, is_active
+PK id. Danh mục dùng chung [CX-18]
+US 5-1, 2-8
+classes
+id, organization_id, class_code, name, subject_id, max_students, start_date, end_date, status [CX-12], teacher_id (null) [CX-20], version, created_by, created_at
+PK id. UNIQUE (organization_id, class_code). CHECK max_students > 0. CHECK end_date >= start_date. FK subject_id, teacher_id
+US 5-1, 5-3, 5-5, 5-7
+class_status_logs
+id, class_id, from_status, to_status, reason, changed_by, changed_at
+PK id. FK class_id. Chỉ thêm, không sửa
+US 5-7
+change_history
+id, entity_type, entity_id, field, old_value, new_value, changed_by, changed_at
+Lịch sử sửa hồ sơ sinh viên và giáo viên
+US 3-3, 4-3
+organization_module_logs
+id, organization_id, module_code, action (bật, tắt), changed_by, changed_at
+Chỉ đọc. Ghi từ FN-09
+US 2-2, 2-5
+enrollments (ngoài phạm vi)
+class_id, student_id, ...
+Sĩ số hiện tại ở US 5-5 sẽ lấy từ đây [CX-31]
+US 5-2
+Liên kết tài khoản và hồ sơ: users có thể có student_id hoặc teacher_id, chưa quy định bắt buộc hay tùy chọn. [CX-05]
+5.2 ERD đề xuất
+erDiagram  organizations ||--o{ organization_modules : có  modules ||--o{ organization_modules : được_cấu_hình  organizations ||--o{ users : gồm  users ||--o{ auth_tokens : sở_hữu  users ||--o{ refresh_tokens : sở_hữu  organizations ||--o{ students : gồm  organizations ||--o{ teachers : gồm  organizations ||--o{ classes : gồm  teachers ||--o{ teacher_specialties : có  specialties ||--o{ teacher_specialties : thuộc  subjects ||--o{ classes : của  teachers |o--o{ classes : phụ_trách  classes ||--o{ class_status_logs : ghi_nhật_ký  classes ||--o{ enrollments : ghi_danh  students ||--o{ enrollments : tham_gia  users |o--o| students : liên_kết_CX05  users |o--o| teachers : liên_kết_CX05
+5.3 Ràng buộc dữ liệu dùng chung
+Mọi bảng nghiệp vụ có organization_id NOT NULL, có index và được lọc ở mọi truy vấn (QC-03).
+Không xóa cứng sinh viên, giáo viên khi đã có dữ liệu liên quan (BR-04, US 3-4, 4-4) [CX-24].
+Tắt module chỉ ẩn dữ liệu, không xóa (BR-06).
+Trường version tăng sau mỗi lần sửa để phục vụ QC-08.
+
+Chương 6. Phân quyền người dùng
+Nguyên tắc. Quyền = vai trò × tổ chức × module đang bật. Module tắt thì chức năng không dùng được dù vai trò có quyền. Quản trị viên hệ thống có phạm vi toàn nền tảng và không dùng chung quy tắc với vai trò trong tổ chức (US 1-6). [JIRA]
+Ma trận (C = tạo, R = đọc, U = sửa, D = xóa, — = không có quyền). “Giáo vụ (hoặc cao hơn)” trong Jira được hiểu là Giáo vụ và Quản trị viên tổ chức [SUY LUẬN, CX-21]. Các ô ghi “—” cho Giáo viên, Sinh viên, Nhân viên vì Jira chỉ giao các chức năng này cho Giáo vụ [SUY LUẬN, CX-33].
+Chức năng
+Module
+QT hệ thống
+QT tổ chức
+Giáo vụ
+Giáo viên
+Sinh viên
+Nhân viên
+FN-01 Đăng nhập, FN-04, FN-05 đặt lại mật khẩu
+— (công khai)
+Có
+Có
+Có
+Có
+Có
+Có
+FN-02, FN-03 Đăng ký, xác thực email
+— (công khai)
+—
+—
+—
+C (tự đăng ký)
+C (tự đăng ký)
+—
+FN-06 Tạo tổ chức
+Nền tảng
+C
+—
+—
+—
+—
+—
+Danh sách tổ chức (US 2-6, tham chiếu)
+Nền tảng
+R
+—
+—
+—
+—
+—
+FN-07 Đổi mật khẩu lần đầu
+Core
+—
+U (tài khoản mới)
+—
+—
+—
+—
+FN-08, FN-09 Cấu hình module
+Core
+—
+R, U
+—
+—
+—
+—
+FN-20 Duyệt giáo viên
+Core
+—
+R, U
+— [CX-21, theo ma trận phân quyền]
+—
+—
+—
+FN-10 đến FN-12 Hồ sơ sinh viên
+Sinh viên
+—
+C, R, U
+C, R, U
+—
+—
+—
+FN-13, FN-14 Lớp học
+Lớp học
+—
+C, R
+C, R
+—
+—
+—
+FN-15 đến FN-17 Hồ sơ giáo viên
+Giáo viên
+—
+C, R, U
+C, R, U
+—
+—
+—
+FN-18 Gán giáo viên cho lớp
+Lớp học, Giáo viên
+—
+U
+U
+—
+—
+—
+FN-19 Chuyển trạng thái lớp thủ công
+Lớp học
+—
+U
+U
+—
+—
+—
+Delete mọi thực thể trong phạm vi
+—
+—
+—
+—
+—
+—
+— (chưa có story, CX-24)
+Giới hạn giữa vai trò.
+Không truy cập dữ liệu tổ chức khác trong mọi trường hợp (QC-03).
+Quản trị viên hệ thống không dùng các chức năng nghiệp vụ trong tổ chức (sinh viên, giáo viên, lớp) [SUY LUẬN từ US 1-6]. Quản trị viên hệ thống chỉ xem thông tin tổng quan của tổ chức, không xem dữ liệu nghiệp vụ (ghi chú có trong canvas, chưa tìm thấy trong Jira, cần xác nhận).
+Vai trò bị đổi khi đang đăng nhập: quyền mới có hiệu lực ở lần tải lại hoặc làm mới token tiếp theo (US 1-6).
+Vai trò không hợp lệ hoặc không xác định: không truy cập trang nào, nhận 403.
+Module tắt được ưu tiên hơn vai trò (US 2-4).
+
+Chương 7. Yêu cầu phi chức năng
+Chỉ liệt kê yêu cầu có căn cứ trong Jira. Con số cụ thể chưa có được đánh dấu CX.
+Nhóm
+Yêu cầu
+Nguồn
+Hiệu năng
+Danh sách hàng nghìn bản ghi phản hồi trong ngưỡng NFR (chưa có con số) [CX-35]. Tìm kiếm và lọc xử lý ở server, phân trang, đánh index cột mã và tên không dấu
+US 3-2, 4-2, 5-5 [JIRA]
+Bảo mật
+Mật khẩu hash, không trả về qua API. JWT hết hạn 24 giờ. Giới hạn đăng nhập sai 5 lần/15 phút, đăng ký 5 lần/15 phút theo IP, đặt lại mật khẩu 5 yêu cầu/giờ. Token chỉ lưu hash, dùng một lần. Thông báo chung chống dò email. Không ghi mật khẩu vào log. Kiểm tra quyền ở server (401, 403). Tách dữ liệu theo tổ chức
+US 1-1, 1-2, 1-3, 1-6 [JIRA]
+Khả năng sử dụng
+Loading state, empty state, lỗi tại từng trường, nhắc khi rời trang chưa lưu, giữ bộ lọc khi quay lại danh sách, chặn gửi trùng
+Các story trong phạm vi [JIRA]
+Khả năng mở rộng
+Danh sách module, quan hệ phụ thuộc, vai trò và quyền nằm trong cấu hình hoặc cơ sở dữ liệu, không viết cứng trong code. Thời hạn, số lần giới hạn đặt trong cấu hình
+US 1-3, 1-6, 2-2, 2-3 [JIRA]
+Tương thích thiết bị
+Responsive trên mobile (bảng cuộn ngang hoặc chuyển dạng thẻ). Canvas thiết kế desktop đầu tiên. Trình duyệt và độ phân giải hỗ trợ [CX-36]
+Notes của US 3-1, 3-2 [JIRA]
+Bảo trì và truy vết
+Nhật ký chuyển trạng thái lớp, lịch sử sửa hồ sơ, ghi người tạo và người sửa. Email dùng template riêng
+US 1-3, 3-3, 4-3, 5-7 [JIRA]
+
+Chương 8. Danh sách vấn đề và đề xuất
+Phần đánh giá UI/UX của Google Stitch chưa thực hiện vì chưa có ảnh chụp hoặc file export. Các vấn đề dưới đây đến từ việc đối chiếu Jira với canvas MEMS.
+8.1 Vấn đề theo mức độ ưu tiên
+Mức
+Mã
+Màn hình
+Hiện trạng và vấn đề
+Giải pháp đề xuất
+Cao
+CX-12, D-02
+SCR-14, SCR-16
+Hai trạng thái lớp khác nhau giữa US 5-1 và US 5-7; canvas dùng cả hai
+Nhóm chốt một bộ trạng thái, sửa Jira và canvas theo đó trước khi tạo enum
+Cao
+CX-04, CX-05
+SCR-10, SCR-18, SCR-24
+Quy trình kích hoạt tài khoản và liên kết hồ sơ chưa thống nhất, chặn FN-07, FN-15, FN-20
+Chốt MEMS-779 trước Sprint 4
+Cao
+CX-18
+SCR-15, SCR-18
+Danh mục chuyên môn, môn học chưa có nguồn dữ liệu (US 2-8 ngoài phạm vi)
+Đưa US 2-8 vào phạm vi, hoặc chốt cách nhập tạm
+Cao
+CX-09
+SCR-08
+Form tạo tổ chức chưa nêu Mã tổ chức nhưng đăng ký bắt buộc nhập mã
+Chốt cách cấp mã, cập nhật US 2-1
+Cao
+D-05
+SCR-01
+Thiếu giao diện cho 6 trạng thái chặn đăng nhập
+Thêm banner theo từng trạng thái, thống nhất câu chữ
+Cao
+CX-24
+Mọi danh sách
+Không có thao tác xóa nên CRUD chưa đủ
+Chốt có xóa mềm hay không, thêm story
+Trung bình
+D-01, CX-17
+SCR-11, SCR-13
+Canvas thiếu trạng thái “tốt nghiệp” của sinh viên
+Sửa canvas theo US 3-4
+Trung bình
+D-04
+SCR-18
+Loại hợp đồng đánh dấu bắt buộc nhưng Jira không bắt buộc
+Bỏ dấu * trên canvas hoặc cập nhật AC
+Trung bình
+D-06, D-10
+SCR-24
+Thiếu trạng thái trống; có cột thừa
+Thêm empty state, bỏ cột Trạng thái
+Trung bình
+CX-29, CX-31
+SCR-11, SCR-14, SCR-16
+Số lớp của sinh viên và sĩ số hiện tại phụ thuộc ghi danh (ngoài phạm vi)
+Chốt cách hiển thị, nêu rõ dữ liệu mẫu khi kiểm thử
+Trung bình
+CX-15, CX-30
+SCR-15, SCR-21
+Chưa rõ chuyển trạng thái lớp tự động và ngày bắt đầu ở quá khứ
+Chốt cơ chế (job hoặc kiểm tra khi truy cập)
+Trung bình
+—
+Toàn hệ thống
+Jira không đặc tả đăng xuất; chưa có nút đăng xuất trên giao diện
+Thêm story đăng xuất [CX-25]
+Thấp
+—
+App shell
+Sidebar dùng chấm tròn thay icon
+Dùng bộ icon Lucide
+Thấp
+—
+SCR-01 đến SCR-07
+Hình minh họa bảng bên trái là bản vẽ đơn giản
+Thay bằng hình minh họa hoàn chỉnh của nhóm
+Thấp
+—
+Mọi màn
+Câu chữ thông báo chưa thống nhất (nhiều ô “Jira không nêu”)
+Lập bảng thông báo chuẩn, dùng chung
+8.2 Chức năng còn thiếu so với nhu cầu vận hành
+Đây là chức năng có trong Jira nhưng nằm ngoài 4 Sprint, khiến luồng vận hành chưa trọn: US 1-4 (quản lý người dùng), US 1-6 (phân quyền), US 1-8 (đổi mật khẩu), US 3-4 (đổi trạng thái sinh viên), US 4-4 (đổi trạng thái giáo viên, cần cho FN-18), US 5-2 (ghi danh, cần cho sĩ số ở FN-14), US 5-6 (đóng lớp, cần cho FN-19), US 2-8 (danh mục), Epic 6 (lịch). Nhóm quyết định đưa vào Sprint nào.
+8.3 Nghiệp vụ chưa rõ và điểm cần thống nhất
+Xem Phần B (CX-01 đến CX-27) và Phần D (CX-28 đến CX-36).
+
+Chương 9. Tiêu chí nghiệm thu
+Cách dùng. Mỗi dòng là một điều kiện kiểm tra độc lập. Developer dùng để biết đã xong chưa. Tester dùng mỗi dòng làm ít nhất một test case. Nội dung dựa trên AC của Jira (rút gọn, giữ ý), dòng có [ĐỀ XUẤT] hoặc [CX] là bổ sung của tài liệu. Loại: T = thành công, L = lỗi hay thất bại, E = edge case (biên, đồng thời), S = quyền và bảo mật. Các dòng QC-01 đến QC-10 áp dụng cho mọi nhóm, không lặp lại trong từng nhóm trừ khi riêng biệt.
+AC-01 · FN-01 Đăng nhập (US 1-1)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-01.01
+Email và mật khẩu đúng, tài khoản Hoạt động: vào trang tổng quan theo vai trò, menu chỉ gồm module đang bật
+T
+AC-01.02
+Email có chữ hoa hoặc thừa khoảng trắng vẫn đăng nhập được (QC-01, QC-02)
+T
+AC-01.03
+Sai mật khẩu và email không tồn tại hiện cùng thông báo “Email hoặc mật khẩu không đúng”
+L
+AC-01.04
+Bỏ trống email hoặc mật khẩu, hoặc email sai định dạng: báo lỗi tại trường, không gọi API
+L
+AC-01.05
+Sai 5 lần trong 15 phút: khóa 15 phút và hiện thời gian còn lại
+L
+AC-01.06
+Sai 4 lần rồi đúng: đăng nhập được, bộ đếm phải reset [ĐỀ XUẤT]
+E
+AC-01.07
+Sai lần thứ 5 đúng lúc 15 phút trước khi hết cửa sổ thời gian: kiểm tra biên
+E
+AC-01.08
+Tài khoản vô hiệu hóa: “Tài khoản đã bị vô hiệu hóa”
+L
+AC-01.09
+Tài khoản chưa xác thực email: “Vui lòng xác thực email trước khi đăng nhập”
+L
+AC-01.10
+Tài khoản giáo viên Chờ duyệt hoặc Bị từ chối không đăng nhập được, có thông báo tương ứng
+L
+AC-01.11
+JWT hết hạn sau 24 giờ; refresh token hết hạn thì chuyển về đăng nhập kèm “Phiên đăng nhập đã hết hạn”
+E
+AC-01.12
+Người đã đăng nhập mở lại trang đăng nhập: chuyển về tổng quan
+E
+AC-01.13
+Mỗi lần đăng nhập thất bại có log (thời gian, email, IP), không chứa mật khẩu
+S
+AC-01.14
+Mật khẩu không xuất hiện trong phản hồi API và đã được hash trong cơ sở dữ liệu
+S
+AC-01.15
+Nút Đăng nhập bị vô hiệu hóa và có loading khi đang xử lý (QC-05)
+E
+AC-02 · FN-02 Đăng ký (US 1-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-02.01
+Đăng ký hợp lệ: tạo tài khoản Chờ xác thực, gửi email, hiện “Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản”
+T
+AC-02.02
+Mỗi trường bắt buộc bị bỏ trống đều báo “Vui lòng nhập ...” tại trường
+L
+AC-02.03
+Email đã tồn tại: “Email đã được sử dụng” (so sánh không phân biệt hoa thường)
+L
+AC-02.04
+Mật khẩu thiếu một trong bốn điều kiện (8 ký tự, hoa, thường, số): báo lỗi
+L
+AC-02.05
+Xác nhận mật khẩu không khớp: “Mật khẩu xác nhận không khớp”
+L
+AC-02.06
+Mã tổ chức sai hoặc tổ chức không hoạt động: “Mã tổ chức không hợp lệ”
+L
+AC-02.07
+Vai trò chỉ chọn được Sinh viên hoặc Giáo viên; gửi vai trò khác qua API bị từ chối
+S
+AC-02.08
+Đăng ký lần thứ 6 trong 15 phút từ cùng IP bị chặn
+S
+AC-02.09
+Gửi lại email: tối đa 1 lần/60 giây, nút đếm ngược
+E
+AC-02.10
+Mật khẩu lưu dạng hash, không trả về API
+S
+AC-02.11
+Nhấn Đăng ký hai lần liên tiếp không tạo hai tài khoản
+E
+AC-03 · FN-03 Xác thực email (US 1-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-03.01
+Link còn hạn: Sinh viên chuyển Hoạt động, Giáo viên chuyển Chờ duyệt
+T
+AC-03.02
+Link quá 24 giờ: SCR-07 và cho gửi lại
+L
+AC-03.03
+Link đã dùng một lần: mở lại bị từ chối
+E
+AC-03.04
+Link bị sửa token: “Liên kết không hợp lệ hoặc đã hết hạn”
+S
+AC-03.05
+Gửi lại link mới thì link cũ mất hiệu lực [ĐỀ XUẤT]
+E
+AC-04 · FN-04 Yêu cầu đặt lại mật khẩu (US 1-3)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-04.01
+Email tồn tại: gửi email có link, hiện thông báo chung
+T
+AC-04.02
+Email không tồn tại: hiện đúng thông báo chung, không gửi email
+S
+AC-04.03
+Email sai định dạng hoặc trống: lỗi tại trường
+L
+AC-04.04
+Yêu cầu hai lần liên tiếp: chỉ link mới nhất dùng được
+E
+AC-04.05
+Vượt 5 yêu cầu/giờ cho mỗi email hoặc IP: “Vui lòng thử lại sau”
+S
+AC-04.06
+Nút Gửi lại chỉ bật sau 60 giây
+E
+AC-04.07
+Tài khoản khóa hoặc vô hiệu hóa không nhận email nhưng thông báo vẫn giống nhau
+S
+AC-04.08
+Token trong cơ sở dữ liệu là hash, có thời gian hết hạn 15 phút
+S
+AC-05 · FN-05 Đặt lại mật khẩu (US 1-3)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-05.01
+Link còn hạn, mật khẩu hợp lệ: đổi thành công, chuyển về đăng nhập kèm thông báo
+T
+AC-05.02
+Sau khi đổi, mọi phiên cũ bị đăng xuất và link không dùng lại được
+S
+AC-05.03
+Link quá 15 phút hoặc đã dùng: SCR-07
+L
+AC-05.04
+Mật khẩu mới trùng mật khẩu hiện tại: từ chối
+L
+AC-05.05
+Mật khẩu không đủ quy tắc hoặc xác nhận không khớp: báo lỗi
+L
+AC-05.06
+Mở link ở thiết bị khác với nơi yêu cầu vẫn đặt được
+E
+AC-05.07
+Trang đặt lại không bị chặn bởi phân quyền khi chưa đăng nhập
+E
+AC-06 · FN-06 Tạo tổ chức (US 2-1)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-06.01
+Nhập đủ thông tin: tạo tổ chức, tài khoản quản trị, 4 module Core bật, gửi email, thông báo, quay về danh sách
+T
+AC-06.02
+Thiếu trường bắt buộc: lỗi từng trường, không lưu
+L
+AC-06.03
+Email quản trị đã tồn tại: từ chối, không tạo tổ chức
+L
+AC-06.04
+Trùng tên tổ chức nhưng mã khác: cảnh báo, vẫn tạo được
+E
+AC-06.05
+Lỗi khi tạo tài khoản quản trị: không để lại tổ chức mồ côi (giao dịch trọn vẹn)
+E
+AC-06.06
+Người không phải Quản trị viên hệ thống vào trang hoặc gọi API: 403
+S
+AC-06.07
+Nhấn Tạo hai lần liên tiếp không tạo hai tổ chức
+E
+AC-06.08
+Thông tin đăng nhập gửi qua email; tài khoản bắt buộc đổi mật khẩu lần đầu [CX-04]
+T
+AC-06.09
+Nhật ký ghi nhận việc tạo tổ chức
+T
+AC-07 · FN-07 Đổi mật khẩu lần đầu [CX-04]
+Mã
+Điều kiện kiểm tra
+Loại
+AC-07.01
+Đăng nhập lần đầu bằng mật khẩu tạm: bị đưa tới SCR-10 và không vào được trang khác
+T
+AC-07.02
+Đổi xong: vào tổng quan, cờ bắt buộc đổi được bỏ
+T
+AC-07.03
+Mật khẩu mới không đủ quy tắc hoặc không khớp: báo lỗi
+L
+AC-08 · FN-08 Xem cấu hình module (US 2-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-08.01
+Hiển thị tất cả module với tên, mô tả, loại, trạng thái
+T
+AC-08.02
+Module Core ghi “Luôn bật” và không có công tắt
+T
+AC-08.03
+Loading khi tải danh sách
+E
+AC-08.04
+Người không phải Quản trị viên tổ chức: 403
+S
+AC-09 · FN-09 Bật hoặc tắt module Optional (US 2-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-09.01
+Bật module Optional: lưu, menu và chức năng hiện ngay, có thông báo
+T
+AC-09.02
+Tắt module Optional: lưu, menu ẩn, dữ liệu giữ nguyên
+T
+AC-09.03
+Bật lại module đã tắt: dữ liệu cũ được khôi phục
+T
+AC-09.04
+Tắt module đang có dữ liệu: hộp xác nhận nêu số bản ghi bị ẩn
+E
+AC-09.05
+Cố tắt module Core (bằng giao diện hoặc API): bị từ chối kèm giải thích
+L
+AC-09.06
+Hai quản trị cùng sửa: người lưu sau nhận cảnh báo cấu hình đã thay đổi
+E
+AC-09.07
+Lưu lỗi: giao diện quay về trạng thái cũ và báo lỗi
+E
+AC-09.08
+Người đang ở trang module vừa tắt: lần gọi API tiếp theo bị chặn, đưa về tổng quan
+E
+AC-09.09
+Module đang tắt được ưu tiên hơn vai trò, gọi API trực tiếp trả “Module chưa được kích hoạt”
+S
+AC-09.10
+Tắt module phòng cuối cùng khi module khác phụ thuộc: xử lý theo US 2-3 [CX-11]
+E
+AC-10 · FN-10 Thêm sinh viên (US 3-1)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-10.01
+Nhập đủ trường bắt buộc: lưu thành công, thông báo, hồ sơ hiện trong danh sách
+T
+AC-10.02
+Thiếu trường bắt buộc: lỗi tại từng trường, không lưu
+L
+AC-10.03
+Email hoặc số điện thoại sai định dạng: lỗi tại trường
+L
+AC-10.04
+Ngày sinh ở tương lai: lỗi tại trường. Ngày sinh là hôm nay: kiểm tra biên
+L
+AC-10.05
+Mã sinh viên trùng trong tổ chức: từ chối, lỗi cụ thể
+L
+AC-10.06
+Cùng mã sinh viên ở tổ chức khác: được lưu (duy nhất theo từng tổ chức)
+E
+AC-10.07
+Họ tên có dấu tiếng Việt và ký tự đặc biệt lưu và hiển thị đúng
+T
+AC-10.08
+Khoảng trắng thừa đầu và cuối được cắt
+E
+AC-10.09
+Cùng họ tên và ngày sinh với sinh viên có sẵn: cảnh báo, chỉ lưu khi xác nhận
+E
+AC-10.10
+Nút Lưu khóa và có loading khi đang xử lý; bấm hai lần không tạo hai hồ sơ
+E
+AC-10.11
+Không có quyền: vào trang hoặc gọi API nhận 403
+S
+AC-10.12
+Ghi người tạo và thời điểm tạo
+T
+AC-11 · FN-11 Danh sách sinh viên (US 3-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-11.01
+Hiển thị đúng các cột: mã, họ tên, lớp, trạng thái, liên hệ
+T
+AC-11.02
+Gõ “nguyen” tìm ra “Nguyễn” (không phân biệt dấu, hoa thường)
+T
+AC-11.03
+Tìm theo mã sinh viên
+T
+AC-11.04
+Lọc theo trạng thái và theo lớp, kết hợp được
+T
+AC-11.05
+Phân trang số bản ghi cố định [CX-27]; kiểm tra trang đầu, trang cuối, trang có đúng số bản ghi biên
+E
+AC-11.06
+Không có kết quả: “Không tìm thấy sinh viên” + nút “Xóa bộ lọc”
+L
+AC-11.07
+Từ khóa chứa ký tự đặc biệt (ví dụ %, dấu nháy) không gây lỗi truy vấn
+S
+AC-11.08
+Loading khi tải; empty state khi tổ chức chưa có sinh viên kèm nút “Thêm sinh viên”
+E
+AC-11.09
+Chỉ sinh viên của tổ chức đang đăng nhập
+S
+AC-11.10
+Quay lại từ chi tiết giữ nguyên bộ lọc và số trang
+E
+AC-11.11
+Danh sách hàng nghìn bản ghi phản hồi trong ngưỡng NFR [CX-35]
+E
+AC-12 · FN-12 Hồ sơ sinh viên (US 3-3)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-12.01
+Chi tiết hiển thị đủ hồ sơ và danh sách lớp của sinh viên
+T
+AC-12.02
+Sửa họ tên, ngày sinh, giới tính, liên hệ: lưu, cập nhật ngay, có thông báo
+T
+AC-12.03
+Ghi người sửa, thời điểm và lịch sử (trường nào)
+T
+AC-12.04
+Dữ liệu không hợp lệ (cùng quy tắc AC-10.02 đến AC-10.04): lỗi tại trường, không lưu
+L
+AC-12.05
+Mã sinh viên chỉ xem; gửi sửa mã qua API bị từ chối
+S
+AC-12.06
+Hai người cùng sửa: người lưu sau nhận cảnh báo dữ liệu đã thay đổi
+E
+AC-12.07
+Rời trang khi có thay đổi chưa lưu: nhắc xác nhận
+E
+AC-12.08
+Nút Lưu khóa khi đang xử lý
+E
+AC-12.09
+Không có quyền sửa: 403
+S
+AC-12.10
+Mở hồ sơ sinh viên của tổ chức khác: bị chặn
+S
+AC-13 · FN-13 Tạo lớp (US 5-1)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-13.01
+Nhập đủ trường bắt buộc: lưu thành công, thông báo, lớp hiện trong danh sách
+T
+AC-13.02
+Thiếu trường bắt buộc: lỗi tại từng trường, không lưu
+L
+AC-13.03
+Mã lớp trùng trong tổ chức: từ chối, lỗi cụ thể
+L
+AC-13.04
+Ngày kết thúc trước ngày bắt đầu: từ chối, lỗi tại trường
+L
+AC-13.05
+Ngày kết thúc bằng ngày bắt đầu: hợp lệ [SUY LUẬN, kiểm tra biên]
+E
+AC-13.06
+Sĩ số bằng 0, số âm hoặc không phải số nguyên (ví dụ 2,5): từ chối
+L
+AC-13.07
+Sĩ số bằng 1: hợp lệ
+E
+AC-13.08
+Tạo lớp chưa có giáo viên hoặc chưa có lịch vẫn được; trạng thái ban đầu theo [CX-12]
+T
+AC-13.09
+Khoảng trắng thừa đầu và cuối được cắt
+E
+AC-13.10
+Nút Lưu khóa và có loading; bấm hai lần không tạo hai lớp
+E
+AC-13.11
+Không có quyền: vào trang hoặc gọi API nhận 403
+S
+AC-13.12
+Môn hoặc khóa học chỉ chọn từ danh mục [CX-18]
+E
+AC-14 · FN-14 Danh sách và chi tiết lớp (US 5-5)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-14.01
+Danh sách có đủ cột: mã, tên, môn, giáo viên, sĩ số (hiện tại/tối đa), trạng thái
+T
+AC-14.02
+Tìm theo mã hoặc tên, không phân biệt dấu và hoa thường
+T
+AC-14.03
+Lọc trạng thái, kết hợp với tìm kiếm
+T
+AC-14.04
+Phân trang cố định; kiểm tra trang cuối
+E
+AC-14.05
+Không có kết quả: “Không tìm thấy lớp” + “Xóa bộ lọc”
+L
+AC-14.06
+Chi tiết hiển thị thông tin lớp, danh sách sinh viên, giáo viên phụ trách, lịch
+T
+AC-14.07
+Lớp chưa có sinh viên hoặc lịch: vẫn hiển thị đủ khung, mỗi phần trống có hướng dẫn
+E
+AC-14.08
+Module phòng bật: lịch có phòng; tắt: ẩn phòng [CX-08]
+E
+AC-14.09
+Loading khi tải; empty state tổ chức chưa có lớp kèm nút “Tạo lớp”
+E
+AC-14.10
+Chỉ hiển thị lớp của tổ chức đang đăng nhập
+S
+AC-14.11
+Lớp Đã kết thúc hoặc Đã hủy vẫn xem và lọc được
+E
+AC-15 · FN-15 Thêm giáo viên (US 4-1)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-15.01
+Nhập đủ trường bắt buộc: lưu thành công, thông báo, hiện trong danh sách
+T
+AC-15.02
+Thiếu mã, họ tên, thông tin liên hệ hoặc chuyên môn: lỗi tại từng trường
+L
+AC-15.03
+Mã giáo viên trùng trong tổ chức: từ chối, lỗi cụ thể
+L
+AC-15.04
+Email trùng trong tổ chức: từ chối, lỗi cụ thể
+L
+AC-15.05
+Email hoặc số điện thoại sai định dạng: lỗi tại trường
+L
+AC-15.06
+Chọn nhiều chuyên môn: lưu được tất cả giá trị
+T
+AC-15.07
+Loại hợp đồng cơ hữu hoặc thỉnh giảng được lưu và hiển thị
+T
+AC-15.08
+Chuyên môn chỉ chọn từ danh mục, không nhập tự do [CX-18]
+E
+AC-15.09
+Họ tên có dấu và ký tự đặc biệt lưu đúng; khoảng trắng thừa được cắt
+E
+AC-15.10
+Nút Lưu khóa và có loading; bấm hai lần không tạo hai hồ sơ
+E
+AC-15.11
+Không có quyền: 403
+S
+AC-15.12
+Không chọn loại hợp đồng vẫn lưu được [theo D-04, chờ xác nhận]
+E
+AC-16 · FN-16 Danh sách giáo viên (US 4-2)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-16.01
+Hiển thị đúng cột: mã, họ tên, chuyên môn, loại hợp đồng, trạng thái, liên hệ
+T
+AC-16.02
+Tìm theo mã hoặc họ tên, không phân biệt dấu tiếng Việt và hoa thường
+T
+AC-16.03
+Lọc chuyên môn và trạng thái, kết hợp được
+T
+AC-16.04
+Giáo viên có nhiều chuyên môn xuất hiện khi lọc theo bất kỳ chuyên môn nào của họ
+E
+AC-16.05
+Phân trang số bản ghi cố định [CX-27]; kiểm tra biên
+E
+AC-16.06
+Không có kết quả: “Không tìm thấy giáo viên” + “Xóa bộ lọc”
+L
+AC-16.07
+Từ khóa có ký tự đặc biệt không gây lỗi truy vấn
+S
+AC-16.08
+Loading; empty state tổ chức chưa có giáo viên kèm nút “Thêm giáo viên”
+E
+AC-16.09
+Chỉ giáo viên của tổ chức đang đăng nhập
+S
+AC-16.10
+Quay lại từ chi tiết giữ nguyên bộ lọc và số trang
+E
+AC-17 · FN-17 Hồ sơ giáo viên (US 4-3)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-17.01
+Chi tiết hiển thị đủ hồ sơ và danh sách lớp đang phụ trách
+T
+AC-17.02
+Sửa họ tên, liên hệ, chuyên môn, loại hợp đồng: lưu, cập nhật ngay, có thông báo
+T
+AC-17.03
+Ghi người sửa, thời điểm và lịch sử
+T
+AC-17.04
+Dữ liệu sai định dạng: lỗi tại trường, không lưu (cùng quy tắc FN-15)
+L
+AC-17.05
+Mã giáo viên chỉ xem; gửi sửa mã qua API bị từ chối
+S
+AC-17.06
+Email mới trùng giáo viên khác: từ chối
+L
+AC-17.07
+Lưu giữ nguyên email của chính mình: không bị báo trùng
+E
+AC-17.08
+Đổi chuyên môn không làm thay đổi các lớp đang dạy
+T
+AC-17.09
+Chuyên môn mới không còn khớp lớp đang phụ trách: cảnh báo nêu tên lớp, chỉ lưu khi xác nhận [CX-19]
+E
+AC-17.10
+Hai người cùng sửa: người lưu sau nhận cảnh báo dữ liệu đã thay đổi
+E
+AC-17.11
+Rời trang khi chưa lưu: nhắc xác nhận
+E
+AC-17.12
+Nút Lưu khóa khi đang xử lý
+E
+AC-17.13
+Không có quyền sửa: 403
+S
+AC-18 · FN-18 Gán giáo viên cho lớp (US 5-3)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-18.01
+Chọn một giáo viên từ danh sách có tìm kiếm, lưu: hiển thị giáo viên phụ trách và thông báo
+T
+AC-18.02
+Chỉ giáo viên “đang dạy” xuất hiện; tạm nghỉ và nghỉ việc không xuất hiện [CX-16]
+E
+AC-18.03
+Lịch của lớp dùng giáo viên này làm mặc định (kiểm thử khi Epic 6 có)
+T
+AC-18.04
+Đổi giáo viên: buổi tương lai đổi, buổi đã diễn ra giữ nguyên
+E
+AC-18.05
+Module Phân công giáo viên bật: ô gán ẩn hoặc chỉ đọc, có hướng dẫn sang Epic 12
+E
+AC-18.06
+Module Phân công giáo viên tắt: gán trực tiếp hoạt động bình thường
+T
+AC-18.07
+Lớp Đã kết thúc hoặc Đã hủy không gán được [SUY LUẬN từ US 5-7]
+L
+AC-18.08
+Giáo viên thuộc tổ chức khác không chọn được
+S
+AC-18.09
+Không có quyền: 403
+S
+AC-18.10
+Cảnh báo trùng lịch giáo viên: ngoài phạm vi Sprint 4, không kiểm thử [CX-06]
+—
+AC-19 · FN-19 Chuyển trạng thái lớp (US 5-7)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-19.01
+Đến ngày bắt đầu: Chưa bắt đầu tự chuyển sang Đang diễn ra [CX-15]
+T
+AC-19.02
+Quá ngày kết thúc: Đang diễn ra tự chuyển sang Đã kết thúc
+T
+AC-19.03
+Giáo vụ đóng lớp thủ công sau hộp thoại xác nhận (US 5-6)
+T
+AC-19.04
+Hủy lớp: bắt buộc nhập lý do và xác nhận; thiếu lý do báo lỗi
+L
+AC-19.05
+Chưa bắt đầu hoặc Đang diễn ra chuyển sang Đã hủy thành công
+T
+AC-19.06
+Không chuyển ngược từ Đã kết thúc hoặc Đã hủy; gọi API trực tiếp bị từ chối
+S
+AC-19.07
+Mỗi lần chuyển ghi nhật ký: ai, khi nào, từ trạng thái nào sang trạng thái nào, lý do nếu có
+T
+AC-19.08
+Đóng lớp khi còn buổi học tương lai: liệt kê buổi và xử lý theo [CX-13]
+E
+AC-19.09
+Hủy lớp: sinh viên và giáo viên nhận thông báo nếu tổ chức bật email [CX-14]
+E
+AC-19.10
+Lớp Đã kết thúc hoặc Đã hủy không có trong danh sách chọn lớp khi ghi danh hoặc xếp lịch, vẫn xem và lọc được
+E
+AC-19.11
+Vai trò khác Giáo vụ và Quản trị viên tổ chức: 403
+S
+AC-19.12
+Hai người cùng đổi trạng thái: người sau nhận thông báo trạng thái đã thay đổi
+E
+AC-19.13
+Lớp tự đổi trạng thái khi đang mở màn hình sửa: lần lưu sau báo trạng thái đã đổi, không ghi đè
+E
+AC-20 · FN-20 Duyệt giáo viên tự đăng ký (US 1-7)
+Mã
+Điều kiện kiểm tra
+Loại
+AC-20.01
+Danh sách chỉ gồm giáo viên của tổ chức ở trạng thái Chờ duyệt, cột họ tên, email, ngày đăng ký
+T
+AC-20.02
+Tìm theo tên hoặc email; phân trang
+T
+AC-20.03
+Duyệt một tài khoản: chuyển Hoạt động, gửi email, đăng nhập được
+T
+AC-20.04
+Từ chối thiếu lý do: báo lỗi, không lưu
+L
+AC-20.05
+Từ chối có lý do: chuyển Bị từ chối, gửi email nêu lý do; đăng nhập báo thông báo tương ứng
+T
+AC-20.06
+Duyệt hoặc từ chối hàng loạt: hiện kết quả thành công hay thất bại từng tài khoản
+T
+AC-20.07
+Tài khoản đã bị người khác xử lý: “Tài khoản đã được xử lý”, không xử lý lại
+E
+AC-20.08
+Không có tài khoản chờ duyệt: “Không có tài khoản chờ duyệt”
+E
+AC-20.09
+Vai trò không được phép: 403
+S
+AC-20.10
+Không thấy tài khoản của tổ chức khác
+S
+AC-20.11
+Duyệt tạo hoặc liên kết hồ sơ giáo viên [CX-05, chưa thể kiểm thử]
+—
+
+Phần C. Bước 4: Rà soát tính nhất quán giữa các chương
+Hạng mục rà soát
+Kết quả
+Ghi chú
+Mã chức năng FN-01 đến FN-20 xuất hiện đồng thời ở A.1, Chương 3, 4, 6 và có nhóm AC tương ứng ở Chương 9
+Đủ 20 trên 20
+AC-01 đến AC-20 đúng ánh xạ FN-01 đến FN-20
+Mã màn hình SCR-01 đến SCR-27
+Nhất quán giữa A.1, Chương 2, 3, 4
+SCR-25, 26, 27 là màn tham chiếu, không có FN riêng
+Mỗi story trong phạm vi (16 story) có ít nhất một chức năng và một nhóm AC
+Đủ
+US 1-2 ánh xạ hai chức năng (FN-02, FN-03). US 2-1 ánh xạ FN-06 và FN-07
+Trường dữ liệu trong Chương 3 có cột tương ứng ở Chương 5
+Đủ
+organization_type, contact chờ CX-09, CX-10. Liên kết tài khoản và hồ sơ chờ CX-05
+Quyền ở Chương 3 (tác nhân) khớp ma trận Chương 6
+Khớp, có 1 điểm cần chú ý
+FN-20 ở Chương 3 ghi “vai trò được cấp quyền theo ma trận”, Chương 6 chỉ gán Quản trị viên tổ chức. Chờ CX-21
+Trạng thái lớp dùng thống nhất trong tài liệu
+Thống nhất theo US 5-7
+Canvas Sprint 3 vẫn “Chưa xếp lịch”, ghi ở D-02 và CX-12
+Điều kiện kiểm tra đồng thời ở Chương 3 và Chương 9 (thông báo, giới hạn, thời hạn)
+Khớp
+5 lần/15 phút, 60 giây, 15 phút, 24 giờ dùng cùng giá trị ở mọi nơi
+Mã CX được dùng trong tài liệu có dòng định nghĩa
+Đủ 36 trên 36
+CX-01 đến CX-27 ở Phần B, CX-28 đến CX-36 ở Phần D
+Nội dung chưa đối chiếu được
+Còn mở
+Definition of Done chung, Glossary, schema, mã nguồn, giao diện Google Stitch
+
+Phần D. Bước 5: Nội dung cần xác nhận trước khi Developer triển khai
+D.1 Điểm bổ sung (CX-28 đến CX-36)
+Mã
+Nội dung cần xác nhận
+Ảnh hưởng
+CX-28
+Gửi nội dung trang Definition of Done chung và Glossary trên Confluence để đối chiếu các yêu cầu chung (loading, 403, responsive, sửa đồng thời)
+Chương 2, 9
+CX-29
+Sinh viên thuộc nhiều lớp hoặc chưa có lớp: cột “Lớp” hiển thị như thế nào và lọc theo lớp lấy lớp nào
+FN-11
+CX-30
+Ngày bắt đầu ở quá khứ khi tạo lớp có được không và trạng thái ban đầu là gì
+FN-13, FN-19
+CX-31
+Sprint 3 chưa có ghi danh (US 5-2) và lịch (Epic 6) nên sĩ số hiện tại, danh sách sinh viên và lịch của lớp luôn trống. Tester dùng dữ liệu mẫu như thế nào
+FN-14
+CX-32
+Email đăng nhập duy nhất toàn nền tảng hay theo từng tổ chức (form đăng nhập chỉ có email, không có ô tổ chức)
+FN-01, FN-02
+CX-33
+Giáo viên, Sinh viên, Nhân viên có được xem danh sách sinh viên, giáo viên, lớp không (Jira chỉ giao cho Giáo vụ)
+Chương 6
+CX-34
+Gửi schema cơ sở dữ liệu hiện tại để đối chiếu Chương 5
+Chương 5
+CX-35
+Ngưỡng hiệu năng cụ thể (mili giây, số bản ghi) cho danh sách
+Chương 7, AC-11.11
+CX-36
+Trình duyệt, thiết bị và độ phân giải phải hỗ trợ
+Chương 7
+D.2 Thứ tự cần chốt
+Tổng cộng 36 điểm. Chia theo thời điểm cần có câu trả lời:
+Nhóm
+Các điểm
+Lý do
+Phải chốt trước khi code Sprint 4
+CX-04, CX-05, CX-12, CX-16, CX-18, CX-20, CX-13, CX-15
+Chặn FN-07, FN-15, FN-18, FN-19, FN-20 hoặc làm đổi enum, quan hệ dữ liệu
+Chốt trước khi viết test case
+CX-26, CX-27, CX-29, CX-30, CX-31, CX-33, CX-35
+Đổi kết quả mong đợi của kiểm thử
+Chốt song song, không chặn
+CX-01, CX-02, CX-03, CX-06, CX-07, CX-08, CX-09, CX-10, CX-11, CX-14, CX-17, CX-19, CX-21, CX-22, CX-23, CX-24, CX-25, CX-28, CX-32, CX-34, CX-36
+Ảnh hưởng phạm vi ngoài Sprint 4 hoặc có giá trị tạm để tiếp tục
+Hai việc làm thêm (không phải câu hỏi): gửi ảnh chụp hoặc file export Google Stitch để thực hiện đánh giá UI/UX; sửa canvas theo D-01 đến D-10.
+
+Phần E. Bảng câu hỏi cần nhóm trả lời
+Đây là bản hỏi đáp rút gọn của 36 điểm CX. Mỗi dòng là một câu hỏi có phương án để chọn. Cột “Nếu chưa trả lời” là cách SRS đang viết tạm, không phải quyết định. Cột “Trả lời của nhóm” để trống cho nhóm điền. Mã câu hỏi trùng mã CX ở Phần B và D.
+E.1 Phải chốt trước khi code Sprint 4
+Mã
+Câu hỏi
+Lựa chọn
+Nếu chưa trả lời
+Trả lời của nhóm
+CX-04
+Tài khoản do quản trị tạo được kích hoạt thế nào?
+A: gửi mật khẩu tạm, bắt buộc đổi ở lần đăng nhập đầu. B: gửi link kích hoạt để tự đặt mật khẩu
+Viết theo A (ghi chú US 2-1)
+
+CX-05
+Hồ sơ sinh viên, giáo viên có liên kết với tài khoản đăng nhập không? Khi duyệt giáo viên (US 1-7) thì làm gì với hồ sơ?
+A: tạo hồ sơ khi duyệt. B: liên kết hồ sơ có sẵn do Giáo vụ nhập. C: tách rời, không liên kết
+Viết theo C
+
+CX-12
+Trạng thái ban đầu của lớp mới là gì?
+A: “Chưa bắt đầu” (4 trạng thái của US 5-7), “Chưa xếp lịch” chỉ là nhãn phụ. B: thêm “Chưa xếp lịch” thành trạng thái thứ năm
+Viết theo A
+
+CX-13
+Đóng lớp khi còn buổi học tương lai thì sao?
+A: hủy các buổi còn lại rồi đóng. B: chặn, bắt xử lý buổi trước
+Nêu cả hai phương án
+
+CX-15
+Lớp tự chuyển trạng thái bằng cách nào? Dùng múi giờ nào?
+A: job chạy mỗi ngày. B: kiểm tra khi có người truy cập. Múi giờ cố định hay theo tổ chức
+Chưa chọn
+
+CX-16
+Giáo viên mới tạo ở trạng thái gì và đổi trạng thái ở đâu (US 4-4 ngoài phạm vi)?
+Mặc định “đang dạy”; đưa US 4-4 vào Sprint 4 hay để sau
+Mặc định “đang dạy”
+
+CX-18
+Chuyên môn (giáo viên) và môn học (lớp) lấy từ đâu?
+A: làm danh mục dùng chung (US 2-8) trước. B: nhập tự do tạm thời
+Chọn từ danh mục, chưa nêu nguồn
+
+CX-20
+Gán giáo viên trực tiếp (US 5-3) và phân công giáo viên (Epic 12) dùng chung dữ liệu hay tách riêng?
+A: dùng chung. B: tách riêng
+Một bảng gán lớp và giáo viên
+
+E.2 Chốt trước khi viết test case
+Mã
+Câu hỏi
+Lựa chọn
+Nếu chưa trả lời
+Trả lời của nhóm
+CX-26
+Thông tin liên hệ sinh viên: bắt buộc cả email lẫn số điện thoại hay một trong hai? Email sinh viên có phải duy nhất?
+A: cả hai. B: một trong hai. Email duy nhất: có hay không
+Cả hai bắt buộc, email không cần duy nhất
+
+CX-27
+Mỗi trang danh sách hiển thị bao nhiêu bản ghi?
+Số cố định (Jira ghi ví dụ 20)
+20
+
+CX-29
+Sinh viên thuộc nhiều lớp hoặc chưa có lớp: cột “Lớp” hiển thị gì? Lọc theo lớp tính như thế nào?
+A: liệt kê mọi lớp. B: chỉ lớp đang học. Bỏ trống hay ghi “—” khi chưa có lớp
+Chưa chọn
+
+CX-30
+Tạo lớp có ngày bắt đầu trong quá khứ được không? Nếu được thì lớp vào trạng thái nào?
+A: không cho. B: cho, vào “Đang diễn ra” ngay
+Chưa chọn
+
+CX-31
+Sprint 3 chưa có ghi danh (US 5-2) và lịch (Epic 6). Tester dùng dữ liệu mẫu gì cho sĩ số, danh sách sinh viên, lịch của lớp?
+A: nhập dữ liệu trực tiếp vào DB. B: làm US 5-2 sớm
+Ghi rõ phần này chỉ có khung, chưa có dữ liệu thật
+
+CX-33
+Giáo viên, Sinh viên, Nhân viên có được xem danh sách sinh viên, giáo viên, lớp không?
+A: không. B: có, chỉ đọc
+A (chỉ Giáo vụ và Quản trị viên tổ chức)
+
+CX-35
+Ngưỡng hiệu năng danh sách là bao nhiêu?
+Ví dụ: dưới 2 giây với 5.000 bản ghi
+Chưa có con số
+
+E.3 Chốt song song, không chặn
+Mã
+Câu hỏi
+Lựa chọn
+Nếu chưa trả lời
+Trả lời của nhóm
+CX-01
+Mỗi tài khoản có một hay nhiều vai trò?
+A: một. B: nhiều
+Viết trung lập
+
+CX-02
+Giáo vụ có thuộc module Nhân viên không?
+A: vai trò độc lập. B: một loại Nhân viên
+Vai trò độc lập, chưa quy định cách tạo
+
+CX-03
+“Nhân viên cơ sở vật chất” là vai trò riêng hay chức danh của Nhân viên?
+A: vai trò riêng. B: chức danh
+Dùng 6 vai trò
+
+CX-06
+Trùng lịch giáo viên: chặn hay cảnh báo?
+A: chặn. B: cảnh báo, có thể vượt
+Không kiểm tra trùng lịch ở Sprint 4
+
+CX-07
+Tên chính thức của 4 module Core là gì?
+Sinh viên, Giáo viên, Lớp học, Lịch học, hoặc tên khác
+Dùng 4 tên này
+
+CX-08
+Module nào điều khiển việc hiển thị cột Phòng?
+A: Phòng học. B: Sử dụng phòng. C: cả hai
+Ghi “module phòng”
+
+CX-09
+Mã tổ chức do ai đặt?
+A: Quản trị viên hệ thống nhập, duy nhất. B: hệ thống tự sinh
+A
+
+CX-10
+Loại hình tổ chức là danh sách cố định hay nhập tự do? Thông tin liên hệ gồm những trường nào?
+Danh sách cố định. Email, số điện thoại, địa chỉ
+Danh sách cố định, email và số điện thoại
+
+CX-11
+Tắt module phòng cuối cùng khi Thiết bị hoặc Sử dụng phòng đang bật thì sao?
+A: chặn. B: tắt kéo theo kèm xác nhận
+Không chọn (US 2-3)
+
+CX-14
+Hủy lớp có hủy các buổi học (Epic 6) và gửi thông báo email (cấu hình ngoài phạm vi) trong Sprint 4 không?
+Có hay để sau
+Để sau, chỉ ghi giao diện
+
+CX-17
+Sinh viên mới tạo ở trạng thái gì?
+Đang học, hoặc trạng thái khác
+Đang học
+
+CX-19
+“Khớp chuyên môn” giữa giáo viên và môn học được xác định thế nào?
+Theo tên môn, theo mã môn, theo nhóm
+Chưa chốt quy tắc
+
+CX-21
+“Giáo vụ (hoặc cao hơn)” gồm vai trò nào?
+Giáo vụ và Quản trị viên tổ chức, hoặc chỉ Giáo vụ
+Giáo vụ và Quản trị viên tổ chức
+
+CX-22
+Sau đăng nhập, mỗi vai trò vào trang nào?
+Danh sách trang đích theo vai trò
+Chưa quy định
+
+CX-23
+Thời hạn “Ghi nhớ tôi”, refresh token và mật khẩu tạm là bao lâu?
+Số ngày hoặc giờ
+Đặt trong cấu hình, chưa có giá trị
+
+CX-24
+Có cho xóa sinh viên, giáo viên, lớp không?
+A: không xóa. B: xóa mềm khi chưa có dữ liệu liên quan
+Không có chức năng Delete
+
+CX-25
+Đưa Danh sách tổ chức (US 2-6), Đăng xuất và Đổi mật khẩu khi đăng nhập (US 1-8) vào sprint nào?
+Sprint 2, 4 hoặc để sau
+Màn tham chiếu
+
+CX-28
+Gửi nội dung Definition of Done chung và Glossary được không?
+Gửi dạng văn bản
+Không đối chiếu
+
+CX-32
+Email đăng nhập duy nhất toàn nền tảng hay theo từng tổ chức?
+A: toàn nền tảng. B: theo tổ chức, thêm ô tổ chức khi đăng nhập
+A
+
+CX-34
+Gửi schema cơ sở dữ liệu hiện tại được không?
+Gửi danh sách bảng và cột
+Chương 5 chỉ là đề xuất
+
+CX-36
+Trình duyệt và thiết bị nào phải hỗ trợ?
+Danh sách phiên bản tối thiểu
+Chưa quy định
+
+E.4 Việc chưa làm và cập nhật gần nhất
+Chưa làm: đánh giá UI/UX giao diện Google Stitch (Giai đoạn 1 đến 3 của yêu cầu gốc). Cần ảnh chụp hoặc file export của dự án.
+Đã sửa trên canvas: D-01 (thêm trạng thái “Tốt nghiệp”), D-04 (loại hợp đồng không bắt buộc), D-05 (màn các trạng thái chặn đăng nhập), D-06 (trạng thái trống của danh sách chờ duyệt), D-10 (bỏ cột Trạng thái thừa). Còn mở: D-02, D-03, D-07, D-08, D-09 (chờ trả lời câu hỏi ở trên).
+Đã đổi câu chữ cho người dùng không chuyên môn: trang 403 (SCR-25). Nguyên tắc áp dụng cho các trang lỗi, xem mục 2.1.
