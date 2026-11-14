@@ -7,6 +7,8 @@ import AdminGuard from './components/AdminGuard/AdminGuard';
 import DocumentTitle from './components/DocumentTitle/DocumentTitle';
 import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayout';
 import OwnerGuard from './components/OwnerGuard/OwnerGuard';
+import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
+import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
@@ -52,6 +54,10 @@ const DepartmentDetailPage = lazy(
   () => import('./pages/DepartmentDetailPage/DepartmentDetailPage'),
 );
 const PositionsPage = lazy(() => import('./pages/PositionsPage/PositionsPage'));
+const TeachersPage = lazy(() => import('./pages/TeachersPage/TeachersPage'));
+const TeacherDetailPage = lazy(() => import('./pages/TeacherDetailPage/TeacherDetailPage'));
+const ClassesPage = lazy(() => import('./pages/ClassesPage/ClassesPage'));
+const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPage'));
 
 /** Màn chờ trong lúc tải chunk của route — chữ kết bằng "…" (quy ước loading). */
 function RouteFallback() {
@@ -190,6 +196,28 @@ export const routes: RouteObject[] = [
             element: <DepartmentDetailPage />,
             handle: { title: 'Chi tiết phòng ban' },
           },
+        ],
+      },
+      {
+        // Sprint 4 (option B): khu vực Đào tạo — quyền theo PEOPLE_*/CLASS_* (và OWNER).
+        // `/to-chuc` Owner Console giữ nguyên.
+        path: 'dao-tao',
+        element: (
+          <AcademicGuard>
+            <AcademicConsoleLayout />
+          </AcademicGuard>
+        ),
+        handle: { title: 'Đào tạo' },
+        children: [
+          { index: true, element: <Navigate to="giao-vien" replace /> },
+          { path: 'giao-vien', element: <TeachersPage />, handle: { title: 'Giáo viên' } },
+          {
+            path: 'giao-vien/:id',
+            element: <TeacherDetailPage />,
+            handle: { title: 'Chi tiết giáo viên' },
+          },
+          { path: 'lop-hoc', element: <ClassesPage />, handle: { title: 'Lớp học' } },
+          { path: 'lop-hoc/:id', element: <ClassDetailPage />, handle: { title: 'Chi tiết lớp học' } },
         ],
       },
       { path: '*', element: <NotFoundPage />, handle: { title: 'Không tìm thấy trang' } },

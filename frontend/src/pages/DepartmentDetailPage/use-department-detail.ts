@@ -25,7 +25,8 @@ export function useDepartmentDetail(departmentId: string) {
   );
 
   const isMissing = departments.isSuccess && department === null;
-  const isLoading = departments.isLoading;
+  const isLoading = departments.isPending;
+  const departmentsError = departments.isError;
 
   const members = useQuery({
     queryKey: ownerKeys.members(departmentId),
@@ -63,6 +64,8 @@ export function useDepartmentDetail(departmentId: string) {
     department,
     isLoading,
     isMissing,
+    departmentsError,
+    refetchDepartments: departments.refetch,
     members,
     positions,
     create,

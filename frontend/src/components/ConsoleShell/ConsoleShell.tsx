@@ -1,10 +1,11 @@
-import { Button, Drawer, Layout, Space, Typography, theme } from 'antd';
+import { Button, Drawer, Flex, Layout, Space, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import type { ConsoleMenuItem } from '../../features/admin/consoleMenu';
 import { logout } from '../../features/auth/authApi';
 import { useAuthStore } from '../../stores/authStore';
+import { typeScale } from '../../theme';
 import ConsoleMenu from '../ConsoleMenu/ConsoleMenu';
 import { useMediaQuery } from './use-media-query';
 
@@ -29,9 +30,6 @@ const visuallyHidden: CSSProperties = {
 
 /**
  * Skip link: chỉ hiện khi nhận focus bằng bàn phím (`WCAG 2.4.1`).
- *
- * Toàn bộ chrome console (hamburger + menu + nút đăng xuất) nằm phía trước
- * nội dung → bàn phím phải Tab qua tất cả mới tới nội dung trang. Dùng
  * `position: fixed` để link vẫn thấy được khi trang đã cuộn.
  */
 function SkipLink() {
@@ -51,7 +49,7 @@ function SkipLink() {
     borderStyle: 'solid',
     borderColor: token.colorPrimary,
     borderRadius: token.borderRadius,
-    boxShadow: token.boxShadow,
+    boxShadow: token.boxShadowSecondary,
     fontWeight: token.fontWeightStrong,
     textDecoration: 'none',
   };
@@ -68,23 +66,35 @@ function SkipLink() {
   );
 }
 
-/** Độ rộng của `Sider` trên desktop — khớp breakpoint `lg` (1024px) của antd. */
-const SIDEBAR_WIDTH = 240;
-/** Chiều rộng `Drawer` trên mobile. */
-const DRAWER_WIDTH = 280;
+/** Độ rộng `Sider` desktop — khớp breakpoint `lg` (1024px) của antd. */
+const SIDEBAR_WIDTH = 248;
+/** Chiều rộng `Drawer` mobile. */
+const DRAWER_WIDTH = 300;
+/** Chiều cao header — khớp `Layout.headerHeight` trong `theme.ts`. */
+const HEADER_HEIGHT = 56;
 
 /**
- * Icon "hamburger" — vẽ bằng SVG thuần.
- *
- * Không import `@ant-design/icons`: package đó KHÔNG có trong `package.json`
- * (chỉ là dependency gián tiếp của antd) → thêm icon từ đó là thêm dependency
- * không khai báo. SVG 3 nét này không tốn thêm gì và antd chỉ cần một ReactNode.
+ * Dấu hiệu nhận diện: 4 ô module (MEMS = quản lý giáo dục **theo module**).
+ * Bốn ô cùng một hình, khác độ đậm — đọc được cả khi in đen trắng.
  */
-const hamburgerIcon: CSSProperties = {
-  display: 'block',
-  // Kích thước khớp `font-size` mặc định của nút antd để icon thẳng hàng với chữ.
-  fontSize: 16,
-};
+function BrandMark() {
+  const { token } = theme.useToken();
+  return (
+    <svg
+      viewBox="0 0 22 22"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      focusable="false"
+      style={{ display: 'block', flex: 'none' }}
+    >
+      <rect x="1" y="1" width="9" height="9" rx="2" fill={token.colorPrimary} />
+      <rect x="12" y="1" width="9" height="9" rx="2" fill={token.colorPrimary} opacity="0.4" />
+      <rect x="1" y="12" width="9" height="9" rx="2" fill={token.colorPrimary} opacity="0.4" />
+      <rect x="12" y="12" width="9" height="9" rx="2" fill={token.colorPrimary} />
+    </svg>
+  );
+}
 
 function MenuIcon() {
   return (
@@ -94,11 +104,11 @@ function MenuIcon() {
       height="1em"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.8"
       strokeLinecap="round"
       aria-hidden="true"
       focusable="false"
-      style={hamburgerIcon}
+      style={{ display: 'block', fontSize: 18 }}
     >
       <path d="M2 4h12M2 8h12M2 12h12" />
     </svg>
@@ -106,8 +116,10 @@ function MenuIcon() {
 }
 
 interface ConsoleShellProps {
-  /** Tên khu vực hiện trên header và trên Drawer (vd "Khu vực tổ chức"). */
+  /** Tên khu vực/module hiện trên header và Drawer (vd "Khu vực tổ chức"). */
   title: string;
+  /** Định danh sản phẩm trên thanh app (mặc định MEMS). */
+  productName?: string;
   /** `aria-label` của `nav` chứa menu. */
   menuAriaLabel: string;
   /** `aria-label` của nút hamburger ở màn hình nhỏ. */
@@ -121,17 +133,17 @@ interface ConsoleShellProps {
 }
 
 /**
- * Khung console dùng chung cho mọi khu vực quản trị (Super Admin, Owner).
+ * Khung console dùng chung (Layer 1, kiểu Odoo): header app nổi bật mang định danh
+ * MEMS + ngữ cảnh khu vực/module + phiên người dùng + đăng xuất; điều hướng bên
+ * (desktop Sider ≥1024px, mobile Drawer <1024px) dùng chung `ConsoleMenu`.
  *
- * Đặc tả "Sprint 2 — Mở rộng console" §5.2 (`Q-28` = A):
- * - **≥1024px**: `Sider` cố định bên trái, nội dung ở giữa/phải.
- * - **<1024px**: `Sider` bị ẩn (`collapsedWidth={0}`), hiện nút hamburger mở `Drawer`.
- *
- * Chỉ phần *khung* ở đây; menu truyền vào qua `items` nên mỗi console tự khai
- * báo mục của mình mà không phải copy layout.
+ * Giữ hành vi/cấu trúc: skip link (WCAG 2.4.1), `#noi-dung-chinh`, logout gọi API
+ * rồi xoá phiên + chuyển `/dang-nhap` kể cả khi API lỗi, `aria-label`/`aria-current`,
+ * responsive, render `<Outlet/>`. Không đổi route/guard/IA.
  */
 export default function ConsoleShell({
   title,
+  productName = 'MEMS',
   menuAriaLabel,
   openMenuLabel,
   logoutLabel,
@@ -145,8 +157,7 @@ export default function ConsoleShell({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Phải khớp breakpoint `lg` của antd — nếu lệch thì Sider ẩn mà nút hamburger
-  // vẫn hiện (hoặc ngược lại) ở đúng mốc 1024px.
+  // Khớp breakpoint `lg` (1024px) của antd.
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const handleLogout = async () => {
@@ -172,17 +183,19 @@ export default function ConsoleShell({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexWrap: 'wrap',
           gap: token.marginSM,
-          height: 'auto',
-          paddingBlock: token.paddingSM,
-          paddingInline: token.padding,
+          height: HEADER_HEIGHT,
+          paddingInline: token.paddingLG,
           background: token.colorBgContainer,
+          color: token.colorText,
+          lineHeight: 'normal',
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
         }}
       >
-        <Space size={token.marginSM}>
-          {/* Chỉ hiện ở <1024px — antd tự ẩn Sider ở đúng mốc đó. */}
+        <Space size={token.marginSM} style={{ minWidth: 0 }}>
           {!isDesktop && (
             <Button
               type="text"
@@ -190,18 +203,58 @@ export default function ConsoleShell({
               aria-label={openMenuLabel}
               aria-expanded={isDrawerOpen}
               onClick={() => setIsDrawerOpen(true)}
+              style={{ color: token.colorText, marginInlineStart: -8 }}
             />
           )}
-          {/* Không dùng `Title`: đây là tên khu vực, không phải tiêu đề trang —
-              nếu là heading thì trang sẽ có `<h1>` giả trước `<h1>` thật. */}
-          <Text strong style={{ fontSize: token.fontSizeLG }}>
-            {title}
-          </Text>
+          <Flex align="center" gap={10} style={{ minWidth: 0 }}>
+            <BrandMark />
+            <Text
+              strong
+              style={{
+                color: token.colorTextHeading,
+                fontSize: typeScale.section,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {productName}
+            </Text>
+            <span
+              aria-hidden="true"
+              style={{
+                width: 1,
+                height: 16,
+                background: token.colorBorderSecondary,
+                display: isDesktop ? 'block' : 'none',
+              }}
+            />
+            {/* Tên khu vực/module — không dùng H1 (H1 thuộc trang con). */}
+            <Text
+              style={{
+                color: token.colorTextSecondary,
+                fontSize: typeScale.body,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {title}
+            </Text>
+          </Flex>
         </Space>
 
         <Space size={token.marginSM}>
-          {username && <Text>{username}</Text>}
-          <Button onClick={handleLogout} loading={isLoggingOut}>
+          {username && (
+            <Text
+              style={{
+                color: token.colorTextSecondary,
+                fontSize: typeScale.caption,
+                display: isDesktop ? 'inline' : 'none',
+              }}
+            >
+              {username}
+            </Text>
+          )}
+          <Button size="small" onClick={handleLogout} loading={isLoggingOut}>
             {logoutLabel}
           </Button>
         </Space>
@@ -217,18 +270,28 @@ export default function ConsoleShell({
             background: token.colorBgContainer,
             borderInlineEnd: `1px solid ${token.colorBorderSecondary}`,
             position: 'sticky',
-            top: 0,
-            height: '100vh',
+            top: HEADER_HEIGHT,
+            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+            overflowY: 'auto',
           }}
         >
-          <ConsoleMenu
-            items={items}
-            menuAriaLabel={menuAriaLabel}
-            selectedKey={selectedKey}
-          />
+          <div style={{ paddingBlock: token.paddingXS }}>
+            <ConsoleMenu
+              items={items}
+              menuAriaLabel={menuAriaLabel}
+              selectedKey={selectedKey}
+            />
+          </div>
         </Sider>
 
-        <Content id={MAIN_CONTENT_ID} tabIndex={-1} style={{ padding: token.padding }}>
+        <Content
+          id={MAIN_CONTENT_ID}
+          tabIndex={-1}
+          style={{
+            padding: isDesktop ? token.paddingXL : token.paddingLG,
+            minWidth: 0,
+          }}
+        >
           <Outlet />
         </Content>
       </Layout>
@@ -239,7 +302,7 @@ export default function ConsoleShell({
         placement="left"
         width={DRAWER_WIDTH}
         title={title}
-        styles={{ body: { padding: 0 } }}
+        styles={{ body: { padding: 0 }, header: { borderBottom: `1px solid ${token.colorBorderSecondary}` } }}
       >
         <ConsoleMenu
           items={items}

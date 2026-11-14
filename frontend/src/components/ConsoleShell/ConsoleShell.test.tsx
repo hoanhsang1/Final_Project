@@ -122,4 +122,10 @@ describe('ConsoleShell', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/dang-nhap'));
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
+
+  it('shows app/product identity in the Odoo-style header', () => {
+    renderShell();
+    expect(screen.getByText(/^MEMS$/i)).toBeInTheDocument();
+    expect(screen.getByText('Khu vực tổ chức')).toBeInTheDocument();
+  });
 });

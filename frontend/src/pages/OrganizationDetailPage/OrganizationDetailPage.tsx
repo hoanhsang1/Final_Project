@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   App,
-  Breadcrumb,
   Button,
   Card,
   Descriptions,
@@ -12,13 +11,13 @@ import {
   Skeleton,
   Table,
   Tag,
-  Typography,
   theme,
 } from 'antd';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import {
   AdminApiError,
@@ -41,8 +40,6 @@ import ApproveOrganizationModal from './ApproveOrganizationModal';
 import ModuleConfigPanel from './ModuleConfigPanel';
 import RejectOrganizationModal from './RejectOrganizationModal';
 import { useOrganizationDetail } from './use-organization-detail';
-
-const { Title } = Typography;
 
 /** Giá trị hiển thị khi BE chưa trả dữ liệu — không để trống trơn, không hiện `undefined` (`TC-ORG-25`). */
 const EMPTY_VALUE = '—';
@@ -233,11 +230,69 @@ export default function OrganizationDetailPage() {
 
   return (
     <Flex vertical gap={token.marginLG}>
-      <Breadcrumb
-        items={[
-          { title: <Link to={backPath}>{MSG_ORG.LIST_TITLE}</Link> },
-          { title: organization.name },
-        ]}
+      <PageHeader
+        breadcrumb={[{ title: MSG_ORG.LIST_TITLE, href: backPath }, { title: organization.name }]}
+        title={organization.name}
+        extra={
+          <Flex align="center" gap={token.marginSM} wrap>
+            <Tag color={orgStatus.color}>{orgStatus.label}</Tag>
+            {isPendingOrg ? (
+              <>
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    setActionError(null);
+                    setApproveOpen(true);
+                  }}
+                >
+                  {MSG_ORG.APPROVE_TITLE}
+                </Button>
+                <Button
+                  danger
+                  onClick={() => {
+                    setActionError(null);
+                    setRejectOpen(true);
+                  }}
+                >
+                  {MSG_ORG.REJECT_TITLE}
+                </Button>
+              </>
+            ) : (
+              <>
+                {/* Trạng thái KHÔNG phải pending → nói rõ "đã được xử lý" (e2e cũ assert câu này),
+                    kèm nút đổi trạng thái theo ma trận đặc tả §3.3. */}
+                <Alert type="info" showIcon message={MSG_ORG.ALREADY_REVIEWED} />
+                {/* `C1` — `BR-04`: chữ là "Vô hiệu hoá", không phải "Xoá". */}
+                {nextSuspendAction && (
+                  <Button
+                    danger={nextSuspendAction === 'suspend'}
+                    onClick={() => {
+                      setActionError(null);
+                      setSuspendAction(nextSuspendAction);
+                    }}
+                    aria-label={`${nextSuspendLabel} tổ chức ${organization.name}`}
+                  >
+                    {nextSuspendLabel}
+                  </Button>
+                )}
+                {currentStatus === 'rejected' && (
+                  // `Q-18`: BE chưa cho duyệt lại tổ chức đã từ chối → nút tạm khoá,
+                  // hiện rõ lý do thay vì ẩn đi (người dùng tự hỏi đi đâu mất).
+                  <Button disabled title={MSG_ORG.REAPPROVE_DISABLED}>
+                    {MSG_ORG.APPROVE_TITLE}
+                  </Button>
+                )}
+              </>
+            )}
+            <Button
+              type="link"
+              onClick={() => navigate(`/quan-tri/to-chuc/${organization.id}/lich-su?from=to-chuc`)}
+            >
+              {MSG_ORG.HISTORY}
+            </Button>
+            <Link to={backPath}>{MSG_ORG.BACK_TO_LIST}</Link>
+          </Flex>
+        }
       />
 
       {/* Lỗi thao tác — hiện ở đây CHỈ KHI không có modal nào đang mở (modal đã
@@ -245,73 +300,6 @@ export default function OrganizationDetailPage() {
       {actionError && !isAnyModalOpen && (
         <Alert type="error" showIcon role="alert" message={actionError} />
       )}
-
-      <Flex justify="space-between" align="center" wrap gap={token.margin}>
-        <Flex align="center" gap={token.marginSM} wrap>
-          <Title level={1} style={{ margin: 0 }}>
-            {organization.name}
-          </Title>
-          <Tag color={orgStatus.color}>{orgStatus.label}</Tag>
-        </Flex>
-
-        <Flex align="center" gap={token.marginSM} wrap>
-          {isPendingOrg ? (
-            <>
-              <Button
-                type="primary"
-                onClick={() => {
-                  setActionError(null);
-                  setApproveOpen(true);
-                }}
-              >
-                {MSG_ORG.APPROVE_TITLE}
-              </Button>
-              <Button
-                danger
-                onClick={() => {
-                  setActionError(null);
-                  setRejectOpen(true);
-                }}
-              >
-                {MSG_ORG.REJECT_TITLE}
-              </Button>
-            </>
-          ) : (
-            <>
-              {/* Trạng thái KHÔNG phải pending → nói rõ "đã được xử lý" (e2e cũ assert câu này),
-                  kèm nút đổi trạng thái theo ma trận đặc tả §3.3. */}
-              <Alert type="info" showIcon message={MSG_ORG.ALREADY_REVIEWED} />
-              {/* `C1` — `BR-04`: chữ là "Vô hiệu hoá", không phải "Xoá". */}
-              {nextSuspendAction && (
-                <Button
-                  danger={nextSuspendAction === 'suspend'}
-                  onClick={() => {
-                    setActionError(null);
-                    setSuspendAction(nextSuspendAction);
-                  }}
-                  aria-label={`${nextSuspendLabel} tổ chức ${organization.name}`}
-                >
-                  {nextSuspendLabel}
-                </Button>
-              )}
-              {currentStatus === 'rejected' && (
-                // `Q-18`: BE chưa cho duyệt lại tổ chức đã từ chối → nút tạm khoá,
-                // hiện rõ lý do thay vì ẩn đi (người dùng tự hỏi đi đâu mất).
-                <Button disabled title={MSG_ORG.REAPPROVE_DISABLED}>
-                  {MSG_ORG.APPROVE_TITLE}
-                </Button>
-              )}
-            </>
-          )}
-          <Button
-            type="link"
-            onClick={() => navigate(`/quan-tri/to-chuc/${organization.id}/lich-su?from=to-chuc`)}
-          >
-            {MSG_ORG.HISTORY}
-          </Button>
-          <Link to={backPath}>{MSG_ORG.BACK_TO_LIST}</Link>
-        </Flex>
-      </Flex>
 
       {/* Khối 1 — Thông tin tổ chức */}
       <Card title={MSG_ORG.INFO}>

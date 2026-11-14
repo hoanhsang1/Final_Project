@@ -1,18 +1,19 @@
-import { App, Button, Empty, Flex, Popconfirm, Result, Space, Table, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Popconfirm, Result, Skeleton, Space, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import MemberFormModal from '../../components/MemberFormModal/MemberFormModal';
 import MemberPositionsModal from '../../components/MemberPositionsModal/MemberPositionsModal';
 import TempPasswordModal from '../../components/TempPasswordModal/TempPasswordModal';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
-import { MSG_MEM, MSG_OWNER } from '../../features/owner/ownerMessages';
+import { MSG_DEPT, MSG_MEM, MSG_OWNER } from '../../features/owner/ownerMessages';
 import { roleLabel } from '../../features/admin/roleLabels';
 import type { CreatedMember, Member, MemberPayload } from '../../features/owner/types';
 import { useDepartmentDetail } from './use-department-detail';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const EMPTY_VALUE = '—';
 
@@ -31,8 +32,18 @@ export default function DepartmentDetailPage() {
   const { token } = theme.useToken();
   const { message } = App.useApp();
 
-  const { department, isLoading, isMissing, members, positions, create, updatePositions, remove } =
-    useDepartmentDetail(id);
+  const {
+    department,
+    isLoading,
+    isMissing,
+    departmentsError,
+    refetchDepartments,
+    members,
+    positions,
+    create,
+    updatePositions,
+    remove,
+  } = useDepartmentDetail(id);
 
   const [addOpen, setAddOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -149,7 +160,26 @@ export default function DepartmentDetailPage() {
   ];
 
   if (isLoading) {
-    return <div>Đang tải...</div>;
+    return <Skeleton active paragraph={{ rows: 6 }} />;
+  }
+
+  if (departmentsError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        role="alert"
+        message={MSG_DEPT.LOAD_ERROR}
+        action={
+          <Space>
+            <Button onClick={() => void refetchDepartments()}>{MSG_OWNER.RETRY}</Button>
+            <Button type="primary" onClick={() => navigate('/to-chuc')}>
+              {MSG_MEM.BACK}
+            </Button>
+          </Space>
+        }
+      />
+    );
   }
 
   if (isMissing || !department) {
@@ -171,42 +201,48 @@ export default function DepartmentDetailPage() {
   const isEmpty = members.isSuccess && data.length === 0;
 
   return (
-    <div>
-      <Flex justify="space-between" align="flex-start" gap={token.margin} wrap>
-        <div>
-          <Title level={2} style={{ marginBottom: token.marginXS }}>
-            {department.name}
-          </Title>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {department.description || EMPTY_VALUE}
-          </Paragraph>
-        </div>
-        <Space>
-          <Button onClick={() => navigate('/to-chuc')}>{MSG_MEM.BACK}</Button>
+    <Flex vertical gap={token.marginMD}>
+      <PageHeader
+        breadcrumb={[{ title: 'Tổ chức', href: '/to-chuc' }, { title: department.name }]}
+        title={department.name}
+        subtitle={department.description || EMPTY_VALUE}
+        extra={
           <Button type="primary" onClick={() => setAddOpen(true)}>
             {MSG_MEM.ADD}
           </Button>
-        </Space>
-      </Flex>
+        }
+      />
 
       {actionError && (
-        <div style={{ marginTop: token.margin }}>
-          <Text type="danger">{actionError}</Text>
-        </div>
+        <Alert type="error" showIcon role="alert" message={actionError} />
       )}
 
-      {isEmpty && (
-        <Empty description={<Text type="secondary">{MSG_MEM.EMPTY}</Text>} style={{ marginTop: token.marginLG }} />
+      {members.isError && (
+        <Alert
+          type="error"
+          showIcon
+          role="alert"
+          message={MSG_MEM.LOAD_ERROR}
+          action={<Button onClick={() => void members.refetch()}>{MSG_OWNER.RETRY}</Button>}
+        />
       )}
 
-      {!isEmpty && (
+      {isEmpty && !members.isError && (
+        <Empty description={<Text type="secondary">{MSG_MEM.EMPTY}</Text>} style={{ marginTop: token.marginLG }}>
+          <Button type="primary" onClick={() => setAddOpen(true)}>
+            {MSG_MEM.ADD}
+          </Button>
+        </Empty>
+      )}
+
+      {!isEmpty && !members.isError && (
         <Table<Member>
           rowKey="userId"
           columns={columns}
           dataSource={data}
           loading={members.isPending}
-          style={{ marginTop: token.margin }}
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
+          pagination={{ pageSize: 20, showSizeChanger: false, hideOnSinglePage: true }}
+          size="middle"
         />
       )}
 
@@ -243,6 +279,6 @@ export default function DepartmentDetailPage() {
           setTempData(null);
         }}
       />
-    </div>
+    </Flex>
   );
 }

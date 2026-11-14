@@ -3,12 +3,17 @@ import { clearTokens, getAccessToken, setTokens } from '../lib/api';
 import type { LoginResponse } from '../features/auth/types';
 import type { RoleId } from '../features/auth/roles';
 import { mapBackendRole } from '../features/auth/backendRoles';
-import { decodeJwtClaims, isTokenExpired, normalizeRoles } from '../features/auth/jwt';
+import {
+  decodeJwtClaims,
+  isTokenExpired,
+  normalizePermissions,
+  normalizeRoles,
+} from '../features/auth/jwt';
 
 /**
  * Phiên đăng nhập phía client (Zustand — client state).
  *
- * Chỉ giữ những thứ UI cần để hiển thị/điều hướng: ai đang đăng nhập, vai trò nào.
+ * Chỉ giữ những thứ UI cần để hiển thị/điều hướng: ai đang đăng nhập, vai trò/quyền nào.
  * KHÔNG nhét dữ liệu server vào đây (server state → TanStack Query).
  *
  * Token thật nằm ở localStorage (ADR-FE-003) để sống sót qua reload trang;
@@ -27,6 +32,8 @@ interface AuthSession {
    * `backendRoles.includes('SUPER_ADMIN')`.
    */
   backendRoles: string[];
+  /** Quyền (permissions) từ JWT — dùng cho phân quyền nghiệp vụ (Sprint 4+). Chỉ để UX. */
+  permissions: string[];
   isAuthenticated: boolean;
   setSession: (res: LoginResponse) => void;
   clearSession: () => void;
@@ -40,11 +47,18 @@ interface AuthSession {
  */
 function restoreSession(): Pick<
   AuthSession,
-  'userId' | 'username' | 'role' | 'backendRoles' | 'isAuthenticated'
+  'userId' | 'username' | 'role' | 'backendRoles' | 'permissions' | 'isAuthenticated'
 > {
   const token = getAccessToken();
   if (!token || isTokenExpired(token)) {
-    return { userId: null, username: null, role: null, backendRoles: [], isAuthenticated: false };
+    return {
+      userId: null,
+      username: null,
+      role: null,
+      backendRoles: [],
+      permissions: [],
+      isAuthenticated: false,
+    };
   }
   const payload = decodeJwtClaims(token);
   const roles = normalizeRoles(payload.roles);
@@ -53,6 +67,7 @@ function restoreSession(): Pick<
     username: payload.username ?? null,
     role: mapBackendRole(roles),
     backendRoles: roles,
+    permissions: normalizePermissions(payload.permissions),
     isAuthenticated: true,
   };
 }
@@ -69,6 +84,7 @@ export const useAuthStore = create<AuthSession>((set) => ({
       username: payload.username ?? null,
       role: mapBackendRole(roles),
       backendRoles: roles,
+      permissions: normalizePermissions(payload.permissions),
       isAuthenticated: true,
     });
   },
@@ -79,6 +95,7 @@ export const useAuthStore = create<AuthSession>((set) => ({
       username: null,
       role: null,
       backendRoles: [],
+      permissions: [],
       isAuthenticated: false,
     });
   },
@@ -103,6 +120,7 @@ export function syncSessionFromToken(): void {
     username: payload.username ?? null,
     role: mapBackendRole(roles),
     backendRoles: roles,
+    permissions: normalizePermissions(payload.permissions),
     isAuthenticated: true,
   });
 }

@@ -1,13 +1,12 @@
-import { Alert, Button, DatePicker, Flex, Input, Select, Typography, theme } from 'antd';
+import { Alert, Button, DatePicker, Flex, Input, Select, theme } from 'antd';
 import type { SelectProps } from 'antd';
 import dayjs from 'dayjs';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import { AUDIT_ACTION_OPTIONS } from '../../features/admin/auditLabels';
 import { MSG_AUD, msgBackendPending } from '../../features/admin/adminMessages';
 import { AdminApiError } from '../../features/admin/adminApi';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
 import { AUDIT_PAGE_SIZE, useAuditLogsPage } from './use-audit-logs';
-
-const { Text, Title } = Typography;
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-22';
@@ -42,19 +41,10 @@ export default function AuditLogPage() {
   const isEndpointMissing =
     result.isError && result.error instanceof AdminApiError && result.error.status === 404;
 
-  const header = (
-    <div>
-      <Title level={1} style={{ margin: 0 }}>
-        {MSG_AUD.TITLE}
-      </Title>
-      <Text type="secondary">{MSG_AUD.SUBTITLE}</Text>
-    </div>
-  );
-
   if (isEndpointMissing) {
     return (
       <Flex vertical gap={token.marginMD}>
-        {header}
+        <PageHeader title={MSG_AUD.TITLE} subtitle={MSG_AUD.SUBTITLE} />
         <Alert
           type="info"
           showIcon
@@ -73,36 +63,36 @@ export default function AuditLogPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      {header}
-
-      <Flex gap={token.marginSM} wrap>
-        <Input.Search
-          allowClear
-          aria-label="Tìm trong nhật ký"
-          placeholder="Tìm theo tên đối tượng hoặc mô tả"
-          defaultValue={keyword}
-          onSearch={(value) => updateParams({ q: value.trim() || null })}
-          style={{ maxWidth: 320 }}
-        />
-        <Select
-          aria-label={MSG_AUD.FILTER_ACTION}
-          value={action?.[0] ?? ''}
-          options={ACTION_OPTIONS}
-          style={{ minWidth: 210 }}
-          onChange={(value) => updateParams({ action: value || null })}
-        />
-        <DatePicker.RangePicker
-          aria-label={MSG_AUD.FILTER_RANGE}
-          format="DD/MM/YYYY"
-          value={[
-            from ? dayjs(from) : null,
-            to ? dayjs(to) : null,
-          ]}
-          onChange={handleRangeChange}
-          allowEmpty={[true, true]}
-          placeholder={['Từ ngày', 'Đến ngày']}
-        />
-      </Flex>
+      <PageHeader title={MSG_AUD.TITLE} subtitle={MSG_AUD.SUBTITLE}>
+        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
+          <Input.Search
+            allowClear
+            aria-label="Tìm trong nhật ký"
+            placeholder="Tìm theo tên đối tượng hoặc mô tả"
+            defaultValue={keyword}
+            onSearch={(value) => updateParams({ q: value.trim() || null })}
+            style={{ maxWidth: 320 }}
+          />
+          <Select
+            aria-label={MSG_AUD.FILTER_ACTION}
+            value={action?.[0] ?? ''}
+            options={ACTION_OPTIONS}
+            style={{ minWidth: 210 }}
+            onChange={(value) => updateParams({ action: value || null })}
+          />
+          <DatePicker.RangePicker
+            aria-label={MSG_AUD.FILTER_RANGE}
+            format="DD/MM/YYYY"
+            value={[
+              from ? dayjs(from) : null,
+              to ? dayjs(to) : null,
+            ]}
+            onChange={handleRangeChange}
+            allowEmpty={[true, true]}
+            placeholder={['Từ ngày', 'Đến ngày']}
+          />
+        </Flex>
+      </PageHeader>
 
       <AuditLogTable
         query={result}

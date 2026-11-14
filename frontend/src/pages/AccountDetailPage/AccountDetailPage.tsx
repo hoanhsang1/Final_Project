@@ -14,6 +14,7 @@ import {
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import AccountRoleModal from '../../components/AccountRoleModal/AccountRoleModal';
 import AccountResetPasswordModal from '../../components/AccountResetPasswordModal/AccountResetPasswordModal';
 import type { PasswordResetMode } from '../../components/AccountResetPasswordModal/AccountResetPasswordModal';
@@ -178,26 +179,6 @@ export default function AccountDetailPage() {
 
   const account = detailQuery.data;
 
-  const header = (
-    <Flex vertical gap={token.marginXS}>
-      <Link to={backPath} aria-label="Quay lại danh sách tài khoản">
-        ← Quay lại danh sách
-      </Link>
-      <Title level={1} style={{ margin: 0 }}>
-        {MSG_ACC.DETAIL_TITLE}
-      </Title>
-      <Text type="secondary">
-        {account ? (
-          <>
-            Tài khoản <Text strong>{account.username}</Text>
-          </>
-        ) : (
-          `Tài khoản ${accountId}`
-        )}
-      </Text>
-    </Flex>
-  );
-
   // 404 từ ITEM endpoint = không tìm thấy đối tượng → Result 404 (khác với
   // collection — xem đặc tả §4.5).
   const isNotFound =
@@ -211,11 +192,15 @@ export default function AccountDetailPage() {
 
   if (isNotFound) {
     return (
-      <Result status="404" title={MSG_ACC.NOT_FOUND} extra={
-        <Link to={backPath}>
-          <Button type="primary">{MSG_ACC.LIST_TITLE}</Button>
-        </Link>
-      } />
+      <Result
+        status="404"
+        title={MSG_ACC.NOT_FOUND}
+        extra={
+          <Link to={backPath}>
+            <Button type="primary">{MSG_ACC.LIST_TITLE}</Button>
+          </Link>
+        }
+      />
     );
   }
 
@@ -241,7 +226,16 @@ export default function AccountDetailPage() {
 
   return (
     <Flex vertical gap={token.marginLG}>
-      {header}
+      <PageHeader
+        breadcrumb={[{ title: MSG_ACC.LIST_TITLE, href: backPath }, { title: account.username }]}
+        title={account.username}
+        subtitle={
+          <Text type="secondary">
+            {MSG_ACC.DETAIL_TITLE}
+            {account.full_name ? ` · ${account.full_name}` : ''}
+          </Text>
+        }
+      />
 
       {/* Lỗi đổi trạng thái — hiện khi modal đã đóng, không nằm sau lớp phủ. */}
       {actionError && pendingTarget === null && (

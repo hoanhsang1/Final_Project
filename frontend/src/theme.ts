@@ -1,39 +1,60 @@
 ﻿import type { ThemeConfig } from 'antd';
 
 /**
- * Token thiết kế — trích từ Figma `MEMS — Registration UI & Design System`
- * (frame `01 · Design System`: Brand/600, Brand/700, Text/Primary, Surface/Canvas…).
+ * Token thiết kế — MEMS (Layer 1+2), hướng "mực xanh học vụ".
  *
- * Đây là nguồn duy nhất của màu sắc / bo góc / font trong toàn repo.
- * Component KHÔNG được hardcode hex hay px (AGENTS.md mục 2) — muốn đổi giao diện
- * thì sửa ở đây rồi nó lan ra qua `ConfigProvider` ở `src/main.tsx`.
+ * Đích: phần mềm quản lý giáo dục chuyên ngành, đáng tin (tham chiếu SMAS/VNEdu).
+ * Nguồn duy nhất màu/bo góc/font/nhịp cho toàn repo — component KHÔNG hardcode
+ * hex/rgba/px (xem `docs/ui-conventions.md`). Đổi giao diện tại đây.
  *
- * Lệch có chủ đích so với Figma (xem `Design-System-Figma-Mapping.md` §7):
- * - `borderInput` đậm hơn `#D6DFED` để viền field đạt 3:1 (WCAG 1.4.11).
+ * Tương phản (AA): brand #0E4A8B trên trắng ≈ 8.8:1; text phụ #475467 ≈ 8.6:1;
+ * borderInput #667085 đủ 3:1 trên trắng và trên canvas (WCAG 1.4.11).
+ *
+ * Mốc tham chiếu (đo bằng `getComputedStyle` ngày 13/11/2026, xem
+ * `docs/ui-conventions.md` mục "Mốc tham chiếu"):
+ *   Khan Academy — nền 14px, bo 8px, bóng đổ 1.2% element, 1 màu nhấn.
+ *   Brilliant    — nội dung chỉ dùng 400 và 500 (231 element 14/400, 4 element 14/500).
+ *   Udemy        — nền 16px/300 + bóng đổ ở header: KHÔNG theo (đó là "SaaS look").
+ * Hệ quả ở file này: `typeScale` chỉ có 12/14/16/24/40, `weight` chỉ có 400/500/600,
+ * và `boxShadow` của bề mặt nội dung = `none`.
  */
 export const color = {
-  /** Brand / 600 */
-  brand: '#215CE8',
-  /** Brand / 700 — trạng thái nhấn */
-  brandActive: '#1747C2',
-  /** Nhấn/hover sáng hơn Brand 600 */
-  brandHover: '#3B70EB',
-  /** Brand / 050 — nền nhấn nhẹ */
-  brandSoft: '#EBF2FF',
-  /** Text / Primary */
-  text: '#142447',
-  /** Text / Secondary */
-  textSecondary: '#63718F',
-  /** Surface / Canvas */
-  canvas: '#F5F7FB',
+  /** Brand chủ đạo (mực xanh) — CTA, link, mục đang chọn. */
+  brand: '#0E4A8B',
+  /** Pressed. */
+  brandActive: '#0A3A6E',
+  /** Hover. */
+  brandHover: '#1359A5',
+  /** Nền nhấn nhẹ — mục chọn, row hover, tag nhẹ. */
+  brandSoft: '#E9F0F8',
+  /** Text chính. */
+  text: '#101828',
+  /** Text phụ — nhãn, mô tả, header bảng. */
+  textSecondary: '#475467',
+  /** Canvas nền trang (xám lạnh, không phải trắng ngà). */
+  canvas: '#F2F4F7',
   surface: '#FFFFFF',
-  /** Border / Default — card, divider */
-  border: '#D6DFED',
-  /** Viền field: đậm hơn Figma để đạt 3:1 trên nền trắng (3.23) và trên canvas (3.01) */
-  borderInput: '#8290A9',
-  error: '#BF2936',
-  warning: '#A66B09',
-  success: '#15803D',
+  /** Hairline — card, divider, bảng. Trang trí, không dùng cho field. */
+  border: '#E4E7EC',
+  /** Nền header bảng / hover row. */
+  surfaceSunken: '#F7F8FA',
+  /** Viền field: đủ 3:1 trên nền trắng/canvas. */
+  borderInput: '#667085',
+  error: '#B42318',
+  warning: '#B54708',
+  success: '#067647',
+  /** Chữ gợi ý trong field — nhạt hơn text phụ nhưng vẫn đọc được. */
+  placeholder: '#98A2B3',
+  /** Hover row/mục menu — xám trung tính, không ngả xanh để không tranh với row đang chọn. */
+  hoverSurface: '#F5F7FA',
+  /** Hover của mục đang chọn. */
+  brandSoftHover: '#DCE8F5',
+  /** Chữ trên nền brand (panel đăng nhập). */
+  onBrand: '#FFFFFF',
+  /** Chữ phụ trên nền brand — vẫn ≥4.5:1 trên #0E4A8B. */
+  onBrandMuted: 'rgba(255, 255, 255, 0.78)',
+  /** Ô/khối mờ trên nền brand. */
+  onBrandSubtle: 'rgba(255, 255, 255, 0.16)',
 } as const;
 
 /** Inter là font của design system; fallback về system stack khi offline. */
@@ -41,21 +62,42 @@ export const fontFamily =
   'Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 /**
- * Thang chữ của design system (px). Component dùng các mốc này thay vì tự đặt số
- * — đổi thiết kế chỉ sửa một chỗ.
+ * Thang chữ (px) — **chỉ 5 mốc**. Component dùng các mốc này thay vì tự đặt số.
+ *
+ * 12 → 14 → 16 → 24 → 40 đúng bằng thang đo được ở Khan Academy (12/14/16/18/20/24
+ * nhưng 18–20 chỉ dùng cho khối marketing, không có trong app). Bỏ các mốc lửng 13,
+ * 15, 17: mỗi mốc thêm vào là một quyết định nữa phải bảo vệ, và ba mốc lửng cộng
+ * lại chỉ hơn kém nhau 2px — mắt không đọc ra cấp bậc, chỉ thấy "hơi lệch".
  */
 export const typeScale = {
-  /** Hero màn đăng nhập/đăng ký (Figma ~46px) */
-  hero: 46,
-  /** Heading trang */
-  h1: 30,
-  /** Section title */
-  section: 20,
-  /** Body / label */
-  body: 15,
-  /** Caption — sàn tuyệt đối, không nhỏ hơn */
+  /** Hero màn đăng nhập/đăng ký. */
+  hero: 40,
+  /** Heading trang (H1). */
+  h1: 24,
+  /** Tiêu đề khối/section (H2), tên sản phẩm trên header. */
+  section: 16,
+  /** Body / label / mô tả / breadcrumb. */
+  body: 14,
+  /** Caption — sàn tuyệt đối, không nhỏ hơn. */
   caption: 12,
 } as const;
+
+/**
+ * Độ đậm — chỉ 3 mức, mỗi mức một vai trò.
+ *
+ * Đo được: Brilliant dùng 400 cho 231 element nội dung và 500 cho đúng 4 element;
+ * ngược lại Khan dùng 44×600 + 42×500 + 38×700 nên "chữ nào cũng đang hét".
+ *
+ * Ở đây: 600 = tiêu đề trang/khối, 500 = nhấn trong nội dung (nút, số liệu, nhãn
+ * quan trọng), 400 = mọi thứ còn lại. Không dùng 700.
+ */
+export const weight = { regular: 400, medium: 500, strong: 600 } as const;
+
+/** Nhịp 8pt. Dùng cho gap/padding của khối, không dùng cho chi tiết icon. */
+export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
+
+/** Số liệu cần thẳng cột (sĩ số, mã, thời gian) — đặt lên ô hiển thị số. */
+export const numericStyle = { fontVariantNumeric: 'tabular-nums' } as const;
 
 export const themeToken: ThemeConfig['token'] = {
   colorPrimary: color.brand,
@@ -73,122 +115,202 @@ export const themeToken: ThemeConfig['token'] = {
   colorTextHeading: color.text,
   colorTextSecondary: color.textSecondary,
   colorTextDescription: color.textSecondary,
+  colorTextPlaceholder: color.placeholder,
 
   colorBgLayout: color.canvas,
   colorBgContainer: color.surface,
+  colorBgElevated: color.surface,
+  /** Viền field (3:1). Viền trang trí dùng `colorBorderSecondary`. */
   colorBorder: color.borderInput,
   colorBorderSecondary: color.border,
 
   fontFamily,
-  fontSize: 15,
-  lineHeight: 1.5,
+  fontSize: typeScale.body,
+  lineHeight: 1.55,
+  fontWeightStrong: weight.strong,
 
-  // Thang heading theo design system: trang 30, section 20, phụ 18/16.
-  fontSizeHeading1: 30,
-  fontSizeHeading2: 20,
-  fontSizeHeading3: 18,
-  fontSizeHeading4: 16,
-  fontSizeHeading5: 15,
+  fontSizeHeading1: typeScale.h1,
+  fontSizeHeading2: typeScale.section,
+  fontSizeHeading3: typeScale.body,
+  fontSizeHeading4: typeScale.body,
+  fontSizeHeading5: typeScale.caption,
   lineHeightHeading1: 1.3,
   lineHeightHeading2: 1.35,
 
-  borderRadius: 8,
-  borderRadiusLG: 12,
-  borderRadiusSM: 6,
-  borderRadiusXS: 4,
+  borderRadius: 6,
+  borderRadiusLG: 8,
+  borderRadiusSM: 4,
+  borderRadiusXS: 2,
 
-  // Input/Button cao 44 (Figma), các control khác 40.
-  controlHeight: 40,
-  controlHeightLG: 48,
+  controlHeight: 36,
+  controlHeightLG: 44,
+  controlHeightSM: 28,
+  controlOutline: color.brandSoft,
+  controlOutlineWidth: 3,
 
   sizeUnit: 4,
   sizeStep: 4,
+  sizeXXS: 4,
+  sizeXS: 8,
+  sizeSM: 12,
+  size: 16,
+  sizeMD: 20,
+  sizeLG: 24,
+  sizeXL: 32,
 
-  boxShadow: '0 8px 30px rgba(20, 36, 71, 0.08)',
-  boxShadowSecondary: '0 4px 16px rgba(20, 36, 71, 0.06)',
+  /**
+   * Bề mặt nội dung **không đổ bóng**: đo được ở Khan chỉ 1.2% element có bóng,
+   * và toàn bộ số đó là menu nổi/overlay. Bóng trên card/bảng là thứ tạo cảm
+   * giác "SaaS nhựa". Phân cấp bằng hairline + khoảng trắng.
+   */
+  boxShadow: 'none',
+  /** Chỉ dùng cho lớp nổi thật (dropdown, popover, modal) — nơi cần tách khỏi nền. */
+  boxShadowSecondary: '0 8px 24px rgba(16, 24, 40, 0.12)',
+
+  // Motion tinh tế; vẫn tôn trọng prefers-reduced-motion (index.css).
+  motion: true,
+  motionDurationFast: '0.1s',
+  motionDurationMid: '0.15s',
+  motionDurationSlow: '0.2s',
 };
 
-/** Token riêng của component — cùng nguồn Figma, gắn ở `ConfigProvider`. */
+/** Token riêng của component — mật độ cao, viền mảnh, không đổ bóng. */
 export const themeComponents: ThemeConfig['components'] = {
   Button: {
-    controlHeight: 44,
-    controlHeightLG: 48,
-    controlHeightSM: 32,
-    borderRadius: 12,
-    fontWeight: 500,
-    paddingInline: 20,
+    controlHeight: 36,
+    controlHeightLG: 44,
+    controlHeightSM: 28,
+    borderRadius: 6,
+    fontWeight: weight.medium,
+    paddingInline: 14,
     primaryShadow: 'none',
     defaultShadow: 'none',
     dangerShadow: 'none',
+    defaultBorderColor: color.borderInput,
+    defaultColor: color.text,
   },
   Input: {
-    controlHeight: 44,
-    controlHeightLG: 48,
-    borderRadius: 10,
-    paddingInline: 14,
-    activeShadow: `0 0 0 2px ${color.brandSoft}`,
+    controlHeight: 36,
+    borderRadius: 6,
+    paddingInline: 12,
+    activeShadow: `0 0 0 3px ${color.brandSoft}`,
+    hoverBorderColor: color.brandHover,
+    activeBorderColor: color.brand,
+  },
+  InputNumber: {
+    controlHeight: 36,
+    borderRadius: 6,
   },
   Select: {
-    controlHeight: 44,
-    borderRadius: 10,
+    controlHeight: 36,
+    borderRadius: 6,
+    optionSelectedBg: color.brandSoft,
+    optionSelectedColor: color.brand,
+  },
+  DatePicker: {
+    controlHeight: 36,
+    borderRadius: 6,
   },
   Card: {
-    borderRadiusLG: 20,
-    paddingLG: 24,
+    borderRadiusLG: 8,
+    paddingLG: 20,
     headerBg: 'transparent',
+    headerFontSize: 15,
+    headerHeight: 48,
+    boxShadowTertiary: 'none',
   },
   Modal: {
-    borderRadiusLG: 20,
+    borderRadiusLG: 8,
+    titleFontSize: 17,
   },
   Table: {
-    headerBg: color.canvas,
-    headerColor: color.text,
+    headerBg: color.surfaceSunken,
+    headerColor: color.textSecondary,
     headerSplitColor: 'transparent',
-    rowHoverBg: color.brandSoft,
+    headerBorderRadius: 0,
+    rowHoverBg: color.hoverSurface,
+    rowSelectedBg: color.brandSoft,
+    rowSelectedHoverBg: color.brandSoftHover,
     borderColor: color.border,
+    /** 10 thay vì 11 → hàng ≈ 42px, mật độ đo được của bảng Khan (~40). */
+    cellPaddingBlock: 10,
+    cellPaddingInline: 16,
+    footerBg: color.surfaceSunken,
   },
   Menu: {
-    itemBorderRadius: 10,
-    itemHeight: 44,
+    itemBorderRadius: 6,
+    itemHeight: 36,
     itemMarginInline: 8,
+    itemMarginBlock: 2,
+    itemColor: color.textSecondary,
     itemSelectedBg: color.brandSoft,
     itemSelectedColor: color.brand,
-    itemHoverBg: color.canvas,
+    itemHoverBg: color.hoverSurface,
+    itemHoverColor: color.text,
+    activeBarBorderWidth: 0,
+    iconSize: 16,
+    subMenuItemBg: 'transparent',
   },
   Layout: {
     headerBg: color.surface,
     siderBg: color.surface,
     bodyBg: color.canvas,
+    headerHeight: 56,
+    headerPadding: '0 24px',
+    triggerBg: color.surfaceSunken,
   },
   Tabs: {
     itemSelectedColor: color.brand,
     inkBarColor: color.brand,
-    titleFontSize: 15,
+    titleFontSize: 14,
+    horizontalItemGutter: 24,
+    horizontalItemPadding: '10px 0',
   },
   Alert: {
-    borderRadiusLG: 12,
+    borderRadiusLG: 6,
   },
   Tag: {
-    borderRadiusSM: 8,
+    borderRadiusSM: 4,
+    defaultBg: color.canvas,
+    defaultColor: color.textSecondary,
   },
   Divider: {
     colorSplit: color.border,
   },
   Form: {
     labelColor: color.text,
-    labelFontSize: 14,
+    labelFontSize: typeScale.body,
+    labelHeight: 20,
     verticalLabelPadding: '0 0 6px',
+    itemMarginBottom: 20,
+  },
+  Breadcrumb: {
+    fontSize: typeScale.caption,
+    itemColor: color.textSecondary,
+    linkColor: color.textSecondary,
+    linkHoverColor: color.brand,
+    separatorColor: color.placeholder,
+  },
+  Drawer: {
+    paddingLG: 20,
+  },
+  Descriptions: {
+    labelBg: color.surfaceSunken,
+    titleMarginBottom: 12,
+  },
+  Pagination: {
+    itemSize: 32,
   },
 };
 
 /** Nền trang. Lấy từ token để chỉ có một nguồn sự thật. */
 export const layoutBackground = themeToken.colorBgLayout;
 
-/** Thẻ trắng canh giữa — dùng chung cho trang xem thử vai trò. */
+/** Thẻ trắng canh giữa — chỉ dùng cho màn đăng nhập / xem thử vai trò. */
 export const cardStyle = {
   width: '100%',
   maxWidth: 420,
-  borderRadius: 20,
+  borderRadius: 8,
   borderColor: color.border,
-  boxShadow: '0 8px 30px rgba(20, 36, 71, 0.08)',
+  boxShadow: 'none',
 } as const;

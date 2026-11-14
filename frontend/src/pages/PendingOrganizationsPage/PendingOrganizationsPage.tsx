@@ -1,13 +1,12 @@
-import { Alert, Button, Empty, Flex, Skeleton, Table, Tag, Typography, theme } from 'antd';
+import { Alert, Button, Empty, Flex, Skeleton, Table, Tag, theme } from 'antd';
 import type { TableProps } from 'antd';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import { MSG_ORG } from '../../features/admin/adminMessages';
 import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/statusLabels';
 import type { PendingOrganization } from '../../features/admin/types';
 import { usePendingOrganizations } from './use-pending-organizations';
-
-const { Text, Title } = Typography;
 
 /**
  * Màn danh sách tổ chức chờ duyệt — `UC-ORG-02` (Đặc tả Sprint 2 §3.2).
@@ -93,12 +92,7 @@ export default function PendingOrganizationsPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      <div>
-        <Title level={1} style={{ margin: 0 }}>
-          {MSG_ORG.LIST_TITLE}
-        </Title>
-        <Text type="secondary">{MSG_ORG.LIST_SUBTITLE}</Text>
-      </div>
+      <PageHeader title={MSG_ORG.LIST_TITLE} subtitle={MSG_ORG.LIST_SUBTITLE} />
 
       {/* Trạng thái loading — `Skeleton` (NFR-PER-001, `TC-ORG-14`).
           KHÔNG render bảng rỗng lúc đang tải để tránh nhấp nháy "không có dữ liệu". */}

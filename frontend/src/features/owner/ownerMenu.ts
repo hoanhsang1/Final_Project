@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { ApartmentOutlined, IdcardOutlined } from '@ant-design/icons';
 import type { ConsoleMenuItem } from '../admin/consoleMenu';
 import { MSG_OWNER } from './ownerMessages';
 
@@ -9,8 +11,8 @@ import { MSG_OWNER } from './ownerMessages';
  * Nhân viên nằm TRONG màn chi tiết phòng ban, không phải mục menu riêng.
  */
 export const OWNER_MENU: readonly ConsoleMenuItem[] = [
-  { key: 'phong-ban', label: MSG_OWNER.MENU_DEPARTMENTS, path: '/to-chuc', exact: true },
-  { key: 'chuc-vu', label: MSG_OWNER.MENU_POSITIONS, path: '/to-chuc/chuc-vu', exact: true },
+  { key: 'phong-ban', label: MSG_OWNER.MENU_DEPARTMENTS, path: '/to-chuc', exact: true, icon: createElement(ApartmentOutlined) },
+  { key: 'chuc-vu', label: MSG_OWNER.MENU_POSITIONS, path: '/to-chuc/chuc-vu', exact: true, icon: createElement(IdcardOutlined) },
 ];
 
 /**

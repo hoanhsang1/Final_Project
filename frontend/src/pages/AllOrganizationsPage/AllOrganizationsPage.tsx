@@ -1,8 +1,9 @@
-import { Alert, App, Button, Empty, Flex, Input, Select, Skeleton, Table, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Input, Select, Skeleton, Table, Tag, theme } from 'antd';
 import type { SelectProps, TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import { AdminApiError } from '../../features/admin/adminApi';
 import { MSG_ORG, msgBackendPending, msgReactivated, msgSuspended } from '../../features/admin/adminMessages';
@@ -18,8 +19,6 @@ import {
   PAGE_SIZE_OPTIONS,
   useAllOrganizationsPage,
 } from './use-all-organizations';
-
-const { Text, Title } = Typography;
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-20';
@@ -205,12 +204,7 @@ export default function AllOrganizationsPage() {
   if (isEndpointMissing) {
     return (
       <Flex vertical gap={token.marginMD}>
-        <div>
-          <Title level={1} style={{ margin: 0 }}>
-            {MSG_ORG.ALL_LIST_TITLE}
-          </Title>
-          <Text type="secondary">{MSG_ORG.ALL_LIST_SUBTITLE}</Text>
-        </div>
+        <PageHeader title={MSG_ORG.ALL_LIST_TITLE} subtitle={MSG_ORG.ALL_LIST_SUBTITLE} />
         <Alert
           type="info"
           showIcon
@@ -246,43 +240,38 @@ export default function AllOrganizationsPage() {
 
   return (
     <Flex vertical gap={token.marginMD}>
-      <div>
-        <Title level={1} style={{ margin: 0 }}>
-          {MSG_ORG.ALL_LIST_TITLE}
-        </Title>
-        <Text type="secondary">{MSG_ORG.ALL_LIST_SUBTITLE}</Text>
-      </div>
+      <PageHeader title={MSG_ORG.ALL_LIST_TITLE} subtitle={MSG_ORG.ALL_LIST_SUBTITLE}>
+        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
+          <Input.Search
+            allowClear
+            aria-label={MSG_ORG.SEARCH}
+            placeholder="Tìm theo tên tổ chức hoặc email"
+            defaultValue={keyword}
+            onSearch={(value) => updateParams({ q: value.trim() || null })}
+            style={{ maxWidth: 320 }}
+          />
+          <Select
+            aria-label={MSG_ORG.FILTER_STATUS}
+            value={status?.[0] ?? ''}
+            options={STATUS_OPTIONS}
+            style={{ minWidth: 170 }}
+            onChange={(value) => updateParams({ status: value || null })}
+          />
+          <Select
+            aria-label={MSG_ORG.FILTER_TYPE}
+            value={orgType ?? ''}
+            options={TYPE_OPTIONS}
+            style={{ minWidth: 150 }}
+            onChange={(value) => updateParams({ orgType: value || null })}
+          />
+        </Flex>
+      </PageHeader>
 
       {/* Lỗi thao tác — hiện khi modal đã đóng; khi modal còn mở thì lỗi nằm
           trong modal (Alert chồng lên bảng thì người dùng không thấy). */}
       {actionError && suspendTarget === null && (
         <Alert type="error" showIcon role="alert" message={actionError} />
       )}
-
-      <Flex gap={token.marginSM} wrap>
-        <Input.Search
-          allowClear
-          aria-label={MSG_ORG.SEARCH}
-          placeholder="Tìm theo tên tổ chức hoặc email"
-          defaultValue={keyword}
-          onSearch={(value) => updateParams({ q: value.trim() || null })}
-          style={{ maxWidth: 320 }}
-        />
-        <Select
-          aria-label={MSG_ORG.FILTER_STATUS}
-          value={status?.[0] ?? ''}
-          options={STATUS_OPTIONS}
-          style={{ minWidth: 170 }}
-          onChange={(value) => updateParams({ status: value || null })}
-        />
-        <Select
-          aria-label={MSG_ORG.FILTER_TYPE}
-          value={orgType ?? ''}
-          options={TYPE_OPTIONS}
-          style={{ minWidth: 150 }}
-          onChange={(value) => updateParams({ orgType: value || null })}
-        />
-      </Flex>
 
       {result.isPending ? (
         <Skeleton active paragraph={{ rows: 8 }} />

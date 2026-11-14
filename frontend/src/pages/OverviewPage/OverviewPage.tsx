@@ -1,11 +1,10 @@
-import { Alert, Button, Card, Col, Flex, List, Row, Skeleton, Statistic, Typography, theme } from 'antd';
+import { Alert, Button, Card, Col, Flex, List, Row, Skeleton, Statistic, theme } from 'antd';
 import { Link } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader/PageHeader';
 import { MSG_ADM, MSG_OVW } from '../../features/admin/adminMessages';
 import { CONSOLE_MENU } from '../../features/admin/consoleMenu';
 import { CORE_MODULES } from '../../features/admin/coreModules';
 import { useOverview } from './use-overview';
-
-const { Title } = Typography;
 
 /** Thẻ số liệu — bấm được, chuyển sang màn tương ứng. */
 interface StatCard {
@@ -100,12 +99,7 @@ export default function OverviewPage() {
 
   return (
     <Flex vertical gap={token.marginLG}>
-      <div>
-        <Title level={1} style={{ margin: 0 }}>
-          {MSG_OVW.TITLE}
-        </Title>
-        <Typography.Text type="secondary">{MSG_OVW.SUBTITLE}</Typography.Text>
-      </div>
+      <PageHeader title={MSG_OVW.TITLE} subtitle={MSG_OVW.SUBTITLE} />
 
       <Row gutter={[token.marginMD, token.marginMD]}>
         {cards.map((card) => (

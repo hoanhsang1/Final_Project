@@ -2,7 +2,7 @@
  * Đọc claim từ JWT — CHỈ để hiển thị phía client.
  *
  * ⚠️ KHÔNG verify chữ ký, KHÔNG dùng để bảo mật. BE luôn chặn lại (ADR-FE-003).
- * Việc duy nhất FE cần là: biết user đang đăng nhập với role nào để ẩn/hiện UI.
+ * Việc duy nhất FE cần là: biết user đang đăng nhập với role/permission nào để ẩn/hiện UI.
  */
 
 /** Claim FE đọc từ access token. */
@@ -11,6 +11,8 @@ export interface JwtClaims {
   username?: string;
   /** Role backend GỐC, vd `["SUPER_ADMIN"]`. */
   roles?: unknown;
+  /** Quyền (permissions) — dùng cho phân quyền nghiệp vụ Sprint 4+. */
+  permissions?: unknown;
   /** Thời điểm hết hạn (giây kể từ epoch). */
   exp?: number;
 }
@@ -39,6 +41,12 @@ export function decodeJwtClaims(token: string): JwtClaims {
 export function normalizeRoles(roles: unknown): string[] {
   if (!Array.isArray(roles)) return [];
   return roles.filter((role): role is string => typeof role === 'string');
+}
+
+/** Chuẩn hoá claim `permissions` về mảng chuỗi (an toàn kiểu như `normalizeRoles`). */
+export function normalizePermissions(permissions: unknown): string[] {
+  if (!Array.isArray(permissions)) return [];
+  return permissions.filter((p): p is string => typeof p === 'string');
 }
 
 /**

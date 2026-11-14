@@ -1,5 +1,6 @@
 import { Avatar, Button, Flex, theme, Typography } from 'antd';
 import type { Role } from '../../features/auth/roles';
+import { typeScale, weight } from '../../theme';
 
 export interface RoleButtonProps {
   role: Role;
@@ -35,8 +36,8 @@ export function RoleButton({ role, onSelect }: RoleButtonProps) {
           {role.label.charAt(0)}
         </Avatar>
         <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-          <Text strong>{role.label}</Text>
-          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: weight.medium }}>{role.label}</Text>
+          <Text type="secondary" style={{ fontSize: typeScale.caption }}>
             {role.description}
           </Text>
         </Flex>

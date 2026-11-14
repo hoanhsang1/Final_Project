@@ -7,6 +7,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import 'antd/dist/reset.css';
+import './index.css';
+import LiveAnnouncer from './components/LiveAnnouncer/LiveAnnouncer';
 import { router } from './router';
 import { fontFamily, themeComponents, themeToken } from './theme';
 
@@ -17,7 +19,12 @@ if (!container) {
 
 // Font design system phải áp cả cho markup không phải component antd (antd chỉ set
 // font qua class `.ant-*`, phần tử HTML thuần vẫn thừa hưởng từ `body`).
-container.style.fontFamily = fontFamily;
+//
+// Đặt trên `body` chứ không chỉ `#root`: Modal/Dropdown/Tooltip của antd render qua
+// portal vào `document.body`, nằm NGOÀI `#root`. Chỉ set `#root` thì mọi lớp nổi
+// (hộp thoại đóng lớp, dropdown "Thao tác khác") rơi về `sans-serif` của antd reset
+// — chữ hơi khác kiểu và không ai biết vì sao. Đo bằng `getComputedStyle` mới thấy.
+document.body.style.fontFamily = fontFamily;
 
 // Client dùng chung cho TanStack Query (server state). Không retry khi lỗi 4xx
 // (đăng nhập sai mật khẩu là 401 — retry vô nghĩa, chỉ làm người dùng đợi lâu).
@@ -34,6 +41,8 @@ createRoot(container).render(
       {/* `App` của antd: để `message`/`notification` đi qua ConfigProvider (đúng token/theme). */}
       <ConfigProvider locale={viVN} theme={{ token: themeToken, components: themeComponents }}>
         <App>
+          {/* Vùng aria-live dùng chung: mọi toast của useNotify đều được đọc to. */}
+          <LiveAnnouncer />
           <RouterProvider router={router} />
         </App>
       </ConfigProvider>
