@@ -41,3 +41,18 @@ spring:
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/permissions/**
+
+        - id: people-teachers
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/teachers/**,/api/teachers
+
+        - id: people-specialties
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/specialties/**,/api/specialties
+
+        - id: people-classes
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/classes/**,/api/classes
