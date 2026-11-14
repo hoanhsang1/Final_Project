@@ -54,11 +54,29 @@ export const memsTheme = defineTheme({
     '--color-background-surface': pair(color.surface, '#1F1F22'),
     '--color-background-popover': pair(color.surface, '#28292C'),
 
+    // Icon dùng chung một mực với chữ: nếu để Astryx tự sinh thì icon là `#191B22`
+    // còn chữ là `#101828` — lệch nhau vài đơn vị, nhìn kỹ mới thấy nhưng là hai
+    // "màu đen" khác nhau trên cùng một dòng.
+    '--color-icon-primary': pair(color.text, '#DFE2E5'),
+    '--color-icon-secondary': pair(color.textSecondary, '#AAAFB5'),
+    '--color-icon-disabled': pair(color.placeholder, '#6F747C'),
+
     // --- Viền ---------------------------------------------------------------
     // `border` = hairline trang trí (card, divider, bảng) — không dùng cho field.
     '--color-border': pair(color.border, '#F2F4F619'),
     // `border-emphasized` = viền field, đủ 3:1 trên trắng lẫn canvas (WCAG 1.4.11).
     '--color-border-emphasized': pair(color.borderInput, '#494D53'),
+
+    // --- Bề mặt phụ ---------------------------------------------------------
+    // Table dùng token này cho nền hàng hover / hàng kẻ sọc, và một số khối phụ
+    // (code block, header nhóm) dùng làm nền. `surfaceSunken` là màu đã chốt cho
+    // "nền header bảng / hover row" trong `theme.ts`.
+    '--color-background-muted': pair(color.surfaceSunken, '#1111127F'),
+    // Skeleton và rãnh của progress bar: phải là xám RẤT nhạt, chỉ đủ thấy hình
+    // khối. Default của Astryx (`#CCD3DB`) đậm gần bằng viền field nên khung xương
+    // đọc như dữ liệu thật đang tải.
+    '--color-skeleton': pair('#EAECF0', '#434653'),
+    '--color-track': pair('#EAECF0', '#434653'),
 
     // --- Trạng thái ---------------------------------------------------------
     // Mỗi trạng thái có 3 lớp: màu đặc (icon/viền), màu chữ, và nền nhạt 20%.
@@ -74,6 +92,24 @@ export const memsTheme = defineTheme({
     '--color-warning': pair(color.warning, '#E9AF08'),
     '--color-text-warning': pair(color.warning, '#FBCE03'),
     '--color-warning-muted': pair('#B5470833', '#E2A4003F'),
+
+    // --- Thông tin (info) ---------------------------------------------------
+    // MEMS không có "xanh thông tin" riêng — antd cũ đặt `colorInfo = brand`.
+    // Giữ đúng tinh thần đó: info là brand, không phải xanh Meta `#0064E0`.
+    // `Banner status="info"` lấy nền từ `--color-info-muted` và chữ từ
+    // `--color-on-info-muted`, nên phải pin cả hai; chỉ pin `--color-info` thì
+    // banner vẫn ra xanh Meta.
+    '--color-info': 'var(--color-accent)',
+    '--color-info-muted': 'var(--color-accent-muted)',
+    '--color-text-info': 'var(--color-accent)',
+    '--color-on-info-muted': pair(color.brand, '#AFD7FF'),
+
+    // Banner tô chữ bằng `--color-on-*-muted`, không dùng `--color-text-*`.
+    // Để default thì chữ banner lệch màu với chữ trạng thái cùng nghĩa
+    // (`#187046` vs `#067647` ở success). Pin cho khớp một mực.
+    '--color-on-success-muted': pair(color.success, '#A5F690'),
+    '--color-on-warning-muted': pair(color.warning, '#FBCE03'),
+    '--color-on-error-muted': pair(color.error, '#FFB2B8'),
   },
 
   typography: {

@@ -73,6 +73,30 @@ it('đèn báo trạng thái có đủ 3 lớp màu để không chỉ dựa và
   expect(token('--color-error-muted')).toBe('light-dark(#B4231833, #F5394F3F)');
 });
 
+it('info là brand, không phải xanh Meta', () => {
+  // Banner info lấy nền từ `-muted` và chữ từ `on-*-muted`; pin thiếu một cái là
+  // banner vẫn ra xanh `#0064E0`.
+  expect(token('--color-info')).toBe('var(--color-accent)');
+  expect(token('--color-info-muted')).toBe('var(--color-accent-muted)');
+  expect(token('--color-text-info')).toBe('var(--color-accent)');
+  expect(token('--color-on-info-muted')).toBe('light-dark(#0E4A8B, #AFD7FF)');
+});
+
+it('chữ trong Banner trùng màu với chữ trạng thái cùng nghĩa', () => {
+  expect(token('--color-on-success-muted')).toBe(token('--color-text-success'));
+  expect(token('--color-on-warning-muted')).toBe(token('--color-text-warning'));
+  expect(token('--color-on-error-muted')).toBe(token('--color-text-error'));
+});
+
+it('icon, nền phụ và skeleton không còn mang sắc xanh do HCT sinh', () => {
+  expect(token('--color-icon-primary')).toBe(token('--color-text-primary'));
+  expect(token('--color-icon-secondary')).toBe(token('--color-text-secondary'));
+  // Nền hàng hover / kẻ sọc của bảng = `surfaceSunken` đã chốt trong theme.ts.
+  expect(token('--color-background-muted')).toBe('light-dark(#F7F8FA, #1111127F)');
+  expect(token('--color-skeleton')).toBe('light-dark(#EAECF0, #434653)');
+  expect(token('--color-track')).toBe('light-dark(#EAECF0, #434653)');
+});
+
 it('bo góc giữ default của core 4 / 8 / 12 / 28', () => {
   expect(resolved('--radius-inner')).toBe('4px');
   expect(resolved('--radius-element')).toBe('8px');
