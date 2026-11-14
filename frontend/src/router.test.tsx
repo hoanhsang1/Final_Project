@@ -31,7 +31,9 @@ function renderAt(path: string) {
 it('chuyển hướng gốc về trang đăng nhập', () => {
   const router = renderAt('/');
   expect(router.state.location.pathname).toBe('/dang-nhap');
-  expect(screen.getByRole('heading', { name: 'Đăng nhập để tiếp tục' })).toBeInTheDocument();
+  // H1 của màn đăng nhập đã rút gọn còn "Đăng nhập" khi dọn lại bố cục (bỏ dòng
+  // phụ dài); tiêu đề cũ "Đăng nhập để tiếp tục" không còn tồn tại.
+  expect(screen.getByRole('heading', { name: 'Đăng nhập' })).toBeInTheDocument();
 });
 
 it('hiện trang đăng ký ở /dang-ky', () => {

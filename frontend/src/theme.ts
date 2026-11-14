@@ -57,9 +57,16 @@ export const color = {
   onBrandSubtle: 'rgba(255, 255, 255, 0.16)',
 } as const;
 
+/**
+ * Font của design system. Tách `fontPrimary`/`fontFallbacks` vì Astryx nhận font
+ * theo hai tham số riêng (`typography.body.family` + `.fallbacks`), còn antd nhận
+ * cả chuỗi. `fontFamily` vẫn là nguồn duy nhất để hai bên không lệch nhau.
+ */
+export const fontPrimary = 'Inter';
+export const fontFallbacks =
+  '-apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 /** Inter là font của design system; fallback về system stack khi offline. */
-export const fontFamily =
-  'Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+export const fontFamily = `${fontPrimary}, ${fontFallbacks}`;
 
 /**
  * Thang chữ (px) — **chỉ 5 mốc**. Component dùng các mốc này thay vì tự đặt số.
