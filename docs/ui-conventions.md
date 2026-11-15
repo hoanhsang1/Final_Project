@@ -303,6 +303,39 @@ hairline + weight đã đủ phân cấp.
    production được LightningCSS polyfill, dev server thì không. Đừng test trên trình
    duyệt cũ rồi kết luận theme sai.
 
+### 6.7 Cạm bẫy phát hiện khi port P2 (4 màn auth)
+
+Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
+
+1. `isRequired`/`isOptional` **chèn chữ vào `<label>`** (" ∙ Bắt buộc"). Không truyền
+   hai prop này khi nhãn đã đủ nghĩa; đánh `aria-required` lên input. Truyền vào là
+   nhãn đọc khác nhãn nhìn, và mọi `getByLabelText(..., { exact: true })` gãy.
+2. `Selector` render **listbox ẩn dùng lại đúng `aria-label`** của nút → `getByLabelText`
+   ra 2 node. Truy vấn bằng `getByRole('combobox', { name })`.
+3. `Button` đặt `aria-label={label}` khi có `children` ⇒ tên nút là `label`, không phải
+   chữ trong children. Nút nhiều dòng (`RoleButton`) phải đặt `label` đúng bằng tên
+   hiển thị, nếu không tên đọc và chữ nhìn thấy lệch nhau (2.5.3).
+4. `Link` **cũng** có `label` → `aria-label`. Không đặt khi chữ hiển thị khác, cùng lý
+   do trên. Chỉ dùng `label` cho link chỉ có icon.
+5. `useMediaQuery` (`@astryxdesign/core/hooks`) thay `Grid.useBreakpoint`. jsdom không
+   có `matchMedia` nên nó luôn trả `false`: unit test chỉ thấy nhánh hẹp, muốn test
+   nhánh rộng phải mock `window.matchMedia`.
+6. `Card padding` là `SpacingStep` (0 · 0.5 · 1 · 1.5 · 2 · 3 · 4 · 5 · 6 · 8 · 10),
+   **không phải px**; `Skeleton` là **một** khối (`height`, `radius` 0–4) — dựng khung
+   xương bằng cách xếp nhiều `Skeleton`, không có bộ khung dựng sẵn.
+7. `CheckboxList` chỉ chạy **collection mode** (tự tính `isChecked`) khi có
+   `value: string[]`; mỗi `CheckboxListItem` phải có `value` trùng một phần tử của
+   mảng đó. Thiếu `value` ở list → mỗi item thành checkbox độc lập, tick không lưu.
+8. `Banner` đặt `role="alert"` lên **title + description**, không lên khung — nhờ vậy
+   `getByRole('alert')` đọc được nội dung mà không kéo theo nút đóng. Vẫn phải
+   `collapsible={false}` để banner không bị thu gọn.
+9. `Field` chỉ render `<div>`, **không** render `<form>`: dùng `<form noValidate
+   onSubmit>` native + `VStack`. `noValidate` để trình duyệt không tự chặn bằng tooltip
+   tiếng Anh trước validator của mình.
+10. Form state: `src/hooks/useFormState.ts` (~130 dòng). Không thêm
+    `react-hook-form`/`zod` cho form 1–7 trường; hai thư viện đó kéo theo một ngôn ngữ
+    khai báo thứ hai nằm cạnh component của Astryx.
+
 ## 7. Sáu khối dùng chung (v2)
 
 | Khối | Spec v2 |
@@ -365,6 +398,7 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
 - [ ] Đủ 5 state: loading / empty / error / success / no-permission.
 - [ ] BR-04 dùng "Vô hiệu hoá"; BR-08 có nhãn chữ; NFR-REL-001 có test ca API lỗi.
 - [ ] 320 / 768 / 1024 / 1440 không tràn ngang; bảng cuộn trong khung của nó.
+- [ ] Tên đọc = chữ nhìn thấy: không đặt `label` (→ `aria-label`) khác nội dung.
 - [ ] Bàn phím: tab thấy focus, Esc đóng dialog, Enter submit, focus quay lại.
 - [ ] `prefers-reduced-motion` không còn animation.
 - [ ] Che logo: vẫn nhận ra là phần mềm quản lý giáo dục?
@@ -382,6 +416,9 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
   thuộc locale của thư viện.
 - Font: `document.body.style.fontFamily` áp cho cả portal của hai bên.
 - `src/test/setup.ts` giữ patch React 19 của antd **tới P5**.
+- Link nội bộ: dùng `components/AppLink` (`<Link as={RouterLink} href={to} />`) thay vì
+  `<a>` trần. Không bọc `LinkProvider` toàn cục vì chỉ có vài chỗ cần, và provider toàn
+  cục sẽ khiến link ngoài `Router` (test riêng lẻ) chết theo.
 - Xoá antd (P5) khi `grep -r "from 'antd'" src` = 0; lúc đó xoá `themeToken`,
   `themeComponents`, patch React 19 và `ConfigProvider`.
 
