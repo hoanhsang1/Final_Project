@@ -9,6 +9,7 @@ import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.SubjectRepository;
 import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
@@ -32,11 +33,13 @@ public class SchoolClassService {
     private final PeopleAuditService audit;
     private final TeacherRepository teacherRepository;
     private final ClassStatusService classStatusService;
+    private final SubjectRepository subjectRepository;
     private final String teacherAssignmentModuleCode;
 
     public SchoolClassService(SchoolClassRepository repository, StudentRepository studentRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard, PeopleAuditService audit,
                               TeacherRepository teacherRepository, ClassStatusService classStatusService,
+                              SubjectRepository subjectRepository,
                               @Value("${TEACHER_ASSIGNMENT_MODULE_CODE:TEACHER_ASSIGNMENT}")
                               String teacherAssignmentModuleCode) {
         this.repository = repository;
@@ -46,15 +49,22 @@ public class SchoolClassService {
         this.audit = audit;
         this.teacherRepository = teacherRepository;
         this.classStatusService = classStatusService;
+        this.subjectRepository = subjectRepository;
         this.teacherAssignmentModuleCode = teacherAssignmentModuleCode;
     }
 
     @Transactional
     public Map<String, Object> list(int page, int size, String q, String status, boolean selectable) {
+        return list(page, size, q, status, selectable, null);
+    }
+
+    @Transactional
+    public Map<String, Object> list(int page, int size, String q, String status, boolean selectable,
+                                    Boolean needsReassignment) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
-        return repository.list(orgId, page, size, q, status, selectable);
+        return repository.list(orgId, page, size, q, status, selectable, needsReassignment);
     }
 
     @Transactional
@@ -72,11 +82,13 @@ public class SchoolClassService {
         validateDates(request.startDate(), request.endDate());
 
         repository.checkClassCodeAvailable(orgId, request.classCode().trim());
+        var subject = subjectRepository.nullableActive(request.subjectId(), orgId);
 
         String id = UUID.randomUUID().toString();
         SchoolClassResponse created = repository.create(
             id, orgId, request.classCode().trim(), request.name().trim(),
             request.academicYear() != null ? request.academicYear().trim() : null,
+            subject == null ? null : subject.id(),
             request.startDate(), request.endDate(), null, actor.userId()
         );
 
@@ -93,10 +105,12 @@ public class SchoolClassService {
         SchoolClassResponse before = repository.require(id, orgId, true);
         ensureEditable(before);
         validateDates(request.startDate(), request.endDate());
+        var subject = subjectRepository.nullableActive(request.subjectId(), orgId);
 
         int updated = repository.update(
             id, orgId, request.name().trim(),
             request.academicYear() != null ? request.academicYear().trim() : null,
+            subject == null ? null : subject.id(),
             request.startDate(), request.endDate(), request.version()
         );
         if (updated == 0) {
@@ -121,6 +135,17 @@ public class SchoolClassService {
 
     @Transactional
     public SchoolClassResponse assignTeacher(String classId, ClassTeacherAssignRequest request) {
+        return assignTeacher(classId, request, false);
+    }
+
+    /** Gán lại giáo viên cho lớp đang gắn nhãn "cần phân công lại" (quy tắc 17). */
+    @Transactional
+    public SchoolClassResponse reassignTeacher(String classId, ClassTeacherAssignRequest request) {
+        return assignTeacher(classId, request, true);
+    }
+
+    private SchoolClassResponse assignTeacher(String classId, ClassTeacherAssignRequest request,
+                                              boolean reassign) {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
@@ -137,6 +162,12 @@ public class SchoolClassService {
             throw new AppException(ErrorCode.TEACHER_NOT_AVAILABLE);
         }
 
+        // Lớp cũ chưa có môn học thì bỏ qua kiểm tra để không chặn dữ liệu legacy.
+        if (before.subjectId() != null
+                && !teacherRepository.teachesSubject(teacher.userId(), orgId, before.subjectId())) {
+            throw new AppException(ErrorCode.SUBJECT_MISMATCH);
+        }
+
         if (moduleGuard.isActive(orgId, teacherAssignmentModuleCode)) {
             throw new AppException(ErrorCode.TEACHER_ASSIGNMENT_MODULE_ACTIVE);
         }
@@ -150,7 +181,9 @@ public class SchoolClassService {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("before", before.teacher());
         details.put("after", after.teacher());
-        audit.record(orgId, actor.userId(), "CLASS_TEACHER_ASSIGNED", classId, details);
+        details.put("needsReassignmentCleared", before.needsReassignment());
+        audit.record(orgId, actor.userId(),
+            reassign ? "CLASS_TEACHER_REASSIGNED" : "CLASS_TEACHER_ASSIGNED", classId, details);
         return after;
     }
 

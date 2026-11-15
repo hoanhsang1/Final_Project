@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  clonePosition,
   createPosition,
   deletePosition,
+  fetchDepartments,
+  fetchPermissionBundles,
   fetchPermissions,
   fetchPositions,
   updatePosition,
 } from '../../features/owner/ownerApi';
 import { ownerKeys } from '../../features/owner/ownerKeys';
-import type { PositionPayload } from '../../features/owner/types';
+import type { PositionClonePayload, PositionPayload } from '../../features/owner/types';
 
 export function usePositionsPage() {
   const queryClient = useQueryClient();
@@ -27,6 +30,16 @@ export function usePositionsPage() {
     queryFn: fetchPermissions,
   });
 
+  const bundles = useQuery({
+    queryKey: ownerKeys.bundles(),
+    queryFn: fetchPermissionBundles,
+  });
+
+  const departments = useQuery({
+    queryKey: ownerKeys.departments(),
+    queryFn: fetchDepartments,
+  });
+
   const create = useMutation({
     mutationFn: (payload: PositionPayload) => createPosition(payload),
     onSuccess: invalidate,
@@ -43,5 +56,11 @@ export function usePositionsPage() {
     onSuccess: invalidate,
   });
 
-  return { list, permissions, create, update, remove };
+  const clone = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: PositionClonePayload }) =>
+      clonePosition(id, payload),
+    onSuccess: invalidate,
+  });
+
+  return { list, permissions, bundles, departments, create, update, remove, clone };
 }

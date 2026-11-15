@@ -11,6 +11,31 @@ export const apiClient = axios.create({
   timeout: 10_000,
 });
 
+/**
+ * Chuẩn hoá payload danh sách trả về từ BE.
+ *
+ * BE không đồng nhất: endpoint cũ trả mảng thuần, có nơi bọc `{ data: [] }`,
+ * endpoint phân trang trả `{ content: [] }`. Nhận `unknown` vì đây là dữ liệu
+ * mạng; LUÔN trả mảng để UI gọi `.map`/`.forEach` mà không nổ.
+ *
+ * Mọi hàm fetch trả danh sách phải đi qua đây thay vì tự xử lý ở từng trang.
+ */
+export function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) {
+    return payload as T[];
+  }
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    for (const key of ['data', 'content', 'items', 'results']) {
+      const value = record[key];
+      if (Array.isArray(value)) {
+        return value as T[];
+      }
+    }
+  }
+  return [];
+}
+
 /** Tên key lưu JWT + refresh token trong localStorage. */
 export const ACCESS_TOKEN_KEY = 'mems.accessToken';
 export const REFRESH_TOKEN_KEY = 'mems.refreshToken';

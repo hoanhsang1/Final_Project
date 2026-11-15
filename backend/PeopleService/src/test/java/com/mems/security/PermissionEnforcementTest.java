@@ -30,19 +30,19 @@ class PermissionEnforcementTest {
     }
 
     @Test
-    @DisplayName("Token thiếu CLASS_ASSIGN_TEACHER: 403 FORBIDDEN")
+    @DisplayName("Token thiếu class.assign_teacher: 403 FORBIDDEN")
     void tokenWithoutNewPermissionReturns403() throws Exception {
         mockMvc.perform(get("/test/class-assignment")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_VIEW"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.view"))))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
     @Test
-    @DisplayName("Token có CLASS_ASSIGN_TEACHER: được phép")
+    @DisplayName("Token có class.assign_teacher: được phép")
     void tokenWithNewPermissionIsAllowed() throws Exception {
         mockMvc.perform(get("/test/class-assignment")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_ASSIGN_TEACHER"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.assign_teacher"))))
             .andExpect(status().isOk());
     }
 }

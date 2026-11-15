@@ -22,7 +22,15 @@ const apiTarget = process.env.VITE_API_TARGET ?? 'http://127.0.0.1:8080';
  *
  * Dùng 127.0.0.1 cho chắc chắn (không phụ thuộc thứ tự resolve IPv4/IPv6 của Node).
  */
-const backendPrefixes = ['/api', '/departments', '/positions', '/permissions'] as const;
+const backendPrefixes = [
+  '/api',
+  '/departments',
+  '/positions',
+  '/permissions',
+  '/permission-bundles',
+  '/students',
+  '/classes',
+] as const;
 
 const proxy = Object.fromEntries(
   backendPrefixes.map((prefix) => [prefix, { target: apiTarget, changeOrigin: true }]),

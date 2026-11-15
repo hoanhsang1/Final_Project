@@ -50,11 +50,13 @@ class TeacherServiceTest {
         when(actor.orgId()).thenReturn("org-1");
         when(actor.userId()).thenReturn("actor-1");
         when(actor.owner()).thenReturn(true);
+        // OWNER thực tế bypass quyền; mock phải trả true để thấy trường nhạy cảm.
+        when(actor.hasPermissionIn(eq("employee.view_detail"), any())).thenReturn(true);
         audit = mock(PeopleAuditService.class);
 
         SpecialtyRepository specialtyRepository = new SpecialtyRepository(jdbc);
         MemberRepository memberRepository = mock(MemberRepository.class);
-        when(memberRepository.positionIds("t001", false)).thenReturn(Set.of("pos-teacher"));
+        when(memberRepository.positionIds("t001")).thenReturn(Set.of("pos-teacher"));
 
         service = new TeacherService(
             mock(MemberService.class),
@@ -164,8 +166,8 @@ class TeacherServiceTest {
     @Test
     @DisplayName("AC-15.11 Người dùng bị giới hạn phòng ban khác: 403")
     void rejectsActorOutsideTeacherDepartment() {
-        doThrow(new AppException(ErrorCode.FORBIDDEN, "Department access denied"))
-            .when(actor).requireDepartment("dept-1");
+        doThrow(new AppException(ErrorCode.FORBIDDEN, "Missing permission in scope: employee.edit"))
+            .when(actor).requirePermissionIn("employee.edit", "dept-1");
         TeacherUpdateRequest request = update("Nguyễn Văn An", "an@example.com", null,
             Set.of("sp-toan"), null, 0L, null);
 

@@ -13,18 +13,29 @@ public class PositionController {
     public PositionController(PositionService service) { this.service=service; }
     @GetMapping({"/permissions", "/permissions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
     public List<PermissionResponse> permissions() { return service.permissions(); }
+    @GetMapping({"/permission-bundles", "/permission-bundles/"})
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    public List<PermissionBundleResponse> bundles() { return service.bundles(); }
     @GetMapping({"/positions", "/positions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
     public List<PositionResponse> list() { return service.list(); }
-    @PostMapping({"/positions", "/positions/"}) @PreAuthorize("hasRole('OWNER')")
+    @PostMapping({"/positions", "/positions/"}) @PreAuthorize("hasRole('OWNER') or hasAuthority('position.manage')")
     public ResponseEntity<PositionResponse> create(@Valid @RequestBody PositionRequest request) {
         var result=service.create(request);
         return ResponseEntity.created(java.net.URI.create("/positions/"+result.id())).body(result);
     }
-    @PutMapping("/positions/{id}") @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/positions/{id}") @PreAuthorize("hasRole('OWNER') or hasAuthority('position.manage')")
     public PositionResponse update(@PathVariable String id,@Valid @RequestBody PositionRequest request) {
         return service.update(id,request);
     }
-    @DeleteMapping("/positions/{id}") @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/positions/{id}") @PreAuthorize("hasRole('OWNER') or hasAuthority('position.manage')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) { service.delete(id); }
+    @GetMapping("/positions/{id}/impact") @PreAuthorize("hasRole('OWNER') or hasAuthority('position.view')")
+    public PositionImpactResponse impact(@PathVariable String id) { return service.impact(id); }
+    @PostMapping("/positions/{id}/clone") @PreAuthorize("hasRole('OWNER') or hasAuthority('position.manage')")
+    public ResponseEntity<PositionCloneResponse> clone(@PathVariable String id,
+                                                       @Valid @RequestBody PositionCloneRequest request) {
+        var result=service.clone(id,request);
+        return ResponseEntity.created(java.net.URI.create("/positions/"+result.position().id())).body(result);
+    }
 }

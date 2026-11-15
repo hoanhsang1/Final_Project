@@ -4,8 +4,11 @@ import com.mems.client.IdentityClient;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.repository.AssignmentRepository;
+import com.mems.repository.PositionRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.SubjectRepository;
 import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
@@ -58,6 +61,15 @@ class StudentClassManagementTest {
     @Mock
     private ClassStatusService classStatusService;
 
+    @Mock
+    private SubjectRepository subjectRepository;
+
+    @Mock
+    private AssignmentRepository assignmentRepository;
+
+    @Mock
+    private PositionRepository positionRepository;
+
     private OrganizationModuleGuard moduleGuard;
     private StudentService studentService;
     private SchoolClassService classService;
@@ -66,10 +78,11 @@ class StudentClassManagementTest {
     @BeforeEach
     void setUp() {
         moduleGuard = new OrganizationModuleGuard(identityClient);
-        studentService = new StudentService(studentRepository, actor, moduleGuard, audit);
+        studentService = new StudentService(studentRepository, actor, moduleGuard, audit, identityClient);
         classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit,
-            teacherRepository, classStatusService, "TEACHER_ASSIGNMENT");
-        effectivePermissions = new EffectivePermissionsService(jdbc, identityClient);
+            teacherRepository, classStatusService, subjectRepository, "TEACHER_ASSIGNMENT");
+        effectivePermissions = new EffectivePermissionsService(jdbc, identityClient,
+            assignmentRepository, positionRepository);
     }
 
     @Test
@@ -112,39 +125,39 @@ class StudentClassManagementTest {
     }
 
     @Test
-    @DisplayName("STAFF thuộc phòng KHÔNG phụ trách STUDENT_MANAGEMENT có chức vụ chứa STUDENT_EDIT: quyền hiệu lực không có STUDENT_EDIT")
+    @DisplayName("STAFF thuộc phòng KHÔNG phụ trách STUDENT_MANAGEMENT có chức vụ chứa student.edit: quyền hiệu lực không có student.edit")
     void staffInDepartmentWithoutModuleLosesStudentEditPermission() {
         when(identityClient.permissions()).thenReturn(List.of(
-            new PermissionResponse("PEOPLE_VIEW", "View department members", null),
-            new PermissionResponse("STUDENT_EDIT", "Edit students", "STUDENT_MANAGEMENT")
+            new PermissionResponse("employee.view", "View department members", null),
+            new PermissionResponse("student.edit", "Edit students", "STUDENT_MANAGEMENT")
         ));
         // Department has no modules
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-no-student"), eq("org-1")))
             .thenReturn(List.of());
 
-        Set<String> effective = effectivePermissions.compute("org-1", "dept-no-student", Set.of("PEOPLE_VIEW", "STUDENT_EDIT"));
-        assertThat(effective).containsExactly("PEOPLE_VIEW");
-        assertThat(effective).doesNotContain("STUDENT_EDIT");
+        Set<String> effective = effectivePermissions.compute("org-1", "dept-no-student", Set.of("employee.view", "student.edit"));
+        assertThat(effective).containsExactly("employee.view");
+        assertThat(effective).doesNotContain("student.edit");
     }
 
     @Test
     @DisplayName("Gỡ module khỏi phòng, refresh: quyền sinh viên biến mất")
     void removingModuleFromDepartmentStripsStudentPermissionsOnRefresh() {
         when(identityClient.permissions()).thenReturn(List.of(
-            new PermissionResponse("STUDENT_VIEW", "View students", "STUDENT_MANAGEMENT"),
-            new PermissionResponse("STUDENT_EDIT", "Edit students", "STUDENT_MANAGEMENT")
+            new PermissionResponse("student.view", "View students", "STUDENT_MANAGEMENT"),
+            new PermissionResponse("student.edit", "Edit students", "STUDENT_MANAGEMENT")
         ));
 
         // Before removal: department had STUDENT_MANAGEMENT
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
             .thenReturn(List.of("STUDENT_MANAGEMENT"));
-        Set<String> before = effectivePermissions.compute("org-1", "dept-1", Set.of("STUDENT_VIEW", "STUDENT_EDIT"));
-        assertThat(before).containsExactlyInAnyOrder("STUDENT_VIEW", "STUDENT_EDIT");
+        Set<String> before = effectivePermissions.compute("org-1", "dept-1", Set.of("student.view", "student.edit"));
+        assertThat(before).containsExactlyInAnyOrder("student.view", "student.edit");
 
         // After removal: department has no modules
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
             .thenReturn(List.of());
-        Set<String> after = effectivePermissions.compute("org-1", "dept-1", Set.of("STUDENT_VIEW", "STUDENT_EDIT"));
+        Set<String> after = effectivePermissions.compute("org-1", "dept-1", Set.of("student.view", "student.edit"));
         assertThat(after).isEmpty();
     }
 
@@ -258,5 +271,62 @@ class StudentClassManagementTest {
 
         verify(studentRepository).delete("student-1", "org-1");
         verify(audit).record(eq("org-1"), eq("user-admin"), eq("STUDENT_DELETED"), eq("student-1"), any());
+    }
+
+    @Test
+    @DisplayName("Quy tắc 12: cấp tài khoản dùng email làm username và lưu mốc tạo tài khoản")
+    void createStudentAccountProvisionsIdentityAccount() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("user-admin");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(studentRepository.require("student-1", "org-1", false)).thenReturn(
+            student("student-1", "Alice@Example.com", null));
+
+        var result = studentService.createAccount("student-1");
+
+        assertThat(result.studentId()).isEqualTo("student-1");
+        assertThat(result.username()).isEqualTo("alice@example.com");
+        assertThat(result.temporaryPassword()).isNotBlank();
+        verify(identityClient).createStudentAccount(eq("student-1"), eq("org-1"),
+            eq("alice@example.com"), eq("alice@example.com"), anyString(), eq("user-admin"));
+        verify(studentRepository).markAccountCreated("student-1", "org-1", "alice@example.com");
+        verify(audit).record(eq("org-1"), eq("user-admin"), eq("STUDENT_ACCOUNT_CREATED"),
+            eq("student-1"), any());
+    }
+
+    @Test
+    @DisplayName("Quy tắc 12: hồ sơ đã có tài khoản → 409 STUDENT_ACCOUNT_EXISTS")
+    void createStudentAccountRejectsDuplicate() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(studentRepository.require("student-1", "org-1", false)).thenReturn(
+            new StudentResponse("student-1", "org-1", "STU001", "Alice", null,
+                "alice@example.com", null, "active", null, null, null, "user-admin",
+                Instant.now(), null, "alice@example.com", Instant.now()));
+
+        assertThatThrownBy(() -> studentService.createAccount("student-1"))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("STUDENT_ACCOUNT_EXISTS"));
+        verify(identityClient, never()).createStudentAccount(anyString(), anyString(), anyString(),
+            anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("Quy tắc 12: thiếu email → 400 STUDENT_EMAIL_REQUIRED")
+    void createStudentAccountRequiresEmail() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(studentRepository.require("student-1", "org-1", false)).thenReturn(
+            student("student-1", null, null));
+
+        assertThatThrownBy(() -> studentService.createAccount("student-1"))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("STUDENT_EMAIL_REQUIRED"));
+    }
+
+    private StudentResponse student(String id, String email, Instant accountCreatedAt) {
+        return new StudentResponse(id, "org-1", "STU001", "Alice", LocalDate.of(2002, 5, 10),
+            email, null, "active", null, null, null, "user-admin", Instant.now(), null,
+            null, accountCreatedAt);
     }
 }

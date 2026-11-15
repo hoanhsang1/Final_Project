@@ -1,5 +1,7 @@
 package com.mems.controller;
 
+import com.mems.dto.StudentAccountResponse;
+import com.mems.dto.StudentClassResponse;
 import com.mems.dto.StudentRequest;
 import com.mems.dto.StudentResponse;
 import com.mems.dto.StudentUpdateRequest;
@@ -11,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,7 +26,7 @@ public class StudentController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('STUDENT_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.view')")
     public Map<String, Object> list(
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "20") int size,
@@ -34,27 +37,45 @@ public class StudentController {
         return service.list(page, size, status, classId, q);
     }
 
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.self_view')")
+    public StudentResponse me() {
+        return service.getSelf();
+    }
+
+    @GetMapping("/me/classes")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.self_view')")
+    public List<StudentClassResponse> myClasses() {
+        return service.myClasses();
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('STUDENT_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.view')")
     public StudentResponse get(@PathVariable String id) {
         return service.get(id);
     }
 
+    @PostMapping("/{id}/account")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.create_account')")
+    public ResponseEntity<StudentAccountResponse> createAccount(@PathVariable String id) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createAccount(id));
+    }
+
     @PostMapping
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('STUDENT_CREATE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.create')")
     public ResponseEntity<StudentResponse> create(@Valid @RequestBody StudentRequest request) {
         StudentResponse created = service.create(request);
         return ResponseEntity.created(URI.create("/students/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('STUDENT_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.edit')")
     public StudentResponse update(@PathVariable String id, @Valid @RequestBody StudentUpdateRequest request) {
         return service.update(id, request);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('STUDENT_DELETE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('student.delete')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.delete(id);

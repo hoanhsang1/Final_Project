@@ -261,7 +261,42 @@ INSERT IGNORE INTO class_close_event
     ('77777777-7777-4777-8777-777777777002', '55555555-5555-4555-8555-555555555005', @sample_org,
      'APPROVED', '22222222-2222-4222-8222-222222222004', NULL, CURRENT_TIMESTAMP(3));
 
+-- ---------------------------------------------------------------------------
+-- People DB: sample students (codes follow the SVxxx standard)
+-- ---------------------------------------------------------------------------
+INSERT IGNORE INTO student
+    (id, org_id, student_code, full_name, date_of_birth, email, phone, status,
+     created_by, created_at) VALUES
+    ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa001', @sample_org, 'SV001', 'Nguyễn Minh Khang', '2008-03-12',
+     'khang.nguyen@sample-mems.example', '0911000001', 'active',
+     '22222222-2222-4222-8222-222222222003', CURRENT_TIMESTAMP(3)),
+    ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa002', @sample_org, 'SV002', 'Trần Thị Lan', '2008-07-25',
+     'lan.tran@sample-mems.example', '0911000002', 'active',
+     '22222222-2222-4222-8222-222222222003', CURRENT_TIMESTAMP(3)),
+    ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa003', @sample_org, 'SV003', 'Lê Quốc Bảo', '2007-11-02',
+     'bao.le@sample-mems.example', '0911000003', 'active',
+     '22222222-2222-4222-8222-222222222003', CURRENT_TIMESTAMP(3)),
+    ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa004', @sample_org, 'SV004', 'Phạm Thu Hà', '2008-01-18',
+     'ha.pham@sample-mems.example', '0911000004', 'inactive',
+     '22222222-2222-4222-8222-222222222003', CURRENT_TIMESTAMP(3)),
+    ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa005', @sample_org, 'SV005', 'Đỗ Gia Huy', '2008-09-30',
+     'huy.do@sample-mems.example', '0911000005', 'suspended',
+     '22222222-2222-4222-8222-222222222003', CURRENT_TIMESTAMP(3));
+
+-- One class per student (class_student enforces a single active class).
+INSERT IGNORE INTO class_student (class_id, student_id, org_id, enrolled_at) VALUES
+    ('55555555-5555-4555-8555-555555555002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa001', @sample_org,
+     CURRENT_TIMESTAMP(3)),
+    ('55555555-5555-4555-8555-555555555002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa002', @sample_org,
+     CURRENT_TIMESTAMP(3)),
+    ('55555555-5555-4555-8555-555555555005', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa003', @sample_org,
+     CURRENT_TIMESTAMP(3)),
+    ('55555555-5555-4555-8555-555555555001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaa005', @sample_org,
+     CURRENT_TIMESTAMP(3));
+
 -- Verification queries (run manually):
 -- SELECT username, status FROM mems_identity_db.account WHERE org_id='11111111-1111-4111-8111-111111111111';
 -- SELECT class_code, status, close_state, teacher_id FROM mems_people_db.school_class
+--   WHERE org_id='11111111-1111-4111-8111-111111111111';
+-- SELECT student_code, full_name, status FROM mems_people_db.student
 --   WHERE org_id='11111111-1111-4111-8111-111111111111';

@@ -22,7 +22,7 @@ import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
 import { useNotify } from '../../components/LiveAnnouncer/LiveAnnouncer';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
-import { canViewClasses, hasPermission, isOwnerRole } from '../../features/auth/permissions';
+import { canReassignTeacher, canViewClasses, hasPermission, isOwnerRole } from '../../features/auth/permissions';
 import {
   CLASS_STATUS_LABEL,
   CLASS_STATUS_TAG,
@@ -38,16 +38,20 @@ import {
 } from '../../features/sprint4/labels';
 import { MSG_CLASS, MSG_S4 } from '../../features/sprint4/sprint4Messages';
 import {
+  approveCancel,
   approveClose,
   assignTeacher,
   cancelClass,
   fetchAssignableTeachers,
   fetchClassDetail,
+  fetchClassStudents,
   fetchCloseEvents,
   fetchStatusLogs,
   isForbiddenError,
   isNotFoundError,
   isStaleConflict,
+  reassignTeacher,
+  rejectCancel,
   rejectClose,
   reopenClass,
   requestClose,
@@ -58,13 +62,24 @@ import type {
   ClassDetail,
   CloseEventItem,
   StatusLogItem,
+  StudentListItem,
 } from '../../features/sprint4/types';
 import { useAuthStore } from '../../stores/authStore';
 
 const { Text } = Typography;
 const { TextArea } = Input;
 
-type ModalKind = 'assign' | 'cancel' | 'requestClose' | 'approve' | 'reject' | 'reopen' | null;
+type ModalKind =
+  | 'assign'
+  | 'reassign'
+  | 'cancel'
+  | 'requestClose'
+  | 'approve'
+  | 'reject'
+  | 'approveCancel'
+  | 'rejectCancel'
+  | 'reopen'
+  | null;
 
 /** §6.4 — chỉ hủy được lớp chưa bắt đầu / đang diễn ra và chưa xin đóng. */
 const CANCELLABLE_STATUSES = ['CHUA_BAT_DAU', 'DANG_DIEN_RA'];
@@ -94,11 +109,12 @@ export default function ClassDetailPage() {
   const isOwner = isOwnerRole(backendRoles);
   const canView = canViewClasses(isOwner, permissions);
 
-  const canAssign = isOwner || hasPermission(permissions, 'CLASS_ASSIGN_TEACHER');
-  const canCancel = isOwner || hasPermission(permissions, 'CLASS_CANCEL');
-  const canRequestClose = isOwner || hasPermission(permissions, 'CLASS_CLOSE_REQUEST');
-  const canApproveClose = isOwner || hasPermission(permissions, 'CLASS_CLOSE_APPROVE');
-  const canReopen = isOwner || hasPermission(permissions, 'CLASS_REOPEN');
+  const canAssign = isOwner || hasPermission(permissions, 'class.assign_teacher');
+  const canReassign = canReassignTeacher(isOwner, permissions);
+  const canCancel = isOwner || hasPermission(permissions, 'class.cancel');
+  const canRequestClose = isOwner || hasPermission(permissions, 'class.request_close');
+  const canApproveClose = isOwner || hasPermission(permissions, 'class.approve_close');
+  const canReopen = isOwner || hasPermission(permissions, 'class.reopen');
 
   const [modal, setModal] = useState<ModalKind>(null);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -132,6 +148,12 @@ export default function ClassDetailPage() {
     enabled: !!id && canView,
   });
 
+  const studentsQuery = useQuery({
+    queryKey: ['class', id, 'students'],
+    queryFn: () => fetchClassStudents(id!),
+    enabled: !!id && canView,
+  });
+
   const assignableQuery = useQuery({
     queryKey: ['teachers', 'assignable', { assignPage, assignKeyword }],
     queryFn: () =>
@@ -140,7 +162,7 @@ export default function ClassDetailPage() {
         size: ASSIGN_PAGE_SIZE,
         q: assignKeyword || undefined,
       }),
-    enabled: modal === 'assign',
+    enabled: modal === 'assign' || modal === 'reassign',
   });
 
   const detail = detailQuery.data;
@@ -163,6 +185,15 @@ export default function ClassDetailPage() {
   }, [eventsQuery.data]);
 
   const isRequester = !!currentUserId && latestRequesterId === currentUserId;
+
+  /** Quy tắc 14 — người gửi yêu cầu hủy mới nhất (không được tự duyệt). */
+  const latestCancelRequesterId = useMemo(() => {
+    const requested = (eventsQuery.data ?? []).filter((event) => event.action === 'CANCEL_REQUESTED');
+    if (requested.length === 0) return null;
+    return requested[requested.length - 1].actorId ?? null;
+  }, [eventsQuery.data]);
+
+  const isCancelRequester = !!currentUserId && latestCancelRequesterId === currentUserId;
 
   /** Sau mọi thao tác: cập nhật cache chi tiết + làm mới danh sách/lịch sử. */
   const applyClassUpdate = (updated: ClassDetail) => {
@@ -225,6 +256,20 @@ export default function ClassDetailPage() {
     onError: handleMutationError,
   });
 
+  const reassignMut = useMutation({
+    mutationFn: (teacherId: string) => {
+      const version = detailQuery.data?.version;
+      if (version == null) throw new Error(MSG_S4.INTERNAL_ERROR);
+      return reassignTeacher(id!, { teacherId, version });
+    },
+    onSuccess: (updated) => {
+      notify.success(MSG_CLASS.REASSIGNED);
+      applyClassUpdate(updated);
+      closeModal();
+    },
+    onError: handleMutationError,
+  });
+
   const cancelMut = useMutation({
     mutationFn: (reason: string) => {
       const version = detailQuery.data?.version;
@@ -232,7 +277,11 @@ export default function ClassDetailPage() {
       return cancelClass(id!, { reason, version });
     },
     onSuccess: (updated) => {
-      notify.success(MSG_CLASS.CANCELED);
+      if (updated.cancelState === 'PENDING') {
+        notify.success(MSG_CLASS.CANCEL_REQUESTED);
+      } else {
+        notify.success(MSG_CLASS.CANCELED);
+      }
       applyClassUpdate(updated);
       closeModal();
     },
@@ -273,6 +322,26 @@ export default function ClassDetailPage() {
     mutationFn: (reason: string) => reopenClass(id!, { reason }),
     onSuccess: (updated) => {
       notify.success(MSG_CLASS.REOPENED);
+      applyClassUpdate(updated);
+      closeModal();
+    },
+    onError: handleMutationError,
+  });
+
+  const approveCancelMut = useMutation({
+    mutationFn: () => approveCancel(id!),
+    onSuccess: (updated) => {
+      notify.success(MSG_CLASS.CANCEL_APPROVED);
+      applyClassUpdate(updated);
+      closeModal();
+    },
+    onError: handleMutationError,
+  });
+
+  const rejectCancelMut = useMutation({
+    mutationFn: (reason: string) => rejectCancel(id!, { reason }),
+    onSuccess: (updated) => {
+      notify.success(MSG_CLASS.CANCEL_REJECTED);
       applyClassUpdate(updated);
       closeModal();
     },
@@ -373,6 +442,41 @@ export default function ClassDetailPage() {
     [],
   );
 
+  const studentColumns = useMemo<ColumnsType<StudentListItem>>(
+    () => [
+      {
+        title: 'Mã sinh viên',
+        dataIndex: 'studentCode',
+        width: 130,
+        render: (value: string | null | undefined) => value || '—',
+      },
+      {
+        title: 'Họ tên',
+        dataIndex: 'fullName',
+        render: (value: string | null | undefined) => value || '—',
+      },
+      {
+        title: 'Ngày sinh',
+        dataIndex: 'dateOfBirth',
+        width: 130,
+        render: (value: string | null | undefined) => formatDate(value),
+      },
+      {
+        title: 'Email',
+        dataIndex: 'email',
+        width: 220,
+        render: (value: string | null | undefined) => value || '—',
+      },
+      {
+        title: 'Số điện thoại',
+        dataIndex: 'phone',
+        width: 150,
+        render: (value: string | null | undefined) => value || '—',
+      },
+    ],
+    [],
+  );
+
   if (!canView) return <ForbiddenNotice />;
   if (detailQuery.isLoading) return <PageLoading />;
 
@@ -410,13 +514,20 @@ export default function ClassDetailPage() {
 
   const classStatus = detail.status ?? null;
   const closeState = detail.closeState ?? 'NONE';
+  const cancelState = detail.cancelState ?? 'NONE';
   const isClosed = closeState === 'CLOSED';
   const isFinished = classStatus === 'DA_KET_THUC' || classStatus === 'DA_HUY';
-  const canChangeTeacher = canAssign && !isFinished && !isClosed;
+  const canChangeTeacher = (canAssign || canReassign) && !isFinished && !isClosed;
   const canCancelClass =
-    canCancel && closeState === 'NONE' && !!classStatus && CANCELLABLE_STATUSES.includes(classStatus);
+    canCancel &&
+    closeState === 'NONE' &&
+    cancelState === 'NONE' &&
+    !!classStatus &&
+    CANCELLABLE_STATUSES.includes(classStatus);
   const canRequest = canRequestClose && closeState === 'NONE' && classStatus !== 'DA_HUY';
   const canApproveOrReject = closeState === 'PENDING' && canApproveClose && !isRequester;
+  const canApproveOrRejectCancel =
+    cancelState === 'PENDING' && canApproveClose && !isCancelRequester;
   const canReopenClass = closeState === 'CLOSED' && canReopen;
 
   const submitAssign = () => {
@@ -425,6 +536,10 @@ export default function ClassDetailPage() {
       return;
     }
     setModalError(null);
+    if (modal === 'reassign') {
+      reassignMut.mutate(selectedTeacherId);
+      return;
+    }
     assignMut.mutate(selectedTeacherId);
   };
 
@@ -452,6 +567,10 @@ export default function ClassDetailPage() {
     try {
       const values = await rejectForm.validateFields();
       setModalError(null);
+      if (modal === 'rejectCancel') {
+        rejectCancelMut.mutate(values.reason.trim());
+        return;
+      }
       rejectMut.mutate(values.reason.trim());
     } catch {
       // Lỗi hiển thị ngay dưới trường — không gửi request.
@@ -490,7 +609,14 @@ export default function ClassDetailPage() {
         }
         extra={
           <Space wrap>
-            {canChangeTeacher && <Button onClick={() => openModal('assign')}>{MSG_CLASS.ASSIGN}</Button>}
+            {canChangeTeacher && !detail.needsReassignment && (
+              <Button onClick={() => openModal('assign')}>{MSG_CLASS.ASSIGN}</Button>
+            )}
+            {detail.needsReassignment && !isFinished && !isClosed && canReassign && (
+              <Button type="primary" danger onClick={() => openModal('reassign')}>
+                {MSG_CLASS.REASSIGN_ACTION}
+              </Button>
+            )}
             {canRequest && (
               <Button onClick={() => openModal('requestClose')}>{MSG_CLASS.REQUEST_CLOSE}</Button>
             )}
@@ -504,6 +630,14 @@ export default function ClassDetailPage() {
                 {MSG_CLASS.REJECT_CLOSE}
               </Button>
             )}
+            {canApproveOrRejectCancel && (
+              <Button type="primary" danger onClick={() => openModal('approveCancel')}>
+                {MSG_CLASS.APPROVE_CANCEL}
+              </Button>
+            )}
+            {canApproveOrRejectCancel && (
+              <Button onClick={() => openModal('rejectCancel')}>{MSG_CLASS.REJECT_CANCEL}</Button>
+            )}
             {canReopenClass && <Button onClick={() => openModal('reopen')}>{MSG_CLASS.REOPEN}</Button>}
             {canCancelClass && (
               <Button danger onClick={() => openModal('cancel')}>
@@ -513,6 +647,32 @@ export default function ClassDetailPage() {
           </Space>
         }
       />
+
+      {detail.needsReassignment && (
+        <Alert
+          type="warning"
+          showIcon
+          message={MSG_CLASS.REASSIGN_BANNER_TITLE}
+          description={
+            detail.reassignmentReason
+              ? `${MSG_CLASS.REASSIGN_BANNER_DESC} (${MSG_CLASS.REASSIGN_REASON}: ${detail.reassignmentReason})`
+              : MSG_CLASS.REASSIGN_BANNER_DESC
+          }
+        />
+      )}
+
+      {cancelState === 'PENDING' && (
+        <Alert
+          type="warning"
+          showIcon
+          message={MSG_CLASS.CANCEL_REQUEST_BANNER_TITLE}
+          description={
+            detail.cancelRequestReason
+              ? `${MSG_CLASS.CANCEL_REQUEST_BANNER_DESC} (${MSG_CLASS.CANCEL_REQUEST_REASON_LABEL}: ${detail.cancelRequestReason})`
+              : MSG_CLASS.CANCEL_REQUEST_BANNER_DESC
+          }
+        />
+      )}
 
       {isClosed && (
         <Alert
@@ -544,6 +704,11 @@ export default function ClassDetailPage() {
                 <Descriptions.Item label="Mã lớp">{detail.classCode || '—'}</Descriptions.Item>
                 <Descriptions.Item label="Tên lớp">{detail.name || '—'}</Descriptions.Item>
                 <Descriptions.Item label="Năm học">{detail.academicYear || '—'}</Descriptions.Item>
+                <Descriptions.Item label={MSG_CLASS.SUBJECT}>
+                  {detail.subjectName || (
+                    <Text type="secondary">{MSG_CLASS.SUBJECT_UNASSIGNED}</Text>
+                  )}
+                </Descriptions.Item>
                 <Descriptions.Item label="Sĩ số">
                   {detail.studentCount == null ? '—' : detail.studentCount}
                 </Descriptions.Item>
@@ -571,6 +736,11 @@ export default function ClassDetailPage() {
                     {detail.cancelReason}
                   </Descriptions.Item>
                 )}
+                {detail.cancelRequestReason && (
+                  <Descriptions.Item label={MSG_CLASS.CANCEL_REQUEST_REASON_LABEL} span={2}>
+                    {detail.cancelRequestReason}
+                  </Descriptions.Item>
+                )}
                 {detail.closeRequestNote && (
                   <Descriptions.Item label="Ghi chú yêu cầu đóng" span={2}>
                     {detail.closeRequestNote}
@@ -582,6 +752,35 @@ export default function ClassDetailPage() {
                   </Descriptions.Item>
                 )}
               </Descriptions>
+            ),
+          },
+          {
+            key: 'students',
+            label: MSG_CLASS.TAB_STUDENTS,
+            children: studentsQuery.isError ? (
+              <Alert
+                type="error"
+                showIcon
+                role="alert"
+                message={MSG_CLASS.STUDENTS_LOAD_ERROR}
+                description={sprint4ErrorMessage(studentsQuery.error)}
+                action={
+                  <Button size="small" onClick={() => studentsQuery.refetch()}>
+                    {MSG_S4.RETRY}
+                  </Button>
+                }
+              />
+            ) : (
+              <Table<StudentListItem>
+                rowKey="id"
+                size="small"
+                loading={studentsQuery.isLoading}
+                columns={studentColumns}
+                dataSource={studentsQuery.data ?? []}
+                locale={{ emptyText: <Empty description={MSG_CLASS.STUDENTS_EMPTY} /> }}
+                pagination={false}
+                scroll={{ x: 760 }}
+              />
             ),
           },
           {
@@ -647,13 +846,13 @@ export default function ClassDetailPage() {
 
       {/* §6.3 — gán/đổi giáo viên: chỉ giáo viên DANG_DAY, có tìm kiếm + phân trang. */}
       <Modal
-        title={MSG_CLASS.ASSIGN_TITLE}
-        open={modal === 'assign'}
+        title={modal === 'reassign' ? MSG_CLASS.REASSIGN_TITLE : MSG_CLASS.ASSIGN_TITLE}
+        open={modal === 'assign' || modal === 'reassign'}
         onCancel={closeModal}
         onOk={submitAssign}
         okText={MSG_S4.CONFIRM}
         cancelText={MSG_S4.CANCEL}
-        confirmLoading={assignMut.isPending}
+        confirmLoading={assignMut.isPending || reassignMut.isPending}
         okButtonProps={{ disabled: !selectedTeacherId }}
         forceRender
         width={720}
@@ -727,6 +926,11 @@ export default function ClassDetailPage() {
       >
         <Flex vertical gap={token.marginSM}>
           {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
+          <Text type="secondary">
+            {(detail.studentCount ?? 0) > 0
+              ? MSG_CLASS.CANCEL_REQUEST_BANNER_DESC
+              : 'Lớp chưa có sinh viên nên sẽ được hủy ngay sau khi xác nhận.'}
+          </Text>
           <Form form={cancelForm} layout="vertical">
             <Form.Item
               name="reason"
@@ -783,14 +987,14 @@ export default function ClassDetailPage() {
       </Modal>
 
       <Modal
-        title={MSG_CLASS.REJECT_CLOSE}
-        open={modal === 'reject'}
+        title={modal === 'rejectCancel' ? MSG_CLASS.REJECT_CANCEL : MSG_CLASS.REJECT_CLOSE}
+        open={modal === 'reject' || modal === 'rejectCancel'}
         onCancel={closeModal}
         onOk={submitReject}
-        okText={MSG_CLASS.REJECT_CLOSE}
+        okText={modal === 'rejectCancel' ? MSG_CLASS.REJECT_CANCEL : MSG_CLASS.REJECT_CLOSE}
         cancelText={MSG_S4.CANCEL}
         okButtonProps={{ danger: true }}
-        confirmLoading={rejectMut.isPending}
+        confirmLoading={rejectMut.isPending || rejectCancelMut.isPending}
         forceRender
       >
         <Flex vertical gap={token.marginSM}>
@@ -807,6 +1011,26 @@ export default function ClassDetailPage() {
               <TextArea rows={3} />
             </Form.Item>
           </Form>
+        </Flex>
+      </Modal>
+
+      <Modal
+        title={MSG_CLASS.APPROVE_CANCEL}
+        open={modal === 'approveCancel'}
+        onCancel={closeModal}
+        onOk={() => {
+          setModalError(null);
+          approveCancelMut.mutate();
+        }}
+        okText={MSG_CLASS.APPROVE_CANCEL}
+        cancelText={MSG_S4.CANCEL}
+        okButtonProps={{ danger: true }}
+        confirmLoading={approveCancelMut.isPending}
+        forceRender
+      >
+        <Flex vertical gap={token.marginSM}>
+          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
+          <Text>{MSG_CLASS.APPROVE_CANCEL_CONFIRM}</Text>
         </Flex>
       </Modal>
 

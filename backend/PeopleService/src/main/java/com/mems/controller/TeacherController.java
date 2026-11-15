@@ -20,14 +20,14 @@ public class TeacherController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PEOPLE_EDIT')")
+    @PreAuthorize("hasAuthority('employee.create')")
     public ResponseEntity<CreatedTeacherResponse> create(@Valid @RequestBody TeacherCreateRequest request) {
         var created = service.create(request);
         return ResponseEntity.created(URI.create("/teachers/" + created.userId())).body(created);
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('PEOPLE_VIEW','PEOPLE_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
     public Map<String, Object> list(@RequestParam(defaultValue = "1") int page,
                                     @RequestParam(defaultValue = "20") int size,
                                     @RequestParam(required = false) String q,
@@ -37,7 +37,7 @@ public class TeacherController {
     }
 
     @GetMapping("/assignable")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_ASSIGN_TEACHER')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.assign_teacher')")
     public Map<String, Object> assignable(@RequestParam(defaultValue = "1") int page,
                                           @RequestParam(defaultValue = "20") int size,
                                           @RequestParam(required = false) String q) {
@@ -45,13 +45,13 @@ public class TeacherController {
     }
 
     @GetMapping("/{staffId}")
-    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('PEOPLE_VIEW','PEOPLE_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
     public TeacherDetailResponse get(@PathVariable String staffId) {
         return service.get(staffId);
     }
 
     @PutMapping("/{staffId}")
-    @PreAuthorize("hasAuthority('PEOPLE_EDIT')")
+    @PreAuthorize("hasAuthority('employee.edit')")
     public TeacherDetailResponse update(@PathVariable String staffId,
                                         @Valid @RequestBody TeacherUpdateRequest request) {
         return service.update(staffId, request);

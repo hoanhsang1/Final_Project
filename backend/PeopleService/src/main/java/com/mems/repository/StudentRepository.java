@@ -1,5 +1,6 @@
 package com.mems.repository;
 
+import com.mems.dto.StudentClassResponse;
 import com.mems.dto.StudentResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
@@ -35,7 +36,9 @@ public class StudentRepository {
         rs.getString("class_name"),
         rs.getString("created_by"),
         rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null,
-        rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null
+        rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null,
+        rs.getString("account_username"),
+        rs.getTimestamp("account_created_at") != null ? rs.getTimestamp("account_created_at").toInstant() : null
     );
 
     public Map<String, Object> list(String orgId, int page, int size, String status, String classId, String q) {
@@ -73,6 +76,7 @@ public class StudentRepository {
         int offset = (page - 1) * size;
         String querySql = """
             SELECT s.id, s.org_id, s.student_code, s.full_name, s.date_of_birth, s.email, s.phone, s.status,
+                   s.account_username, s.account_created_at,
                    cs.class_id, sc.class_code, sc.name AS class_name,
                    s.created_by, s.created_at, s.updated_at
             FROM student s
@@ -97,6 +101,7 @@ public class StudentRepository {
     public StudentResponse require(String id, String orgId, boolean lock) {
         String sql = """
             SELECT s.id, s.org_id, s.student_code, s.full_name, s.date_of_birth, s.email, s.phone, s.status,
+                   s.account_username, s.account_created_at,
                    cs.class_id, sc.class_code, sc.name AS class_name,
                    s.created_by, s.created_at, s.updated_at
             FROM student s
@@ -120,6 +125,16 @@ public class StudentRepository {
         if (count != null && count > 0) {
             throw new AppException(ErrorCode.CONFLICT, "Student code already exists in organization");
         }
+    }
+
+    /** Sinh mã sinh viên kế tiếp theo chuẩn SV001, SV002… */
+    public String nextStudentCode(String orgId) {
+        Integer max = jdbc.queryForObject("""
+            SELECT COALESCE(MAX(CAST(SUBSTRING(student_code, 3) AS UNSIGNED)), 0)
+            FROM student
+            WHERE org_id = ? AND student_code REGEXP '^SV[0-9]+$'
+            """, Integer.class, orgId);
+        return String.format("SV%03d", (max == null ? 0 : max) + 1);
     }
 
     public StudentResponse create(String id, String orgId, String studentCode, String fullName,
@@ -159,9 +174,38 @@ public class StudentRepository {
         );
     }
 
+    public void markAccountCreated(String id, String orgId, String username) {
+        jdbc.update("""
+            UPDATE student SET account_username = ?, account_created_at = ?, updated_at = ?
+            WHERE id = ? AND org_id = ? AND deleted_at IS NULL
+            """, username, Timestamp.from(Instant.now()), Timestamp.from(Instant.now()), id, orgId);
+    }
+
+    public List<StudentClassResponse> classesOf(String studentId, String orgId) {
+        return jdbc.query("""
+            SELECT sc.id, sc.class_code, sc.name, sc.academic_year, sc.start_date, sc.end_date,
+                   sc.status, sc.close_state,
+                   sp.full_name AS teacher_name, sub.name AS subject_name
+            FROM class_student cs
+            JOIN school_class sc ON sc.id = cs.class_id AND sc.org_id = cs.org_id AND sc.deleted_at IS NULL
+            LEFT JOIN staff_profile sp ON sp.user_id = sc.teacher_id AND sp.org_id = sc.org_id
+            LEFT JOIN subject sub ON sub.id = sc.subject_id AND sub.org_id = sc.org_id
+            WHERE cs.student_id = ? AND cs.org_id = ?
+            ORDER BY sc.class_code
+            """, (rs, n) -> new StudentClassResponse(
+                rs.getString("id"), rs.getString("class_code"), rs.getString("name"),
+                rs.getString("academic_year"),
+                rs.getDate("start_date") != null ? rs.getDate("start_date").toLocalDate() : null,
+                rs.getDate("end_date") != null ? rs.getDate("end_date").toLocalDate() : null,
+                rs.getString("status"), rs.getString("close_state"),
+                rs.getString("teacher_name"), rs.getString("subject_name")
+            ), studentId, orgId);
+    }
+
     public List<StudentResponse> findByClassId(String classId, String orgId) {
         String sql = """
             SELECT s.id, s.org_id, s.student_code, s.full_name, s.date_of_birth, s.email, s.phone, s.status,
+                   s.account_username, s.account_created_at,
                    cs.class_id, sc.class_code, sc.name AS class_name,
                    s.created_by, s.created_at, s.updated_at
             FROM student s

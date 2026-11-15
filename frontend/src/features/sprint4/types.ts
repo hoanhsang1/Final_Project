@@ -31,6 +31,19 @@ export interface DepartmentOption {
   name: string;
 }
 
+/** `GET /departments/{id}/members` — một nhân viên thuộc phòng ban. */
+export interface DepartmentMemberItem {
+  userId: string;
+  username: string;
+  departmentId: string;
+  /** `OWNER` | `MANAGER` | `STAFF`. */
+  role: string;
+  appointedBy?: string | null;
+  appointedAt?: string | null;
+  positionIds?: string[] | null;
+  permissions?: string[] | null;
+}
+
 /** §3 — `specialties[].id` + `name`. */
 export interface Specialty {
   id: string;
@@ -45,6 +58,9 @@ export interface TeacherClass {
   status?: ClassStatus | null;
   closeState?: ClassCloseState | null;
   closeLabel?: string | null;
+  /** Quy tắc 17 — giáo viên chuyển phòng nhưng lớp vẫn giữ nguyên. */
+  needsReassignment?: boolean;
+  reassignmentReason?: string | null;
 }
 
 /** §5.2 — một dòng lịch sử thay đổi hồ sơ. */
@@ -91,7 +107,8 @@ export interface TeacherCreatePayload {
   email: string;
   role: 'STAFF' | 'MANAGER';
   positionIds: string[];
-  staffCode: string;
+  /** Bỏ trống để BE tự sinh theo chuẩn `GV001`, `GV002`… */
+  staffCode?: string;
   fullName: string;
   phone: string;
   teacherProfile: {
@@ -147,8 +164,26 @@ export interface ClassListItem {
   closeState?: ClassCloseState | null;
   teacher?: ClassTeacher | null;
   studentCount?: number | null;
+  /** Quy tắc 17 — lớp cần phân công lại sau khi giáo viên chuyển phòng ban. */
+  needsReassignment?: boolean;
+  reassignmentReason?: string | null;
+  /** Quy tắc 13 — môn học của lớp, dùng để đối chiếu chuyên môn giáo viên. */
+  subjectId?: string | null;
+  subjectName?: string | null;
+  /** Quy tắc 14 — yêu cầu hủy lớp có sinh viên chờ trưởng phòng duyệt. */
+  cancelState?: ClassCancelState | null;
+  cancelRequestReason?: string | null;
   /** §6.1 — gửi kèm khi sửa/hủy/gán. */
   version: number;
+}
+
+/** Quy tắc 14 — trạng thái duyệt yêu cầu hủy lớp. */
+export type ClassCancelState = 'NONE' | 'PENDING';
+
+/** Quy tắc 13 — môn học dùng cho form lớp và đối chiếu giáo viên. */
+export interface Subject {
+  id: string;
+  name: string;
 }
 
 /** §6.2 — chi tiết lớp. */
@@ -239,8 +274,81 @@ export interface CloseEventItem {
   reason?: string | null;
 }
 
-/* ── Dùng chung ────────────────────────────────────────────────────────── */
+/** §6.1 — body `POST /api/classes`. */
+export interface ClassCreatePayload {
+  classCode: string;
+  name: string;
+  academicYear?: string | null;
+  /** Quy tắc 13 — bắt buộc trên UI để đối chiếu chuyên môn giáo viên. */
+  subjectId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
 
+/* ── Sinh viên ─────────────────────────────────────────────────────────── */
+
+/** Trạng thái hồ sơ sinh viên (đúng regex BE `StudentRequest`). */
+export type StudentStatus = 'active' | 'inactive' | 'suspended';
+
+/** Một dòng danh sách sinh viên — `classCode`/`className` null khi chưa xếp lớp. */
+export interface StudentListItem {
+  id: string;
+  studentCode?: string | null;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: StudentStatus | null;
+  classId?: string | null;
+  classCode?: string | null;
+  className?: string | null;
+  /** Quy tắc 12 — tài khoản đăng nhập đã tạo hay chưa. */
+  accountUsername?: string | null;
+  accountCreatedAt?: string | null;
+}
+
+/** Quy tắc 12 — `POST /students/{id}/account` trả mật khẩu tạm một lần. */
+export interface StudentAccountResponse {
+  studentId: string;
+  username: string;
+  temporaryPassword: string;
+}
+
+/** Quy tắc 12 — lớp của chính sinh viên đang đăng nhập (`GET /students/me/classes`). */
+export interface StudentClass {
+  id: string;
+  classCode?: string | null;
+  name?: string | null;
+  academicYear?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status?: ClassStatus | null;
+  closeState?: ClassCloseState | null;
+  teacherName?: string | null;
+  subjectName?: string | null;
+}
+
+/** `POST /api/students`. */
+export interface StudentCreatePayload {
+  /** Bỏ trống để BE tự sinh theo chuẩn `SV001`, `SV002`… */
+  studentCode?: string;
+  fullName: string;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: StudentStatus;
+}
+
+/** `PUT /api/students/{id}` — `studentCode` chỉ đọc. */
+export interface StudentUpdatePayload {
+  fullName: string;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: StudentStatus;
+}
+
+/* ── Dùng chung ────────────────────────────────────────────────────────── */
 /** §1 — mọi danh sách phân trang: `page` từ 1, `size` 1–100. */
 export interface PagedResponse<T> {
   items: T[];

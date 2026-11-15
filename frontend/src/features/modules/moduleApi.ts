@@ -1,4 +1,4 @@
-import { apiClient } from '../../lib/api';
+import { apiClient, unwrapList } from '../../lib/api';
 
 /**
  * Danh mục module hệ thống — `GET /api/v1/modules`.
@@ -25,6 +25,6 @@ export const moduleCatalogKey = ['modules'] as const;
 export const MODULE_CATALOG_STALE_TIME = 10 * 60 * 1000;
 
 export async function fetchModuleCatalog(): Promise<ModuleCatalogItem[]> {
-  const { data } = await apiClient.get<ModuleCatalogItem[]>('/api/v1/modules');
-  return data;
+  const { data } = await apiClient.get('/api/v1/modules');
+  return unwrapList<ModuleCatalogItem>(data);
 }

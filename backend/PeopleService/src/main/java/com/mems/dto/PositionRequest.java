@@ -8,4 +8,17 @@ public record PositionRequest(
     @NotNull(message = "PERMISSIONS_REQUIRED")
     @Size(max = 50, message = "PERMISSIONS_TOO_MANY")
     Set<@NotBlank(message = "PERMISSION_CODE_REQUIRED")
-        @Size(max = 100, message = "PERMISSION_CODE_TOO_LONG") String> permissions) {}
+        @Size(max = 100, message = "PERMISSION_CODE_TOO_LONG") String> permissions,
+    Set<@NotBlank(message = "PERMISSION_CODE_REQUIRED")
+        @Size(max = 100, message = "PERMISSION_CODE_TOO_LONG") String> bundleCodes,
+    String scope,
+    String departmentId) {
+    public PositionRequest(String name, String description, Set<String> permissions) {
+        this(name, description, permissions, Set.of(), "DEPARTMENT", null);
+    }
+    public PositionRequest {
+        permissions = permissions == null ? Set.of() : permissions;
+        bundleCodes = bundleCodes == null ? Set.of() : bundleCodes;
+        scope = scope == null || scope.isBlank() ? "DEPARTMENT" : scope.trim().toUpperCase();
+    }
+}

@@ -12,7 +12,21 @@ CREATE TABLE IF NOT EXISTS position (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  name VARCHAR(200) NOT NULL, description VARCHAR(1000), created_at TIMESTAMP NOT NULL,
  profile_type VARCHAR(20) NOT NULL DEFAULT 'GENERAL',
+ scope VARCHAR(20) NOT NULL DEFAULT 'DEPARTMENT', department_id VARCHAR(36), deleted_at TIMESTAMP,
  UNIQUE(org_id,name), UNIQUE(id,org_id)
+);
+CREATE TABLE IF NOT EXISTS position_bundle (
+ position_id VARCHAR(36) NOT NULL, bundle_code VARCHAR(100) NOT NULL,
+ PRIMARY KEY(position_id,bundle_code),
+ FOREIGN KEY(position_id) REFERENCES position(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS assignment (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+ position_id VARCHAR(36) NOT NULL, scope_type VARCHAR(20) NOT NULL, department_id VARCHAR(36),
+ effective_from TIMESTAMP NOT NULL, effective_to TIMESTAMP, status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+ assigned_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, revoked_at TIMESTAMP, revoked_by VARCHAR(36),
+ reason VARCHAR(1000), revoked_reason VARCHAR(1000),
+ FOREIGN KEY(position_id) REFERENCES position(id)
 );
 CREATE TABLE IF NOT EXISTS position_seed (
  org_id VARCHAR(36) PRIMARY KEY, seeded_at TIMESTAMP NOT NULL
@@ -25,8 +39,14 @@ CREATE TABLE IF NOT EXISTS position_permission (
 CREATE TABLE IF NOT EXISTS department_member (
  user_id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, department_id VARCHAR(36) NOT NULL,
  role VARCHAR(20) NOT NULL, appointed_by VARCHAR(36) NOT NULL, appointed_at TIMESTAMP NOT NULL,
- username VARCHAR(100),
+ username VARCHAR(100), status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', resigned_at TIMESTAMP,
  UNIQUE(user_id,org_id), FOREIGN KEY(department_id,org_id) REFERENCES department(id,org_id)
+);
+CREATE TABLE IF NOT EXISTS resignation_request (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+ department_id VARCHAR(36) NOT NULL, reason VARCHAR(1000) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ requested_by VARCHAR(36) NOT NULL, requested_at TIMESTAMP NOT NULL,
+ decided_by VARCHAR(36), decided_at TIMESTAMP, decision_note VARCHAR(1000)
 );
 CREATE TABLE IF NOT EXISTS member_position (
  user_id VARCHAR(36) NOT NULL,position_id VARCHAR(36) NOT NULL,org_id VARCHAR(36) NOT NULL,
@@ -79,6 +99,7 @@ CREATE TABLE IF NOT EXISTS student (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  student_code VARCHAR(100) NOT NULL, full_name VARCHAR(200) NOT NULL,
  date_of_birth DATE, email VARCHAR(255), phone VARCHAR(50), status VARCHAR(20) NOT NULL DEFAULT 'active',
+ account_username VARCHAR(100), account_created_at TIMESTAMP,
  created_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP, deleted_at TIMESTAMP,
  UNIQUE(org_id, student_code)
 );
@@ -88,6 +109,8 @@ CREATE TABLE IF NOT EXISTS school_class (
  academic_year VARCHAR(50), status VARCHAR(20) NOT NULL DEFAULT 'active',
  teacher_id VARCHAR(36), start_date DATE, end_date DATE, subject_id VARCHAR(36),
  version BIGINT NOT NULL DEFAULT 0, close_state VARCHAR(10) NOT NULL DEFAULT 'NONE',
+ cancel_state VARCHAR(10) NOT NULL DEFAULT 'NONE', cancel_request_reason VARCHAR(1000),
+ needs_reassignment BOOLEAN NOT NULL DEFAULT FALSE, reassignment_reason VARCHAR(255),
  created_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP, deleted_at TIMESTAMP,
  UNIQUE(org_id, class_code)
 );
@@ -104,4 +127,36 @@ CREATE TABLE IF NOT EXISTS class_status_log (
 CREATE TABLE IF NOT EXISTS class_close_event (
  id VARCHAR(36) PRIMARY KEY, class_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
  action VARCHAR(20) NOT NULL, actor_id VARCHAR(36) NOT NULL, reason VARCHAR(1000), created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS transfer_request (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+ from_department_id VARCHAR(36) NOT NULL, to_department_id VARCHAR(36) NOT NULL,
+ reason VARCHAR(1000) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ requested_by VARCHAR(36) NOT NULL, requested_at TIMESTAMP NOT NULL,
+ applied_at TIMESTAMP, applied_by VARCHAR(36)
+);
+CREATE TABLE IF NOT EXISTS transfer_approval (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, request_id VARCHAR(36) NOT NULL,
+ step VARCHAR(20) NOT NULL, decision VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ decided_by VARCHAR(36), decided_at TIMESTAMP, note VARCHAR(1000),
+ UNIQUE(request_id, step)
+);
+CREATE TABLE IF NOT EXISTS notification (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+ type VARCHAR(50) NOT NULL, title VARCHAR(255) NOT NULL, body VARCHAR(1000),
+ entity_type VARCHAR(50), entity_id VARCHAR(36), read_at TIMESTAMP, created_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS delegation (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
+ delegator_id VARCHAR(36) NOT NULL, delegate_id VARCHAR(36) NOT NULL,
+ scope VARCHAR(20) NOT NULL DEFAULT 'ORGANIZATION',
+ effective_from TIMESTAMP NOT NULL, effective_to TIMESTAMP,
+ status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE', reason VARCHAR(1000),
+ created_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP,
+ revoked_by VARCHAR(36), revoked_at TIMESTAMP, revoked_reason VARCHAR(1000)
+);
+CREATE TABLE IF NOT EXISTS delegation_permission (
+ delegation_id VARCHAR(36) NOT NULL, permission_code VARCHAR(100) NOT NULL,
+ PRIMARY KEY (delegation_id, permission_code),
+ FOREIGN KEY (delegation_id) REFERENCES delegation(id) ON DELETE CASCADE
 );

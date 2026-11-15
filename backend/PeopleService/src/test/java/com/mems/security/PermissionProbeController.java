@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class PermissionProbeController {
     @GetMapping("/test/class-assignment")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_ASSIGN_TEACHER')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.assign_teacher')")
     String assign() {
         return "ok";
     }

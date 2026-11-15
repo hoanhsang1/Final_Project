@@ -32,8 +32,8 @@ class DefaultPositionSeederTest {
         assertThat(profileType("org-new", "Giáo viên")).isEqualTo("TEACHER");
         assertThat(profileType("org-new", "Giáo vụ")).isEqualTo("GENERAL");
         assertThat(permissions("org-new", "Giáo viên"))
-            .containsExactly("CLASS_VIEW", "SCHEDULE_VIEW", "STUDENT_VIEW");
-        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(18);
+            .containsExactly("class.view", "schedule.view", "student.view");
+        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(41);
     }
 
     @Test
@@ -59,7 +59,7 @@ class DefaultPositionSeederTest {
             VALUES (?, ?, ?, ?, ?, ?)
             """, "pos-custom", "org-existing", "Giáo vụ", "Owner description", Timestamp.from(Instant.now()), "GENERAL");
         jdbc.update("INSERT INTO position_permission(position_id, permission_code) VALUES (?, ?)",
-            "pos-custom", "FACILITY_MANAGE");
+            "pos-custom", "facility.manage");
 
         seeder.ensureForOrg("org-existing");
 
@@ -67,7 +67,7 @@ class DefaultPositionSeederTest {
         assertThat(jdbc.queryForObject(
             "SELECT description FROM position WHERE org_id=? AND name='Giáo vụ'", String.class, "org-existing"))
             .isEqualTo("Owner description");
-        assertThat(permissions("org-existing", "Giáo vụ")).containsExactly("FACILITY_MANAGE");
+        assertThat(permissions("org-existing", "Giáo vụ")).containsExactly("facility.manage");
     }
 
     @Test

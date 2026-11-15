@@ -65,6 +65,11 @@ export default function LoginPage() {
         navigate('/dao-tao');
         return;
       }
+      // Quy tắc 12 — sinh viên vào cổng SELF, không vào console quản trị.
+      if (state.permissions.includes('student.self_view')) {
+        navigate('/hoc-sinh');
+        return;
+      }
       const role = state.role;
       if (role) {
         navigate(rolePreviewPath(role));

@@ -18,18 +18,19 @@ import java.util.*;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper,
+            @Value("${INTERNAL_API_KEY:}") String internalKey) throws Exception {
+        var bearer = org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class;
         http.csrf(c -> c.disable())
             .cors(org.springframework.security.config.Customizer.withDefaults())
+            .addFilterBefore(new InternalApiFilter(internalKey, mapper), bearer)
             .addFilterAfter(new PasswordChangeRequiredFilter(mapper,Set.of()),
-                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
+                bearer)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
+                .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/departments/*/facilities", "/departments/*/facilities/**")
-                    .access(org.springframework.security.authorization.AuthorizationManagers.anyOf(
-                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole("OWNER"),
-                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("FACILITY_MANAGE")))
+                .requestMatchers("/departments/*/facilities", "/departments/*/facilities/**").authenticated()
                 .anyRequest().denyAll())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();

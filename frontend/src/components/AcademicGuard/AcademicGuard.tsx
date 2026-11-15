@@ -7,7 +7,7 @@ import { useAuthStore } from '../../stores/authStore';
 
 /**
  * Chặn route khu vực đào tạo (`/dao-tao`) — Sprint 4 (option B).
- * Cho phép: OWNER/ORG_OWNER hoặc user có permission PEOPLE_* / CLASS_*.
+ * Cho phép: OWNER/ORG_OWNER hoặc user có permission employee.* / class.* / student.*.
  * ⚠️ Chỉ UX; quyền thật do backend chặn.
  */
 export default function AcademicGuard({ children }: PropsWithChildren) {

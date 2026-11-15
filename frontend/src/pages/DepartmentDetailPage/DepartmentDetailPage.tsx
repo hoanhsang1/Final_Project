@@ -40,6 +40,7 @@ export default function DepartmentDetailPage() {
     refetchDepartments,
     members,
     positions,
+    specialties,
     create,
     updatePositions,
     remove,
@@ -75,11 +76,11 @@ export default function DepartmentDetailPage() {
     setPosOpen(true);
   };
 
-  const handleChangePositions = async (positionIds: string[]) => {
+  const handleChangePositions = async (positionIds: string[], reason?: string) => {
     if (!editingMember) return;
     setActionError(null);
     try {
-      await updatePositions.mutateAsync({ userId: editingMember.userId, positionIds });
+      await updatePositions.mutateAsync({ userId: editingMember.userId, positionIds, reason });
       setPosOpen(false);
       setEditingMember(null);
       message.success(MSG_MEM.POSITIONS_UPDATED);
@@ -255,6 +256,7 @@ export default function DepartmentDetailPage() {
       <MemberFormModal
         open={addOpen}
         positions={positions.data ?? []}
+        specialties={specialties.data ?? []}
         submitting={create.isPending}
         error={addError}
         onCancel={() => {
@@ -273,7 +275,7 @@ export default function DepartmentDetailPage() {
           setPosOpen(false);
           setEditingMember(null);
         }}
-        onSubmit={(ids) => void handleChangePositions(ids)}
+        onSubmit={(ids, reason) => void handleChangePositions(ids, reason)}
       />
 
       <TempPasswordModal

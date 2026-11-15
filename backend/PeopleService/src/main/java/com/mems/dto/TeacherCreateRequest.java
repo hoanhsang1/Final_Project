@@ -18,7 +18,6 @@ public record TeacherCreateRequest(
     @NotEmpty(message = "POSITION_IDS_REQUIRED")
     @Size(max = 50, message = "POSITION_IDS_TOO_MANY")
     Set<@NotBlank(message = "POSITION_ID_REQUIRED") String> positionIds,
-    @NotBlank(message = "CODE_REQUIRED")
     @Size(max = 50, message = "CODE_TOO_LONG") String staffCode,
     @NotBlank(message = "NAME_REQUIRED")
     @Size(max = 200, message = "NAME_TOO_LONG") String fullName,

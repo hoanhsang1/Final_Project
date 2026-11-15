@@ -60,6 +60,11 @@ spring:
           predicates:
             - Path=/permissions/**,/permissions,/permissions/
 
+        - id: people-permission-bundles
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/permission-bundles/**,/permission-bundles,/permission-bundles/
+
         - id: people-students
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
@@ -80,6 +85,16 @@ spring:
           predicates:
             - Path=/specialties/**,/specialties,/specialties/
 
+        - id: people-transfer-requests
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/transfer-requests/**,/transfer-requests,/transfer-requests/
+
+        - id: people-notifications
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/notifications/**,/notifications,/notifications/
+
         # Sprint 4 FE gọi kèm prefix /api; gateway bỏ 1 segment để khớp controller.
         - id: people-teachers-api
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
@@ -95,9 +110,66 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: people-subjects-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/subjects/**,/api/subjects
+          filters:
+            - StripPrefix=1
+
         - id: people-classes-api
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/classes/**,/api/classes
+          filters:
+            - StripPrefix=1
+
+        - id: people-transfer-requests-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/transfer-requests/**,/api/transfer-requests
+          filters:
+            - StripPrefix=1
+
+        - id: people-notifications-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/notifications/**,/api/notifications
+          filters:
+            - StripPrefix=1
+
+        - id: people-delegations-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/delegations/**,/api/delegations
+          filters:
+            - StripPrefix=1
+
+        - id: people-general-manager-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/general-manager/**,/api/general-manager
+          filters:
+            - StripPrefix=1
+
+        # Phần 7 — lịch học & cơ sở vật chất (FE gọi /api/departments/{id}/...).
+        - id: schedule-department-api
+          uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/departments/*/schedules/**,/api/departments/*/schedules
+          filters:
+            - StripPrefix=1
+
+        - id: schedule-self-api
+          uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/schedules/**
+          filters:
+            - StripPrefix=1
+
+        - id: facility-department-api
+          uri: ${FACILITY_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/departments/*/facilities/**,/api/departments/*/facilities
           filters:
             - StripPrefix=1

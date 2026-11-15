@@ -20,13 +20,13 @@ public class SpecialtyController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('PEOPLE_VIEW','PEOPLE_EDIT','CLASS_ASSIGN_TEACHER')")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit','class.assign_teacher')")
     public List<SpecialtyResponse> list(@RequestParam(required = false) String q) {
         return service.list(q);
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('PEOPLE_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('employee.edit')")
     @ResponseStatus(HttpStatus.CREATED)
     public SpecialtyResponse create(@Valid @RequestBody SpecialtyCreateRequest request) {
         return service.create(request);

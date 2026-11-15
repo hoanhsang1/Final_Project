@@ -7,6 +7,7 @@ import {
   decodeJwtClaims,
   isTokenExpired,
   normalizePermissions,
+  normalizePermissionScopes,
   normalizeRoles,
 } from '../features/auth/jwt';
 
@@ -32,8 +33,12 @@ interface AuthSession {
    * `backendRoles.includes('SUPER_ADMIN')`.
    */
   backendRoles: string[];
+  /** Phòng ban chính từ JWT — dùng để chọn phạm vi cho màn lịch học/cơ sở vật chất. */
+  departmentId: string | null;
   /** Quyền (permissions) từ JWT — dùng cho phân quyền nghiệp vụ (Sprint 4+). Chỉ để UX. */
   permissions: string[];
+  /** Phạm vi từng quyền: mã quyền → `ORGANIZATION` / `DEPARTMENT:<id>`. */
+  permissionScopes: Record<string, string[]>;
   /** Tài khoản đang dùng mật khẩu tạm — phải đổi trước khi vào console. */
   mustChangePassword: boolean;
   isAuthenticated: boolean;
@@ -49,7 +54,8 @@ interface AuthSession {
  */
 function restoreSession(): Pick<
   AuthSession,
-  'userId' | 'username' | 'role' | 'backendRoles' | 'permissions' | 'mustChangePassword' | 'isAuthenticated'
+  'userId' | 'username' | 'role' | 'backendRoles' | 'departmentId' | 'permissions'
+  | 'permissionScopes' | 'mustChangePassword' | 'isAuthenticated'
 > {
   const token = getAccessToken();
   if (!token || isTokenExpired(token)) {
@@ -58,7 +64,9 @@ function restoreSession(): Pick<
       username: null,
       role: null,
       backendRoles: [],
+      departmentId: null,
       permissions: [],
+      permissionScopes: {},
       mustChangePassword: false,
       isAuthenticated: false,
     };
@@ -70,7 +78,9 @@ function restoreSession(): Pick<
     username: payload.username ?? null,
     role: mapBackendRole(roles),
     backendRoles: roles,
+    departmentId: payload.departmentId ?? null,
     permissions: normalizePermissions(payload.permissions),
+    permissionScopes: normalizePermissionScopes(payload.permissionScopes),
     mustChangePassword: payload.mustChangePassword === true,
     isAuthenticated: true,
   };
@@ -88,7 +98,9 @@ export const useAuthStore = create<AuthSession>((set) => ({
       username: payload.username ?? null,
       role: mapBackendRole(roles),
       backendRoles: roles,
+      departmentId: payload.departmentId ?? null,
       permissions: normalizePermissions(payload.permissions),
+      permissionScopes: normalizePermissionScopes(payload.permissionScopes),
       mustChangePassword: payload.mustChangePassword === true,
       isAuthenticated: true,
     });
@@ -100,7 +112,9 @@ export const useAuthStore = create<AuthSession>((set) => ({
       username: null,
       role: null,
       backendRoles: [],
+      departmentId: null,
       permissions: [],
+      permissionScopes: {},
       mustChangePassword: false,
       isAuthenticated: false,
     });
@@ -126,7 +140,9 @@ export function syncSessionFromToken(): void {
     username: payload.username ?? null,
     role: mapBackendRole(roles),
     backendRoles: roles,
+    departmentId: payload.departmentId ?? null,
     permissions: normalizePermissions(payload.permissions),
+    permissionScopes: normalizePermissionScopes(payload.permissionScopes),
     mustChangePassword: payload.mustChangePassword === true,
     isAuthenticated: true,
   });
