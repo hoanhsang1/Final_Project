@@ -1,30 +1,48 @@
+import {
+  Banner,
+  Button,
+  Card,
+  CheckboxInput,
+  Divider,
+  Heading,
+  HStack,
+  Text,
+  TextInput,
+  VStack,
+} from '@astryxdesign/core';
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Button, Checkbox, Flex, Form, Grid, Input, Typography, theme } from 'antd';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import loginIllustration from '../../assets/auth/login-illustration.png';
+import { AppLink } from '../../components/AppLink/AppLink';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
+import { AuthSwitch } from '../../components/AuthCard/AuthSwitch';
 import { RoleButton } from '../../components/RoleButton/RoleButton';
 import { login } from '../../features/auth/authApi';
 import { ROLES, rolePreviewPath } from '../../features/auth/roles';
 import type { Role } from '../../features/auth/roles';
 import { useAuthStore } from '../../stores/authStore';
 import { canAccessAcademicArea, isOwnerRole } from '../../features/auth/permissions';
-import { color, typeScale, weight } from '../../theme';
+import { useFormState } from '../../hooks/useFormState';
 
-const { Text, Title } = Typography;
-const { useBreakpoint } = Grid;
-
-interface LoginFormValues {
+type LoginFormValues = {
   username: string;
   password: string;
-  remember?: boolean;
-}
+  remember: boolean;
+};
 
+/**
+ * Màn đăng nhập `/dang-nhap`.
+ *
+ * Trạng thái: **idle** (form trống) · **loading** (nút Đăng nhập) ·
+ * **error** (`Banner status="error"`, `role="alert"`) · **success** (điều
+ * hướng theo vai trò). Không có empty/no-permission — màn công khai.
+ *
+ * `NFR-REL-001`: lỗi/timeout chỉ hiện banner đỏ và **giữ nguyên** URL; không
+ * bao giờ đi tiếp như đăng nhập thành công.
+ */
 export default function LoginPage() {
-  const { token } = theme.useToken();
-  const screens = useBreakpoint();
-  const isDesktop = screens.lg;
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
 
@@ -32,6 +50,14 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   /** Thông báo khi đăng nhập OK nhưng vai trò chưa có trang tương ứng. */
   const [notice, setNotice] = useState<string | null>(null);
+
+  const form = useFormState<LoginFormValues>(
+    { username: '', password: '', remember: false },
+    {
+      username: (value) => (value.trim() ? undefined : 'Vui lòng nhập tên đăng nhập'),
+      password: (value) => (value ? undefined : 'Vui lòng nhập mật khẩu'),
+    },
+  );
 
   const loginMutation = useMutation({
     mutationFn: login,
@@ -71,386 +97,227 @@ export default function LoginPage() {
     },
   });
 
-  const handleSubmit = (values: LoginFormValues) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.validate()) return;
     setNotice(null);
     // Backend không có trường "remember" — chỉ gửi 2 field contract yêu cầu.
-    loginMutation.mutate({ username: values.username, password: values.password });
+    loginMutation.mutate({
+      username: form.values.username.trim(),
+      password: form.values.password,
+    });
   };
 
   const handleSelectRole = (role: Role) => {
     navigate(rolePreviewPath(role.id));
   };
 
-  /**
-   * Chỉ bo góc + màu, và **tất cả** lấy từ `theme.ts`.
-   *
-   * Bản cũ giữ một bộ số riêng: bo 20/12/14 và `#D1E0FF` viết tay. Kết quả là
-   * màn đăng nhập bo góc tròn hơn hẳn phần còn lại của hệ thống — cùng một app
-   * mà hai ngôn ngữ hình khối, mắt đọc ra ngay là "ghép từ hai nguồn".
-   */
-  const ui = {
-    cardRadius: token.borderRadiusLG,
-    controlRadius: token.borderRadius,
-    tabRadius: token.borderRadiusLG,
-    softBg: color.brandSoft,
-    tabSelectedBg: color.surface,
-    cardBorder: token.colorBorderSecondary,
-    textMuted: token.colorTextSecondary,
-    textSoft: token.colorTextSecondary,
-  };
-
   const hero = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 1 }}>
+    <div className="mems-auth__hero">
       <img
         src={loginIllustration}
         alt=""
         aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: -token.paddingXL,
-          width: `calc(100% + ${token.paddingXL * 2}px)`,
-          height: `calc(100% + ${token.paddingXL * 2}px)`,
-          objectFit: 'cover',
-          opacity: 0.14,
-          pointerEvents: 'none',
-        }}
+        className="mems-auth__hero-image"
       />
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <Text
-          style={{
-            color: color.onBrand,
-            fontSize: typeScale.section,
-            fontWeight: weight.strong,
-            lineHeight: 1.2,
-          }}
-        >
+      <div>
+        <Text type="large" weight="semibold" color="inherit" display="block">
           MEMS
         </Text>
         {/* Câu thường thay cho "EDUCATION MANAGEMENT" in hoa + letter-spacing:
             chữ hoa toàn bộ ở 12px đọc chậm hơn và là dấu hiệu landing page. */}
-        <Text style={{ color: color.onBrandMuted, fontSize: typeScale.caption, marginTop: token.marginXXS }}>
+        <Text
+          type="supporting"
+          color="inherit"
+          display="block"
+          className="mems-auth__on-brand-muted"
+          style={{ marginTop: 'var(--spacing-1)' }}
+        >
           Hệ thống quản lý giáo dục theo module
         </Text>
+      </div>
 
-        {/* Bỏ khối "01 / 02 / 03" ba lợi ích chung chung. Panel giờ có đúng một
-            câu nói việc người dùng cần làm. Khoảng trắng làm phần phân cấp. */}
-        <div style={{ marginTop: 'auto' }}>
-          <Title
-            level={2}
-            style={{
-              color: color.onBrand,
-              fontSize: typeScale.h1,
-              lineHeight: 1.25,
-              fontWeight: weight.strong,
-              letterSpacing: '-0.02em',
-              margin: 0,
-              marginBottom: token.marginSM,
-              maxWidth: '16ch',
-            }}
-          >
-            Quản trị nhà trường trên một hệ thống.
-          </Title>
-          <Text
-            style={{
-              color: color.onBrandMuted,
-              fontSize: typeScale.body,
-              maxWidth: '30ch',
-              display: 'block',
-            }}
-          >
-            Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp.
-          </Text>
-        </div>
-
-        <Text
-          style={{
-            color: color.onBrandMuted,
-            fontSize: typeScale.caption,
-            marginTop: 'auto',
-            paddingTop: token.paddingLG,
-          }}
+      {/* Panel có đúng một câu nói việc người dùng cần làm; khoảng trắng làm
+          phần phân cấp thay cho khối "01 / 02 / 03" lợi ích chung chung. */}
+      <div>
+        <Heading
+          level={2}
+          type="display-3"
+          color="inherit"
+          style={{ margin: 0, marginBottom: 'var(--spacing-3)', maxWidth: '16ch' }}
         >
-          © 2026 MEMS
+          Quản trị nhà trường trên một hệ thống.
+        </Heading>
+        <Text
+          type="body"
+          color="inherit"
+          display="block"
+          className="mems-auth__on-brand-muted"
+          style={{ maxWidth: '30ch' }}
+        >
+          Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp.
         </Text>
       </div>
+
+      <Text type="supporting" color="inherit" className="mems-auth__on-brand-muted">
+        © 2026 MEMS
+      </Text>
     </div>
   );
 
   return (
     <AuthCard variant="split" activeTab="login" title="" subtitle="" hero={hero} rightMaxWidth={1014}>
-      <Flex
-        gap={token.marginXS}
-        align="center"
-        style={{ marginBottom: token.margin, marginTop: isDesktop ? token.marginXS : 0 }}
-      >
-        <Text style={{ fontSize: typeScale.caption, color: ui.textSoft }}>Tài khoản</Text>
-        <Text style={{ fontSize: typeScale.caption, color: ui.textSoft }}>/</Text>
-        <Text style={{ fontSize: typeScale.caption, color: ui.textSoft, fontWeight: weight.medium }}>
-          Đăng nhập
-        </Text>
-      </Flex>
-
-      <div
-        style={{
-          background: token.colorBgContainer,
-          borderRadius: ui.cardRadius,
-          boxShadow: token.boxShadowSecondary,
-          border: `${token.lineWidth}px solid ${ui.cardBorder}`,
-          padding: isDesktop ? token.paddingXL : token.paddingLG,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: isDesktop ? token.margin : token.marginSM,
-        }}
-      >
-        <div>
-          <Flex align="center" gap={token.marginSM} style={{ marginBottom: token.marginXS }}>
-            <div
-              aria-hidden="true"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: ui.controlRadius,
-                background: token.colorPrimary,
-                color: token.colorWhite,
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: typeScale.section,
-                fontWeight: weight.strong,
-                flexShrink: 0,
-              }}
-            >
-              M
-            </div>
-            <Title level={1} style={{ margin: 0, fontSize: typeScale.h1, lineHeight: 1.25, color: token.colorTextHeading }}>
-              Đăng nhập
-            </Title>
-          </Flex>
-          <Text style={{ display: 'block', fontSize: typeScale.body, lineHeight: 1.5, color: ui.textMuted }}>
-            Chào mừng bạn quay lại hệ thống MEMS
+      <VStack gap={3} className="mems-auth__card">
+        <HStack gap={1} align="center">
+          <Text type="supporting" color="secondary">
+            Tài khoản
           </Text>
-        </div>
-
-        <Flex
-          role="tablist"
-          aria-label="Chọn loại tài khoản"
-          style={{
-            background: ui.softBg,
-            borderRadius: ui.tabRadius,
-            padding: token.paddingXXS,
-            gap: token.paddingXXS,
-          }}
-        >
-          <div
-            role="tab"
-            aria-selected="true"
-            style={{
-              flex: 1,
-              display: 'grid',
-              placeItems: 'center',
-              minHeight: token.controlHeightLG,
-              borderRadius: ui.controlRadius,
-              background: ui.tabSelectedBg,
-              color: token.colorPrimary,
-              fontSize: typeScale.body,
-              fontWeight: weight.medium,
-            }}
-          >
+          <Text type="supporting" color="secondary">
+            /
+          </Text>
+          <Text type="supporting" weight="medium">
             Đăng nhập
-          </div>
-          <Link
-            role="tab"
-            aria-selected="false"
-            to="/dang-ky"
-            style={{
-              flex: 1,
-              display: 'grid',
-              placeItems: 'center',
-              minHeight: token.controlHeightLG,
-              borderRadius: ui.controlRadius,
-              color: ui.textMuted,
-              fontSize: typeScale.body,
-              fontWeight: weight.medium,
-              textDecoration: 'none',
-            }}
-          >
-            Đăng ký
-          </Link>
-        </Flex>
-
-        <div>
-          {formError && (
-            <Alert
-              type="error"
-              showIcon
-              message={formError}
-              style={{ marginBottom: token.margin, borderRadius: ui.controlRadius }}
-              role="alert"
-            />
-          )}
-          {notice && (
-            <Alert
-              type="warning"
-              showIcon
-              message={notice}
-              style={{ marginBottom: token.margin, borderRadius: ui.controlRadius }}
-              role="status"
-            />
-          )}
-
-          <Form<LoginFormValues> layout="vertical" requiredMark={false} onFinish={handleSubmit}>
-            {/* Spec Figma ghi nhãn "Email"; BE/contract + tests hiện dùng username/Tên đăng nhập — giữ contract. */}
-            <Form.Item
-              label="Tên đăng nhập"
-              name="username"
-              rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
-              style={{ marginBottom: token.margin }}
-            >
-              <Input
-                autoComplete="username"
-                placeholder="Ví dụ: nghia.ledai"
-                size="large"
-                style={{ borderRadius: ui.controlRadius }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Mật khẩu"
-              name="password"
-              rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
-              style={{ marginBottom: token.margin }}
-            >
-              <Input.Password
-                autoComplete="current-password"
-                placeholder="Nhập mật khẩu"
-                size="large"
-                style={{ borderRadius: ui.controlRadius }}
-              />
-            </Form.Item>
-
-            <Flex
-              justify="space-between"
-              align="center"
-              wrap="wrap"
-              gap={token.marginXS}
-              style={{ marginBottom: token.marginLG }}
-            >
-              <Form.Item name="remember" valuePropName="checked" noStyle>
-                <Checkbox style={{ fontSize: typeScale.body, color: token.colorText }}>Ghi nhớ tôi</Checkbox>
-              </Form.Item>
-              <Link
-                to="/quen-mat-khau"
-                style={{ fontSize: typeScale.body, fontWeight: weight.medium, color: token.colorLink }}
-              >
-                Quên mật khẩu?
-              </Link>
-            </Flex>
-
-            <Form.Item style={{ marginBottom: 0 }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                size="large"
-                loading={loginMutation.isPending}
-                style={{
-                  height: token.controlHeightLG,
-                  borderRadius: ui.controlRadius,
-                  fontSize: typeScale.body,
-                  boxShadow: 'none',
-                }}
-              >
-                Đăng nhập
-              </Button>
-            </Form.Item>
-          </Form>
-
-          <Text
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              fontSize: typeScale.caption,
-              lineHeight: 1.5,
-              color: ui.textMuted,
-              marginTop: token.marginLG,
-            }}
-          >
-            Không chia sẻ mật khẩu với bất kỳ ai.
           </Text>
-        </div>
+        </HStack>
 
-        <div style={{ height: token.lineWidth, background: token.colorBorderSecondary }} />
+        <Card padding={6}>
+          <VStack gap={4}>
+            <div>
+              <HStack gap={3} align="center" style={{ marginBottom: 'var(--spacing-2)' }}>
+                <div className="mems-auth__mark" aria-hidden="true">
+                  M
+                </div>
+                <Heading level={1}>Đăng nhập</Heading>
+              </HStack>
+              <Text type="body" color="secondary">
+                Chào mừng bạn quay lại hệ thống MEMS
+              </Text>
+            </div>
 
-        <Flex justify="center" align="center" gap={token.marginXS} wrap="wrap">
-          <Text style={{ fontSize: typeScale.body, color: ui.textMuted }}>Chưa có tài khoản?</Text>
-          <Link
-            to="/dang-ky"
-            aria-label="Đăng ký tổ chức"
-            style={{ fontSize: typeScale.body, fontWeight: weight.medium, color: token.colorLink }}
-          >
+            <AuthSwitch current="login" />
+
+            {formError && (
+              <Banner
+                status="error"
+                title={formError}
+                collapsible={false}
+                role="alert"
+                isDismissable
+                onDismiss={() => setFormError(null)}
+              />
+            )}
+            {notice && (
+              <Banner
+                status="warning"
+                title={notice}
+                collapsible={false}
+                role="status"
+                isDismissable
+                onDismiss={() => setNotice(null)}
+              />
+            )}
+
+            <form onSubmit={handleSubmit} noValidate>
+              <VStack gap={4}>
+                {/* Spec Figma ghi nhãn "Email"; BE/contract + tests hiện dùng
+                    username/Tên đăng nhập — giữ contract. */}
+                <TextInput
+                  label="Tên đăng nhập"
+                  value={form.values.username}
+                  onChange={(value) => form.setValue('username', value)}
+                  autoComplete="username"
+                  placeholder="Ví dụ: nghia.ledai"
+                  size="lg"
+                  aria-required="true"
+                  status={
+                    form.errorOf('username')
+                      ? { type: 'error', message: form.errorOf('username') }
+                      : undefined
+                  }
+                />
+
+                <TextInput
+                  type="password"
+                  label="Mật khẩu"
+                  value={form.values.password}
+                  onChange={(value) => form.setValue('password', value)}
+                  autoComplete="current-password"
+                  placeholder="Nhập mật khẩu"
+                  size="lg"
+                  aria-required="true"
+                  status={
+                    form.errorOf('password')
+                      ? { type: 'error', message: form.errorOf('password') }
+                      : undefined
+                  }
+                />
+
+                <HStack justify="between" align="center" gap={2} wrap="wrap">
+                  <CheckboxInput
+                    label="Ghi nhớ tôi"
+                    value={form.values.remember}
+                    onChange={(checked) => form.setValue('remember', checked)}
+                  />
+                  <AppLink to="/quen-mat-khau" type="body" weight="medium">
+                    Quên mật khẩu?
+                  </AppLink>
+                </HStack>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  label="Đăng nhập"
+                  width="100%"
+                  size="lg"
+                  isLoading={loginMutation.isPending}
+                />
+              </VStack>
+            </form>
+
+            <Text type="supporting" color="secondary" style={{ textAlign: 'center' }}>
+              Không chia sẻ mật khẩu với bất kỳ ai.
+            </Text>
+          </VStack>
+        </Card>
+
+        <HStack justify="center" align="center" gap={1} wrap="wrap">
+          <Text type="body" color="secondary">
+            Chưa có tài khoản?
+          </Text>
+          {/* Không đặt `label` (→ `aria-label`): tên của liên kết phải là chữ
+              người dùng nhìn thấy ("Đăng ký ngay"), nếu không sẽ phạm 2.5.3
+              Label in Name và điều khiển bằng giọng nói cũng trượt. */}
+          <AppLink to="/dang-ky" type="body" weight="medium">
             Đăng ký ngay
-          </Link>
-        </Flex>
+          </AppLink>
+        </HStack>
 
-        <div
-          style={{
-            background: ui.softBg,
-            borderRadius: ui.controlRadius,
-            border: `${token.lineWidth}px solid ${ui.cardBorder}`,
-            paddingBlock: token.paddingSM,
-            paddingInline: token.padding,
-          }}
-        >
-          <Text
-            style={{
-              display: 'block',
-              fontSize: typeScale.body,
-              fontWeight: weight.medium,
-              lineHeight: 1.5,
-              color: token.colorText,
-              marginBottom: token.marginXXS,
-            }}
-          >
+        <Card variant="muted" padding={3}>
+          <Text type="body" weight="medium" display="block">
             Cần hỗ trợ đăng nhập?
           </Text>
-          <Text style={{ fontSize: typeScale.body, lineHeight: 1.5, color: ui.textMuted }}>
+          <Text type="body" color="secondary" style={{ marginTop: 'var(--spacing-1)' }}>
             Liên hệ quản trị viên tổ chức để được trợ giúp.
           </Text>
-        </div>
+        </Card>
 
-        {/* Giữ luồng xem thử/điều hướng theo role cho Sprint 1 + test contract; không có trong spec Figma. */}
-        <div>
-          <Text
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              fontSize: typeScale.caption,
-              color: ui.textMuted,
-              marginBottom: token.marginXS,
-            }}
-          >
+        <Divider />
+
+        {/* Giữ luồng xem thử/điều hướng theo role cho Sprint 1 + test contract;
+            không có trong spec Figma. */}
+        <VStack gap={2}>
+          <Text type="supporting" color="secondary" style={{ textAlign: 'center' }}>
             hoặc xem thử theo vai trò
           </Text>
-          <Flex vertical gap={token.marginXS}>
-            {ROLES.map((role) => (
-              <RoleButton key={role.id} role={role} onSelect={handleSelectRole} />
-            ))}
-          </Flex>
-        </div>
-      </div>
+          {ROLES.map((role) => (
+            <RoleButton key={role.id} role={role} onSelect={handleSelectRole} />
+          ))}
+        </VStack>
 
-      <Text
-        style={{
-          display: 'block',
-          textAlign: 'center',
-          fontSize: typeScale.caption,
-          lineHeight: 1.5,
-          color: ui.textMuted,
-          marginTop: token.margin,
-          marginBottom: token.marginXS,
-        }}
-      >
-        © MEMS · Hệ thống Quản lý Giáo dục theo Module
-      </Text>
+        <Text type="supporting" color="secondary" style={{ textAlign: 'center' }}>
+          © MEMS · Hệ thống Quản lý Giáo dục theo Module
+        </Text>
+      </VStack>
     </AuthCard>
   );
 }

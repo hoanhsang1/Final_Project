@@ -21,7 +21,9 @@ it('có đủ trường thông tin tổ chức', () => {
 
   expect(screen.getByRole('heading', { name: 'Thông tin tổ chức' })).toBeInTheDocument();
   expect(screen.getByLabelText('Tên tổ chức')).toBeInTheDocument();
-  expect(screen.getByLabelText('Loại tổ chức')).toBeInTheDocument();
+  // Selector của Astryx render cả listbox ẩn có cùng `aria-label`; truy vấn theo
+  // role combobox để chỉ bắt đúng ô chọn.
+  expect(screen.getByRole('combobox', { name: 'Loại tổ chức' })).toBeInTheDocument();
   expect(screen.getByText('Module cần sử dụng')).toBeInTheDocument();
 });
 

@@ -115,13 +115,9 @@ test.describe('Quên / đặt lại mật khẩu', () => {
     await expect(page.getByText('Vui lòng nhập mật khẩu mới')).toBeVisible();
 
     await page.getByLabel('Mật khẩu mới').fill('123');
-    // antd giữ 2 node cùng nội dung trong lúc animation (appear + item) → lấy node đầu.
-    await expect(
-      page
-        .locator('.ant-form-item-explain-error')
-        .filter({ hasText: 'Mật khẩu cần ít nhất 8 ký tự' })
-        .first(),
-    ).toBeVisible();
+    // Thông báo lỗi do chính `TextInput` render (qua `status.message`), không phải
+    // khối `.ant-form-item-explain-error` của antd.
+    await expect(page.getByText('Mật khẩu cần ít nhất 8 ký tự')).toBeVisible();
 
     await page.getByLabel('Mật khẩu mới').fill(NEW_PASSWORD);
     await page.getByLabel('Nhập lại mật khẩu').fill('khac-hoan-toan');
@@ -140,7 +136,8 @@ test.describe('Quên / đặt lại mật khẩu', () => {
 
   test('TC-PWD-07 — token hết hạn (400): lỗi rõ ràng + lối yêu cầu liên kết mới', async ({
     page,
-  }) => {    await page.route(RESET_API, (route) =>
+  }) => {
+    await page.route(RESET_API, (route) =>
       route.fulfill({
         status: 400,
         contentType: 'application/json',

@@ -81,7 +81,8 @@ it('bỏ trống rồi bấm Đăng nhập thì hiện lỗi ngay tại từng t
 it('có lối sang trang đăng ký tổ chức', () => {
   renderLogin();
 
-  expect(screen.getByRole('link', { name: 'Đăng ký tổ chức' })).toHaveAttribute('href', '/dang-ky');
+  // Tên liên kết là chữ nhìn thấy (không đặt `aria-label` khác) — 2.5.3.
+  expect(screen.getByRole('link', { name: 'Đăng ký ngay' })).toHaveAttribute('href', '/dang-ky');
 });
 
 it('nhập đúng rồi bấm Đăng nhập thì gọi API và vào trang theo vai trò', async () => {

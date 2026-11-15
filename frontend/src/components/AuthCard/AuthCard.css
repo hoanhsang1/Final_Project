@@ -1,0 +1,184 @@
+/*
+ * Khung auth (AuthCard) — chỉ những thứ Astryx không có sẵn: bố cục hai cột
+ * toàn màn hình, panel thương hiệu nền brand và cặp liên kết Đăng nhập/Đăng ký.
+ *
+ * Mọi màu / cỡ chữ / bo góc lấy từ CSS variable của theme. CSS ở đây KHÔNG nằm
+ * trong layer của Astryx nên thắng selector trùng — vì vậy chỉ đặt class riêng
+ * `mems-auth*`, không đụng vào class `.astryx-*`.
+ */
+
+.mems-auth {
+  min-height: 100vh;
+  background: var(--color-background-body);
+}
+
+.mems-auth__main {
+  min-width: 0;
+  min-height: 100vh;
+  padding: var(--spacing-4);
+  overflow: auto;
+}
+
+.mems-auth__main--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: var(--spacing-8);
+}
+
+.mems-auth__aside {
+  display: flex;
+  min-height: 100vh;
+  padding: var(--spacing-8);
+  overflow: hidden;
+  position: relative;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.mems-auth__aside-inner {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+}
+
+/* Chữ phụ trên nền brand: 78% trắng vẫn đạt ≈5.7:1 trên #0E4A8B. */
+.mems-auth__on-brand-muted {
+  color: color-mix(in srgb, var(--color-on-accent) 78%, transparent);
+}
+
+/* Ô "M" nhỏ — dấu nhận diện, không mang nghĩa nên đánh aria-hidden ở JSX. */
+.mems-auth__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  border-radius: var(--radius-element);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.mems-auth__aside .mems-auth__mark {
+  background: color-mix(in srgb, var(--color-on-accent) 16%, transparent);
+}
+
+.mems-auth__brand-title {
+  margin: var(--spacing-6) 0 var(--spacing-3);
+  max-width: 18ch;
+}
+
+.mems-auth__brand-lead {
+  max-width: 32ch;
+}
+
+.mems-auth__areas {
+  display: grid;
+  gap: var(--spacing-4);
+  margin: var(--spacing-8) 0 0;
+}
+
+.mems-auth__areas dt {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.mems-auth__areas dd {
+  margin: 0;
+  font-size: var(--font-size-base);
+}
+
+/* Ảnh nền mờ của panel đăng nhập — chỉ để tạo chất liệu, không phải nội dung. */
+.mems-auth__hero {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  position: relative;
+  z-index: 1;
+}
+
+.mems-auth__hero-image {
+  position: absolute;
+  inset: calc(var(--spacing-8) * -1);
+  width: calc(100% + var(--spacing-8) * 2);
+  height: calc(100% + var(--spacing-8) * 2);
+  object-fit: cover;
+  opacity: 0.14;
+  pointer-events: none;
+}
+
+/* Thẻ form: bề rộng khác nhau giữa đăng nhập (1 cột) và đăng ký (nhiều khối). */
+.mems-auth__card {
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
+}
+
+.mems-auth__card--wide {
+  max-width: 720px;
+}
+
+.mems-auth__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+}
+
+.mems-auth__card-footnote {
+  text-align: center;
+}
+
+/* Cặp "Đăng nhập / Đăng ký": hai liên kết thật, mục đang mở đánh
+   aria-current="page" — không giả lập tab khi mỗi mục là một URL. */
+.mems-auth__switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1);
+  background: var(--color-accent-muted);
+  border-radius: var(--radius-element);
+}
+
+.mems-auth__switch-item {
+  display: grid;
+  place-items: center;
+  min-height: var(--size-element-lg);
+  border-radius: var(--radius-element);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.mems-auth__switch-item:hover {
+  color: var(--color-text-primary);
+}
+
+.mems-auth__switch-item[aria-current='page'] {
+  background: var(--color-background-card);
+  color: var(--color-accent);
+}
+
+@media (min-width: 1024px) {
+  .mems-auth--split {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) 1fr;
+  }
+
+  .mems-auth--card {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+  }
+
+  .mems-auth__main {
+    padding: var(--spacing-8);
+  }
+}

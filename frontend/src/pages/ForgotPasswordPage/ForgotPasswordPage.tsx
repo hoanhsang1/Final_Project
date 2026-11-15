@@ -1,37 +1,45 @@
+import { Banner, Button, HStack, Text, TextInput, VStack } from '@astryxdesign/core';
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Button, Flex, Form, Input, Result, Typography, theme } from 'antd';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import type { FormEvent } from 'react';
+import { AppLink } from '../../components/AppLink/AppLink';
 import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { PasswordResetError, requestPasswordReset } from '../../features/auth/authApi';
+import { useFormState } from '../../hooks/useFormState';
 
-const { Text } = Typography;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Giá trị form — chỉ 1 trường, khai báo để `Form` suy ra type khi `onFinish`. */
-interface ForgotPasswordValues {
+type ForgotPasswordValues = {
   email: string;
-}
+};
 
 /**
  * Màn Quên mật khẩu `/quen-mat-khau` — bước 1 của luồng đặt lại.
- *
- * Figma: frame `05 · Forgot password` (cùng khung 2 cột với màn đăng nhập).
  *
  * Nguyên tắc chống dò tài khoản: dù email có trong hệ thống hay không, BE trả
  * cùng một kết quả và FE hiện **cùng một thông báo** — người ngoài không dùng
  * màn này để kiểm tra email nào đã đăng ký.
  *
- * Trạng thái: **loading** (nút gửi) · **error** (`Alert` trong form) ·
- * **success** (`Result` "Kiểm tra email"). Không có empty/no-permission — màn
- * công khai, không cần dữ liệu để hiển thị.
+ * Trạng thái: **loading** (nút gửi) · **error** (`Banner` đỏ trong form) ·
+ * **success** (`Banner` xanh "Kiểm tra email"). Không có empty/no-permission —
+ * màn công khai, không cần dữ liệu để hiển thị.
  *
- * ⚠️ BE chưa có endpoint `D-32` → bấm gửi sẽ ra `Alert` "chức năng chưa sẵn
+ * ⚠️ BE chưa có endpoint `D-32` → bấm gửi sẽ ra banner "chức năng chưa sẵn
  * sàng", KHÔNG giả thành công (`NFR-REL-001`).
  */
 export default function ForgotPasswordPage() {
-  const { token } = theme.useToken();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const form = useFormState<ForgotPasswordValues>(
+    { email: '' },
+    {
+      email: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập email';
+        return EMAIL_PATTERN.test(value.trim()) ? undefined : 'Email không đúng định dạng';
+      },
+    },
+  );
 
   const mutation = useMutation({
     mutationFn: (email: string) => requestPasswordReset(email),
@@ -50,6 +58,12 @@ export default function ForgotPasswordPage() {
     },
   });
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.validate()) return;
+    mutation.mutate(form.values.email.trim());
+  };
+
   if (sentTo) {
     return (
       <AuthCard
@@ -57,32 +71,39 @@ export default function ForgotPasswordPage() {
         title="Kiểm tra email của bạn"
         subtitle="Hướng dẫn đặt lại mật khẩu vừa được gửi đi."
       >
-        <Result
-          status="success"
-          title="Đã gửi yêu cầu đặt lại mật khẩu"
-          subTitle={
-            <Text>
-              Nếu <Text strong>{sentTo}</Text> đã đăng ký tài khoản, bạn sẽ nhận được email kèm
-              liên kết đặt lại. Liên kết hiệu lực trong 30 phút.
-            </Text>
-          }
-          extra={<Link to="/dang-nhap">Về trang đăng nhập</Link>}
-        />
+        <VStack gap={4}>
+          <Banner
+            status="success"
+            title="Đã gửi yêu cầu đặt lại mật khẩu"
+            description={
+              <>
+                Nếu <Text weight="semibold">{sentTo}</Text> đã đăng ký tài khoản, bạn sẽ nhận được
+                email kèm liên kết đặt lại. Liên kết hiệu lực trong 30 phút.
+              </>
+            }
+            collapsible={false}
+          />
 
-        <Flex vertical gap={token.marginSM} align="center">
-          <Text type="secondary" style={{ textAlign: 'center' }}>
+          <Text type="body" color="secondary" style={{ textAlign: 'center' }}>
             Không thấy email? Kiểm tra hộp thư rác trước khi yêu cầu lại.
           </Text>
-          <Button
-            type="link"
-            onClick={() => {
-              setSentTo(null);
-              setFormError(null);
-            }}
-          >
-            Dùng email khác
-          </Button>
-        </Flex>
+
+          <HStack justify="between" align="center" gap={2} wrap="wrap">
+            <AppLink to="/dang-nhap" type="body" weight="medium">
+              Về trang đăng nhập
+            </AppLink>
+            <Button
+              type="button"
+              variant="ghost"
+              label="Dùng email khác"
+              onClick={() => {
+                setSentTo(null);
+                setFormError(null);
+                form.reset();
+              }}
+            />
+          </HStack>
+        </VStack>
       </AuthCard>
     );
   }
@@ -93,48 +114,46 @@ export default function ForgotPasswordPage() {
       title="Quên mật khẩu"
       subtitle="Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu."
     >
-      <Form<ForgotPasswordValues>
-        layout="vertical"
-        requiredMark={false}
-        onFinish={(values) => mutation.mutate(values.email.trim())}
-      >
-        <Form.Item
-          label="Email"
-          name="email"
-          rules={[
-            { required: true, message: 'Vui lòng nhập email' },
-            { type: 'email', message: 'Email không đúng định dạng' },
-          ]}
-        >
-          <Input
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            placeholder="ten@donvi.edu.vn"
-          />
-        </Form.Item>
+      <VStack gap={4}>
+        <form onSubmit={handleSubmit} noValidate>
+          <VStack gap={4}>
+            <TextInput
+              type="email"
+              label="Email"
+              value={form.values.email}
+              onChange={(value) => form.setValue('email', value)}
+              autoComplete="email"
+              placeholder="ten@donvi.edu.vn"
+              isDisabled={mutation.isPending}
+              aria-required="true"
+              status={
+                form.errorOf('email') ? { type: 'error', message: form.errorOf('email') } : undefined
+              }
+            />
 
-        {formError && (
-          <Alert
-            type="error"
-            showIcon
-            role="alert"
-            message={formError}
-            style={{ marginBottom: token.margin }}
-          />
-        )}
+            {formError && (
+              <Banner status="error" title={formError} collapsible={false} role="alert" />
+            )}
 
-        <Form.Item style={{ marginBottom: token.margin }}>
-          <Button type="primary" htmlType="submit" block loading={mutation.isPending}>
-            Gửi liên kết đặt lại
-          </Button>
-        </Form.Item>
-      </Form>
+            <Button
+              type="submit"
+              variant="primary"
+              label="Gửi liên kết đặt lại"
+              width="100%"
+              isLoading={mutation.isPending}
+            />
+          </VStack>
+        </form>
 
-      <Flex justify="center" gap={token.marginXXS}>
-        <Text type="secondary">Nhớ ra mật khẩu?</Text>
-        <Link to="/dang-nhap">Đăng nhập</Link>
-      </Flex>
+        <HStack justify="center" gap={1} wrap="wrap">
+          <Text type="body" color="secondary">
+            Nhớ ra mật khẩu?
+          </Text>
+          <AppLink to="/dang-nhap" type="body" weight="medium">
+            Đăng nhập
+          </AppLink>
+        </HStack>
+      </VStack>
     </AuthCard>
   );
 }

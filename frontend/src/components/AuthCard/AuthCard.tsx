@@ -1,8 +1,7 @@
-import { Card, Flex, Grid, Typography, theme } from 'antd';
-import { color, typeScale, weight } from '../../theme';
+import { Card, Heading, HStack, Text, VStack } from '@astryxdesign/core';
+import { useMediaQuery } from '@astryxdesign/core/hooks';
 import type { AuthCardProps } from './types';
-
-const { Text, Title } = Typography;
+import './AuthCard.css';
 
 /**
  * Ba khu vực **thật** của sản phẩm.
@@ -20,94 +19,48 @@ const AREAS: readonly { name: string; detail: string }[] = [
 ];
 
 function BrandPanel() {
-  const { token } = theme.useToken();
   return (
     <>
       <div>
-        <Flex align="center" gap={token.marginSM}>
-          <Flex
-            align="center"
-            justify="center"
-            aria-hidden="true"
-            style={{
-              width: 32,
-              height: 32,
-              flex: 'none',
-              borderRadius: token.borderRadius,
-              background: color.onBrandSubtle,
-              color: color.onBrand,
-              fontWeight: weight.strong,
-              fontSize: typeScale.section,
-            }}
-          >
+        <HStack gap={3} align="center">
+          <div className="mems-auth__mark" aria-hidden="true">
             M
-          </Flex>
-          <Flex vertical gap={2}>
-            <Text
-              style={{
-                color: color.onBrand,
-                fontWeight: weight.strong,
-                fontSize: typeScale.section,
-                lineHeight: 1.2,
-              }}
-            >
+          </div>
+          <div>
+            <Text type="large" weight="semibold" color="inherit" display="block">
               MEMS
             </Text>
             {/* Câu thường, không ALL-CAPS: chữ hoa toàn bộ ở cỡ 12px đọc chậm hơn
                 và là mốt của landing page, không phải của phần mềm nghiệp vụ. */}
-            <Text style={{ color: color.onBrandMuted, fontSize: typeScale.caption }}>
+            <Text
+              type="supporting"
+              color="inherit"
+              display="block"
+              className="mems-auth__on-brand-muted"
+            >
               Quản lý giáo dục theo module
             </Text>
-          </Flex>
-        </Flex>
+          </div>
+        </HStack>
 
-        <Title
-          level={2}
-          style={{
-            color: color.onBrand,
-            fontSize: typeScale.h1,
-            lineHeight: 1.25,
-            fontWeight: weight.strong,
-            letterSpacing: '-0.02em',
-            marginTop: token.marginXL,
-            marginBottom: token.marginSM,
-            maxWidth: '18ch',
-          }}
-        >
+        <Heading level={2} type="display-3" color="inherit" className="mems-auth__brand-title">
           Quản trị nhà trường trên một hệ thống.
-        </Title>
-        <Text style={{ color: color.onBrandMuted, fontSize: typeScale.body }}>
+        </Heading>
+        <Text type="body" color="inherit" className="mems-auth__on-brand-muted">
           Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp.
         </Text>
 
-        <dl
-          style={{
-            margin: 0,
-            marginTop: token.marginXL,
-            display: 'grid',
-            gap: token.margin,
-          }}
-        >
+        <dl className="mems-auth__areas">
           {AREAS.map((area) => (
             <div key={area.name}>
-              <dt
-                style={{
-                  color: color.onBrand,
-                  fontSize: typeScale.body,
-                  fontWeight: weight.medium,
-                }}
-              >
-                {area.name}
-              </dt>
-              <dd style={{ margin: 0, color: color.onBrandMuted, fontSize: typeScale.body }}>
-                {area.detail}
-              </dd>
+              <dt>{area.name}</dt>
+              <dd className="mems-auth__on-brand-muted">{area.detail}</dd>
             </div>
           ))}
         </dl>
       </div>
 
-      <Text style={{ color: color.onBrandMuted, fontSize: typeScale.caption }}>
+      <Text type="supporting" color="inherit" className="mems-auth__on-brand-muted">
         © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module
       </Text>
     </>
@@ -115,10 +68,13 @@ function BrandPanel() {
 }
 
 /**
- * Khung auth dùng chung (Layer 2, tương thích ngược):
- * - `variant='card'` (mặc định): panel brand trái (≥lg) + Card trắng phải — Register/Forgot/Reset.
+ * Khung auth dùng chung:
+ * - `variant='card'` (mặc định): panel brand trái (≥1024px) + Card trắng phải — Register/Forgot/Reset.
  * - `variant='split'`: hero trái + nội dung phải full-viewport, không bọc Card — Login.
- * Token-driven, responsive; không hardcode màu brand ngoài token/theme.
+ *
+ * `useMediaQuery` thay cho `Grid.useBreakpoint` của antd: cùng một query
+ * `min-width: 1024px` với breakpoint `lg` của Astryx, và ở jsdom (không có
+ * `matchMedia`) nó trả `false` nên panel thương hiệu không render trong unit test.
  */
 export function AuthCard({
   activeTab,
@@ -129,136 +85,70 @@ export function AuthCard({
   variant = 'card',
   rightMaxWidth,
 }: AuthCardProps) {
-  const { token } = theme.useToken();
-  const screens = Grid.useBreakpoint();
-  const isWide = Boolean(screens.lg);
+  const isWide = useMediaQuery('(min-width: 1024px)');
   const left = hero ?? <BrandPanel />;
+
+  const aside = isWide ? (
+    <aside className="mems-auth__aside" aria-label="Giới thiệu MEMS">
+      <div className="mems-auth__aside-inner">{left}</div>
+    </aside>
+  ) : null;
 
   if (variant === 'split') {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: token.colorBgLayout,
-          display: isWide ? 'grid' : 'block',
-          gridTemplateColumns: isWide ? 'minmax(320px, 420px) 1fr' : undefined,
-        }}
-      >
-        {isWide && (
-          <Flex
-            component="aside"
-            aria-label="Giới thiệu MEMS"
-            vertical
-            justify="space-between"
-            style={{
-              minHeight: '100vh',
-              padding: token.paddingXL,
-              background: color.brand,
-              color: token.colorWhite,
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            {left}
-          </Flex>
-        )}
-        <div
-          style={{
-            minWidth: 0,
-            minHeight: '100vh',
-            padding: isWide ? token.paddingXL : token.padding,
-            overflow: 'auto',
-          }}
-        >
-          <div style={{ width: '100%', maxWidth: rightMaxWidth ?? '100%', margin: '0 auto' }}>{children}</div>
-        </div>
+      <div className={isWide ? 'mems-auth mems-auth--split' : 'mems-auth'}>
+        {aside}
+        <main className="mems-auth__main">
+          <div style={{ width: '100%', maxWidth: rightMaxWidth ?? '100%', margin: '0 auto' }}>
+            {children}
+          </div>
+        </main>
       </div>
     );
   }
 
-  const cardMaxWidth = activeTab === 'register' ? 720 : 520;
-
   return (
-    <Flex style={{ minHeight: '100vh', background: token.colorBgLayout }}>
-      {isWide && (
-        <Flex
-          component="aside"
-          aria-label="Giới thiệu MEMS"
-          vertical
-          justify="space-between"
-          style={{
-            width: 420,
-            flex: '0 0 420px',
-            padding: token.paddingXL,
-            background: color.brand,
-            color: token.colorWhite,
-          }}
-        >
-          {left}
-        </Flex>
-      )}
-
-      <Flex
-        align="center"
-        justify="center"
-        style={{ flex: 1, paddingBlock: token.paddingXL, paddingInline: token.padding }}
-      >
+    <div className={isWide ? 'mems-auth mems-auth--card' : 'mems-auth'}>
+      {aside}
+      <main className="mems-auth__main mems-auth__main--center">
         <Card
-          style={{
-            width: '100%',
-            maxWidth: cardMaxWidth,
-            borderRadius: token.borderRadiusLG,
-            borderColor: token.colorBorderSecondary,
-            boxShadow: token.boxShadow,
-          }}
-          styles={{ body: { padding: isWide ? token.paddingXL : token.paddingLG } }}
+          className={
+            activeTab === 'register' ? 'mems-auth__card mems-auth__card--wide' : 'mems-auth__card'
+          }
+          padding={isWide ? 6 : 4}
         >
-          <Flex align="center" gap={token.marginXS} style={{ marginBottom: token.margin }}>
-            <Flex
-              align="center"
-              justify="center"
-              aria-hidden="true"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: token.borderRadius,
-                background: token.colorPrimary,
-                color: token.colorWhite,
-                fontWeight: token.fontWeightStrong,
-                fontSize: typeScale.body,
-              }}
-            >
-              M
-            </Flex>
-            <Text strong style={{ fontSize: typeScale.section }}>
-              MEMS
+          <VStack gap={4}>
+            <div>
+              <div className="mems-auth__card-head">
+                <div className="mems-auth__mark" aria-hidden="true">
+                  M
+                </div>
+                <Text weight="semibold" type="large">
+                  MEMS
+                </Text>
+              </div>
+
+              <Heading level={1}>{title}</Heading>
+              {subtitle && (
+                <Text
+                  type="body"
+                  color="secondary"
+                  display="block"
+                  style={{ marginTop: 'var(--spacing-1)' }}
+                >
+                  {subtitle}
+                </Text>
+              )}
+            </div>
+
+            {children}
+
+            <Text type="supporting" color="secondary" display="block" className="mems-auth__card-footnote">
+              Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.
             </Text>
-          </Flex>
-
-          <Title level={1} style={{ marginTop: 0, marginBottom: token.marginXXS, lineHeight: 1.3 }}>
-            {title}
-          </Title>
-          {subtitle && (
-            <Text type="secondary" style={{ fontSize: typeScale.body }}>
-              {subtitle}
-            </Text>
-          )}
-
-          <div style={{ marginTop: token.margin }}>{children}</div>
-
-          <Text
-            type="secondary"
-            style={{
-              display: 'block',
-              marginTop: token.marginLG,
-              fontSize: typeScale.caption,
-              textAlign: 'center',
-            }}
-          >
-            Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.
-          </Text>
+          </VStack>
         </Card>
-      </Flex>
-    </Flex>
+      </main>
+    </div>
   );
 }

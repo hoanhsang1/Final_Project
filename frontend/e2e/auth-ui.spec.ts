@@ -1,39 +1,43 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Design system (Figma `MEMS — Registration UI & Design System`) áp lên 2 màn auth.
+ * Design system áp lên 2 màn auth — phần **hình thức**.
  *
- * Chỉ kiểm phần **hình thức** — luồng đăng nhập/đăng ký và validate vẫn do
- * `LoginPage.test.tsx` / `RegisterPage.test.tsx` phủ:
+ * Luồng đăng nhập/đăng ký và validate đã do `LoginPage.test.tsx` /
+ * `RegisterPage.test.tsx` phủ ở mức jsdom; ở đây kiểm những thứ chỉ trình duyệt
+ * thật mới nói được:
  *
- * 1. `≥1024px`: panel thương hiệu bên trái + card bên phải (`03 · Login UI`).
- * 2. `<1024px`: ẩn panel, card chiếm hết chiều rộng — 320px không tràn ngang.
- * 3. Token: font Inter, chữ chính `#142447`, control cao 44px.
- * 4. Điều hướng giữa 2 màn bằng liên kết thật ở chân card (không còn cặp tab
- *    trên đầu card — đã bỏ để khỏi lặp với dòng "Chưa có tổ chức?").
+ * 1. `≥1024px` — panel thương hiệu bên trái + nội dung bên phải.
+ * 2. `<1024px` — panel không được render (`useMediaQuery`), 320px không tràn ngang.
+ * 3. Token thật của Astryx: chữ chính `#101828`, cỡ H1 24px, font Inter,
+ *    control `lg` cao 36px (`--size-element-lg`).
+ * 4. Điều hướng Đăng nhập ↔ Đăng ký là hai liên kết thật, mục đang mở đánh
+ *    `aria-current="page"` — không còn `role="tablist"` giả.
  */
 
-/** Chữ chính của design system — Text/Primary `#142447`. */
-const TEXT_PRIMARY = 'rgb(20, 36, 71)';
+/** `--color-text-primary` của theme MEMS: `#101828`. */
+const TEXT_PRIMARY = 'rgb(16, 24, 40)';
+
+/** `--size-element-lg` — control `lg` của Astryx. */
+const CONTROL_LG = 36;
+
+/** Panel thương hiệu chỉ tồn tại từ breakpoint `lg` của Astryx. */
+const BRAND_PANEL = { name: 'Giới thiệu MEMS' } as const;
 
 test.describe('Design system — màn đăng nhập / đăng ký', () => {
-  test('TC-AUTH-UI-01 — desktop hiện panel thương hiệu, không tràn ngang', async ({ page }) => {
+  test('TC-AUTH-UI-01 — desktop hiện panel thương hiệu, H1 đúng token', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/dang-nhap');
 
-    await expect(
-      page.getByRole('complementary', { name: 'Giới thiệu MEMS' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 1, name: 'Đăng nhập để tiếp tục' }),
-    ).toBeVisible();
+    await expect(page.getByRole('complementary', BRAND_PANEL)).toBeVisible();
 
-    // Token: màu chữ chính + font Inter của design system.
-    await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('color', TEXT_PRIMARY);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveCSS(
-      'font-family',
-      /Inter/,
-    );
+    const heading = page.getByRole('heading', { level: 1, name: 'Đăng nhập' });
+    await expect(heading).toBeVisible();
+
+    // Token chữ: một mực `#101828`, cỡ 24px của thang 12/14/17/20/24, font Inter.
+    await expect(heading).toHaveCSS('color', TEXT_PRIMARY);
+    await expect(heading).toHaveCSS('font-size', '24px');
+    await expect(heading).toHaveCSS('font-family', /Inter/);
 
     // Không được có thanh cuộn ngang ở bất kỳ breakpoint nào.
     const overflow = await page.evaluate(
@@ -42,26 +46,25 @@ test.describe('Design system — màn đăng nhập / đăng ký', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('TC-AUTH-UI-02 — mobile 320px: ẩn panel, card full width, control 44px', async ({
+  test('TC-AUTH-UI-02 — mobile 320px: không render panel, control 36px, không tràn ngang', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto('/dang-nhap');
 
-    // Panel chỉ dành cho desktop — mobile phải ẩn hẳn khỏi layout.
-    await expect(page.getByRole('complementary', { name: 'Giới thiệu MEMS' })).toHaveCount(0);
+    // Panel dành cho desktop — dưới 1024px không được render vào DOM.
+    await expect(page.getByRole('complementary', BRAND_PANEL)).toHaveCount(0);
 
     const password = page.getByLabel('Mật khẩu', { exact: true });
     await expect(password).toBeVisible();
-    // Figma: field cao 44px, đủ vùng chạm trên mobile (WCAG 2.5.5).
-    // `Input.Password` bọc `<input>` trong `.ant-input-affix-wrapper` — đo cả khung,
-    // không đo mỗi thẻ input (thẻ input cao đúng bằng dòng chữ).
+
+    // Astryx bọc `<input>` trong một khối mang chiều cao của size `lg`; đo khối
+    // đó chứ không đo thẻ input (thẻ input chỉ cao bằng dòng chữ bên trong).
     const fieldHeight = await password.evaluate((el) => {
-      const box = el.closest('.ant-input-affix-wrapper') ?? el.parentElement ?? el;
+      const box = el.parentElement ?? el;
       return box.getBoundingClientRect().height;
     });
-    expect(fieldHeight).toBeGreaterThanOrEqual(44);
-    expect(fieldHeight).toBeLessThan(45);
+    expect(fieldHeight).toBe(CONTROL_LG);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
@@ -69,24 +72,45 @@ test.describe('Design system — màn đăng nhập / đăng ký', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('TC-AUTH-UI-03 — điều hướng đăng nhập ↔ đăng ký bằng liên kết ở chân card', async ({
+  test('TC-AUTH-UI-03 — cặp Đăng nhập/Đăng ký là liên kết thật, có aria-current', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/dang-nhap');
 
-    // Không còn tab trên đầu card.
-    await expect(
-      page.getByRole('navigation', { name: 'Chuyển giữa đăng nhập và đăng ký' }),
-    ).toHaveCount(0);
+    const nav = page.getByRole('navigation', {
+      name: 'Chuyển giữa đăng nhập và đăng ký',
+    });
+    await expect(nav).toBeVisible();
 
-    await page.getByRole('link', { name: 'Đăng ký tổ chức' }).click();
+    // Sai kiểu cũ: `role="tablist"` + `aria-selected` trên hai thứ dẫn tới hai URL.
+    await expect(page.getByRole('tablist')).toHaveCount(0);
+    await expect(nav.getByRole('link')).toHaveCount(2);
+
+    await expect(nav.getByRole('link', { name: 'Đăng nhập', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(nav.getByRole('link', { name: 'Đăng ký', exact: true })).not.toHaveAttribute(
+      'aria-current',
+      /.*/,
+    );
+
+    await nav.getByRole('link', { name: 'Đăng ký', exact: true }).click();
     await expect(page).toHaveURL(/\/dang-ky$/);
-    await expect(
-      page.getByRole('heading', { level: 1, name: 'Đăng ký tổ chức' }),
-    ).toBeVisible();
+  });
 
-    // Chân card trang đăng ký phải có lối quay lại đăng nhập (trước đây là tab).
+  test('TC-AUTH-UI-04 — trang đăng ký có H1 riêng và lối quay lại đăng nhập', async ({ page }) => {
+    // Không có BE khi chạy e2e: chặn danh mục module để trang ở trạng thái xác
+    // định thay vì phụ thuộc vào lỗi mạng.
+    await page.route('**/api/v1/modules', (route) =>
+      route.fulfill({ json: [{ code: 'STUDENT_MANAGEMENT', name: 'Quản lý học sinh' }] }),
+    );
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/dang-ky');
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Đăng ký tổ chức' })).toBeVisible();
+
     await page.getByRole('link', { name: 'Đăng nhập', exact: true }).click();
     await expect(page).toHaveURL(/\/dang-nhap$/);
   });

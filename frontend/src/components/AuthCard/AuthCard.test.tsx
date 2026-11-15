@@ -26,13 +26,16 @@ it('không còn cặp tab Đăng nhập / Đăng ký ở đầu thẻ', () => {
   expect(screen.queryByRole('link', { name: 'Đăng ký' })).not.toBeInTheDocument();
 });
 
-it('thẻ đăng ký rộng hơn thẻ đăng nhập để chứa form 2 cột', () => {
+it('thẻ đăng ký rộng hơn thẻ đăng nhập để chứa form nhiều khối', () => {
+  // Bề rộng nằm trong CSS (`.mems-auth__card` 520 / `--wide` 720) nên test
+  // kiểm đúng class quyết định bề rộng, không đo style đã tính của jsdom.
   const { unmount } = renderCard('register');
-  expect(document.querySelector<HTMLElement>('.ant-card')?.style.maxWidth).toBe('720px');
+  expect(document.querySelector('.mems-auth__card--wide')).not.toBeNull();
   unmount();
 
   renderCard('login');
-  expect(document.querySelector<HTMLElement>('.ant-card')?.style.maxWidth).toBe('520px');
+  expect(document.querySelector('.mems-auth__card')).not.toBeNull();
+  expect(document.querySelector('.mems-auth__card--wide')).toBeNull();
 });
 
 it('variant split hiển thị hero và children (không dùng Card tiêu đề mặc định)', () => {

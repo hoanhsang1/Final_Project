@@ -1,47 +1,46 @@
-import { Avatar, Button, Flex, theme, Typography } from 'antd';
+import { Button, Text, VStack } from '@astryxdesign/core';
 import type { Role } from '../../features/auth/roles';
-import { typeScale, weight } from '../../theme';
 
 export interface RoleButtonProps {
   role: Role;
   onSelect: (role: Role) => void;
 }
 
-const { Text } = Typography;
-
 /**
  * Một nút chọn tác nhân.
  *
  * BR-08: nút luôn có NHÃN CHỮ, không dùng màu hay icon làm tín hiệu duy nhất.
- * Mọi kích thước/màu lấy từ token của antd — không hardcode hex/px (AGENTS.md mục 2).
+ * `label` của Astryx vừa là nội dung, vừa là tên cho trình đọc màn hình: khi
+ * `children` khác `label`, Astryx đặt `aria-label={label}` — nhờ vậy tên nút
+ * vẫn là "Giáo viên" dù bên trong có thêm dòng mô tả.
+ *
+ * Không dùng `Avatar`: nút của Astryx bọc nội dung trong `<span>`, đặt `<div>`
+ * của Avatar vào đó là lồng sai loại nội dung. Chữ cái đầu nằm trong CSS nếu
+ * sau này cần, còn hiện tại nhãn chữ đã đủ phân biệt.
  */
 export function RoleButton({ role, onSelect }: RoleButtonProps) {
-  const { token } = theme.useToken();
-
   return (
     <Button
-      type="default"
-      block
-      htmlType="button"
+      type="button"
+      variant="secondary"
+      label={role.label}
+      width="100%"
       onClick={() => onSelect(role)}
       style={{
         height: 'auto',
-        padding: token.paddingSM,
-        textAlign: 'left',
-        whiteSpace: 'normal',
+        justifyContent: 'flex-start',
+        paddingBlock: 'var(--spacing-2)',
+        textAlign: 'start',
       }}
     >
-      <Flex align="center" gap={token.marginSM} style={{ width: '100%' }}>
-        <Avatar aria-hidden="true" style={{ backgroundColor: token.colorPrimary, flexShrink: 0 }}>
-          {role.label.charAt(0)}
-        </Avatar>
-        <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: typeScale.body, fontWeight: weight.medium }}>{role.label}</Text>
-          <Text type="secondary" style={{ fontSize: typeScale.caption }}>
-            {role.description}
-          </Text>
-        </Flex>
-      </Flex>
+      <VStack as="span" gap={0.5} align="stretch">
+        <Text as="span" type="body" weight="medium">
+          {role.label}
+        </Text>
+        <Text as="span" type="supporting" color="secondary">
+          {role.description}
+        </Text>
+      </VStack>
     </Button>
   );
 }
