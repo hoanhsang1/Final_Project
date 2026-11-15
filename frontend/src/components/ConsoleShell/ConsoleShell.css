@@ -1,0 +1,176 @@
+/*
+ * Khung console — chỉ những thứ Astryx không có sẵn: bố cục header + cột bên +
+ * vùng nội dung, skip link, và giới hạn bề rộng header trên màn hẹp.
+ *
+ * Mọi màu / cỡ chữ / bo góc / nhịp lấy từ CSS variable của theme. CSS ở đây
+ * KHÔNG nằm trong layer của Astryx nên thắng selector trùng — vì vậy chỉ đặt
+ * class riêng `mems-console*`, không đụng `.astryx-*`.
+ *
+ * 56px là chiều cao header (kích thước bố cục, không phải màu/chữ): cột bên
+ * `sticky` phải bắt đầu đúng dưới nó, nên dùng chung một biến.
+ */
+
+.mems-console {
+  --mems-console-header-height: 56px;
+  --mems-console-sider-width: 248px;
+
+  min-height: 100vh;
+  background: var(--color-background-body);
+  color: var(--color-text-primary);
+}
+
+/* ---------- Skip link ---------- */
+
+.mems-console__skip {
+  position: fixed;
+  z-index: 100;
+  inset-block-start: var(--spacing-3);
+  inset-inline-start: var(--spacing-3);
+  padding: var(--spacing-1) var(--spacing-3);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  /* Đẩy ra ngoài khung nhìn nhưng vẫn nhận focus bằng Tab. */
+  transform: translateY(-200%);
+}
+
+.mems-console__skip:focus {
+  transform: none;
+}
+
+/* ---------- Header ---------- */
+
+.mems-console__header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  height: var(--mems-console-header-height);
+  padding-inline: var(--spacing-4);
+  border-block-end: var(--border-width) solid var(--color-border);
+  background: var(--color-background-surface);
+}
+
+.mems-console__header-start,
+.mems-console__header-end {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+
+.mems-console__header-end {
+  flex: none;
+}
+
+.mems-console__menu-button {
+  margin-inline-start: calc(var(--spacing-2) * -1);
+}
+
+.mems-console__brand {
+  display: flex;
+  flex: none;
+}
+
+.mems-console__brand-svg {
+  display: block;
+}
+
+.mems-console__brand-strong {
+  fill: var(--color-accent);
+}
+
+.mems-console__brand-soft {
+  fill: var(--color-accent);
+  opacity: 0.4;
+}
+
+.mems-console__product {
+  flex: none;
+  white-space: nowrap;
+}
+
+.mems-console__header-divider {
+  display: none;
+  flex: none;
+  width: var(--border-width);
+  height: var(--spacing-4);
+  background: var(--color-border);
+}
+
+.mems-console__context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mems-console__username {
+  display: none;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mems-console__menu-icon {
+  display: block;
+  font-size: var(--font-size-xl);
+}
+
+/* ---------- Body ---------- */
+
+.mems-console__body {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.mems-console__sider {
+  position: sticky;
+  inset-block-start: var(--mems-console-header-height);
+  flex: none;
+  align-self: flex-start;
+  height: calc(100vh - var(--mems-console-header-height));
+  overflow-y: auto;
+  padding-inline: var(--spacing-2);
+  border-inline-end: var(--border-width) solid var(--color-border);
+  background: var(--color-background-surface);
+}
+
+.mems-console__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--spacing-5) var(--spacing-4);
+}
+
+.mems-console__main:focus {
+  outline: none;
+}
+
+.mems-console__drawer-menu {
+  padding-inline: var(--spacing-2);
+}
+
+/* ---------- Desktop ---------- */
+
+@media (min-width: 1024px) {
+  .mems-console__header {
+    padding-inline: var(--spacing-6);
+  }
+
+  .mems-console__header-divider,
+  .mems-console__username {
+    display: block;
+  }
+
+  .mems-console__main {
+    padding: var(--spacing-8);
+  }
+}

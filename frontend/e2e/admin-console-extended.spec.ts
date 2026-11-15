@@ -52,9 +52,11 @@ test.describe('Khung menu mở rộng (Q-28)', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/quan-tri');
 
-    await expect(page.locator('.ant-layout-sider').getByRole('menuitem')).toHaveCount(6);
-    await expect(page.getByRole('menuitem', { name: 'Tổng quan' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'Nhật ký hệ thống' })).toBeVisible();
+    // Cột bên là `nav` có tên nên scope được mà không cần class của framework.
+    const sider = page.getByRole('navigation', { name: 'Menu quản trị' });
+    await expect(sider.getByRole('link')).toHaveCount(6);
+    await expect(sider.getByRole('link', { name: 'Tổng quan' })).toBeVisible();
+    await expect(sider.getByRole('link', { name: 'Nhật ký hệ thống' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mở menu quản trị' })).toHaveCount(0);
   });
 
@@ -69,8 +71,12 @@ test.describe('Khung menu mở rộng (Q-28)', () => {
     await expect(page.getByRole('button', { name: 'Mở menu quản trị' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Mở menu quản trị' }).click();
-    // Phải click trong `.ant-drawer-open` — menu của Sider vẫn nằm trong DOM dù bị ẩn.
-    await page.locator('.ant-drawer-open').getByText('Nhật ký hệ thống').click();
+    // `Drawer` là `<dialog>` có `aria-label` = tên khu vực, nên scope theo role
+    // thay vì class `.ant-drawer-open` (menu cột bên không render ở mobile).
+    await page
+      .getByRole('dialog', { name: 'Khu vực quản trị' })
+      .getByRole('link', { name: 'Nhật ký hệ thống' })
+      .click();
 
     await expect(page).toHaveURL(/\/quan-tri\/nhat-ky$/);
     await expect(page.getByRole('heading', { name: 'Nhật ký hệ thống' })).toBeVisible();

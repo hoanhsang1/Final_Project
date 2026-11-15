@@ -82,7 +82,7 @@ test.describe('Trải nghiệm người dùng cốt lõi', () => {
     await page.goto(`/quan-tri/to-chuc/${ORG_C.id}`);
     await page.getByRole('checkbox', { name: 'Quản lý thiết bị' }).uncheck();
 
-    await page.getByRole('menuitem', { name: 'Nhật ký hệ thống' }).click();
+    await page.getByRole('link', { name: 'Nhật ký hệ thống' }).click();
 
     // `Modal.confirm` của antd render title ở 2 chỗ (`.ant-modal-title` +
     // `.ant-modal-confirm-title`) → phải scope theo hộp thoại.
@@ -103,7 +103,7 @@ test.describe('Trải nghiệm người dùng cốt lõi', () => {
     await page.goto(`/quan-tri/to-chuc/${ORG_C.id}`);
     await page.getByRole('checkbox', { name: 'Quản lý thiết bị' }).uncheck();
 
-    await page.getByRole('menuitem', { name: 'Nhật ký hệ thống' }).click();
+    await page.getByRole('link', { name: 'Nhật ký hệ thống' }).click();
     await page.getByRole('button', { name: 'Rời trang' }).click();
     await expect(page).toHaveURL('/quan-tri/nhat-ky');
 

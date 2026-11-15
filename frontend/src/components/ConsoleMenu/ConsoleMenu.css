@@ -1,0 +1,63 @@
+/*
+ * Menu điều hướng console — chỉ những thứ Astryx không có sẵn: danh sách liên
+ * kết dọc, mục đang mở có nền nhạt + chữ brand.
+ *
+ * CSS ở đây KHÔNG nằm trong layer của Astryx nên thắng selector trùng; vì vậy
+ * chỉ đặt class riêng `mems-console-menu*`, không đụng `.astryx-*`.
+ */
+
+.mems-console-menu {
+  padding-block: var(--spacing-1);
+}
+
+.mems-console-menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mems-console-menu__link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: var(--size-element-lg);
+  padding-inline: var(--spacing-3);
+  border-radius: var(--radius-element);
+  text-decoration: none;
+}
+
+.mems-console-menu__link:hover {
+  background: var(--color-background-muted);
+}
+
+/* Mục đang mở: nền nhạt. Màu chữ + độ đậm do prop `color`/`weight` của `Link`
+ * quyết định (Text bên trong luôn tự đặt hai thứ đó) — nền là tín hiệu KHÔNG
+ * phải màu duy nhất, cùng với độ đậm và `aria-current` (BR-08). */
+.mems-console-menu__link[aria-current='page'] {
+  background: var(--color-accent-muted);
+}
+
+.mems-console-menu__link:focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: calc(var(--focus-outline-offset) - 1px);
+}
+
+.mems-console-menu__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--spacing-4);
+  color: currentColor;
+  font-size: var(--font-size-lg);
+}
+
+.mems-console-menu__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -336,6 +336,30 @@ Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
     `react-hook-form`/`zod` cho form 1–7 trường; hai thư viện đó kéo theo một ngôn ngữ
     khai báo thứ hai nằm cạnh component của Astryx.
 
+### 6.8 Cạm bẫy phát hiện khi port P3 (primitive + shell)
+
+1. `Text` **bên trong `Link`** luôn tự đặt `color` và `font-weight`
+   (`defaultWeightByTypeStyles`) ⇒ CSS trên thẻ `<a>` không đổi được màu/độ đậm của
+   chữ. Muốn mục menu đang mở đậm hơn: truyền `color`/`weight` cho `Link`
+   (`color={isSelected ? 'accent' : 'primary'}`), CSS chỉ lo **nền**.
+2. `Drawer`/`Dialog` dùng `<dialog>` native. jsdom 30 chỉ có class rỗng, không có
+   `showModal` ⇒ test mở overlay ném `showModal is not a function` rồi rơi vào error
+   boundary. Đã vá tối thiểu trong `src/test/setup.ts` (bật/tắt `open`, phát `close`).
+   Hệ quả tốt: `<dialog>` đóng là `display:none` theo UA stylesheet, nên nội dung
+   trong Drawer **không** lọt vào `getByRole` khi chưa mở.
+3. **Bỏ `antd/dist/reset.css`.** CSS không layer thắng CSS có layer, nên
+   `h1..h6 { margin-bottom:.5em; font-weight:500 }` của antd đè `Heading` của Astryx.
+   Astryx `reset.css` đã dọn đủ cho cả hai bên.
+4. Điều hướng là **danh sách liên kết** (`nav > ul > li > a`), không phải `Menu`:
+   `role="menu"` chỉ dành cho menu lệnh, còn mỗi mục ở đây dẫn tới một URL nên đúng
+   ngữ nghĩa là `link` + `aria-current="page"`. E2E phải tìm `getByRole('link')`
+   trong `getByRole('navigation', { name })` — không dùng `menuitem`/`.ant-layout-sider`.
+5. `EmptyState` mặc định `headingLevel={3}`; bọc của mình mặc định **2** vì trang đã
+   có H1, và hạ xuống 3 khi đặt trong `DetailSection` (đã có H2).
+6. `useMediaQuery` của Astryx là **nguồn breakpoint duy nhất** cho shell. Không viết
+   hook `matchMedia` riêng và không để CSS quyết định ẩn/hiện cột bên — hai nguồn sẽ
+   lệch nhau (JS nghĩ desktop, CSS nghĩ mobile).
+
 ## 7. Sáu khối dùng chung (v2)
 
 | Khối | Spec v2 |
@@ -412,6 +436,12 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
   trộn component hai bên trong cùng một màn.
 - `main.tsx` bọc `Theme` ngoài `ConfigProvider`; `Theme` là theme gốc nên gắn
   `data-theme`/`data-astryx-theme` lên `<html>` — portal của Dialog/Toast vẫn ăn token.
+- `ConsoleShell`/`ConsoleMenu` đã là Astryx thuần: header + cột bên + `<main>` là flex
+  và CSS của mình, breakpoint duy nhất là `useMediaQuery('(min-width: 1024px)')`. Trang
+  con vẫn có thể còn antd — đó là dạng lai được phép cho tới P4; chỉ **không** trộn
+  hai bên trong cùng một component.
+- E2E không bám class `.ant-*` của layout nữa: dùng `navigation`/`link`/`dialog` +
+  `aria-label` của mình.
 - i18n: Astryx `vi-VN`, antd `vi_VN`. Chuỗi của mình vẫn nằm trong code, không phụ
   thuộc locale của thư viện.
 - Font: `document.body.style.fontFamily` áp cho cả portal của hai bên.

@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { ConfigProvider } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import type { ConsoleMenuItem } from '../../features/admin/consoleMenu';
@@ -10,18 +9,37 @@ const items: ConsoleMenuItem[] = [
   { key: 'chuc-vu', label: 'Chức vụ', path: '/to-chuc/chuc-vu', exact: true },
 ];
 
+function renderMenu(selectedKey: string | null) {
+  return render(
+    <MemoryRouter>
+      <ConsoleMenu items={items} menuAriaLabel="Menu test" selectedKey={selectedKey} />
+    </MemoryRouter>,
+  );
+}
+
 describe('ConsoleMenu', () => {
-  it('renders nav with aria-label, links, and aria-current only on selected item', () => {
-    render(
-      <ConfigProvider>
-        <MemoryRouter>
-          <ConsoleMenu items={items} menuAriaLabel="Menu test" selectedKey="phong-ban" />
-        </MemoryRouter>
-      </ConfigProvider>,
-    );
+  it('render nav có aria-label, mỗi mục là một liên kết thật', () => {
+    renderMenu('phong-ban');
 
     expect(screen.getByRole('navigation', { name: 'Menu test' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Phòng ban' })).toHaveAttribute('href', '/to-chuc');
+    expect(screen.getByRole('link', { name: 'Chức vụ' })).toHaveAttribute(
+      'href',
+      '/to-chuc/chuc-vu',
+    );
+  });
+
+  it('chỉ đánh dấu aria-current="page" cho mục đang chọn', () => {
+    renderMenu('phong-ban');
+
     expect(screen.getByRole('link', { name: 'Phòng ban' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Chức vụ' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('không đánh dấu mục nào khi selectedKey = null (màn chi tiết)', () => {
+    renderMenu(null);
+
+    expect(screen.getByRole('link', { name: 'Phòng ban' })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('link', { name: 'Chức vụ' })).not.toHaveAttribute('aria-current');
   });
 });
