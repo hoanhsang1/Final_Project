@@ -152,6 +152,10 @@ it('OWNER đăng nhập thành công thì vào thẳng /to-chuc', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
   await waitFor(() => expect(router.state.location.pathname).toBe('/to-chuc'));
-  expect(await screen.findByRole('heading', { name: 'Phòng ban' })).toBeInTheDocument();
+  // Cả cây router (console + bảng) mount sau khi đổi URL; 1s mặc định của
+  // Testing Library không đủ khi 140 test chạy song song trên máy chậm.
+  expect(
+    await screen.findByRole('heading', { name: 'Phòng ban' }, { timeout: 3000 }),
+  ).toBeInTheDocument();
   expect(useAuthStore.getState().backendRoles).toContain('OWNER');
 });

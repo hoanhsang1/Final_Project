@@ -23,7 +23,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import DetailSection from '../../components/DetailSection/DetailSection';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
-import { useNotify } from '../../components/LiveAnnouncer/LiveAnnouncer';
+import { useNotify } from '../../hooks/useNotify';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import { canViewClasses, hasPermission, isOwnerRole } from '../../features/auth/permissions';

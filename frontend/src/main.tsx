@@ -9,6 +9,14 @@ import '@ant-design/v5-patch-for-react-19';
 // trong lúc migration.
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
+// KHÔNG import `antd/dist/reset.css` nữa.
+//
+// Reset của antd không nằm trong layer nào, mà CSS không layer luôn thắng CSS có
+// layer — nên `h1..h6 { margin-bottom: .5em; font-weight: 500 }` của nó đè lên
+// `Heading` của Astryx (đang ở layer `astryx-base`). Astryx `reset.css` đã dọn
+// đủ cho cả hai bên (box-sizing, margin, heading, form inherit), nên bỏ reset của
+// antd là cách rẻ nhất để hết xung đột toàn cục. CSS component của antd do
+// cssinjs chèn theo class `.ant-*`, không đụng class của Astryx.
 import { InternationalizationProvider, Theme } from '@astryxdesign/core';
 import viVNAstryx from '@astryxdesign/core/locales/vi-VN.generated.js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -20,7 +28,6 @@ import { RouterProvider } from 'react-router-dom';
 import 'antd/dist/reset.css';
 import { memsTheme } from './astryx-theme';
 import './index.css';
-import LiveAnnouncer from './components/LiveAnnouncer/LiveAnnouncer';
 import { router } from './router';
 import { fontFamily, themeComponents, themeToken } from './theme';
 
@@ -62,8 +69,6 @@ createRoot(container).render(
           {/* `App` của antd: để `message`/`notification` đi qua ConfigProvider (đúng token/theme). */}
           <ConfigProvider locale={viVN} theme={{ token: themeToken, components: themeComponents }}>
             <App>
-              {/* Vùng aria-live dùng chung: mọi toast của useNotify đều được đọc to. */}
-              <LiveAnnouncer />
               <RouterProvider router={router} />
             </App>
           </ConfigProvider>

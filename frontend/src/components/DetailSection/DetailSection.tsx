@@ -1,15 +1,12 @@
-import { Flex, Typography, theme } from 'antd';
+import { Divider, Heading, HStack, Text, VStack } from '@astryxdesign/core';
 import type { ReactNode } from 'react';
-import { typeScale, weight } from '../../theme';
-
-const { Title, Text } = Typography;
 
 export interface DetailSectionProps {
   /** Tiêu đề khối — render thành H2 để không phá cấu trúc heading của trang. */
   title: ReactNode;
   /** Một câu mô tả ngắn (tuỳ chọn). Đừng lặp lại tiêu đề. */
   description?: ReactNode;
-  /** Hành động của riêng khối (tối đa 1 nút, thường là `type="text"`). */
+  /** Hành động của riêng khối (tối đa 1 nút, thường là `variant="ghost"`). */
   extra?: ReactNode;
   children: ReactNode;
 }
@@ -21,6 +18,9 @@ export interface DetailSectionProps {
  * một `Card` sinh ra "card kit" — mọi khối cùng bo góc, cùng đổ bóng, không
  * khối nào quan trọng hơn khối nào. Hairline + khoảng trắng phân cấp rẻ hơn và
  * đọc nhanh hơn, đúng quy ước `docs/ui-conventions.md` mục 4.
+ *
+ * `Heading level={2}` = 20px theo thang v2. Bản antd cũ dùng `typeScale.section`
+ * = **16px** — mốc không còn tồn tại trong hợp đồng, nên port này sửa luôn.
  */
 export default function DetailSection({
   title,
@@ -28,42 +28,20 @@ export default function DetailSection({
   extra,
   children,
 }: DetailSectionProps) {
-  const { token } = theme.useToken();
-
   return (
-    <section style={{ marginBottom: token.marginXL }}>
-      <Flex
-        align="baseline"
-        justify="space-between"
-        gap={token.marginSM}
-        style={{
-          paddingBottom: token.paddingXS,
-          marginBottom: token.margin,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-        }}
-      >
-        <Flex vertical gap={2} style={{ minWidth: 0 }}>
-          <Title
-            level={2}
-            style={{
-              margin: 0,
-              fontSize: typeScale.section,
-              lineHeight: 1.4,
-              fontWeight: weight.strong,
-              letterSpacing: '-0.01em',
-              color: token.colorTextHeading,
-            }}
-          >
-            {title}
-          </Title>
+    <section style={{ marginBottom: 'var(--spacing-8)' }}>
+      <HStack align="start" justify="between" gap={3} wrap="wrap">
+        <VStack gap={0.5} style={{ minWidth: 0 }}>
+          <Heading level={2}>{title}</Heading>
           {description ? (
-            <Text style={{ fontSize: typeScale.body, color: token.colorTextSecondary }}>
+            <Text type="body" color="secondary">
               {description}
             </Text>
           ) : null}
-        </Flex>
+        </VStack>
         {extra}
-      </Flex>
+      </HStack>
+      <Divider variant="subtle" style={{ marginBlock: 'var(--spacing-2)' }} />
       {children}
     </section>
   );

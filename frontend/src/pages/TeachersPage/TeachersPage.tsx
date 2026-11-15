@@ -18,7 +18,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
-import { useNotify } from '../../components/LiveAnnouncer/LiveAnnouncer';
+import { useNotify } from '../../hooks/useNotify';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import { canEditTeachers, canViewTeachers, isOwnerRole } from '../../features/auth/permissions';
 import {

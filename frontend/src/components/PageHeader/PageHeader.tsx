@@ -1,9 +1,14 @@
-import { Breadcrumb, Flex, Typography, theme } from 'antd';
+import {
+  BreadcrumbItem,
+  Breadcrumbs,
+  Heading,
+  HStack,
+  Stack,
+  Text,
+  VStack,
+} from '@astryxdesign/core';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { typeScale, weight } from '../../theme';
-
-const { Title, Text } = Typography;
+import { Link as RouterLink } from 'react-router-dom';
 
 export interface PageHeaderBreadcrumbItem {
   title: ReactNode;
@@ -23,54 +28,55 @@ export interface PageHeaderProps {
 
 /**
  * Header trang dùng chung (Layer 1) — ngữ cảnh + tiêu đề H1 + hành động.
- * Token-driven, Odoo-clean; tái dùng cho Lớp 2/3. Không hardcode màu/px.
+ *
+ * Chỉ dùng token của Astryx: `Heading level={1}` = 24px (thang 12/14/17/20/24),
+ * `Text type="body" color="secondary"` cho phụ đề. Không còn `theme.useToken()`
+ * nên component này không cần `ConfigProvider` — nhờ vậy dùng được ở cả trang
+ * đã port lẫn trang còn antd trong lúc chuyển tiếp.
+ *
+ * Breadcrumb cuối cùng là `isCurrent`: nó không phải liên kết, đúng ngữ nghĩa
+ * "bạn đang ở đây" thay vì một link trỏ về chính trang hiện tại.
  */
 export default function PageHeader({ title, subtitle, breadcrumb, extra, children }: PageHeaderProps) {
-  const { token } = theme.useToken();
-
-  const breadcrumbItems = breadcrumb?.map((item, index) => ({
-    key: `${index}-${typeof item.title === 'string' ? item.title : index}`,
-    title: item.href ? <Link to={item.href}>{item.title}</Link> : item.title,
-  }));
+  const items = breadcrumb ?? [];
 
   return (
-    <Flex vertical gap={token.marginXS} style={{ marginBottom: token.marginLG }}>
-      {breadcrumbItems && breadcrumbItems.length > 0 && <Breadcrumb items={breadcrumbItems} />}
-      <Flex
-        align="flex-start"
-        justify="space-between"
-        wrap="wrap"
-        gap={token.marginSM}
-      >
-        <Flex vertical gap={2} style={{ minWidth: 0, flex: '1 1 240px' }}>
-          <Title
-            level={1}
-            style={{
-              margin: 0,
-              fontSize: typeScale.h1,
-              lineHeight: 1.3,
-              fontWeight: weight.strong,
-              letterSpacing: '-0.02em',
-              color: token.colorTextHeading,
-            }}
-          >
-            {title}
-          </Title>
+    <Stack direction="vertical" gap={2} style={{ marginBottom: 'var(--spacing-6)' }}>
+      {items.length > 0 ? (
+        <Breadcrumbs>
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1;
+            return (
+              <BreadcrumbItem
+                key={`${index}-${typeof item.title === 'string' ? item.title : index}`}
+                as={item.href ? RouterLink : undefined}
+                href={item.href}
+                isCurrent={isLast}
+              >
+                {item.title}
+              </BreadcrumbItem>
+            );
+          })}
+        </Breadcrumbs>
+      ) : null}
+
+      <HStack align="start" justify="between" gap={3} wrap="wrap">
+        <VStack gap={0.5} style={{ minWidth: 0, flex: '1 1 240px' }}>
+          <Heading level={1}>{title}</Heading>
           {subtitle ? (
-            <Text
-              style={{
-                fontSize: token.fontSize,
-                color: token.colorTextSecondary,
-                maxWidth: '76ch',
-              }}
-            >
+            <Text type="body" color="secondary" style={{ maxWidth: '76ch' }}>
               {subtitle}
             </Text>
           ) : null}
-        </Flex>
-        {extra ? <Flex gap={token.marginSM} align="center" wrap="wrap">{extra}</Flex> : null}
-      </Flex>
+        </VStack>
+        {extra ? (
+          <HStack gap={3} align="center" wrap="wrap">
+            {extra}
+          </HStack>
+        ) : null}
+      </HStack>
+
       {children}
-    </Flex>
+    </Stack>
   );
 }
