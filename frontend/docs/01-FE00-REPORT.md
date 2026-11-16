@@ -320,3 +320,15 @@ DEPARTMENT/ORGANIZATION (6 unit test). Tổng **53 test / 10 file**.
 - `http://localhost:5173/` và `/src/main.tsx`: HTTP 200, phục vụ app mới.
 - Kiểm thử backend thật chỉ ở mức probe endpoint (không có browser E2E do môi trường sandbox chặn
   Chrome); mọi tuyên bố “real” đều kèm mã HTTP thực tế.
+
+## 14. Nghiệm thu FE-00 / FE-01 / FE-02 (16/11/2026)
+
+| Gói | Trạng thái | Bằng chứng |
+|---|---|---|
+| **FE-00** | DONE | 23 file / 112 test pass; `tsc`, `lint` (0 error), `build` pass; 21 route nghiệp vụ được rà (11 route có test page, 1 route có app-flow test) |
+| **FE-01** | DONE (source) | Chi tiết tổ chức SA + bật/tắt/khóa module chạy với API thật qua gateway dựng từ source (mục 9 của [04-INTEGRATION-MATRIX](04-INTEGRATION-MATRIX.md)); image container đang chạy là bản cũ nên cần rebuild trước khi coi là live |
+| **FE-02** | DONE | Chức vụ & quyền: CRUD, bundle, scope, clone, impact, lọc quyền theo module phòng ban; 5 test (thành công, lỗi 403, validation, refetch) |
+
+Đã sửa trong đợt nghiệm thu: `AccountService` (Identity) trả `temporaryPassword` cho tạo/reset tài
+khoản và ép `must_change_password`; FE hiển thị đúng mật khẩu backend trả; nhãn `Field` trong
+dialog tạo tài khoản đã gắn `htmlFor`/`id`.

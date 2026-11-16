@@ -5,14 +5,18 @@ import type {
   CreatedMember,
   Department,
   DepartmentInput,
+  DepartmentModuleImpact,
   Member,
   MemberDetail,
   OrganizationModule,
   OrganizationModuleStatus,
   Position,
+  PositionCloneResult,
+  PositionInput,
   Specialty,
   TransferRequest,
 } from '@/features/organization/types'
+import type { PermissionDefinition } from '@/features/workflows/types'
 
 export const departmentsApi = {
   async list(): Promise<Department[]> {
@@ -45,6 +49,20 @@ export const departmentsApi = {
 
   async remove(id: string): Promise<void> {
     await api.delete(`/departments/${id}`)
+  },
+
+  async availablePermissions(id: string): Promise<PermissionDefinition[]> {
+    const { data } = await api.get<PermissionDefinition[]>(
+      `/departments/${id}/available-permissions`,
+    )
+    return data
+  },
+
+  async moduleImpact(id: string, moduleCodes: string[]): Promise<DepartmentModuleImpact> {
+    const { data } = await api.get<DepartmentModuleImpact>(`/departments/${id}/module-impact`, {
+      params: { moduleCodes },
+    })
+    return data
   },
 
   async members(departmentId: string): Promise<Member[]> {
@@ -91,6 +109,33 @@ export const departmentsApi = {
 export const positionsApi = {
   async list(): Promise<Position[]> {
     const { data } = await api.get<Position[]>('/positions')
+    return data
+  },
+
+  async create(input: PositionInput): Promise<Position> {
+    const { data } = await api.post<Position>('/positions', input)
+    return data
+  },
+
+  async update(id: string, input: PositionInput): Promise<Position> {
+    const { data } = await api.put<Position>(`/positions/${id}`, input)
+    return data
+  },
+
+  async remove(id: string): Promise<void> {
+    await api.delete(`/positions/${id}`)
+  },
+
+  async impact(id: string): Promise<{ activeHolders: number }> {
+    const { data } = await api.get<{ activeHolders: number }>(`/positions/${id}/impact`)
+    return data
+  },
+
+  async clone(
+    id: string,
+    input: { name?: string; departmentId: string },
+  ): Promise<PositionCloneResult> {
+    const { data } = await api.post<PositionCloneResult>(`/positions/${id}/clone`, input)
     return data
   },
 }
@@ -140,6 +185,10 @@ export const notificationsApi = {
   async list(): Promise<AppNotification[]> {
     const { data } = await api.get<AppNotification[]>('/notifications')
     return data
+  },
+
+  async markRead(id: string): Promise<void> {
+    await api.post(`/notifications/${id}/read`)
   },
 
   async markAllRead(): Promise<{ updated: number }> {

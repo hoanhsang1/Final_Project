@@ -41,6 +41,32 @@ export interface Position {
   departmentId: string | null
 }
 
+export interface PositionInput {
+  name: string
+  description?: string
+  permissions: string[]
+  bundleCodes: string[]
+  scope: 'ORGANIZATION' | 'DEPARTMENT'
+  departmentId?: string | null
+}
+
+export interface PositionCloneResult {
+  position: Position
+  removedPermissions: string[]
+  droppedBundles: string[]
+}
+
+export interface DepartmentModuleImpact {
+  removedModules: string[]
+  positions: {
+    id: string
+    name: string
+    permissions: string[]
+    members: number
+  }[]
+  affectedMembers: number
+}
+
 export interface Specialty {
   id: string
   name: string

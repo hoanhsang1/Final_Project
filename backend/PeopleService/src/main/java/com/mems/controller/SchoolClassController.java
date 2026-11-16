@@ -94,14 +94,15 @@ public class SchoolClassController {
         return statusService.cancel(id, request);
     }
 
+    // Decision endpoints delegate authorization to ClassApprovalPolicy (OWNER, responsible
+    // department head, or delegated GM). A class.approve_close pre-check would exclude heads,
+    // who are department-scoped approvers and therefore never hold that ORG-only permission.
     @PostMapping("/{id}/cancel-requests/approve")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse approveCancel(@PathVariable String id) {
         return statusService.approveCancel(id);
     }
 
     @PostMapping("/{id}/cancel-requests/reject")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse rejectCancel(@PathVariable String id,
                                             @Valid @RequestBody ClassCloseRejectRequest request) {
         return statusService.rejectCancel(id, request);
@@ -121,13 +122,11 @@ public class SchoolClassController {
     }
 
     @PostMapping("/{id}/close-requests/approve")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse approveClose(@PathVariable String id) {
         return statusService.approveClose(id);
     }
 
     @PostMapping("/{id}/close-requests/reject")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse rejectClose(@PathVariable String id,
                                            @Valid @RequestBody ClassCloseRejectRequest request) {
         return statusService.rejectClose(id, request);

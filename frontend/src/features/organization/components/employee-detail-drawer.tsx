@@ -46,6 +46,7 @@ import {
   ROLE_LABELS,
   TEACHING_STATUS_LABELS,
 } from '@/features/organization/types'
+import { useMemberEffectivePermissions } from '@/features/workflows/hooks'
 import { getInitials, formatDate } from '@/lib/format'
 import { ApiError } from '@/lib/api-error'
 import { ALL_PERMISSION_META, PERM } from '@/lib/permissions'
@@ -71,6 +72,10 @@ export function EmployeeDetailDrawer({
   const updatePositions = useUpdateMemberPositions()
   const resetPassword = useResetMemberPassword()
   const removeMember = useRemoveMember()
+  const effective = useMemberEffectivePermissions(
+    departmentId ?? undefined,
+    open ? userId ?? undefined : undefined,
+  )
 
   const [editOpen, setEditOpen] = useState(false)
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
@@ -268,6 +273,23 @@ export function EmployeeDetailDrawer({
                   <p className="mt-2 text-2xs leading-relaxed text-ink-400">
                     Danh sách do backend tính từ vai trò, chức vụ, bundle và ủy quyền còn hiệu lực.
                   </p>
+                  {effective.isError ? (
+                    <p className="mt-1 text-2xs text-danger-500">
+                      Không tải được quyền hiệu lực từ backend: {ApiError.from(effective.error).message}
+                    </p>
+                  ) : null}
+                  {effective.data ? (
+                    <p className="mt-1 text-2xs text-ink-500">
+                      Backend xác nhận {effective.data.permissions.length} quyền
+                      {effective.data.delegatedPermissions.length > 0
+                        ? ` · ${effective.data.delegatedPermissions.length} quyền từ ủy quyền`
+                        : ''}
+                      {effective.data.departmentId
+                        ? ` · phạm vi phòng ban ${effective.data.departmentId.slice(0, 8)}`
+                        : ''}
+                      .
+                    </p>
+                  ) : null}
                 </section>
 
                 <section className="border-t border-line pt-4">

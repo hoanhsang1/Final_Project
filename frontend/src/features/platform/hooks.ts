@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { organizationsApi } from '@/features/platform/api'
+import { accountsApi, organizationsApi } from '@/features/platform/api'
 import type { OrganizationListParams } from '@/features/platform/types'
 import { queryKeys } from '@/lib/query-keys'
 
@@ -114,4 +114,53 @@ export function useReactivateOrganization() {
       organizationsApi.reactivate(id, reason),
     onSuccess: invalidate,
   })
+}
+
+export function useModuleCatalog() {
+  return useQuery({
+    queryKey: queryKeys.moduleCatalog,
+    queryFn: () => organizationsApi.moduleCatalog(),
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useAccounts(params: {
+  page?: number
+  size?: number
+  organizationId?: string
+  role?: string
+  status?: string
+  keyword?: string
+}) {
+  return useQuery({
+    queryKey: ['accounts', params],
+    queryFn: () => accountsApi.list(params),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useAccountMutations() {
+  const queryClient = useQueryClient()
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['accounts'] })
+  return {
+    create: useMutation({
+      mutationFn: (input: { email: string; role: string; organizationId?: string }) =>
+        accountsApi.create(input),
+      onSuccess: invalidate,
+    }),
+    updateStatus: useMutation({
+      mutationFn: ({ id, status, reason }: { id: string; status: string; reason?: string }) =>
+        accountsApi.updateStatus(id, status, reason),
+      onSuccess: invalidate,
+    }),
+    updateRole: useMutation({
+      mutationFn: ({ id, role }: { id: string; role: string }) => accountsApi.updateRole(id, role),
+      onSuccess: invalidate,
+    }),
+    resetPassword: useMutation({
+      mutationFn: ({ id, newPassword }: { id: string; newPassword?: string }) =>
+        accountsApi.resetPassword(id, newPassword),
+      onSuccess: invalidate,
+    }),
+  }
 }

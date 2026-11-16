@@ -41,6 +41,7 @@ import {
   useRejectOrganization,
   useSuspendOrganization,
   useToggleModuleLock,
+  useUpdateOrganizationModules,
 } from '@/features/platform/hooks'
 import {
   ORG_STATUS_LABELS,
@@ -79,6 +80,7 @@ export function OrganizationDetailPage() {
   const suspend = useSuspendOrganization()
   const reactivate = useReactivateOrganization()
   const toggleLock = useToggleModuleLock()
+  const updateModules = useUpdateOrganizationModules()
 
   const [approveOpen, setApproveOpen] = useState(false)
   const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null)
@@ -87,6 +89,9 @@ export function OrganizationDetailPage() {
   const [lockTarget, setLockTarget] = useState<LockTarget | null>(null)
   const [lockReason, setLockReason] = useState('')
   const [lockError, setLockError] = useState<string>()
+  const [modulesOpen, setModulesOpen] = useState(false)
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [modulesError, setModulesError] = useState<string>()
 
   if (query.isLoading) {
     return (
@@ -172,8 +177,41 @@ export function OrganizationDetailPage() {
         ? suspend.isPending
         : reactivate.isPending
 
-  const submitLock = () => {
-    if (!id || !lockTarget) return
+  const openModules = () => {
+    const current = moduleRows
+      .filter((module) => module.isCore || module.status === 'active')
+      .map((module) => module.code)
+    setSelectedModules(current)
+    setModulesError(undefined)
+    setModulesOpen(true)
+  }
+
+  const toggleModule = (code: string) => {
+    setSelectedModules((current) =>
+      current.includes(code) ? current.filter((item) => item !== code) : [...current, code],
+    )
+  }
+
+  const submitModules = () => {
+    if (!id) return
+    setModulesError(undefined)
+    if (selectedModules.length === 0) {
+      setModulesError('Tổ chức cần giữ ít nhất một module.')
+      return
+    }
+    updateModules.mutate(
+      { id, modules: selectedModules },
+      {
+        onSuccess: () => {
+          toast.success('Đã cập nhật module của tổ chức')
+          setModulesOpen(false)
+        },
+        onError: (error) => setModulesError(ApiError.from(error).message),
+      },
+    )
+  }
+
+  const submitLock = () => {    if (!id || !lockTarget) return
     const trimmed = lockReason.trim()
     if (!trimmed) {
       setLockError('Cần nêu lý do khóa hoặc mở khóa module.')
@@ -329,6 +367,9 @@ export function OrganizationDetailPage() {
                   Trạng thái do backend trả về; module lõi không thể tắt.
                 </p>
               </div>
+              <Button variant="outline" size="sm" onClick={openModules}>
+                Cập nhật module
+              </Button>
             </CardHeader>
             <CardContent className="pt-1">
               {moduleRows.length === 0 ? (
@@ -427,6 +468,59 @@ export function OrganizationDetailPage() {
           </Alert>
         </div>
       </div>
+
+      <Dialog
+        open={modulesOpen}
+        onOpenChange={(open) => {
+          setModulesOpen(open)
+          if (!open) setModulesError(undefined)
+        }}
+      >
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Cập nhật module của tổ chức</DialogTitle>
+            <DialogDescription>
+              Tập module gửi lên thay thế toàn bộ trạng thái hiện tại; module lõi luôn được giữ.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            {modulesError ? <Alert tone="danger">{modulesError}</Alert> : null}
+            {moduleRows.length === 0 ? (
+              <p className="text-sm text-ink-500">Chưa có module để cập nhật.</p>
+            ) : (
+              <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border border-line-200 p-3 sm:grid-cols-2">
+                {moduleRows.map((module) => (
+                  <div
+                    key={module.code}
+                    className="flex items-start gap-2 text-sm text-ink-700"
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={module.name}
+                      className="mt-0.5 size-4 rounded border-line-300"
+                      checked={module.isCore || selectedModules.includes(module.code)}
+                      disabled={module.isCore}
+                      onChange={() => toggleModule(module.code)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate">{module.name}</span>
+                      <span className="block font-mono text-2xs text-ink-400">{module.code}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModulesOpen(false)}>
+              Huỷ
+            </Button>
+            <Button onClick={submitModules} isLoading={updateModules.isPending}>
+              Lưu module
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(lockTarget)}

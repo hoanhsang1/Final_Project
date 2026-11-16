@@ -43,10 +43,28 @@ class ClassLifecyclePermissionTest {
     void lifecycleEndpointsRequireTheirPermission() throws Exception {
         assertForbidden("/classes/class-1/cancel", "{\"reason\":\"Lý do\",\"version\":0}", "class.view");
         assertForbidden("/classes/class-1/close-requests", "{}", "class.view");
-        assertForbidden("/classes/class-1/close-requests/approve", null, "class.request_close");
-        assertForbidden("/classes/class-1/close-requests/reject",
-            "{\"reason\":\"Lý do\"}", "class.request_close");
         assertForbidden("/classes/class-1/reopen", "{}", "class.request_close");
+    }
+
+    @Test
+    @DisplayName("Duyệt hủy/đóng lớp chỉ cần đăng nhập; quyền duyệt do ClassApprovalPolicy quyết định")
+    void decisionEndpointsRequireAuthenticationOnly() throws Exception {
+        mockMvc.perform(post("/classes/class-1/close-requests/approve"))
+            .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/classes/class-1/cancel-requests/approve"))
+            .andExpect(status().isUnauthorized());
+
+        SchoolClassResponse response = new SchoolClassResponse("class-1", "org-1", "C001", "Class 1",
+            "2026", LocalDate.now(), null, "CHUA_BAT_DAU", null, "NONE", 1, 0, "owner", Instant.now(), null);
+        when(statusService.approveClose("class-1")).thenReturn(response);
+        when(statusService.approveCancel("class-1")).thenReturn(response);
+
+        mockMvc.perform(post("/classes/class-1/close-requests/approve")
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.approve_close"))))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/classes/class-1/cancel-requests/approve")
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.approve_close"))))
+            .andExpect(status().isOk());
     }
 
     @Test

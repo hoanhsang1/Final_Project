@@ -58,10 +58,17 @@ public class ResignationApprovalPolicy {
         if (!directHolders.isEmpty())
             throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
 
-        // Level 2: department head when no eligible HR approver remains.
-        if (headIds(orgId, departmentId).contains(actorId)) return;
+        // Level 2: department head when no eligible HR approver remains. A head who is
+        // the requester/subject is not an approver, so level 3 stays reachable.
+        Set<String> heads = headIds(orgId, departmentId);
+        heads.remove(requesterId);
+        heads.remove(subjectId);
+        if (heads.contains(actorId)) return;
+        if (!heads.isEmpty())
+            throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
 
-        // Level 3: general manager with an active, matching delegation.
+        // Level 3: general manager with an active, matching delegation. Reached only when
+        // no direct holder and no eligible head remain.
         if (hasDelegatedPermission(orgId, actorId)) return;
 
         throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);

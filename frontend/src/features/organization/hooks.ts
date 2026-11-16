@@ -14,6 +14,7 @@ import type {
   DepartmentInput,
   EmployeeRow,
   Position,
+  PositionInput,
 } from '@/features/organization/types'
 import { hydrateOwnerModules } from '@/features/auth/module-hydration'
 import { queryKeys } from '@/lib/query-keys'
@@ -35,6 +36,29 @@ export function useDepartment(id: string | undefined) {
     queryKey: queryKeys.department(id ?? ''),
     queryFn: () => departmentsApi.byId(id!),
     enabled: Boolean(id),
+  })
+}
+
+/** Quyền còn hiệu lực theo module đang bật của một phòng ban. */
+export function useAvailablePermissions(departmentId: string | undefined) {
+  return useQuery({
+    queryKey: ['departments', departmentId ?? '', 'available-permissions'],
+    queryFn: () => departmentsApi.availablePermissions(departmentId!),
+    enabled: Boolean(departmentId),
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Cảnh báo chức danh/nhân sự bị ảnh hưởng khi gỡ module khỏi phòng ban. */
+export function useDepartmentModuleImpact(
+  departmentId: string | undefined,
+  moduleCodes: string[],
+) {
+  return useQuery({
+    queryKey: ['departments', departmentId ?? '', 'module-impact', moduleCodes.join(',')],
+    queryFn: () => departmentsApi.moduleImpact(departmentId!, moduleCodes),
+    enabled: Boolean(departmentId) && moduleCodes.length > 0,
+    staleTime: 30_000,
   })
 }
 
@@ -94,6 +118,56 @@ export function useMemberDetail(departmentId: string | undefined, userId: string
 export function usePositionMap(): Map<string, Position> {
   const { data } = usePositions()
   return useMemo(() => new Map((data ?? []).map((position) => [position.id, position])), [data])
+}
+
+function useInvalidatePositions() {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.positions })
+    void queryClient.invalidateQueries({ queryKey: ['departments'] })
+  }
+}
+
+export function useCreatePosition() {
+  const invalidate = useInvalidatePositions()
+  return useMutation({
+    mutationFn: (input: PositionInput) => positionsApi.create(input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdatePosition() {
+  const invalidate = useInvalidatePositions()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: PositionInput }) =>
+      positionsApi.update(id, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeletePosition() {
+  const invalidate = useInvalidatePositions()
+  return useMutation({
+    mutationFn: (id: string) => positionsApi.remove(id),
+    onSuccess: invalidate,
+  })
+}
+
+export function useClonePosition() {
+  const invalidate = useInvalidatePositions()
+  return useMutation({
+    mutationFn: ({ id, name, departmentId }: { id: string; name?: string; departmentId: string }) =>
+      positionsApi.clone(id, { name, departmentId }),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePositionImpact(id: string | undefined) {
+  return useQuery({
+    queryKey: ['positions', id ?? '', 'impact'],
+    queryFn: () => positionsApi.impact(id!),
+    enabled: Boolean(id),
+  })
 }
 
 /**

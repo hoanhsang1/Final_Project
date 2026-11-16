@@ -114,7 +114,7 @@ public class OrganizationModuleService {
         }
 
         audit(orgId, actorId, enable ? "MODULE_ENABLED" : "MODULE_DISABLED",
-            "ORGANIZATION_MODULE", orgId + ":" + module.code(),
+            "ORGANIZATION_MODULE", module.code(),
             Map.of("module", module.code(), "oldStatus", oldStatus),
             Map.of("module", module.code(), "newStatus", targetStatus));
     }
@@ -189,7 +189,7 @@ public class OrganizationModuleService {
         }
 
         audit(orgId, adminId, lock ? "MODULE_LOCKED_BY_ADMIN" : "MODULE_UNLOCKED_BY_ADMIN",
-            "ORGANIZATION_MODULE", orgId + ":" + module.code(),
+            "ORGANIZATION_MODULE", module.code(),
             Map.of("module", module.code(), "oldStatus", oldStatus, "reason", reason.trim()),
             Map.of("module", module.code(),
                 "newStatus", lock ? "locked" : restoreStatus(current.statusBeforeLock())));

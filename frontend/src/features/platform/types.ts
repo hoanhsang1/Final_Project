@@ -108,3 +108,31 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   ACCOUNT_ROLE_CHANGED: 'Đổi vai trò tài khoản',
   ACCOUNT_PASSWORD_RESET: 'Đặt lại mật khẩu tài khoản',
 }
+
+export interface AccountRow {
+  id: string
+  username: string
+  email: string
+  fullName: string
+  organizationId: string | null
+  organizationName: string | null
+  role: string
+  status: string
+  createdAt: string | null
+  lastLoginAt: string | null
+}
+
+export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
+  active: 'Đang hoạt động',
+  locked: 'Tạm khoá',
+  disabled: 'Đã vô hiệu hoá',
+}
+
+export const ACCOUNT_ROLE_LABELS: Record<string, string> = {
+  OWNER: 'Chủ tổ chức',
+  MANAGER: 'Quản lý',
+  STAFF: 'Nhân viên',
+  ACADEMIC_STAFF: 'Giáo vụ',
+  STUDENT: 'Sinh viên',
+  SUPER_ADMIN: 'Quản trị hệ thống',
+}

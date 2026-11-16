@@ -195,6 +195,56 @@ class ResignationApprovalPolicyTest {
     }
 
     @Test
+    @DisplayName("A delegated GM cannot skip a department head who is still eligible")
+    void delegatedGeneralManagerCannotSkipEligibleHead() {
+        when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM, HEAD);
+        stubHeads(HEAD);
+        stubGeneralManager(true);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("A head who is the requester does not block the delegated GM level")
+    void requesterHeadDoesNotBlockDelegatedGeneralManager() {
+        when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM, HEAD);
+        stubHeads(REQUESTER);
+        stubGeneralManager(true);
+
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
+    }
+
+    @Test
+    @DisplayName("A second HR holder approves at level 1 before the head is considered")
+    void secondHrApprovesBeforeHead() {
+        String hr2 = "hr-2";
+        when(actor.userId()).thenReturn(hr2);
+        stubMembers(REQUESTER, EMPLOYEE, HR, hr2, HEAD);
+        stubDirectPermission(hr2);
+        stubHeads(HEAD);
+
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
+    }
+
+    @Test
+    @DisplayName("An expired delegation grants nothing to the GM")
+    void expiredDelegationIsRejected() {
+        when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM);
+        stubGeneralManager(false);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
+    }
+
+    @Test
     @DisplayName("Owner is the final level and always allowed when not requester/subject")
     void ownerCanApproveAtFinalLevel() {
         when(actor.userId()).thenReturn(OWNER);

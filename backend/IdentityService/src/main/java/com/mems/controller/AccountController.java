@@ -64,15 +64,14 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/reset-password")
-    public ResponseEntity<Void> resetPassword(
+    public ResponseEntity<Map<String, String>> resetPassword(
             @PathVariable String id,
             @RequestBody(required = false) Map<String, Object> payload
     ) {
         String newPassword = payload != null && payload.get("new_password") != null
                 ? payload.get("new_password").toString()
                 : null;
-        accountService.resetPassword(id, newPassword);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(accountService.resetPassword(id, newPassword));
     }
 }
 

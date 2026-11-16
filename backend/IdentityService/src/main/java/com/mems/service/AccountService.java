@@ -173,19 +173,21 @@ public class AccountService {
         Long roleId = roleIds.get(0);
 
         String accountId = UUID.randomUUID().toString();
-        String tempPassword = UUID.randomUUID().toString().replace("-", "").substring(0, 10) + "A1!";
+        String tempPassword = generateTemporaryPassword();
 
         jdbc.update(
             """
-            INSERT INTO account (id, org_id, username, email, password_hash, status)
-            VALUES (?, ?, ?, ?, ?, 'active')
+            INSERT INTO account (id, org_id, username, email, password_hash, status, must_change_password)
+            VALUES (?, ?, ?, ?, ?, 'active', TRUE)
             """,
             accountId, orgId, username, email, passwordEncoder.encode(tempPassword)
         );
 
         jdbc.update("INSERT INTO account_role (account_id, role_id) VALUES (?, ?)", accountId, roleId);
 
-        return getAccount(accountId);
+        Map<String, Object> created = new LinkedHashMap<>(getAccount(accountId));
+        created.put("temporaryPassword", tempPassword);
+        return created;
     }
 
     @Transactional
@@ -224,7 +226,7 @@ public class AccountService {
     }
 
     @Transactional
-    public void resetPassword(String accountId, String newPassword) {
+    public Map<String, String> resetPassword(String accountId, String newPassword) {
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM account WHERE id = ?", Integer.class, accountId);
         if (exists == null || exists == 0) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
@@ -234,13 +236,19 @@ public class AccountService {
             if (newPassword.length() < 8) {
                 throw new AppException(ErrorCode.PASSWORD_TOO_SHORT);
             }
-            jdbc.update("UPDATE account SET password_hash = ? WHERE id = ?",
+            jdbc.update("UPDATE account SET password_hash = ?, must_change_password = TRUE WHERE id = ?",
                 passwordEncoder.encode(newPassword), accountId);
-        } else {
-            String tempPassword = UUID.randomUUID().toString().replace("-", "").substring(0, 10) + "A1!";
-            jdbc.update("UPDATE account SET password_hash = ? WHERE id = ?",
-                passwordEncoder.encode(tempPassword), accountId);
+            return Map.of();
         }
+
+        String tempPassword = generateTemporaryPassword();
+        jdbc.update("UPDATE account SET password_hash = ?, must_change_password = TRUE WHERE id = ?",
+            passwordEncoder.encode(tempPassword), accountId);
+        return Map.of("temporaryPassword", tempPassword);
+    }
+
+    private String generateTemporaryPassword() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 10) + "A1!";
     }
 }
 

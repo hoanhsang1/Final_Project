@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Alert } from '@/components/ui/feedback'
@@ -14,10 +14,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Field, Input, Textarea } from '@/components/ui/input'
-import { useCreateDepartment, useUpdateDepartment } from '@/features/organization/hooks'
+import {
+  useCreateDepartment,
+  useDepartmentModuleImpact,
+  useUpdateDepartment,
+} from '@/features/organization/hooks'
 import type { Department } from '@/features/organization/types'
 import { ApiError } from '@/lib/api-error'
-import { MODULE_CATALOG } from '@/lib/modules'
+import { MODULE_CATALOG, moduleLabel } from '@/lib/modules'
 
 interface FormErrors {
   name?: string
@@ -44,6 +48,12 @@ export function DepartmentFormDialog({
   const [errors, setErrors] = useState<FormErrors>({})
 
   const isEdit = Boolean(department)
+
+  const removedModules = useMemo(
+    () => (department?.modules ?? []).filter((code) => !moduleCodes.includes(code)),
+    [department?.modules, moduleCodes],
+  )
+  const impact = useDepartmentModuleImpact(department?.id, removedModules)
 
   const toggleModule = (code: string) => {
     setModuleCodes((current) => {
@@ -161,6 +171,34 @@ export function DepartmentFormDialog({
               Chỉ chọn được module đã bật ở cấp tổ chức. Module lõi không thể tắt.
             </p>
           </fieldset>
+
+          {removedModules.length > 0 ? (
+            <Alert tone="warning" title="Cảnh báo gỡ module">
+              {impact.isError ? (
+                <p>Không tải được cảnh báo ảnh hưởng; vẫn có thể lưu thay đổi.</p>
+              ) : impact.isLoading ? (
+                <p>Đang kiểm tra chức danh và nhân sự bị ảnh hưởng…</p>
+              ) : (
+                <>
+                  <p>
+                    Gỡ {removedModules.map((code) => moduleLabel(code)).join(', ')} ảnh hưởng{' '}
+                    <span className="font-semibold tabular">
+                      {impact.data?.affectedMembers ?? 0}
+                    </span>{' '}
+                    nhân sự đang giữ {impact.data?.positions.length ?? 0} chức danh. Không quyền nào
+                    bị xoá tự động; quyền hiệu lực ngừng áp dụng cho tới khi module được bật lại.
+                  </p>
+                  {impact.data?.positions.length ? (
+                    <p className="mt-1 text-2xs">
+                      {impact.data.positions
+                        .map((position) => `${position.name} (${position.members})`)
+                        .join(' · ')}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </Alert>
+          ) : null}
         </DialogBody>
 
         <DialogFooter>

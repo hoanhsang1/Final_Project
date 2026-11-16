@@ -1,4 +1,5 @@
 import { Building2, KeyRound, LogOut, Mail, ShieldCheck, UserRound } from 'lucide-react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -6,11 +7,25 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { Spinner } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
 import { useLogout, useSession } from '@/features/auth/hooks'
+import { useEffectivePermissionsMe } from '@/features/workflows/hooks'
+import { errorMessage } from '@/lib/api-error'
 import { getInitials } from '@/lib/format'
 import { isOwner } from '@/lib/nav'
-import { PERMISSION_GROUPS } from '@/lib/permissions'
+import { ALL_PERMISSION_META, PERMISSION_GROUPS } from '@/lib/permissions'
+
+const SCOPE_LABELS: Record<string, string> = {
+  ORGANIZATION: 'Cấp tổ chức',
+  DEPARTMENT: 'Phòng ban',
+  SELF: 'Cá nhân',
+}
+
+function permissionLabel(code: string): string {
+  return ALL_PERMISSION_META.find((item) => item.code === code)?.label ?? code
+}
 
 function roleLabel(roles: string[]): string {
   if (roles.includes('SUPER_ADMIN')) return 'Quản trị hệ thống'
@@ -23,6 +38,22 @@ function roleLabel(roles: string[]): string {
 export function ProfilePage() {
   const session = useSession()
   const logout = useLogout()
+  const effective = useEffectivePermissionsMe()
+
+  const scopeGroups = useMemo(() => {
+    const data = effective.data
+    if (!data) return []
+    const buckets = new Map<string, string[]>()
+    for (const code of data.permissions) {
+      for (const scope of data.permissionScopes[code] ?? ['UNKNOWN']) {
+        const list = buckets.get(scope) ?? []
+        list.push(code)
+        buckets.set(scope, list)
+      }
+    }
+    return [...buckets.entries()]
+  }, [effective.data])
+
   if (!session) return null
 
   const displayName = session.user.fullName ?? session.user.username
@@ -201,6 +232,72 @@ export function ProfilePage() {
                   ))}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Quyền hiệu lực từ backend</CardTitle>
+                <p className="mt-0.5 text-sm text-ink-500">
+                  Backend tính lại theo chức vụ, bundle và ủy quyền còn hiệu lực tại thời điểm tải.
+                </p>
+              </div>
+              {effective.data ? (
+                <Badge tone="neutral">{effective.data.permissions.length} quyền</Badge>
+              ) : null}
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 pt-2">
+              {effective.isLoading ? <Spinner label="Đang tải quyền hiệu lực…" /> : null}
+              {effective.isError ? (
+                <ErrorState
+                  title="Không tải được quyền hiệu lực"
+                  description={errorMessage(effective.error)}
+                  onRetry={() => void effective.refetch()}
+                />
+              ) : null}
+              {effective.data ? (
+                <>
+                  {effective.data.departmentId ? (
+                    <p className="text-xs text-ink-400">
+                      Phòng ban đang xét: <span className="font-mono">{effective.data.departmentId}</span>
+                    </p>
+                  ) : null}
+                  {scopeGroups.length === 0 ? (
+                    <p className="text-sm text-ink-500">Backend không trả về quyền nghiệp vụ nào.</p>
+                  ) : (
+                    scopeGroups.map(([scope, codes]) => (
+                      <div key={scope}>
+                        <p className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.1em] text-ink-400">
+                          {SCOPE_LABELS[scope] ?? scope}
+                        </p>
+                        <ul className="flex flex-wrap gap-1.5">
+                          {codes.slice(0, 16).map((code) => (
+                            <li
+                              key={code}
+                              className="rounded-full border border-line bg-surface-muted px-2 py-0.5 text-2xs text-ink-600"
+                              title={code}
+                            >
+                              {permissionLabel(code)}
+                            </li>
+                          ))}
+                          {codes.length > 16 ? (
+                            <li className="rounded-full bg-ink-100 px-2 py-0.5 text-2xs text-ink-500">
+                              +{codes.length - 16}
+                            </li>
+                          ) : null}
+                        </ul>
+                      </div>
+                    ))
+                  )}
+                  {effective.data.delegatedPermissions.length > 0 ? (
+                    <p className="text-xs text-ink-500">
+                      Trong đó {effective.data.delegatedPermissions.length} quyền đến từ ủy quyền còn
+                      hiệu lực.
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
             </CardContent>
           </Card>
         </div>

@@ -1,6 +1,7 @@
 import { api } from '@/services/http'
 import type { PageResponse } from '@/types/api'
 import type {
+  AccountRow,
   AdminModule,
   AuditLogItem,
   ModuleCatalogItem,
@@ -199,5 +200,88 @@ export const organizationsApi = {
     params: { lock: boolean; reason: string },
   ): Promise<void> {
     await api.patch(`/api/v1/organizations/${id}/modules/${moduleCode}/lock`, params)
+  },
+}
+
+interface RawAccountRow {
+  id: string
+  username: string
+  email: string
+  full_name?: string
+  organization_id?: string | null
+  organization_name?: string | null
+  role?: string
+  status?: string
+  created_at?: string | null
+  last_login_at?: string | null
+  temporaryPassword?: string
+}
+
+export interface AccountCreated extends AccountRow {
+  temporaryPassword: string
+}
+
+function toAccountRow(raw: RawAccountRow): AccountRow {
+  return {
+    id: raw.id,
+    username: raw.username,
+    email: raw.email,
+    fullName: raw.full_name ?? raw.username,
+    organizationId: raw.organization_id ?? null,
+    organizationName: raw.organization_name ?? null,
+    role: raw.role ?? 'STAFF',
+    status: raw.status ?? 'active',
+    createdAt: raw.created_at ?? null,
+    lastLoginAt: raw.last_login_at ?? null,
+  }
+}
+
+export const accountsApi = {
+  async list(params: {
+    page?: number
+    size?: number
+    organizationId?: string
+    role?: string
+    status?: string
+    keyword?: string
+    sort?: string
+  } = {}): Promise<PageResponse<AccountRow>> {
+    const { data } = await api.get<PageResponse<RawAccountRow>>('/api/v1/accounts', {
+      params: {
+        page: params.page ?? 1,
+        size: params.size ?? 20,
+        organizationId: params.organizationId,
+        role: params.role,
+        status: params.status,
+        keyword: params.keyword || undefined,
+        sort: params.sort,
+      },
+    })
+    return { ...data, items: data.items.map(toAccountRow) }
+  },
+
+  async create(input: { email: string; role: string; organizationId?: string }): Promise<AccountCreated> {
+    const { data } = await api.post<RawAccountRow>('/api/v1/accounts', {
+      email: input.email,
+      role: input.role,
+      organization_id: input.organizationId,
+    })
+    return { ...toAccountRow(data), temporaryPassword: data.temporaryPassword ?? '' }
+  },
+
+  async updateStatus(id: string, status: string, reason?: string): Promise<void> {
+    await api.patch(`/api/v1/accounts/${id}/status`, { status, reason })
+  },
+
+  async updateRole(id: string, role: string): Promise<void> {
+    await api.patch(`/api/v1/accounts/${id}/role`, { role })
+  },
+
+  async resetPassword(id: string, newPassword?: string): Promise<{ temporaryPassword?: string }> {
+    const { data } = await api.post<{ temporaryPassword?: string }>(
+      `/api/v1/accounts/${id}/reset-password`,
+      { new_password: newPassword },
+    )
+    return data
   },
 }

@@ -13,6 +13,7 @@ import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class ClassStatusService {
         this(repository, classRepository, actor, moduleGuard, null, null);
     }
 
+    @Autowired
     public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard,
                               ClassApprovalPolicy approvalPolicy, NotificationService notifications) {
