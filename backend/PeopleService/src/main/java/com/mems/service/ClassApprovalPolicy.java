@@ -40,13 +40,36 @@ public class ClassApprovalPolicy {
     }
 
     public boolean canApprove(String orgId) {
-        return actor.owner()
-            || responsibleHeadIds(orgId).contains(actor.userId())
-            || isActiveGeneralManager(orgId, actor.userId());
+        return canApprove(orgId, null);
+    }
+
+    /**
+     * Escalation order (kế hoạch v2 §1.5): responsible department head →
+     * delegated general manager → organization owner. A higher level may only act
+     * when no eligible lower-level approver exists. The requester is never an
+     * eligible approver.
+     */
+    public boolean canApprove(String orgId, String requesterId) {
+        String actorId = actor.userId();
+        if (requesterId != null && requesterId.equals(actorId)) return false;
+        if (actor.owner()) return true;
+
+        Set<String> eligibleHeads = eligibleHeadIds(orgId, requesterId);
+        if (eligibleHeads.contains(actorId)) return true;
+        // A head exists but this actor is not that head: do not skip the first level.
+        if (!eligibleHeads.isEmpty()) return false;
+        return isActiveGeneralManager(orgId, actorId);
     }
 
     public void requireApprover(String orgId) {
-        if (!canApprove(orgId)) {
+        requireApprover(orgId, null);
+    }
+
+    public void requireApprover(String orgId, String requesterId) {
+        if (requesterId != null && requesterId.equals(actor.userId())) {
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
+        }
+        if (!canApprove(orgId, requesterId)) {
             throw new AppException(ErrorCode.CLASS_APPROVER_NOT_ALLOWED);
         }
     }
@@ -57,10 +80,14 @@ public class ClassApprovalPolicy {
      * (kế hoạch v2 §1.5).
      */
     public void requireApproverNotSelf(String orgId, String requesterId) {
-        requireApprover(orgId);
-        if (requesterId != null && requesterId.equals(actor.userId())) {
-            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
-        }
+        requireApprover(orgId, requesterId);
+    }
+
+    /** Heads that may act at the first escalation level (requester excluded). */
+    public Set<String> eligibleHeadIds(String orgId, String requesterId) {
+        Set<String> heads = responsibleHeadIds(orgId);
+        if (requesterId != null) heads.remove(requesterId);
+        return heads;
     }
 
     /** Người duyệt mặc định: trưởng phòng ban phụ trách module đào tạo. */
@@ -77,6 +104,7 @@ public class ClassApprovalPolicy {
             JOIN department_module dm ON dm.department_id=a.department_id AND dm.org_id=a.org_id
             WHERE a.org_id=? AND dm.module_code=? AND a.status='ACTIVE'
               AND a.scope_type='DEPARTMENT'
+              AND p.scope='DEPARTMENT'
               AND p.name IN (?,?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, String.class, params.toArray()));

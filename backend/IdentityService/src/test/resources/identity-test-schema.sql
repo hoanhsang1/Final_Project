@@ -38,10 +38,17 @@ CREATE TABLE IF NOT EXISTS refresh_token (
  issued_at TIMESTAMP NOT NULL,expires_at TIMESTAMP NOT NULL,revoked_at TIMESTAMP,replaced_by VARCHAR(36),
  FOREIGN KEY(account_id) REFERENCES account(id),FOREIGN KEY(replaced_by) REFERENCES refresh_token(id)
 );
-CREATE TABLE IF NOT EXISTS module (code VARCHAR(60) PRIMARY KEY,name VARCHAR(150),is_active BOOLEAN);
+CREATE TABLE IF NOT EXISTS module (
+ code VARCHAR(60) PRIMARY KEY,name VARCHAR(150),is_active BOOLEAN,is_core BOOLEAN NOT NULL DEFAULT FALSE
+);
 CREATE TABLE IF NOT EXISTS organization_module (
- org_id VARCHAR(36) NOT NULL,module_code VARCHAR(60) NOT NULL,status VARCHAR(20) NOT NULL,
+ org_id VARCHAR(36) NOT NULL,module_code VARCHAR(60) NOT NULL,
+ status VARCHAR(20) NOT NULL,disabled_at TIMESTAMP,locked_by_admin VARCHAR(36),
+ locked_reason VARCHAR(1000),locked_at TIMESTAMP,status_before_lock VARCHAR(20),
  PRIMARY KEY(org_id, module_code),FOREIGN KEY(org_id) REFERENCES organization(id)
+);
+CREATE TABLE IF NOT EXISTS module_legacy_map (
+ legacy_code VARCHAR(60) PRIMARY KEY,canonical_code VARCHAR(60) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS audit_log (
  id VARCHAR(36) PRIMARY KEY,org_id VARCHAR(36),actor_account_id VARCHAR(36),

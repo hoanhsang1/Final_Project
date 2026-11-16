@@ -111,13 +111,15 @@ public class ClassStatusRepository {
     }
 
     /** Lớp còn học sinh: ghi nhận yêu cầu hủy, chờ trưởng phòng duyệt. */
-    public int requestCancel(String id, String orgId, String reason, long expectedVersion) {
+    public int requestCancel(String id, String orgId, String reason, long expectedVersion,
+                             String requestedBy) {
         return jdbc.update("""
             UPDATE school_class
-            SET cancel_state = 'PENDING', cancel_request_reason = ?, version = version + 1, updated_at = ?
+            SET cancel_state = 'PENDING', cancel_request_reason = ?, cancel_requested_by = ?,
+                version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
               AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA') AND cancel_state = 'NONE'
-            """, reason, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
+            """, reason, requestedBy, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
     }
 
     public int approveCancel(String id, String orgId) {
@@ -137,13 +139,13 @@ public class ClassStatusRepository {
             """, Timestamp.from(Instant.now()), id, orgId);
     }
 
-    public int requestClose(String id, String orgId) {
+    public int requestClose(String id, String orgId, String requestedBy) {
         return jdbc.update("""
             UPDATE school_class
-            SET close_state = 'PENDING', version = version + 1, updated_at = ?
+            SET close_state = 'PENDING', close_requested_by = ?, version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL
               AND close_state = 'NONE' AND cancel_state = 'NONE' AND status <> 'DA_HUY'
-            """, Timestamp.from(Instant.now()), id, orgId);
+            """, requestedBy, Timestamp.from(Instant.now()), id, orgId);
     }
 
     public int approveClose(String id, String orgId) {
@@ -189,16 +191,24 @@ public class ClassStatusRepository {
             """, eventMapper, classId, orgId);
     }
 
-    public String lastRequester(String classId, String orgId) {
-        return lastEventActor(classId, orgId, "REQUESTED");
+    /** Người tạo yêu cầu hủy hiện tại (null nếu không có yêu cầu đang chờ). */
+    public String cancelRequester(String classId, String orgId) {
+        return singleString("""
+            SELECT cancel_requested_by FROM school_class
+            WHERE id = ? AND org_id = ? AND cancel_state = 'PENDING'
+            """, classId, orgId);
     }
 
-    public String lastEventActor(String classId, String orgId, String action) {
-        List<String> rows = jdbc.queryForList("""
-            SELECT actor_id FROM class_close_event
-            WHERE class_id = ? AND org_id = ? AND action = ?
-            ORDER BY created_at DESC, id DESC LIMIT 1
-            """, String.class, classId, orgId, action);
+    /** Người tạo yêu cầu đóng lớp hiện tại (null nếu không có yêu cầu đang chờ). */
+    public String closeRequester(String classId, String orgId) {
+        return singleString("""
+            SELECT close_requested_by FROM school_class
+            WHERE id = ? AND org_id = ? AND close_state = 'PENDING'
+            """, classId, orgId);
+    }
+
+    private String singleString(String sql, String classId, String orgId) {
+        List<String> rows = jdbc.queryForList(sql, String.class, classId, orgId);
         return rows.isEmpty() ? null : rows.get(0);
     }
 }

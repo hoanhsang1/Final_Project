@@ -1,5 +1,7 @@
 package com.mems.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.client.PeopleModuleClient;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
@@ -13,6 +15,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,16 +34,26 @@ import java.util.UUID;
 public class OrganizationModuleService {
 
     private static final Logger log = LoggerFactory.getLogger(OrganizationModuleService.class);
+    private static final String NOT_REGISTERED = "not_registered";
+
+    /**
+     * Modules whose pending work is an approval workflow owned by PeopleService.
+     * Facility work (incident reports) is not an approval queue, and transfers are
+     * an HR/People workflow that must never be counted against FACILITY_MANAGEMENT.
+     */
+    private static final Set<String> PENDING_WORKFLOW_MODULES = Set.of("STUDENT_MANAGEMENT");
 
     private final JdbcTemplate jdbc;
     private final OrganizationApprovalService approvalService;
     private final PeopleModuleClient peopleModuleClient;
+    private final ObjectMapper json;
 
     public OrganizationModuleService(JdbcTemplate jdbc, OrganizationApprovalService approvalService,
-                                     PeopleModuleClient peopleModuleClient) {
+                                     PeopleModuleClient peopleModuleClient, ObjectMapper json) {
         this.jdbc = jdbc;
         this.approvalService = approvalService;
         this.peopleModuleClient = peopleModuleClient;
+        this.json = json;
     }
 
     // ------------------------------------------------------------------ owner
@@ -58,31 +71,47 @@ public class OrganizationModuleService {
             throw new AppException(ErrorCode.MODULE_IS_CORE);
         }
 
-        ModuleOrgRow current = getOrCreateOrgModule(orgId, module.code());
+        ModuleOrgRow current = findOrgModule(orgId, module.code());
+        String currentStatus = current == null ? NOT_REGISTERED : current.status();
 
-        if ("locked".equals(current.status())) {
+        if ("locked".equals(currentStatus)) {
             throw new AppException(ErrorCode.MODULE_LOCKED_BY_ADMIN);
         }
 
         String targetStatus = enable ? "active" : "disabled";
-        if (targetStatus.equals(current.status())) {
+        if (targetStatus.equals(currentStatus)) {
             throw new AppException(ErrorCode.MODULE_ALREADY_IN_STATE,
                 "Module is already " + targetStatus);
+        }
+        if (!enable && !"active".equals(currentStatus)) {
+            // requested/rejected/not_registered modules are not enabled, so there is
+            // nothing to disable. Never invent an "active" row just to turn it off.
+            throw new AppException(ErrorCode.MODULE_ALREADY_IN_STATE,
+                "Module is not enabled for this organization");
         }
 
         if (!enable) {
             checkNoPendingWorkflows(orgId, module.code());
         }
 
-        String oldStatus = current.status();
-        jdbc.update("""
-            UPDATE organization_module
-            SET status = ?, disabled_at = ?
-            WHERE org_id = ? AND module_code = ?
-            """,
-            targetStatus,
-            enable ? null : Timestamp.from(Instant.now()),
-            orgId, module.code());
+        String oldStatus = currentStatus;
+        if (current == null) {
+            jdbc.update("""
+                INSERT INTO organization_module (org_id, module_code, status, disabled_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                orgId, module.code(), targetStatus,
+                enable ? null : Timestamp.from(Instant.now()));
+        } else {
+            jdbc.update("""
+                UPDATE organization_module
+                SET status = ?, disabled_at = ?, status_before_lock = NULL
+                WHERE org_id = ? AND module_code = ?
+                """,
+                targetStatus,
+                enable ? null : Timestamp.from(Instant.now()),
+                orgId, module.code());
+        }
 
         audit(orgId, actorId, enable ? "MODULE_ENABLED" : "MODULE_DISABLED",
             "ORGANIZATION_MODULE", orgId + ":" + module.code(),
@@ -111,35 +140,59 @@ public class OrganizationModuleService {
                 "Core modules cannot be locked — they are always active");
         }
 
-        ModuleOrgRow current = getOrCreateOrgModule(orgId, module.code());
+        ModuleOrgRow current = findOrgModule(orgId, module.code());
+        String currentStatus = current == null ? NOT_REGISTERED : current.status();
 
-        String targetStatus = lock ? "locked" : "active";
-        if (targetStatus.equals(current.status())) {
-            throw new AppException(ErrorCode.MODULE_ALREADY_IN_STATE,
-                "Module is already " + targetStatus);
-        }
-
-        String oldStatus = current.status();
+        String oldStatus = currentStatus;
         if (lock) {
-            jdbc.update("""
-                UPDATE organization_module
-                SET status = 'locked', locked_by_admin = ?, locked_reason = ?, locked_at = ?
-                WHERE org_id = ? AND module_code = ?
-                """,
-                adminId, reason.trim(), Timestamp.from(Instant.now()), orgId, moduleCode);
+            if ("locked".equals(currentStatus)) {
+                throw new AppException(ErrorCode.MODULE_ALREADY_IN_STATE,
+                    "Module is already locked");
+            }
+            // Remember the effective pre-lock state so unlock never silently turns on a
+            // module the Owner had disabled. An unregistered module restores as disabled.
+            String priorStatus = current == null ? "disabled" : priorStatusForLock(currentStatus);
+            if (current == null) {
+                jdbc.update("""
+                    INSERT INTO organization_module
+                        (org_id, module_code, status, locked_by_admin, locked_reason, locked_at,
+                         status_before_lock)
+                    VALUES (?, ?, 'locked', ?, ?, ?, ?)
+                    """,
+                    orgId, module.code(), adminId, reason.trim(), Timestamp.from(Instant.now()),
+                    priorStatus);
+            } else {
+                jdbc.update("""
+                    UPDATE organization_module
+                    SET status = 'locked', locked_by_admin = ?, locked_reason = ?, locked_at = ?,
+                        status_before_lock = ?
+                    WHERE org_id = ? AND module_code = ?
+                    """,
+                    adminId, reason.trim(), Timestamp.from(Instant.now()), priorStatus,
+                    orgId, module.code());
+            }
         } else {
+            if (current == null || !"locked".equals(currentStatus)) {
+                throw new AppException(ErrorCode.MODULE_ALREADY_IN_STATE,
+                    "Module is not locked");
+            }
+            String restoreStatus = restoreStatus(current.statusBeforeLock());
             jdbc.update("""
                 UPDATE organization_module
-                SET status = 'active', locked_by_admin = NULL, locked_reason = NULL, locked_at = NULL
+                SET status = ?, locked_by_admin = NULL, locked_reason = NULL, locked_at = NULL,
+                    status_before_lock = NULL, disabled_at = ?
                 WHERE org_id = ? AND module_code = ?
                 """,
-                orgId, moduleCode);
+                restoreStatus,
+                "disabled".equals(restoreStatus) ? Timestamp.from(Instant.now()) : null,
+                orgId, module.code());
         }
 
         audit(orgId, adminId, lock ? "MODULE_LOCKED_BY_ADMIN" : "MODULE_UNLOCKED_BY_ADMIN",
-            "ORGANIZATION_MODULE", orgId + ":" + moduleCode,
-            Map.of("module", moduleCode, "oldStatus", oldStatus, "reason", reason),
-            Map.of("module", moduleCode, "newStatus", targetStatus));
+            "ORGANIZATION_MODULE", orgId + ":" + module.code(),
+            Map.of("module", module.code(), "oldStatus", oldStatus, "reason", reason.trim()),
+            Map.of("module", module.code(),
+                "newStatus", lock ? "locked" : restoreStatus(current.statusBeforeLock())));
     }
 
     /** Returns module status details visible to SUPER_ADMIN. */
@@ -178,18 +231,19 @@ public class OrganizationModuleService {
      * Checks whether pending workflows would be broken by disabling this module.
      * Calls PeopleService via internal HTTP API (fail-closed: any exception blocks the disable).
      *
-     * <p>Module mapping (kế hoạch v2 §0.2):
+     * <p>Mapping:
      * <ul>
-     *   <li>STUDENT_MANAGEMENT — class close/cancel requests pending</li>
-     *   <li>FACILITY_MANAGEMENT — transfer requests pending</li>
-     *   <li>SCHEDULE_MANAGEMENT — no dedicated approval workflow yet; allowed</li>
-     *   <li>Others — not yet tracked; allowed</li>
+     *   <li>STUDENT_MANAGEMENT — pending class close/cancel approvals (PeopleService)</li>
+     *   <li>FACILITY_MANAGEMENT — no approval queue in scope. Incident reports are
+     *       operational records, and transfers are an HR/People workflow: counting
+     *       transfers here would block facility disable for an unrelated reason.</li>
+     *   <li>Others — no tracked approval workflow; allowed.</li>
      * </ul>
      * </p>
      */
     private void checkNoPendingWorkflows(String orgId, String moduleCode) {
-        // Only modules whose pending workflows are tracked in PeopleService need a cross-service call.
-        if (!"STUDENT_MANAGEMENT".equals(moduleCode) && !"FACILITY_MANAGEMENT".equals(moduleCode)) {
+        // Only modules with an actual approval workflow need a cross-service call.
+        if (!PENDING_WORKFLOW_MODULES.contains(moduleCode)) {
             return;
         }
         try {
@@ -244,48 +298,59 @@ public class OrganizationModuleService {
             Boolean.TRUE.equals(row.get("is_core")));
     }
 
-    private ModuleOrgRow getOrCreateOrgModule(String orgId, String moduleCode) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT status, locked_by_admin FROM organization_module WHERE org_id = ? AND module_code = ? FOR UPDATE",
-            orgId, moduleCode);
-        if (!rows.isEmpty()) {
-            return new ModuleOrgRow(
-                (String) rows.get(0).get("status"),
-                (String) rows.get(0).get("locked_by_admin"));
+    private ModuleOrgRow findOrgModule(String orgId, String moduleCode) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+            SELECT status, locked_by_admin, status_before_lock
+            FROM organization_module
+            WHERE org_id = ? AND module_code = ?
+            FOR UPDATE
+            """, orgId, moduleCode);
+        if (rows.isEmpty()) {
+            return null;
         }
-        // Module not yet registered for this org — create as 'active' baseline.
-        jdbc.update(
-            "INSERT INTO organization_module (org_id, module_code, status) VALUES (?, ?, 'active')",
-            orgId, moduleCode);
-        return new ModuleOrgRow("active", null);
+        Map<String, Object> row = rows.get(0);
+        return new ModuleOrgRow(
+            (String) row.get("status"),
+            (String) row.get("locked_by_admin"),
+            (String) row.get("status_before_lock"));
+    }
+
+    /** Status to restore when a lock is released; never automatically enable. */
+    private String priorStatusForLock(String currentStatus) {
+        return switch (currentStatus) {
+            case "active", "disabled" -> currentStatus;
+            case "requested", "rejected", NOT_REGISTERED -> "disabled";
+            default -> "disabled";
+        };
+    }
+
+    private String restoreStatus(String statusBeforeLock) {
+        if ("active".equals(statusBeforeLock)) return "active";
+        return "disabled";
     }
 
     private void audit(String orgId, String actorId, String action, String entityType,
                        String entityId, Map<String, ?> oldValue, Map<String, ?> newValue) {
-        try {
-            jdbc.update("""
-                INSERT INTO audit_log (id, org_id, actor_account_id, action, entity_type, entity_id,
-                                       old_value, new_value, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
-                """,
-                UUID.randomUUID().toString(), orgId, actorId, action, entityType, entityId,
-                toJson(oldValue), toJson(newValue));
-        } catch (Exception ignored) {
-            // Audit failure must never break the primary operation.
-        }
+        // No catch: the audit row and the state change share one transaction. If the
+        // audit cannot be written, the business change must roll back rather than pass silently.
+        jdbc.update("""
+            INSERT INTO audit_log (id, org_id, actor_account_id, action, entity_type, entity_id,
+                                   old_value, new_value, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+            """,
+            UUID.randomUUID().toString(), orgId, actorId, action, entityType, entityId,
+            toJson(oldValue), toJson(newValue));
     }
 
     private String toJson(Map<String, ?> map) {
         if (map == null || map.isEmpty()) return null;
-        StringBuilder sb = new StringBuilder("{");
-        map.forEach((k, v) -> {
-            if (sb.length() > 1) sb.append(",");
-            sb.append("\"").append(k).append("\":\"").append(v).append("\"");
-        });
-        sb.append("}");
-        return sb.toString();
+        try {
+            return json.writeValueAsString(map);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Cannot serialize audit payload", ex);
+        }
     }
 
     private record ModuleRow(String code, String name, boolean isCore) {}
-    private record ModuleOrgRow(String status, String lockedByAdmin) {}
+    private record ModuleOrgRow(String status, String lockedByAdmin, String statusBeforeLock) {}
 }

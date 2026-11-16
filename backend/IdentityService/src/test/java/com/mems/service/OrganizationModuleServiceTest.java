@@ -1,11 +1,13 @@
 package com.mems.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.client.PeopleModuleClient;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.client.ResourceAccessException;
 
@@ -21,24 +23,6 @@ import static org.mockito.Mockito.*;
  * Unit tests for OrganizationModuleService (BE-00.2).
  *
  * <p>Tests use Mockito to stub JdbcTemplate. No database required.</p>
- *
- * Coverage:
- *  T-01  Owner enables Optional module (success)
- *  T-02  Owner disables Optional module (success)
- *  T-03  Core module cannot be disabled
- *  T-04  Locked module cannot be toggled by owner
- *  T-05  Module already in requested state → conflict
- *  T-06  Module not found → invalid module error
- *  T-07  Organization not found → org not found error
- *  T-08  Organization inactive → org inactive error
- *  T-09  SUPER_ADMIN locks module (success)
- *  T-10  SUPER_ADMIN unlocks module (success)
- *  T-11  SUPER_ADMIN lock without reason → error
- *  T-12  SUPER_ADMIN cannot lock a core module
- *  T-13  Legacy module code resolved via module_legacy_map
- *  T-14  Pending workflows block module disable
- *  T-15  PeopleService unavailable → fail-closed (throws MODULE_PENDING_WORKFLOWS)
- *  T-16  No pending workflows → allow disable
  */
 class OrganizationModuleServiceTest {
 
@@ -50,6 +34,7 @@ class OrganizationModuleServiceTest {
     private static final String ORG_ID = "org-001";
     private static final String ACTOR_ID = "user-001";
     private static final String MODULE_FACILITY = "FACILITY_MANAGEMENT";
+    private static final String MODULE_STUDENT = "STUDENT_MANAGEMENT";
     private static final String MODULE_SCHEDULE = "SCHEDULE_MANAGEMENT";
 
     @BeforeEach
@@ -57,25 +42,23 @@ class OrganizationModuleServiceTest {
         jdbc = mock(JdbcTemplate.class);
         approvalService = mock(OrganizationApprovalService.class);
         peopleModuleClient = mock(PeopleModuleClient.class);
-        service = new OrganizationModuleService(jdbc, approvalService, peopleModuleClient);
+        service = new OrganizationModuleService(jdbc, approvalService, peopleModuleClient,
+            new ObjectMapper());
 
-        // Default: org is active
         stubOrg(ORG_ID, "active");
-        // Default: no pending workflows
         when(peopleModuleClient.pendingWorkflowCount(any(), any())).thenReturn(0);
     }
 
     // ------------------------------------------------------------------ T-01
 
     @Test
-    @DisplayName("T-01: Owner enables Optional module successfully")
+    @DisplayName("T-01: Owner enables a disabled Optional module successfully")
     void ownerEnablesOptionalModule() {
-        stubModule(MODULE_FACILITY, false /* not core */);
+        stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "disabled", null);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "disabled", null, null);
         stubUpdateAndAudit();
 
-        // Should complete without throwing
         service.ownerToggle(ORG_ID, MODULE_FACILITY, true, ACTOR_ID);
 
         verify(jdbc).update(contains("SET status = ?"),
@@ -85,11 +68,11 @@ class OrganizationModuleServiceTest {
     // ------------------------------------------------------------------ T-02
 
     @Test
-    @DisplayName("T-02: Owner disables Optional module successfully")
+    @DisplayName("T-02: Owner disables an active Optional module successfully")
     void ownerDisablesOptionalModule() {
         stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
         stubUpdateAndAudit();
 
         service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID);
@@ -103,7 +86,7 @@ class OrganizationModuleServiceTest {
     @Test
     @DisplayName("T-03: Core module cannot be disabled by Owner")
     void coreModuleCannotBeDisabled() {
-        stubModule(MODULE_SCHEDULE, true /* core */);
+        stubModule(MODULE_SCHEDULE, true);
         stubNoLegacyMap(MODULE_SCHEDULE);
 
         assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_SCHEDULE, false, ACTOR_ID))
@@ -119,7 +102,7 @@ class OrganizationModuleServiceTest {
     void ownerCannotToggleLockedModule() {
         stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "locked", "admin-001");
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "locked", "admin-001", "disabled");
 
         assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, true, ACTOR_ID))
             .isInstanceOf(AppException.class)
@@ -134,7 +117,7 @@ class OrganizationModuleServiceTest {
     void toggleToSameStateIsRejected() {
         stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
 
         assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, true, ACTOR_ID))
             .isInstanceOf(AppException.class)
@@ -191,28 +174,44 @@ class OrganizationModuleServiceTest {
     void adminLocksModuleWithReason() {
         stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
         stubUpdateAndAudit();
 
         service.adminLockToggle(ORG_ID, MODULE_FACILITY, true, "Policy violation", "admin-001");
 
         verify(jdbc).update(contains("SET status = 'locked'"),
-            eq("admin-001"), eq("Policy violation"), any(), eq(ORG_ID), eq(MODULE_FACILITY));
+            eq("admin-001"), eq("Policy violation"), any(), eq("active"),
+            eq(ORG_ID), eq(MODULE_FACILITY));
     }
 
     // ------------------------------------------------------------------ T-10
 
     @Test
-    @DisplayName("T-10: SUPER_ADMIN unlocks a locked module")
+    @DisplayName("T-10: SUPER_ADMIN unlocks a module back to its pre-lock state")
     void adminUnlocksModule() {
         stubModule(MODULE_FACILITY, false);
         stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "locked", "admin-001");
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "locked", "admin-001", "active");
         stubUpdateAndAudit();
 
         service.adminLockToggle(ORG_ID, MODULE_FACILITY, false, "Unlocking after review", "admin-001");
 
-        verify(jdbc).update(contains("SET status = 'active'"), eq(ORG_ID), eq(MODULE_FACILITY));
+        verify(jdbc).update(contains("SET status = ?"), eq("active"), isNull(),
+            eq(ORG_ID), eq(MODULE_FACILITY));
+    }
+
+    @Test
+    @DisplayName("T-10b: Unlock never auto-enables a module the Owner had disabled")
+    void adminUnlockRestoresDisabledState() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "locked", "admin-001", "disabled");
+        stubUpdateAndAudit();
+
+        service.adminLockToggle(ORG_ID, MODULE_FACILITY, false, "Review finished", "admin-001");
+
+        verify(jdbc).update(contains("SET status = ?"), eq("disabled"), any(),
+            eq(ORG_ID), eq(MODULE_FACILITY));
     }
 
     // ------------------------------------------------------------------ T-11
@@ -253,15 +252,12 @@ class OrganizationModuleServiceTest {
     @Test
     @DisplayName("T-13: Legacy code ROOM_MANAGEMENT resolved to FACILITY_MANAGEMENT")
     void legacyCodeIsResolved() {
-        // Legacy map returns canonical code
         when(jdbc.queryForList(contains("FROM module_legacy_map"), eq(String.class), eq("ROOM_MANAGEMENT")))
             .thenReturn(List.of("FACILITY_MANAGEMENT"));
-        // Now the canonical module lookup proceeds
         stubModule(MODULE_FACILITY, false);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "disabled", null);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "disabled", null, null);
         stubUpdateAndAudit();
 
-        // Should NOT throw — legacy code is transparently resolved
         service.ownerToggle(ORG_ID, "ROOM_MANAGEMENT", true, ACTOR_ID);
 
         verify(jdbc).update(contains("SET status = ?"),
@@ -271,14 +267,14 @@ class OrganizationModuleServiceTest {
     // ------------------------------------------------------------------ T-14
 
     @Test
-    @DisplayName("T-14: Pending workflows (count > 0) block module disable")
+    @DisplayName("T-14: Pending student workflows (count > 0) block module disable")
     void pendingWorkflowsBlockModuleDisable() {
-        stubModule(MODULE_FACILITY, false);
-        stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
-        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY)).thenReturn(3);
+        stubModule(MODULE_STUDENT, false);
+        stubNoLegacyMap(MODULE_STUDENT);
+        stubOrgModule(ORG_ID, MODULE_STUDENT, "active", null, null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_STUDENT)).thenReturn(3);
 
-        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_STUDENT, false, ACTOR_ID))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.MODULE_PENDING_WORKFLOWS));
@@ -289,13 +285,13 @@ class OrganizationModuleServiceTest {
     @Test
     @DisplayName("T-15: PeopleService unavailable → fail-closed → MODULE_PENDING_WORKFLOWS")
     void peopleServiceUnavailableFailsClosed() {
-        stubModule(MODULE_FACILITY, false);
-        stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
-        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY))
+        stubModule(MODULE_STUDENT, false);
+        stubNoLegacyMap(MODULE_STUDENT);
+        stubOrgModule(ORG_ID, MODULE_STUDENT, "active", null, null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_STUDENT))
             .thenThrow(new ResourceAccessException("Connection refused"));
 
-        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_STUDENT, false, ACTOR_ID))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.MODULE_PENDING_WORKFLOWS));
@@ -306,17 +302,118 @@ class OrganizationModuleServiceTest {
     @Test
     @DisplayName("T-16: No pending workflows → module disable allowed")
     void noPendingWorkflowsAllowDisable() {
-        stubModule(MODULE_FACILITY, false);
-        stubNoLegacyMap(MODULE_FACILITY);
-        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
-        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY)).thenReturn(0);
+        stubModule(MODULE_STUDENT, false);
+        stubNoLegacyMap(MODULE_STUDENT);
+        stubOrgModule(ORG_ID, MODULE_STUDENT, "active", null, null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_STUDENT)).thenReturn(0);
         stubUpdateAndAudit();
 
-        // Should complete without throwing
-        service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID);
+        service.ownerToggle(ORG_ID, MODULE_STUDENT, false, ACTOR_ID);
 
         verify(jdbc).update(contains("SET status = ?"),
-            eq("disabled"), any(), eq(ORG_ID), eq(MODULE_FACILITY));
+            eq("disabled"), any(), eq(ORG_ID), eq(MODULE_STUDENT));
+    }
+
+    // ------------------------------------------------------------------ P0-A
+
+    @Test
+    @DisplayName("P0-A: Unregistered module is not silently created as active")
+    void unregisteredModuleIsNotAutoActivated() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        // No organization_module row exists.
+        stubUpdateAndAudit();
+
+        // Disabling a module that was never registered must fail instead of inserting 'active'.
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.MODULE_ALREADY_IN_STATE));
+
+        verify(jdbc, never()).update(contains("INSERT INTO organization_module"),
+            any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("P0-A: Explicit enable of an unregistered module writes only the requested state")
+    void explicitEnableOfUnregisteredModuleWritesRequestedState() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubUpdateAndAudit();
+
+        service.ownerToggle(ORG_ID, MODULE_FACILITY, true, ACTOR_ID);
+
+        verify(jdbc).update(contains("INSERT INTO organization_module"),
+            eq(ORG_ID), eq(MODULE_FACILITY), eq("active"), isNull());
+    }
+
+    // ------------------------------------------------------------------ P0-B
+
+    @Test
+    @DisplayName("P0-B: Audit failure aborts the operation instead of being swallowed")
+    void auditFailureIsNotSwallowed() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
+        when(jdbc.update(contains("SET status = ?"), any(), any(), any(), any())).thenReturn(1);
+        when(jdbc.update(contains("INSERT INTO audit_log"),
+            any(), any(), any(), any(), any(), any(), any(), any()))
+            .thenThrow(new IllegalStateException("audit table unavailable"));
+
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("audit table unavailable");
+    }
+
+    @Test
+    @DisplayName("P0-B: Audit payload is JSON-escaped, not hand-concatenated")
+    void auditPayloadIsValidJson() throws Exception {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
+        stubUpdateAndAudit();
+
+        service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID);
+
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(contains("INSERT INTO audit_log"), args.capture());
+        ObjectMapper mapper = new ObjectMapper();
+        var oldValue = mapper.readTree((String) args.getValue()[6]);
+        var newValue = mapper.readTree((String) args.getValue()[7]);
+        assertThat(oldValue.get("module").asText()).isEqualTo(MODULE_FACILITY);
+        assertThat(oldValue.get("oldStatus").asText()).isEqualTo("active");
+        assertThat(newValue.get("module").asText()).isEqualTo(MODULE_FACILITY);
+        assertThat(newValue.get("newStatus").asText()).isEqualTo("disabled");
+    }
+
+    // ------------------------------------------------------------------ P0-C
+
+    @Test
+    @DisplayName("P0-C: Locking an unregistered module records a non-active restore state")
+    void lockingUnregisteredModuleRemembersDisabledState() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubUpdateAndAudit();
+
+        service.adminLockToggle(ORG_ID, MODULE_FACILITY, true, "Abuse", "admin-001");
+
+        verify(jdbc).update(contains("INSERT INTO organization_module"),
+            eq(ORG_ID), eq(MODULE_FACILITY), eq("admin-001"), eq("Abuse"), any(), eq("disabled"));
+    }
+
+    // ------------------------------------------------------------------ P0-D
+
+    @Test
+    @DisplayName("P0-D: Disabling Facility does not query PeopleService (no HR transfer conflation)")
+    void facilityDisableDoesNotCallPeopleService() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null, null);
+        stubUpdateAndAudit();
+
+        service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID);
+
+        verifyNoInteractions(peopleModuleClient);
     }
 
     // ------------------------------------------------------------------ stubs
@@ -336,13 +433,14 @@ class OrganizationModuleServiceTest {
             .thenReturn(List.of());
     }
 
-    @SuppressWarnings("unchecked")
-    private void stubOrgModule(String orgId, String moduleCode, String status, String lockedBy) {
-        // Use anyString() for the SQL since the query contains FOR UPDATE
+    private void stubOrgModule(String orgId, String moduleCode, String status,
+                               String lockedBy, String statusBeforeLock) {
         when(jdbc.queryForList(
-            anyString(), eq(orgId), eq(moduleCode)))
-            .thenReturn(List.of(Map.of("status", status,
-                "locked_by_admin", lockedBy == null ? "" : lockedBy)));
+            contains("FROM organization_module"), eq(orgId), eq(moduleCode)))
+            .thenReturn(List.of(Map.of(
+                "status", status,
+                "locked_by_admin", lockedBy == null ? "" : lockedBy,
+                "status_before_lock", statusBeforeLock == null ? "" : statusBeforeLock)));
     }
 
     private void stubUpdateAndAudit() {

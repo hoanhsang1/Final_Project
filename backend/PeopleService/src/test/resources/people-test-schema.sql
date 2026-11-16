@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS school_class (
  teacher_id VARCHAR(36), start_date DATE, end_date DATE, subject_id VARCHAR(36),
  version BIGINT NOT NULL DEFAULT 0, close_state VARCHAR(10) NOT NULL DEFAULT 'NONE',
  cancel_state VARCHAR(10) NOT NULL DEFAULT 'NONE', cancel_request_reason VARCHAR(1000),
+ cancel_requested_by VARCHAR(36), close_requested_by VARCHAR(36),
  needs_reassignment BOOLEAN NOT NULL DEFAULT FALSE, reassignment_reason VARCHAR(255),
  created_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP, deleted_at TIMESTAMP,
  UNIQUE(org_id, class_code)

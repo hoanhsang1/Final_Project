@@ -16,18 +16,10 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for {@link ClassApprovalPolicy} (B3, B5 — kế hoạch v2 §1.5).
+ * Unit tests for {@link ClassApprovalPolicy} (kế hoạch v2 §1.5).
  *
- * Coverage:
- *  P-01  Owner can always approve
- *  P-02  Head of responsible department can approve
- *  P-03  Active Tổng quản lý can approve (escalation path)
- *  P-04  Regular staff cannot approve → CLASS_APPROVER_NOT_ALLOWED
- *  P-05  Self-approval blocked → SELF_APPROVAL_NOT_ALLOWED
- *  P-06  Owner can approve when requester is different person
- *
- * Note: ACADEMIC_MANAGEMENT bundle regression guard (class.approve_close removal)
- * is covered in IdentityService's PermissionCatalogTest.
+ * <p>Escalation order: responsible head → delegated general manager → owner.
+ * A higher level only acts when no eligible lower level exists.</p>
  */
 class ClassApprovalPolicyTest {
 
@@ -48,26 +40,38 @@ class ClassApprovalPolicyTest {
         actor = mock(Actor.class);
         policy = new ClassApprovalPolicy(jdbc, actor);
 
-        // Default: actor is not owner
         when(actor.owner()).thenReturn(false);
-        // Default: no responsible heads
         when(jdbc.queryForList(contains("FROM assignment"), eq(String.class), any()))
             .thenReturn(List.of());
-        // Default: actor is not a general manager
         when(jdbc.queryForObject(contains("p.scope='ORGANIZATION'"), eq(Integer.class),
             any(), any(), any(), any(), any()))
+            .thenReturn(0);
+        when(jdbc.queryForObject(contains("FROM delegation d"), eq(Integer.class),
+            any(), any(), any(), any()))
             .thenReturn(0);
     }
 
     // ------------------------------------------------------------------ P-01
 
     @Test
-    @DisplayName("P-01: Owner can always approve regardless of department structure")
+    @DisplayName("P-01: Owner can approve regardless of department structure")
     void ownerCanAlwaysApprove() {
         when(actor.owner()).thenReturn(true);
         when(actor.userId()).thenReturn(OWNER_USER_ID);
 
         assertThat(policy.canApprove(ORG_ID)).isTrue();
+    }
+
+    @Test
+    @DisplayName("P-01b: Owner still cannot approve their own request")
+    void ownerCannotApproveOwnRequest() {
+        when(actor.owner()).thenReturn(true);
+        when(actor.userId()).thenReturn(OWNER_USER_ID);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG_ID, OWNER_USER_ID))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.SELF_APPROVAL_NOT_ALLOWED));
     }
 
     // ------------------------------------------------------------------ P-02
@@ -76,34 +80,31 @@ class ClassApprovalPolicyTest {
     @DisplayName("P-02: Head of responsible department can approve")
     void responsibleHeadCanApprove() {
         when(actor.userId()).thenReturn(HEAD_USER_ID);
-        // Responsible heads query returns head-001
-        when(jdbc.queryForList(contains("FROM assignment"), eq(String.class),
-            eq(ORG_ID), eq(ClassApprovalPolicy.MODULE_CODE),
-            eq("Trưởng phòng"), eq("Trưởng phòng ban"), any(), any()))
-            .thenReturn(List.of(HEAD_USER_ID));
+        stubHeads(HEAD_USER_ID);
 
-        assertThat(policy.canApprove(ORG_ID)).isTrue();
+        assertThat(policy.canApprove(ORG_ID, REQUESTER_ID)).isTrue();
     }
 
     // ------------------------------------------------------------------ P-03
 
     @Test
-    @DisplayName("P-03: Active Tổng quản lý can approve (escalation path)")
-    void activeGeneralManagerCanApprove() {
+    @DisplayName("P-03: Delegated general manager approves when no eligible head exists")
+    void delegatedGeneralManagerCanApprove() {
         when(actor.userId()).thenReturn(GM_USER_ID);
-        // No responsible head
-        when(jdbc.queryForList(contains("FROM assignment"), eq(String.class),
-            eq(ORG_ID), eq(ClassApprovalPolicy.MODULE_CODE),
-            eq("Trưởng phòng"), eq("Trưởng phòng ban"), any(), any()))
-            .thenReturn(List.of());
-        // GM check returns count=1
-        when(jdbc.queryForObject(contains("p.scope='ORGANIZATION'"), eq(Integer.class),
-            eq(ORG_ID), eq(GM_USER_ID),
-            eq(GeneralManagerService.GENERAL_MANAGER_POSITION_NAME),
-            any(), any()))
-            .thenReturn(1);
+        stubHeads();
+        stubGeneralManager(GM_USER_ID, true);
 
-        assertThat(policy.canApprove(ORG_ID)).isTrue();
+        assertThat(policy.canApprove(ORG_ID, REQUESTER_ID)).isTrue();
+    }
+
+    @Test
+    @DisplayName("P-03b: General manager appointed without delegation cannot approve")
+    void generalManagerWithoutDelegationCannotApprove() {
+        when(actor.userId()).thenReturn(GM_USER_ID);
+        stubHeads();
+        stubGeneralManager(GM_USER_ID, false);
+
+        assertThat(policy.canApprove(ORG_ID, REQUESTER_ID)).isFalse();
     }
 
     // ------------------------------------------------------------------ P-04
@@ -112,9 +113,8 @@ class ClassApprovalPolicyTest {
     @DisplayName("P-04: Regular staff cannot approve → CLASS_APPROVER_NOT_ALLOWED")
     void regularStaffCannotApprove() {
         when(actor.userId()).thenReturn(STAFF_USER_ID);
-        // No heads, not a GM (default stubs in setUp)
 
-        assertThatThrownBy(() -> policy.requireApprover(ORG_ID))
+        assertThatThrownBy(() -> policy.requireApprover(ORG_ID, REQUESTER_ID))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.CLASS_APPROVER_NOT_ALLOWED));
@@ -126,13 +126,8 @@ class ClassApprovalPolicyTest {
     @DisplayName("P-05: Self-approval blocked even when user is an approver")
     void selfApprovalIsBlocked() {
         when(actor.userId()).thenReturn(HEAD_USER_ID);
-        // Actor IS a responsible head
-        when(jdbc.queryForList(contains("FROM assignment"), eq(String.class),
-            eq(ORG_ID), eq(ClassApprovalPolicy.MODULE_CODE),
-            eq("Trưởng phòng"), eq("Trưởng phòng ban"), any(), any()))
-            .thenReturn(List.of(HEAD_USER_ID));
+        stubHeads(HEAD_USER_ID);
 
-        // Self-approval: requester == actor
         assertThatThrownBy(() -> policy.requireApproverNotSelf(ORG_ID, HEAD_USER_ID))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
@@ -145,15 +140,63 @@ class ClassApprovalPolicyTest {
     @DisplayName("P-06: Approver is not blocked when requester is a different person")
     void approverAllowedWhenRequesterDiffers() {
         when(actor.userId()).thenReturn(HEAD_USER_ID);
-        // Actor IS a responsible head
-        when(jdbc.queryForList(contains("FROM assignment"), eq(String.class),
-            eq(ORG_ID), eq(ClassApprovalPolicy.MODULE_CODE),
-            eq("Trưởng phòng"), eq("Trưởng phòng ban"), any(), any()))
-            .thenReturn(List.of(HEAD_USER_ID));
+        stubHeads(HEAD_USER_ID);
 
-        // Different requester — no exception
         policy.requireApproverNotSelf(ORG_ID, REQUESTER_ID);
     }
 
+    // ------------------------------------------------------------------ P-07
+
+    @Test
+    @DisplayName("P-07: GM cannot skip an available head (escalation order)")
+    void generalManagerCannotSkipAvailableHead() {
+        when(actor.userId()).thenReturn(GM_USER_ID);
+        stubHeads(HEAD_USER_ID);
+        stubGeneralManager(GM_USER_ID, true);
+
+        assertThat(policy.canApprove(ORG_ID, REQUESTER_ID)).isFalse();
+    }
+
+    // ------------------------------------------------------------------ P-08
+
+    @Test
+    @DisplayName("P-08: GM can approve when the only head is the requester")
+    void generalManagerApprovesWhenHeadIsRequester() {
+        when(actor.userId()).thenReturn(GM_USER_ID);
+        stubHeads(HEAD_USER_ID);
+        stubGeneralManager(GM_USER_ID, true);
+
+        assertThat(policy.canApprove(ORG_ID, HEAD_USER_ID)).isTrue();
+    }
+
+    // ------------------------------------------------------------------ P-09
+
+    @Test
+    @DisplayName("P-09: Head who created the request cannot approve it")
+    void headWhoCreatedRequestCannotApprove() {
+        when(actor.userId()).thenReturn(HEAD_USER_ID);
+        stubHeads(HEAD_USER_ID);
+
+        assertThat(policy.canApprove(ORG_ID, HEAD_USER_ID)).isFalse();
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private void stubHeads(String... userIds) {
+        when(jdbc.queryForList(contains("FROM assignment"), eq(String.class),
+            eq(ORG_ID), eq(ClassApprovalPolicy.MODULE_CODE),
+            eq("Trưởng phòng"), eq("Trưởng phòng ban"), any(), any()))
+            .thenReturn(List.of(userIds));
+    }
+
+    private void stubGeneralManager(String userId, boolean delegated) {
+        when(jdbc.queryForObject(contains("p.scope='ORGANIZATION'"), eq(Integer.class),
+            eq(ORG_ID), eq(userId),
+            eq(GeneralManagerService.GENERAL_MANAGER_POSITION_NAME),
+            any(), any()))
+            .thenReturn(1);
+        when(jdbc.queryForObject(contains("FROM delegation d"), eq(Integer.class),
+            eq(ORG_ID), eq(userId), any(), any()))
+            .thenReturn(delegated ? 1 : 0);
+    }
 }
