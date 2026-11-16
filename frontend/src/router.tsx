@@ -9,6 +9,8 @@ import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayo
 import OwnerGuard from './components/OwnerGuard/OwnerGuard';
 import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
 import AcademicGuard from './components/AcademicGuard/AcademicGuard';
+import PeopleEditGuard from './components/PeopleEditGuard/PeopleEditGuard';
+import RouteErrorBoundary from './components/RouteErrorBoundary/RouteErrorBoundary';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
 import LoginPage from './pages/LoginPage/LoginPage';
 import ChangePasswordPage from './pages/ChangePasswordPage/ChangePasswordPage';
@@ -44,6 +46,15 @@ const TeachersPage = lazy(() => import('./pages/TeachersPage/TeachersPage'));
 const TeacherDetailPage = lazy(() => import('./pages/TeacherDetailPage/TeacherDetailPage'));
 const ClassesPage = lazy(() => import('./pages/ClassesPage/ClassesPage'));
 const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPage'));
+const StudentsPage = lazy(() => import('./pages/StudentsPage/StudentsPage'));
+const StaffPage = lazy(() => import('./pages/StaffPage/StaffPage'));
+const TransferPage = lazy(() => import('./pages/TransferPage/TransferPage'));
+const StudentPortalPage = lazy(() => import('./pages/StudentPortalPage/StudentPortalPage'));
+const DelegationPage = lazy(() => import('./pages/DelegationPage/DelegationPage'));
+const MyDelegationsPage = lazy(() => import('./pages/MyDelegationsPage/MyDelegationsPage'));
+const SchedulePage = lazy(() => import('./pages/SchedulePage/SchedulePage'));
+const MySchedulePage = lazy(() => import('./pages/MySchedulePage/MySchedulePage'));
+const FacilityPage = lazy(() => import('./pages/FacilityPage/FacilityPage'));
 
 function RouteFallback() {
   const { token } = theme.useToken();
@@ -80,6 +91,8 @@ export const routes: RouteObject[] = [
   {
     path: '/',
     element: <RootLayout />,
+    // Lưới an toàn cho toàn app: thay màn "Unexpected Application Error!" mặc định.
+    errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Navigate to="/dang-nhap" replace /> },
       { path: 'dang-nhap', element: <LoginPage />, handle: { title: 'Đăng nhập' } },
@@ -113,6 +126,7 @@ export const routes: RouteObject[] = [
             <AdminConsoleLayout />
           </AdminGuard>
         ),
+        errorElement: <RouteErrorBoundary />,
         handle: { title: 'Khu vực quản trị' },
         children: [
           { index: true, element: <OverviewPage />, handle: { title: 'Tổng quan' } },
@@ -162,10 +176,16 @@ export const routes: RouteObject[] = [
             <OwnerConsoleLayout />
           </OwnerGuard>
         ),
+        errorElement: <RouteErrorBoundary />,
         handle: { title: 'Khu vực tổ chức' },
         children: [
           { index: true, element: <DepartmentsPage />, handle: { title: 'Phòng ban' } },
           { path: 'chuc-vu', element: <PositionsPage />, handle: { title: 'Chức vụ' } },
+          {
+            path: 'uy-quyen',
+            element: <DelegationPage />,
+            handle: { title: 'Tổng quản lý & ủy quyền' },
+          },
           {
             path: 'phong-ban/:id',
             element: <DepartmentDetailPage />,
@@ -182,9 +202,25 @@ export const routes: RouteObject[] = [
             <AcademicConsoleLayout />
           </AcademicGuard>
         ),
+        errorElement: <RouteErrorBoundary />,
         handle: { title: 'Đào tạo' },
         children: [
           { index: true, element: <Navigate to="giao-vien" replace /> },
+          { path: 'nhan-su', element: <StaffPage />, handle: { title: 'Nhân sự' } },
+          {
+            path: 'chuyen-phong',
+            element: <TransferPage />,
+            handle: { title: 'Chuyển phòng ban' },
+          },
+          {
+            path: 'chuc-vu',
+            element: (
+              <PeopleEditGuard>
+                <PositionsPage />
+              </PeopleEditGuard>
+            ),
+            handle: { title: 'Chức vụ' },
+          },
           { path: 'giao-vien', element: <TeachersPage />, handle: { title: 'Giáo viên' } },
           {
             path: 'giao-vien/:id',
@@ -193,7 +229,37 @@ export const routes: RouteObject[] = [
           },
           { path: 'lop-hoc', element: <ClassesPage />, handle: { title: 'Lớp học' } },
           { path: 'lop-hoc/:id', element: <ClassDetailPage />, handle: { title: 'Chi tiết lớp học' } },
+          { path: 'sinh-vien', element: <StudentsPage />, handle: { title: 'Sinh viên' } },
+          { path: 'lich-hoc', element: <SchedulePage />, handle: { title: 'Lịch học' } },
+          {
+            path: 'lich-cua-toi',
+            element: <MySchedulePage />,
+            handle: { title: 'Lịch của tôi' },
+          },
+          {
+            path: 'co-so-vat-chat',
+            element: <FacilityPage />,
+            handle: { title: 'Cơ sở vật chất' },
+          },
         ],
+      },
+      {
+        // Tổng quản lý (và mọi nhân sự) tự xem quyền được ủy quyền cho mình.
+        path: 'uy-quyen',
+        element: <MyDelegationsPage />,
+        handle: { title: 'Quyền được ủy quyền' },
+      },
+      {
+        // Quy tắc 12 — cổng SELF riêng của sinh viên, tách khỏi khu vực đào tạo.
+        path: 'hoc-sinh',
+        element: <StudentPortalPage />,
+        handle: { title: 'Cổng sinh viên' },
+      },
+      {
+        // Lịch của chính mình — dùng được cho cả giáo viên và sinh viên (SELF).
+        path: 'lich-cua-toi',
+        element: <MySchedulePage />,
+        handle: { title: 'Lịch của tôi' },
       },
       { path: '*', element: <NotFoundPage />, handle: { title: 'Không tìm thấy trang' } },
     ],

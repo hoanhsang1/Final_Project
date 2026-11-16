@@ -2,73 +2,90 @@ package com.mems.service;
 
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
-import com.mems.repository.MemberRepository;
 import com.mems.repository.PositionRepository;
 import com.mems.security.Actor;
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+/**
+ * Kiểm tra quyền quản lý nhân sự theo phạm vi phòng ban.
+ *
+ * <p>Quyền quản lý đến từ chức vụ ({@code employee.*}), không từ role MANAGER.
+ * Người không phải OWNER chỉ được gán chức vụ có tập quyền ⊆ quyền hiệu lực
+ * của mình, và chức vụ phải nằm trong module phòng ban đang bật.</p>
+ */
 @Service
 public class MembershipPolicy {
     private final Actor actor;
-    private final MemberRepository members;
     private final PositionRepository positions;
-    private final JdbcTemplate jdbc;
     private final EffectivePermissionsService effectivePermissions;
 
-    public MembershipPolicy(Actor actor, MemberRepository members, PositionRepository positions,
-                            JdbcTemplate jdbc, EffectivePermissionsService effectivePermissions) {
+    public MembershipPolicy(Actor actor, PositionRepository positions,
+                            EffectivePermissionsService effectivePermissions) {
         this.actor = actor;
-        this.members = members;
         this.positions = positions;
-        this.jdbc = jdbc;
         this.effectivePermissions = effectivePermissions;
     }
 
-    public void check(String departmentId, String targetRole, Set<String> proposedPositions) {
-        actor.requireDepartment(departmentId);
+    /**
+     * Quyền được xét lại theo phòng ban đích từ DB (không chỉ token), nên HR
+     * phạm vi DEPARTMENT chỉ qua được phòng của mình, còn phạm vi ORGANIZATION
+     * qua được mọi phòng ban (yêu cầu Phần 3).
+     */
+    public void requirePermission(String departmentId, String permission) {
         String orgId = actor.orgId();
-        Set<String> ownPositions = new TreeSet<>();
-        if (!actor.owner()) {
-            var manager = members.require(actor.userId(), orgId, departmentId, true);
-            if (!"MANAGER".equals(manager.role()) || !"STAFF".equals(targetRole))
-                throw actor.forbidden("Managers may only manage STAFF in their own department");
-            ownPositions.addAll(members.positionIds(actor.userId(), true));
+        if (actor.owner()) return;
+        Set<String> effective = effectivePermissions
+            .resolve(orgId, actor.userId(), departmentId).permissions();
+        if (!effective.contains(permission)) {
+            throw actor.forbidden("Missing permission in department: " + permission);
         }
-        Set<String> all = new TreeSet<>(proposedPositions);
-        all.addAll(ownPositions);
-        Map<String, Set<String>> grants = new HashMap<>();
-        // Lock templates in stable order so concurrent owner edits cannot broaden a grant unnoticed.
-        for (String id : all) {
-            positions.require(id, orgId, true);
-            grants.put(id, new HashSet<>(jdbc.queryForList(
-                "SELECT permission_code FROM position_permission WHERE position_id=? FOR UPDATE", String.class, id)));
-        }
-        if (!actor.owner()) {
-            Set<String> ownRaw = new HashSet<>();
-            ownPositions.forEach(id -> ownRaw.addAll(grants.get(id)));
-            Set<String> available = effectivePermissions.compute(orgId, departmentId, ownRaw);
+    }
 
-            Set<String> requested = new HashSet<>();
-            proposedPositions.forEach(id -> requested.addAll(grants.get(id)));
+    /** Dùng cho việc che trường nhạy cảm: trả về thay vì ném lỗi. */
+    public boolean hasPermission(String departmentId, String permission) {
+        if (actor.owner()) return true;
+        return effectivePermissions.resolve(actor.orgId(), actor.userId(), departmentId)
+            .permissions().contains(permission);
+    }
 
-            // Check if proposed positions contain permissions outside the department's module scope
-            Set<String> deptModules = effectivePermissions.departmentModules(orgId, departmentId);
-            Map<String, String> permModuleMap = effectivePermissions.permissionModuleMap();
-            for (String reqPerm : requested) {
-                String mod = permModuleMap.get(reqPerm);
-                if (mod != null && !mod.isBlank() && !deptModules.contains(mod)) {
-                    throw new AppException(ErrorCode.PERMISSION_OUT_OF_MODULE,
-                        "Cannot assign permission outside department modules: " + reqPerm);
-                }
+    public void check(String departmentId, String targetRole, Set<String> proposedPositions) {
+        String orgId = actor.orgId();
+
+        // Luôn xác thực chức vụ thuộc tổ chức và khoá mẫu quyền.
+        List<com.mems.dto.PositionResponse> loaded = new ArrayList<>();
+        for (String id : proposedPositions) loaded.add(positions.require(id, orgId, true));
+
+        if (actor.owner()) return;
+
+        // Quy tắc 18 / Phần 2: chức danh cấp tổ chức (Tổng quản lý, HR cấp tổ chức) do Owner gán.
+        if (loaded.stream().anyMatch(p -> "ORGANIZATION".equals(p.scope())))
+            throw actor.forbidden("Only the organization owner can assign ORGANIZATION-scope positions");
+
+        // Người quản lý nhân sự phòng ban chỉ thao tác trên STAFF cùng phòng.
+        if (!"STAFF".equals(targetRole))
+            throw actor.forbidden("Only STAFF in your own department can be managed");
+
+        Set<String> available = effectivePermissions
+            .resolve(orgId, actor.userId(), departmentId).permissions();
+        if (!available.contains("employee.assign_position"))
+            throw actor.forbidden("Missing permission: employee.assign_position");
+
+        Set<String> requested = effectivePermissions.expandPositions(orgId, proposedPositions);
+
+        Set<String> deptModules = effectivePermissions.departmentModules(orgId, departmentId);
+        Map<String, String> permModuleMap = effectivePermissions.permissionModuleMap();
+        for (String reqPerm : requested) {
+            String mod = permModuleMap.get(reqPerm);
+            if (mod != null && !mod.isBlank() && !deptModules.contains(mod)) {
+                throw new AppException(ErrorCode.PERMISSION_OUT_OF_MODULE,
+                    "Cannot assign permission outside department modules: " + reqPerm);
             }
-
-            if (!available.contains("PEOPLE_EDIT") || !available.containsAll(requested))
-                throw actor.forbidden("Cannot assign permissions beyond your current permissions");
         }
+
+        if (!available.containsAll(requested))
+            throw actor.forbidden("Cannot assign permissions beyond your current permissions");
     }
 
     public void protectOwner(String targetId) {

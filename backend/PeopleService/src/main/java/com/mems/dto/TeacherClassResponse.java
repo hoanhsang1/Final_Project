@@ -6,5 +6,7 @@ public record TeacherClassResponse(
     String name,
     String status,
     String closeState,
-    String closeLabel
+    String closeLabel,
+    boolean needsReassignment,
+    String reassignmentReason
 ) {}

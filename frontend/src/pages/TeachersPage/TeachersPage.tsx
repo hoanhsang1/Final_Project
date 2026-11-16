@@ -58,9 +58,8 @@ const CONTRACT_TYPE_OPTIONS = [
   { value: 'THINH_GIANG', label: CONTRACT_TYPE_LABEL.THINH_GIANG },
 ];
 
-/** Giá trị form "Thêm giáo viên" (§4.1 + §4.4). */
+/** Giá trị form "Thêm giáo viên" (§4.1 + §4.4). Mã nhân sự do hệ thống tự sinh. */
 interface TeacherFormValues {
-  staffCode: string;
   fullName: string;
   username: string;
   email: string;
@@ -434,7 +433,6 @@ export default function TeachersPage() {
               email: values.email.trim(),
               role: 'STAFF',
               positionIds: values.positionIds,
-              staffCode: values.staffCode.trim(),
               fullName: values.fullName.trim(),
               phone: values.phone.trim(),
               teacherProfile: {
@@ -445,17 +443,6 @@ export default function TeachersPage() {
           }
         >
           <Flex gap={token.marginSM} wrap="wrap">
-            <Form.Item
-              name="staffCode"
-              label="Mã nhân sự"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập mã nhân sự' },
-                { max: 50, message: 'Mã nhân sự tối đa 50 ký tự' },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="VD: GV001" />
-            </Form.Item>
             <Form.Item
               name="fullName"
               label="Họ tên"

@@ -1,16 +1,18 @@
 import { isAxiosError } from 'axios';
-import { apiClient } from '../../lib/api';
+import { apiClient, unwrapList } from '../../lib/api';
 import { MSG_CLASS, MSG_S4, MSG_TEACHER } from './sprint4Messages';
 import type {
   AssignableTeacher,
   AssignableTeacherQuery,
   AssignTeacherPayload,
   ClassCancelPayload,
+  ClassCreatePayload,
   ClassDetail,
   ClassListItem,
   CloseEventItem,
   CloseRejectPayload,
   CloseRequestPayload,
+  DepartmentMemberItem,
   DepartmentOption,
   PagedResponse,
   PositionOption,
@@ -19,6 +21,12 @@ import type {
   SpecialtyMismatchClass,
   SpecialtyMismatchPayload,
   StatusLogItem,
+  StudentAccountResponse,
+  StudentClass,
+  StudentCreatePayload,
+  StudentListItem,
+  StudentUpdatePayload,
+  Subject,
   TeacherCreatePayload,
   TeacherCreatedResponse,
   TeacherDetail,
@@ -75,6 +83,7 @@ const CODE_MESSAGES: Record<string, string> = {
   SELF_APPROVAL_NOT_ALLOWED: 'Bạn không thể tự duyệt yêu cầu của mình.',
   TEACHER_NOT_FOUND: 'Không tìm thấy giáo viên.',
   CLASS_NOT_FOUND: 'Không tìm thấy lớp học.',
+  STUDENT_NOT_FOUND: 'Không tìm thấy sinh viên.',
   DEPARTMENT_NOT_FOUND: 'Không tìm thấy phòng ban.',
   POSITION_NOT_FOUND: 'Không tìm thấy chức vụ.',
   EMAIL_EXISTS: 'Email đã được dùng bởi nhân sự khác.',
@@ -89,7 +98,24 @@ const CODE_MESSAGES: Record<string, string> = {
   CLASS_NOT_EDITABLE: 'Lớp đang ở trạng thái chỉ xem.',
   CLASS_NOT_CANCELLABLE: 'Không thể hủy lớp ở trạng thái này.',
   CLASS_NOT_CLOSABLE: 'Không thể yêu cầu đóng lớp đã hủy.',
+  STUDENT_ACCOUNT_EXISTS: 'Sinh viên đã có tài khoản đăng nhập.',
+  STUDENT_EMAIL_REQUIRED: 'Cần nhập email sinh viên trước khi tạo tài khoản.',
+  SUBJECT_NOT_FOUND: 'Không tìm thấy môn học.',
+  SUBJECT_MISMATCH: 'Giáo viên không dạy môn học của lớp này.',
+  CANCEL_STATE_CHANGED: 'Yêu cầu hủy lớp đã được xử lý hoặc không còn chờ duyệt.',
+  CLASS_APPROVER_NOT_ALLOWED:
+    'Chỉ trưởng phòng phụ trách đào tạo mới được duyệt yêu cầu của lớp.',
   TEACHER_ASSIGNMENT_MODULE_ACTIVE: MSG_CLASS.ASSIGNMENT_BLOCKED,
+  TRANSFER_NOT_FOUND: 'Không tìm thấy yêu cầu chuyển phòng ban.',
+  TRANSFER_ALREADY_PENDING: 'Nhân sự đã có một yêu cầu chuyển phòng ban đang chờ duyệt.',
+  TRANSFER_NOT_PENDING: 'Yêu cầu chuyển phòng ban đã được xử lý bởi người khác.',
+  TRANSFER_STEP_ALREADY_DECIDED: 'Bước này đã được người khác quyết định.',
+  TRANSFER_STEP_NOT_ALLOWED: 'Bạn không phải người duyệt bước này.',
+  TRANSFER_HEAD_MISSING: 'Mỗi phòng ban phải có Trưởng phòng đang hoạt động trước khi chuyển.',
+  TRANSFER_SAME_DEPARTMENT: 'Phòng ban đích phải khác phòng ban hiện tại.',
+  TRANSFER_OWNER_NOT_ALLOWED: 'Không thể chuyển chủ tổ chức bằng quy trình này.',
+  TRANSFER_CANCEL_NOT_ALLOWED: 'Chỉ người tạo yêu cầu mới được huỷ yêu cầu.',
+  INVALID_TRANSFER_STEP: 'Bước duyệt không hợp lệ.',
   UNCATEGORIZED_EXCEPTION: MSG_S4.INTERNAL_ERROR,
   IDENTITY_UNAVAILABLE: MSG_S4.IDENTITY_UNAVAILABLE,
 };
@@ -132,6 +158,11 @@ async function request<T>(fn: () => Promise<{ data: T }>): Promise<T> {
   }
 }
 
+/** Bọc lời gọi trả danh sách — mọi shape lạ đều thành mảng. */
+function requestList<T>(fn: () => Promise<{ data: unknown }>): Promise<T[]> {
+  return request(fn).then((raw) => unwrapList<T>(raw));
+}
+
 /** Câu lỗi hiển thị cho người dùng cuối (đã là tiếng Việt). */
 export function sprint4ErrorMessage(error: unknown): string {
   if (error instanceof Sprint4ApiError) return error.message;
@@ -149,7 +180,8 @@ export function isStaleConflict(error: unknown): boolean {
     error.status === 409 &&
     (error.code === 'DATA_CHANGED' ||
       error.code === 'STATUS_CHANGED' ||
-      error.code === 'CLOSE_STATE_CHANGED')
+      error.code === 'CLOSE_STATE_CHANGED' ||
+      error.code === 'CANCEL_STATE_CHANGED')
   );
 }
 
@@ -194,7 +226,8 @@ function normalizePaged<T>(input: unknown): PagedResponse<T> {
     return { items, total: items.length, page: 1, size: items.length || 1, pages: 1 };
   }
   const data = (input ?? {}) as PagedLike<T>;
-  const items = data.items ?? [];
+  // BE có thể bọc thêm `{ data: [] }` / `{ content: [] }` — unwrapList xử lý cả hai.
+  const items = Array.isArray(data.items) ? data.items : unwrapList<T>(input);
   return {
     items,
     total: data.total ?? data.totalItems ?? items.length,
@@ -287,15 +320,19 @@ export const fetchAssignableTeachers = (query: AssignableTeacherQuery = {}) =>
 /* ── Danh mục dùng cho form tạo giáo viên ──────────────────────────────── */
 
 export const fetchPositions = () =>
-  request(() => apiClient.get<PositionOption[]>('/positions'));
+  requestList<PositionOption>(() => apiClient.get('/positions'));
 
 export const fetchDepartments = () =>
-  request(() => apiClient.get<DepartmentOption[]>('/departments'));
+  requestList<DepartmentOption>(() => apiClient.get('/departments'));
+
+/** BE tự giới hạn phòng ban của người gọi; OWNER xem được mọi phòng ban. */
+export const fetchDepartmentMembers = (departmentId: string) =>
+  requestList<DepartmentMemberItem>(() => apiClient.get(`/departments/${departmentId}/members`));
 
 /* ── Chuyên môn ────────────────────────────────────────────────────────── */
 
 export const fetchSpecialties = () =>
-  request(() => apiClient.get<Specialty[]>('/api/specialties'));
+  requestList<Specialty>(() => apiClient.get('/api/specialties'));
 
 export const createSpecialty = (name: string) =>
   request(() => apiClient.post<Specialty>('/api/specialties', { name }));
@@ -309,6 +346,8 @@ export interface ClassListQuery {
   status?: string;
   /** `true` cho dropdown chọn lớp — server loại lớp kết thúc/hủy/đóng (§6.1). */
   selectable?: boolean;
+  /** Quy tắc 17 — chỉ lấy lớp đang gắn nhãn cần phân công lại. */
+  needsReassignment?: boolean;
 }
 
 export const fetchClasses = (query: ClassListQuery = {}) =>
@@ -317,11 +356,28 @@ export const fetchClasses = (query: ClassListQuery = {}) =>
 export const fetchClassDetail = (classId: string) =>
   request(() => apiClient.get<ClassDetail>(`/api/classes/${classId}`));
 
+export const createClass = (payload: ClassCreatePayload) =>
+  request(() => apiClient.post<ClassDetail>('/api/classes', payload));
+
 export const assignTeacher = (classId: string, payload: AssignTeacherPayload) =>
   request(() => apiClient.put<ClassDetail>(`/api/classes/${classId}/teacher`, payload));
 
+/** Quy tắc 17 — gán lại giáo viên, BE xoá nhãn "cần phân công lại". */
+export const reassignTeacher = (classId: string, payload: AssignTeacherPayload) =>
+  request(() => apiClient.put<ClassDetail>(`/api/classes/${classId}/teacher/reassign`, payload));
+
 export const cancelClass = (classId: string, payload: ClassCancelPayload) =>
   request(() => apiClient.post<ClassDetail>(`/api/classes/${classId}/cancel`, payload));
+
+/** Quy tắc 14 — lớp còn sinh viên: yêu cầu hủy chờ trưởng phòng duyệt. */
+export const approveCancel = (classId: string) =>
+  request(() => apiClient.post<ClassDetail>(`/api/classes/${classId}/cancel-requests/approve`));
+
+export const rejectCancel = (classId: string, payload: CloseRejectPayload) =>
+  request(() => apiClient.post<ClassDetail>(`/api/classes/${classId}/cancel-requests/reject`, payload));
+
+export const fetchClassStudents = (classId: string) =>
+  requestList<StudentListItem>(() => apiClient.get(`/api/classes/${classId}/students`));
 
 export const requestClose = (classId: string, payload: CloseRequestPayload) =>
   request(() => apiClient.post<ClassDetail>(`/api/classes/${classId}/close-requests`, payload));
@@ -336,11 +392,54 @@ export const reopenClass = (classId: string, payload: ReopenPayload) =>
   request(() => apiClient.post<ClassDetail>(`/api/classes/${classId}/reopen`, payload));
 
 export const fetchStatusLogs = (classId: string) =>
-  request(() => apiClient.get<StatusLogItem[]>(`/api/classes/${classId}/status-logs`)).then(
-    (items) => (items ?? []).map(normalizeStatusLog),
+  requestList<StatusLogItem>(() => apiClient.get(`/api/classes/${classId}/status-logs`)).then(
+    (items) => items.map(normalizeStatusLog),
   );
 
 export const fetchCloseEvents = (classId: string) =>
-  request(() => apiClient.get<CloseEventItem[]>(`/api/classes/${classId}/close-events`)).then(
-    (items) => (items ?? []).map(normalizeCloseEvent),
+  requestList<CloseEventItem>(() => apiClient.get(`/api/classes/${classId}/close-events`)).then(
+    (items) => items.map(normalizeCloseEvent),
   );
+
+/* ── Sinh viên ─────────────────────────────────────────────────────────── */
+
+export interface StudentListQuery {
+  page?: number;
+  size?: number;
+  q?: string;
+  status?: string;
+  classId?: string;
+}
+
+/** BE phục vụ controller ở gốc `/students`; Vite proxy và Vercel rewrite đã có sẵn. */
+export const fetchStudents = (query: StudentListQuery = {}) =>
+  request(() => apiClient.get('/students', { params: query })).then(
+    normalizePaged<StudentListItem>,
+  );
+
+export const createStudent = (payload: StudentCreatePayload) =>
+  request(() => apiClient.post<StudentListItem>('/students', payload));
+
+export const updateStudent = (studentId: string, payload: StudentUpdatePayload) =>
+  request(() => apiClient.put<StudentListItem>(`/students/${studentId}`, payload));
+
+export const deleteStudent = (studentId: string) =>
+  request(() => apiClient.delete<void>(`/students/${studentId}`));
+
+/** Quy tắc 12 — cấp tài khoản STUDENT từ hồ sơ đã có, trả mật khẩu tạm một lần. */
+export const createStudentAccount = (studentId: string) =>
+  request(() => apiClient.post<StudentAccountResponse>(`/students/${studentId}/account`));
+
+/* ── Môn học ───────────────────────────────────────────────────────────── */
+
+/** Quy tắc 13 — danh mục môn học để gán cho lớp và đối chiếu chuyên môn giáo viên. */
+export const fetchSubjects = (q?: string) =>
+  requestList<Subject>(() => apiClient.get('/api/subjects', { params: { q } }));
+
+/* ── Sinh viên tự xem (quyền SELF) ─────────────────────────────────────── */
+
+export const fetchMyStudentProfile = () =>
+  request(() => apiClient.get<StudentListItem>('/students/me'));
+
+export const fetchMyStudentClasses = () =>
+  requestList<StudentClass>(() => apiClient.get('/students/me/classes'));

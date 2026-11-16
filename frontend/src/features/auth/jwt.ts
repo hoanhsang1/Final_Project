@@ -11,8 +11,15 @@ export interface JwtClaims {
   username?: string;
   /** Role backend GỐC, vd `["SUPER_ADMIN"]`. */
   roles?: unknown;
+  /** Phòng ban chính của tài khoản (null với chủ tổ chức / nhân sự cấp tổ chức). */
+  departmentId?: string | null;
   /** Quyền (permissions) — dùng cho phân quyền nghiệp vụ Sprint 4+. */
   permissions?: unknown;
+  /**
+   * Phạm vi của từng quyền: `{ "employee.view": ["ORGANIZATION"] }` hoặc
+   * `["DEPARTMENT:<id>"]`. Chỉ để UX; BE luôn kiểm lại.
+   */
+  permissionScopes?: unknown;
   /** Tài khoản còn mật khẩu tạm, phải đổi trước khi gọi API nghiệp vụ. */
   mustChangePassword?: unknown;
   /** Thời điểm hết hạn (giây kể từ epoch). */
@@ -49,6 +56,17 @@ export function normalizeRoles(roles: unknown): string[] {
 export function normalizePermissions(permissions: unknown): string[] {
   if (!Array.isArray(permissions)) return [];
   return permissions.filter((p): p is string => typeof p === 'string');
+}
+
+/** Chuẩn hoá claim `permissionScopes` về `{ mã quyền: [phạm vi] }`. */
+export function normalizePermissionScopes(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: Record<string, string[]> = {};
+  for (const [code, scopes] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(scopes)) continue;
+    result[code] = scopes.filter((s): s is string => typeof s === 'string');
+  }
+  return result;
 }
 
 /**

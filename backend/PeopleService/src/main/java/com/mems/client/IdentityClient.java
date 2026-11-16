@@ -1,6 +1,7 @@
 package com.mems.client;
 
 import com.mems.dto.PermissionResponse;
+import com.mems.dto.PermissionBundleResponse;
 import com.mems.dto.MemberRequest;
 import java.util.Map;
 import com.mems.exception.AppException;
@@ -40,6 +41,17 @@ public class IdentityClient {
         }
     }
 
+    public List<PermissionBundleResponse> permissionBundles() {
+        try {
+            var response = http.exchange("/internal/permissions/bundles", HttpMethod.GET, null,
+                new ParameterizedTypeReference<List<PermissionBundleResponse>>() {});
+            if (response.getBody() == null) throw unavailable(null);
+            return response.getBody();
+        } catch (RestClientException ex) {
+            throw unavailable(ex);
+        }
+    }
+
     public List<String> activeModules(String orgId) {
         try {
             var response = http.exchange(
@@ -61,6 +73,20 @@ public class IdentityClient {
             http.postForEntity("/internal/accounts", Map.of(
                 "userId", id, "orgId", orgId, "username", request.username().trim(), "email", request.email().trim(),
                 "temporaryPassword", password, "role", request.role(), "appointedBy", actorId), Void.class);
+        } catch (HttpClientErrorException.Conflict ex) {
+            throw new AppException(ErrorCode.ACCOUNT_EXISTS);
+        } catch (RestClientException ex) {
+            throw unavailable(ex);
+        }
+    }
+
+    /** Tạo tài khoản đăng nhập vai trò STUDENT từ hồ sơ học sinh đã có. */
+    public void createStudentAccount(String id, String orgId, String username, String email,
+                                     String password, String actorId) {
+        try {
+            http.postForEntity("/internal/accounts", Map.of(
+                "userId", id, "orgId", orgId, "username", username, "email", email,
+                "temporaryPassword", password, "role", "STUDENT", "appointedBy", actorId), Void.class);
         } catch (HttpClientErrorException.Conflict ex) {
             throw new AppException(ErrorCode.ACCOUNT_EXISTS);
         } catch (RestClientException ex) {

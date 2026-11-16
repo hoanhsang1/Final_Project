@@ -1,4 +1,4 @@
-import { Alert, App, Button, Empty, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -11,10 +11,15 @@ import {
   MODULE_CATALOG_STALE_TIME,
   moduleCatalogKey,
 } from '../../features/modules/moduleApi';
-import { ownerErrorMessage, fetchPermissions } from '../../features/owner/ownerApi';
+import {
+  fetchDepartmentModuleImpact,
+  fetchPermissions,
+  ownerErrorMessage,
+} from '../../features/owner/ownerApi';
 import { MSG_DEPT, MSG_OWNER } from '../../features/owner/ownerMessages';
 import { ownerKeys } from '../../features/owner/ownerKeys';
-import type { Department, DepartmentPayload } from '../../features/owner/types';
+import { permissionLabel } from '../../features/owner/permissionLabels';
+import type { Department, DepartmentModuleImpact, DepartmentPayload } from '../../features/owner/types';
 import { useDepartmentsPage } from './use-departments';
 
 /** Giá trị hiển thị khi BE trả `null` — không để ô trống, không hiện `null`. */
@@ -34,7 +39,7 @@ function formatDate(value: string): string {
  */
 export default function DepartmentsPage() {
   const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { list, create, update, remove } = useDepartmentsPage();
   const modules = useQuery({
     queryKey: moduleCatalogKey,
@@ -74,10 +79,74 @@ export default function DepartmentsPage() {
     setFormError(null);
   };
 
+  const renderImpactContent = (impact: DepartmentModuleImpact) => (
+    <Flex vertical gap={token.marginXS}>
+      <Typography.Paragraph style={{ marginBottom: 0 }}>
+        {MSG_DEPT.MODULE_REMOVAL_HINT}
+      </Typography.Paragraph>
+      <ul style={{ margin: 0, paddingInlineStart: token.padding }}>
+        {impact.positions.map((position) => (
+          <li key={position.id}>
+            <Typography.Text strong>{position.name}</Typography.Text>
+            {' — '}
+            {position.permissions.map((code) => permissionLabel(code)).join(', ')}
+            {' '}
+            <Typography.Text type="secondary">({position.members})</Typography.Text>
+          </li>
+        ))}
+      </ul>
+      <Typography.Text type="secondary">
+        {MSG_DEPT.MODULE_REMOVAL_MEMBERS(impact.affectedMembers)}
+      </Typography.Text>
+    </Flex>
+  );
+
+  /**
+   * Gỡ module là thay đổi có ảnh hưởng dây chuyền: BE không tự xoá quyền, nhưng
+   * quyền ngoài module sẽ mất hiệu lực. Hỏi Owner trước khi lưu, và không bao giờ
+   * tự thu hồi ngầm.
+   */
+  const confirmModuleRemoval = async (
+    department: Department,
+    payload: DepartmentPayload,
+  ): Promise<boolean> => {
+    const removed = (department.modules ?? []).filter(
+      (code) => !payload.moduleCodes.includes(code),
+    );
+    if (removed.length === 0) {
+      return true;
+    }
+    let impact: DepartmentModuleImpact;
+    try {
+      impact = await fetchDepartmentModuleImpact(department.id, payload.moduleCodes);
+    } catch (error) {
+      setFormError(ownerErrorMessage(error));
+      return false;
+    }
+    if (impact.positions.length === 0) {
+      return true;
+    }
+    return new Promise<boolean>((resolve) => {
+      modal.confirm({
+        title: MSG_DEPT.MODULE_REMOVAL_TITLE,
+        width: 560,
+        content: renderImpactContent(impact),
+        okText: MSG_DEPT.MODULE_REMOVAL_CONFIRM,
+        cancelText: MSG_OWNER.CANCEL,
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  };
+
   const handleSubmit = async (payload: DepartmentPayload) => {
     setFormError(null);
     try {
       if (editing) {
+        const proceed = await confirmModuleRemoval(editing, payload);
+        if (!proceed) {
+          return;
+        }
         await update.mutateAsync({ id: editing.id, payload });
         message.success(MSG_DEPT.UPDATED);
       } else {

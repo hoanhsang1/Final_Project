@@ -1,17 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  appointGeneralManager,
+  clonePosition,
+  createDelegation,
   createDepartment,
   createMember,
   createPosition,
   deleteDepartment,
   deleteMember,
   deletePosition,
+  fetchDelegations,
+  fetchDepartmentAvailablePermissions,
+  fetchDepartmentModuleImpact,
   fetchDepartments,
+  fetchGeneralManagerCandidates,
+  fetchGeneralManagers,
+  fetchMyDelegations,
   fetchMembers,
   fetchPermissions,
+  fetchPositionImpact,
   fetchPositions,
   OwnerApiError,
   ownerErrorMessage,
+  removeGeneralManager,
+  revokeDelegation,
+  updateDelegation,
   updateDepartment,
   updateMemberPositions,
   updatePosition,
@@ -26,14 +39,18 @@ const mockPost = vi.fn();
 const mockPut = vi.fn();
 const mockDelete = vi.fn();
 
-vi.mock('../../lib/api', () => ({
-  apiClient: {
-    get: (...args: unknown[]) => mockGet(...args),
-    post: (...args: unknown[]) => mockPost(...args),
-    put: (...args: unknown[]) => mockPut(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
-  },
-}));
+vi.mock('../../lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/api')>();
+  return {
+    ...actual,
+    apiClient: {
+      get: (...args: unknown[]) => mockGet(...args),
+      post: (...args: unknown[]) => mockPost(...args),
+      put: (...args: unknown[]) => mockPut(...args),
+      delete: (...args: unknown[]) => mockDelete(...args),
+    },
+  };
+});
 
 /** Error giống axios ném ra khi response lỗi (có `response.status` + `response.data`). */
 function axiosLikeError(status: number, data: unknown) {
@@ -52,7 +69,10 @@ const POSITION = {
   name: 'Giáo vụ',
   description: 'Quản lý hồ sơ sinh viên',
   createdAt: '2026-10-02T03:00:00Z',
-  permissions: ['PEOPLE_VIEW'],
+  permissions: ['employee.view'],
+  bundleCodes: ['HR_MANAGEMENT'],
+  scope: 'ORGANIZATION' as const,
+  departmentId: null,
 };
 
 const MEMBER = {
@@ -62,7 +82,7 @@ const MEMBER = {
   appointedBy: 'owner-1',
   appointedAt: '2026-10-03T03:00:00Z',
   positionIds: ['p1'],
-  permissions: ['PEOPLE_VIEW'],
+  permissions: ['employee.view'],
 };
 
 beforeEach(() => {
@@ -109,6 +129,26 @@ describe('phòng ban', () => {
     await deleteDepartment('d1');
     expect(mockDelete).toHaveBeenCalledWith('/departments/d1');
   });
+
+  it('fetchDepartmentAvailablePermissions gọi GET .../available-permissions', async () => {
+    const permissions = [
+      { code: 'employee.view', description: 'View employees', allowedScopes: ['DEPARTMENT'] },
+    ];
+    mockGet.mockResolvedValue({ data: permissions });
+
+    await expect(fetchDepartmentAvailablePermissions('d1')).resolves.toEqual(permissions);
+    expect(mockGet).toHaveBeenCalledWith('/departments/d1/available-permissions');
+  });
+
+  it('fetchDepartmentModuleImpact gửi danh sách module còn lại dạng CSV', async () => {
+    const impact = { removedModules: ['FACILITY_MANAGEMENT'], positions: [], affectedMembers: 0 };
+    mockGet.mockResolvedValue({ data: impact });
+
+    await expect(fetchDepartmentModuleImpact('d1', ['STUDENT_MANAGEMENT'])).resolves.toEqual(impact);
+    expect(mockGet).toHaveBeenCalledWith('/departments/d1/module-impact', {
+      params: { moduleCodes: 'STUDENT_MANAGEMENT' },
+    });
+  });
 });
 
 describe('chức vụ và quyền', () => {
@@ -120,7 +160,7 @@ describe('chức vụ và quyền', () => {
   });
 
   it('fetchPermissions gọi GET /permissions', async () => {
-    const permissions = [{ code: 'PEOPLE_VIEW', description: 'View department members' }];
+    const permissions = [{ code: 'employee.view', description: 'View employees', allowedScopes: ['ORGANIZATION', 'DEPARTMENT'] }];
     mockGet.mockResolvedValue({ data: permissions });
 
     await expect(fetchPermissions()).resolves.toEqual(permissions);
@@ -130,7 +170,12 @@ describe('chức vụ và quyền', () => {
   it('createPosition gửi kèm mảng quyền', async () => {
     mockPost.mockResolvedValue({ data: POSITION });
 
-    const payload = { name: 'Giáo vụ', permissions: ['PEOPLE_VIEW', 'PEOPLE_EDIT'] };
+    const payload = {
+      name: 'Giáo vụ',
+      permissions: ['employee.view', 'employee.edit'],
+      bundleCodes: [],
+      scope: 'ORGANIZATION' as const,
+    };
     await createPosition(payload);
     expect(mockPost).toHaveBeenCalledWith('/positions', payload);
   });
@@ -138,11 +183,21 @@ describe('chức vụ và quyền', () => {
   it('updatePosition gọi PUT /positions/{id}', async () => {
     mockPut.mockResolvedValue({ data: POSITION });
 
-    await updatePosition('p1', { name: 'Giáo vụ', description: 'Mô tả', permissions: [] });
+    await updatePosition('p1', {
+      name: 'Giáo vụ',
+      description: 'Mô tả',
+      permissions: [],
+      bundleCodes: [],
+      scope: 'DEPARTMENT',
+      departmentId: 'd1',
+    });
     expect(mockPut).toHaveBeenCalledWith('/positions/p1', {
       name: 'Giáo vụ',
       description: 'Mô tả',
       permissions: [],
+      bundleCodes: [],
+      scope: 'DEPARTMENT',
+      departmentId: 'd1',
     });
   });
 
@@ -151,6 +206,21 @@ describe('chức vụ và quyền', () => {
 
     await deletePosition('p1');
     expect(mockDelete).toHaveBeenCalledWith('/positions/p1');
+  });
+
+  it('fetchPositionImpact gọi GET /positions/{id}/impact', async () => {
+    mockGet.mockResolvedValue({ data: { activeHolders: 2 } });
+
+    await expect(fetchPositionImpact('p1')).resolves.toEqual({ activeHolders: 2 });
+    expect(mockGet).toHaveBeenCalledWith('/positions/p1/impact');
+  });
+
+  it('clonePosition gửi phòng đích và trả danh sách quyền bị loại', async () => {
+    const result = { position: POSITION, removedPermissions: ['facility.view'], droppedBundles: [] };
+    mockPost.mockResolvedValue({ data: result });
+
+    await expect(clonePosition('p1', { departmentId: 'd2' })).resolves.toEqual(result);
+    expect(mockPost).toHaveBeenCalledWith('/positions/p1/clone', { departmentId: 'd2' });
   });
 });
 
@@ -252,7 +322,113 @@ describe('ownerErrorMessage', () => {
     );
   });
 
+  it('module chưa bật hoặc không hợp lệ', () => {
+    expect(messageFor(400, 'MODULE_NOT_ENABLED')).toBe(
+      'Module chưa được bật cho tổ chức hoặc không hợp lệ.',
+    );
+  });
+
+  it('quyền nằm ngoài module của phòng ban', () => {
+    expect(messageFor(403, 'PERMISSION_OUT_OF_MODULE')).toBe(
+      'Có quyền hoặc gói quyền không thuộc module của phòng ban đã chọn. Hãy bật module tương ứng hoặc bỏ quyền đó.',
+    );
+  });
+
   it('KHÔNG hiện message tiếng Anh chưa biết cho người dùng', () => {
     expect(messageFor(500, 'INTERNAL_ERROR')).toBe('Không lưu được, vui lòng thử lại.');
+  });
+});
+
+
+describe('Tổng quản lý và ủy quyền', () => {
+  const DELEGATION = {
+    id: 'del-1',
+    delegatorId: 'owner-1',
+    delegatorName: 'Chủ tổ chức',
+    delegateId: 'gm-1',
+    delegateName: 'Tổng quản lý',
+    delegateUsername: 'gm',
+    delegateDepartmentId: 'd1',
+    delegateDepartmentName: 'Khoa CNTT',
+    permissions: ['employee.view'],
+    scope: 'ORGANIZATION',
+    effectiveFrom: '2026-11-13T00:00:00Z',
+    effectiveTo: null,
+    status: 'ACTIVE',
+    active: true,
+    reason: 'Điều hành',
+    createdAt: '2026-11-13T00:00:00Z',
+    revokedAt: null,
+    revokedReason: null,
+  };
+
+  it('fetchGeneralManagers gọi GET /api/general-manager', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+    await fetchGeneralManagers();
+    expect(mockGet).toHaveBeenCalledWith('/api/general-manager');
+  });
+
+  it('fetchGeneralManagerCandidates gọi GET /api/general-manager/candidates', async () => {
+    mockGet.mockResolvedValue({ data: [] });
+    await fetchGeneralManagerCandidates();
+    expect(mockGet).toHaveBeenCalledWith('/api/general-manager/candidates');
+  });
+
+  it('appointGeneralManager gửi userId và lý do', async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await appointGeneralManager('gm-1', 'Bổ nhiệm');
+    expect(mockPost).toHaveBeenCalledWith('/api/general-manager', {
+      userId: 'gm-1',
+      reason: 'Bổ nhiệm',
+    });
+  });
+
+  it('removeGeneralManager gọi DELETE kèm reason', async () => {
+    mockDelete.mockResolvedValue({ data: undefined });
+    await removeGeneralManager('gm-1', 'Bãi nhiệm');
+    expect(mockDelete).toHaveBeenCalledWith('/api/general-manager/gm-1', {
+      params: { reason: 'Bãi nhiệm' },
+    });
+  });
+
+  it('fetchDelegations truyền activeOnly', async () => {
+    mockGet.mockResolvedValue({ data: [DELEGATION] });
+    await fetchDelegations(true);
+    expect(mockGet).toHaveBeenCalledWith('/api/delegations', { params: { activeOnly: true } });
+  });
+
+  it('fetchMyDelegations gọi GET /api/delegations/me', async () => {
+    mockGet.mockResolvedValue({ data: [DELEGATION] });
+    await fetchMyDelegations();
+    expect(mockGet).toHaveBeenCalledWith('/api/delegations/me');
+  });
+
+  it('createDelegation gửi body', async () => {
+    mockPost.mockResolvedValue({ data: DELEGATION });
+    const payload = { delegateId: 'gm-1', permissions: ['employee.view'], effectiveTo: null };
+    await createDelegation(payload);
+    expect(mockPost).toHaveBeenCalledWith('/api/delegations', payload);
+  });
+
+  it('updateDelegation gọi PUT /api/delegations/{id}', async () => {
+    mockPut.mockResolvedValue({ data: DELEGATION });
+    await updateDelegation('del-1', { permissions: ['employee.view'], effectiveTo: null });
+    expect(mockPut).toHaveBeenCalledWith('/api/delegations/del-1', {
+      permissions: ['employee.view'],
+      effectiveTo: null,
+    });
+  });
+
+  it('revokeDelegation gọi POST .../revoke', async () => {
+    mockPost.mockResolvedValue({ data: DELEGATION });
+    await revokeDelegation('del-1', 'Thu hồi');
+    expect(mockPost).toHaveBeenCalledWith('/api/delegations/del-1/revoke', {
+      reason: 'Thu hồi',
+    });
+  });
+
+  it('mã lỗi ủy quyền được dịch sang tiếng Việt', () => {
+    const error = new OwnerApiError(403, 'DELEGATION_PERMISSION_NOT_HELD', 'Cannot delegate');
+    expect(ownerErrorMessage(error)).toContain('chỉ được ủy quyền');
   });
 });

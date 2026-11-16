@@ -1,4 +1,4 @@
-import { Form, Modal, Select } from 'antd';
+import { Form, Input, Modal, Select } from 'antd';
 import { useEffect } from 'react';
 import { MSG_MEM, MSG_OWNER } from '../../features/owner/ownerMessages';
 import type { Member, Position } from '../../features/owner/types';
@@ -9,11 +9,12 @@ interface MemberPositionsModalProps {
   positions: Position[];
   submitting: boolean;
   onCancel: () => void;
-  onSubmit: (positionIds: string[]) => void;
+  onSubmit: (positionIds: string[], reason?: string) => void;
 }
 
 interface FormValues {
   positionIds: string[];
+  reason?: string;
 }
 
 export default function MemberPositionsModal({
@@ -35,7 +36,7 @@ export default function MemberPositionsModal({
     if (!open || !member) {
       return;
     }
-    form.setFieldsValue({ positionIds: member.positionIds });
+    form.setFieldsValue({ positionIds: member.positionIds, reason: undefined });
   }, [open, member, form]);
 
   return (
@@ -54,7 +55,7 @@ export default function MemberPositionsModal({
         form={form}
         layout="vertical"
         requiredMark={false}
-        onFinish={(values) => onSubmit(values.positionIds)}
+        onFinish={(values) => onSubmit(values.positionIds, values.reason?.trim() || undefined)}
       >
         <Form.Item
           label={MSG_MEM.POSITIONS}
@@ -65,6 +66,9 @@ export default function MemberPositionsModal({
             mode="multiple"
             options={options.map((p) => ({ value: p.id, label: p.name }))}
           />
+        </Form.Item>
+        <Form.Item label={MSG_MEM.REASON} name="reason">
+          <Input.TextArea rows={2} maxLength={1000} placeholder={MSG_MEM.REASON_PLACEHOLDER} />
         </Form.Item>
       </Form>
     </Modal>

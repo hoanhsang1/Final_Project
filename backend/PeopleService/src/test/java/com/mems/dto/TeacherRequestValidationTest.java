@@ -27,8 +27,9 @@ class TeacherRequestValidationTest {
 
         Set<String> fields = properties(validator.validate(request));
 
+        // staffCode không còn bắt buộc: hệ thống tự sinh mã khi bỏ trống.
         assertThat(fields).contains("departmentId", "username", "email", "role",
-            "positionIds", "staffCode", "fullName", "phone", "teacherProfile");
+            "positionIds", "fullName", "phone", "teacherProfile");
     }
 
     @Test

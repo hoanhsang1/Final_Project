@@ -58,13 +58,14 @@ public class TeacherService {
     public Map<String, Object> list(int page, int size, String q, String specialtyId, String teachingStatus) {
         String orgId = actor.orgId();
         String departmentId = null;
-        if (!actor.owner()) {
+        if (!actor.owner() && !actor.hasPermissionIn("employee.view", null)) {
             departmentId = actor.departmentIdOrNull();
             if (departmentId == null || departmentId.isBlank()) {
                 throw actor.forbidden("Department access denied");
             }
         }
-        return teachers.list(orgId, departmentId, q, specialtyId, teachingStatus, page, size);
+        return teachers.list(orgId, departmentId, q, specialtyId, teachingStatus, page, size,
+            actor.owner() || actor.hasPermissionIn("employee.view_detail", departmentId));
     }
 
     @Transactional(readOnly = true)
@@ -76,15 +77,15 @@ public class TeacherService {
     public TeacherDetailResponse get(String userId) {
         String orgId = actor.orgId();
         var row = teachers.requireTeacher(userId, orgId, false);
-        actor.requireDepartment(row.departmentId());
-        return detail(row);
+        actor.requirePermissionIn("employee.view", row.departmentId());
+        return detail(row, actor.hasPermissionIn("employee.view_detail", row.departmentId()));
     }
 
     @Transactional
     public TeacherDetailResponse update(String userId, TeacherUpdateRequest request) {
         String orgId = actor.orgId(), actorId = actor.userId();
         var row = teachers.requireTeacher(userId, orgId, true);
-        actor.requireDepartment(row.departmentId());
+        actor.requirePermissionIn("employee.edit", row.departmentId());
         specialtyService.validateIds(orgId, request.specialtyIds());
 
         String fullName = request.fullName().trim();
@@ -124,17 +125,20 @@ public class TeacherService {
         }
         audit.record(orgId, actorId, "TEACHER_UPDATED", userId, changes);
 
-        return detail(teachers.requireTeacher(userId, orgId, false));
+        return detail(teachers.requireTeacher(userId, orgId, false),
+            actor.hasPermissionIn("employee.view_detail", row.departmentId()));
     }
 
-    private TeacherDetailResponse detail(TeacherRepository.TeacherRow row) {
+    private TeacherDetailResponse detail(TeacherRepository.TeacherRow row, boolean includeSensitive) {
         List<TeacherClassResponse> classes = teachers.classes(row.userId(), row.orgId());
         long classCount = classes.stream()
             .filter(c -> "CHUA_BAT_DAU".equals(c.status()) || "DANG_DIEN_RA".equals(c.status()))
             .count();
         return new TeacherDetailResponse(
-            row.userId(), row.staffCode(), row.fullName(), row.email(), row.phone(), row.departmentId(),
-            memberRepository.positionIds(row.userId(), false),
+            row.userId(), row.staffCode(), row.fullName(),
+            includeSensitive ? row.email() : null, includeSensitive ? row.phone() : null,
+            row.departmentId(),
+            memberRepository.positionIds(row.userId()),
             specialties.forUser(row.userId(), row.orgId()),
             row.contractType(), row.teachingStatus(), classes,
             row.version(), row.createdAt(), row.updatedAt(),

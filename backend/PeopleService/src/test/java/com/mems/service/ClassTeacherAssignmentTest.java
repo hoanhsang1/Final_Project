@@ -7,6 +7,7 @@ import com.mems.dto.SchoolClassResponse;
 import com.mems.exception.AppException;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.SubjectRepository;
 import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
@@ -35,6 +36,7 @@ class ClassTeacherAssignmentTest {
     @Mock private SchoolClassRepository classes;
     @Mock private StudentRepository students;
     @Mock private TeacherRepository teachers;
+    @Mock private SubjectRepository subjects;
     @Mock private Actor actor;
     @Mock private IdentityClient identityClient;
     @Mock private PeopleAuditService audit;
@@ -45,7 +47,8 @@ class ClassTeacherAssignmentTest {
     @BeforeEach
     void setUp() {
         service = new SchoolClassService(classes, students, actor,
-            new OrganizationModuleGuard(identityClient), audit, teachers, classStatusService, "TEACHER_ASSIGNMENT");
+            new OrganizationModuleGuard(identityClient), audit, teachers, classStatusService, subjects,
+            "TEACHER_ASSIGNMENT");
         when(actor.orgId()).thenReturn("org-1");
         when(actor.userId()).thenReturn("actor-1");
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
@@ -124,6 +127,40 @@ class ClassTeacherAssignmentTest {
             .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "DATA_CHANGED"));
     }
 
+    @Test
+    @DisplayName("Quy tắc 13: giáo viên không dạy môn của lớp → 409 SUBJECT_MISMATCH")
+    void rejectsTeacherWithoutMatchingSubject() {
+        when(classes.require("class-1", "org-1", true)).thenReturn(
+            classRowWithSubject("class-1", "subject-1"));
+        when(teachers.requireTeacher("teacher-1", "org-1", false)).thenReturn(teacher("teacher-1", "DANG_DAY"));
+        when(teachers.hasTeacherPosition("teacher-1", "org-1")).thenReturn(true);
+        when(teachers.teachesSubject("teacher-1", "org-1", "subject-1")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L)))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.CONFLICT, "SUBJECT_MISMATCH"));
+        verify(classes, never()).assignTeacher(anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Quy tắc 17: phân công lại dùng quyền riêng và ghi nhật ký CLASS_TEACHER_REASSIGNED")
+    void reassignClearsLabelWithDedicatedAudit() {
+        when(classes.require("class-1", "org-1", true)).thenReturn(
+            classRowWithSubject("class-1", "subject-1"));
+        when(classes.require("class-1", "org-1", false)).thenReturn(
+            classRowWithSubject("class-1", "subject-1"));
+        when(teachers.requireTeacher("teacher-1", "org-1", false)).thenReturn(teacher("teacher-1", "DANG_DAY"));
+        when(teachers.hasTeacherPosition("teacher-1", "org-1")).thenReturn(true);
+        when(teachers.teachesSubject("teacher-1", "org-1", "subject-1")).thenReturn(true);
+        when(classes.assignTeacher("class-1", "org-1", "teacher-1", 0)).thenReturn(1);
+
+        service.reassignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L));
+
+        verify(classes).assignTeacher("class-1", "org-1", "teacher-1", 0);
+        verify(audit).record(eq("org-1"), eq("actor-1"), eq("CLASS_TEACHER_REASSIGNED"),
+            eq("class-1"), any());
+    }
+
     private void assertError(AppException ex, HttpStatus status, String code) {
         assertThat(ex.getStatus()).isEqualTo(status);
         assertThat(ex.getCode()).isEqualTo(code);
@@ -133,6 +170,13 @@ class ClassTeacherAssignmentTest {
                                          ClassTeacherInfo teacher, long version) {
         return new SchoolClassResponse(id, "org-1", "C001", "Class 1", "2026", null, null, status,
             teacher, closeState, version, 0, "owner", Instant.now(), null);
+    }
+
+    private SchoolClassResponse classRowWithSubject(String id, String subjectId) {
+        return new SchoolClassResponse(id, "org-1", "C001", "Class 1", "2026", null, null,
+            "CHUA_BAT_DAU", null, "NONE", 0L, 0, "owner", Instant.now(), null,
+            null, null, null, true, "Giáo viên đã nghỉ việc", subjectId, "Toán",
+            "NONE", null);
     }
 
     private TeacherRepository.TeacherRow teacher(String id, String teachingStatus) {

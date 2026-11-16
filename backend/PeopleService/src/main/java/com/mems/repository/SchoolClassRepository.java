@@ -51,12 +51,23 @@ public class SchoolClassRepository {
             rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toInstant() : null,
             withReasons ? rs.getString("cancel_reason") : null,
             withReasons ? rs.getString("close_request_note") : null,
-            withReasons ? rs.getString("close_reject_reason") : null
+            withReasons ? rs.getString("close_reject_reason") : null,
+            rs.getBoolean("needs_reassignment"),
+            rs.getString("reassignment_reason"),
+            rs.getString("subject_id"),
+            rs.getString("subject_name"),
+            rs.getString("cancel_state"),
+            rs.getString("cancel_request_reason")
         );
     }
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable) {
+        return list(orgId, page, size, q, status, selectable, null);
+    }
+
+    public Map<String, Object> list(String orgId, int page, int size, String q, String status,
+                                    boolean selectable, Boolean needsReassignment) {
         if (page < 1) page = 1;
         if (size < 1) size = 20;
         if (size > 100) size = 100;
@@ -72,6 +83,10 @@ public class SchoolClassRepository {
 
         if (selectable) {
             where.append(" AND c.status NOT IN ('DA_KET_THUC', 'DA_HUY') AND c.close_state <> 'CLOSED' ");
+        }
+
+        if (Boolean.TRUE.equals(needsReassignment)) {
+            where.append(" AND c.needs_reassignment = TRUE ");
         }
 
         if (q != null && !q.isBlank()) {
@@ -90,16 +105,23 @@ public class SchoolClassRepository {
             SELECT c.id, c.org_id, c.class_code, c.name, c.academic_year,
                    c.start_date, c.end_date, c.status,
                    c.teacher_id, c.close_state, c.version,
+                   c.needs_reassignment, c.reassignment_reason,
+                   c.subject_id, sub.name AS subject_name,
+                   c.cancel_state, c.cancel_request_reason,
                    t.staff_code AS teacher_code, t.full_name AS teacher_name,
                    COUNT(cs.student_id) AS student_count,
                    c.created_by, c.created_at, c.updated_at
             FROM school_class c
             LEFT JOIN class_student cs ON cs.class_id = c.id AND cs.org_id = c.org_id
             LEFT JOIN staff_profile t ON t.user_id = c.teacher_id AND t.org_id = c.org_id
+            LEFT JOIN subject sub ON sub.id = c.subject_id AND sub.org_id = c.org_id
             """ + where + """
             GROUP BY c.id, c.org_id, c.class_code, c.name, c.academic_year,
                      c.start_date, c.end_date, c.status,
-                     c.teacher_id, c.close_state, c.version, t.staff_code, t.full_name,
+                     c.teacher_id, c.close_state, c.version,
+                     c.needs_reassignment, c.reassignment_reason,
+                     c.subject_id, sub.name, c.cancel_state, c.cancel_request_reason,
+                     t.staff_code, t.full_name,
                      c.created_by, c.created_at, c.updated_at
             ORDER BY c.class_code ASC LIMIT ? OFFSET ?
             """;
@@ -132,6 +154,9 @@ public class SchoolClassRepository {
             SELECT c.id, c.org_id, c.class_code, c.name, c.academic_year,
                    c.start_date, c.end_date, c.status,
                    c.teacher_id, c.close_state, c.version,
+                   c.needs_reassignment, c.reassignment_reason,
+                   c.subject_id, sub.name AS subject_name,
+                   c.cancel_state, c.cancel_request_reason,
                    t.staff_code AS teacher_code, t.full_name AS teacher_name,
                    COUNT(cs.student_id) AS student_count,
                    c.created_by, c.created_at, c.updated_at,
@@ -147,10 +172,14 @@ public class SchoolClassRepository {
             FROM school_class c
             LEFT JOIN class_student cs ON cs.class_id = c.id AND cs.org_id = c.org_id
             LEFT JOIN staff_profile t ON t.user_id = c.teacher_id AND t.org_id = c.org_id
+            LEFT JOIN subject sub ON sub.id = c.subject_id AND sub.org_id = c.org_id
             WHERE c.id = ? AND c.org_id = ? AND c.deleted_at IS NULL
             GROUP BY c.id, c.org_id, c.class_code, c.name, c.academic_year,
                      c.start_date, c.end_date, c.status,
-                     c.teacher_id, c.close_state, c.version, t.staff_code, t.full_name,
+                     c.teacher_id, c.close_state, c.version,
+                     c.needs_reassignment, c.reassignment_reason,
+                     c.subject_id, sub.name, c.cancel_state, c.cancel_request_reason,
+                     t.staff_code, t.full_name,
                      c.created_by, c.created_at, c.updated_at
             """;
 
@@ -172,16 +201,17 @@ public class SchoolClassRepository {
     }
 
     public SchoolClassResponse create(String id, String orgId, String classCode, String name,
-                                      String academicYear, LocalDate startDate, LocalDate endDate,
+                                      String academicYear, String subjectId,
+                                      LocalDate startDate, LocalDate endDate,
                                       String status, String createdBy) {
         Instant now = Instant.now();
         jdbc.update(
             """
-            INSERT INTO school_class(id, org_id, class_code, name, academic_year, start_date, end_date,
-                                     status, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO school_class(id, org_id, class_code, name, academic_year, subject_id,
+                                     start_date, end_date, status, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            id, orgId, classCode, name, academicYear,
+            id, orgId, classCode, name, academicYear, subjectId,
             startDate != null ? Date.valueOf(startDate) : null,
             endDate != null ? Date.valueOf(endDate) : null,
             normalizeStatus(status), createdBy, Timestamp.from(now)
@@ -189,26 +219,28 @@ public class SchoolClassRepository {
         return require(id, orgId, false);
     }
 
-    public int update(String id, String orgId, String name, String academicYear,
+    public int update(String id, String orgId, String name, String academicYear, String subjectId,
                       LocalDate startDate, LocalDate endDate, long expectedVersion) {
         return jdbc.update(
             """
             UPDATE school_class
-            SET name = ?, academic_year = ?, start_date = ?, end_date = ?,
+            SET name = ?, academic_year = ?, subject_id = ?, start_date = ?, end_date = ?,
                 version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
             """,
-            name, academicYear,
+            name, academicYear, subjectId,
             startDate != null ? Date.valueOf(startDate) : null,
             endDate != null ? Date.valueOf(endDate) : null,
             Timestamp.from(Instant.now()), id, orgId, expectedVersion
         );
     }
 
+    /** Gán giáo viên và xoá nhãn "cần phân công lại" (quy tắc 17). */
     public int assignTeacher(String id, String orgId, String teacherId, long expectedVersion) {
         return jdbc.update("""
             UPDATE school_class
-            SET teacher_id = ?, version = version + 1, updated_at = ?
+            SET teacher_id = ?, needs_reassignment = FALSE, reassignment_reason = NULL,
+                version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
             """, teacherId, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
     }
@@ -225,8 +257,29 @@ public class SchoolClassRepository {
         };
     }
 
-    public void delete(String id, String orgId) {
-        Integer students = jdbc.queryForObject(
+    /**
+     * Gắn nhãn "cần phân công lại" cho các lớp giáo viên còn phụ trách.
+     * Không đổi teacher_id — quy tắc 17 yêu cầu giữ nguyên lớp.
+     */
+    public int markNeedsReassignment(String orgId, String teacherId, String reason) {
+        return jdbc.update("""
+            UPDATE school_class
+            SET needs_reassignment = TRUE, reassignment_reason = ?, updated_at = ?
+            WHERE teacher_id = ? AND org_id = ? AND deleted_at IS NULL
+              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA')
+            """, reason, Timestamp.from(Instant.now()), teacherId, orgId);
+    }
+
+    /** Người tạo các lớp đang mở của một giáo viên — người quản lý cần được thông báo. */
+    public List<String> classCreatorsForTeacher(String orgId, String teacherId) {
+        return jdbc.queryForList("""
+            SELECT DISTINCT created_by FROM school_class
+            WHERE teacher_id = ? AND org_id = ? AND deleted_at IS NULL
+              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA')
+            """, String.class, teacherId, orgId);
+    }
+
+    public void delete(String id, String orgId) {        Integer students = jdbc.queryForObject(
             "SELECT COUNT(*) FROM class_student WHERE class_id = ? AND org_id = ?",
             Integer.class, id, orgId
         );

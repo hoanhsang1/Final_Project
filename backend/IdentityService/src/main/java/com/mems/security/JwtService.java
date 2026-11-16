@@ -27,10 +27,16 @@ public class JwtService {
         Instant now=Instant.now();
         Set<String> effectiveRoles=new LinkedHashSet<>(roles);
         effectiveRoles.remove("MANAGER");effectiveRoles.remove("STAFF");effectiveRoles.add(profile.role());
+        Map<String,List<String>> permissionScopes=new TreeMap<>();
+        profile.permissionScopes().forEach((code,scopes)->permissionScopes.put(code,
+            scopes==null?List.of():new ArrayList<>(new TreeSet<>(scopes))));
         var builder=JwtClaimsSet.builder().issuer("mems-identity").subject(userId).issuedAt(now)
             .expiresAt(now.plusSeconds(accessTokenSeconds)).claim("userId",userId).claim("username",username)
             .claim("roles",new ArrayList<>(effectiveRoles)).claim("role",profile.role())
             .claim("permissions",new TreeSet<>(profile.permissions())).claim("mustChangePassword",mustChangePassword)
+            .claim("permissionScopes",permissionScopes)
+            // PeopleService dùng claim này để loại quyền đã thu hồi và nạp lại từ DB mỗi request.
+            .claim("delegatedPermissions",new TreeSet<>(profile.delegatedPermissions()))
             .claims(claims -> claims.put("departmentId",profile.departmentId()));
         if(orgId!=null) builder.claim("orgId",orgId);
         return jwtEncoder.encode(JwtEncoderParameters.from(

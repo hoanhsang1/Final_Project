@@ -32,13 +32,23 @@ public class ClassStatusService {
     private final SchoolClassRepository classRepository;
     private final Actor actor;
     private final OrganizationModuleGuard moduleGuard;
+    private final ClassApprovalPolicy approvalPolicy;
+    private final NotificationService notifications;
 
     public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard) {
+        this(repository, classRepository, actor, moduleGuard, null, null);
+    }
+
+    public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
+                              Actor actor, OrganizationModuleGuard moduleGuard,
+                              ClassApprovalPolicy approvalPolicy, NotificationService notifications) {
         this.repository = repository;
         this.classRepository = classRepository;
         this.actor = actor;
         this.moduleGuard = moduleGuard;
+        this.approvalPolicy = approvalPolicy;
+        this.notifications = notifications;
     }
 
     @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Ho_Chi_Minh")
@@ -77,7 +87,8 @@ public class ClassStatusService {
         refreshOrganization(orgId);
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
-        if (!CANCELLABLE.contains(before.status()) || !"NONE".equals(before.closeState())) {
+        if (!CANCELLABLE.contains(before.status()) || !"NONE".equals(before.closeState())
+                || !"NONE".equals(before.cancelState())) {
             throw new AppException(ErrorCode.CLASS_NOT_CANCELLABLE);
         }
         if (before.version() != request.version()) {
@@ -85,11 +96,65 @@ public class ClassStatusService {
         }
 
         String reason = requireReason(request.reason(), "reason");
+        if (before.studentCount() > 0) {
+            if (repository.requestCancel(classId, orgId, reason, request.version()) == 0) {
+                throw statusChanged();
+            }
+            repository.insertCloseEvent(classId, orgId, "CANCEL_REQUESTED", actor.userId(), reason);
+            notifyManagers(orgId, classId, "Yêu cầu hủy lớp cần duyệt",
+                "Lớp " + before.classCode() + " còn " + before.studentCount()
+                    + " học sinh nên cần trưởng phòng duyệt hủy. Lý do: " + reason);
+            return classRepository.require(classId, orgId, false);
+        }
+
         int updated = repository.cancel(classId, orgId, request.version());
         if (updated == 0) {
             throw statusChanged();
         }
         repository.insertStatusLog(classId, orgId, before.status(), "DA_HUY", reason, actor.userId());
+        return classRepository.require(classId, orgId, false);
+    }
+
+    /** Duyệt hủy lớp có học sinh (quy tắc 14). */
+    @Transactional
+    public SchoolClassResponse approveCancel(String classId) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        refreshOrganization(orgId);
+
+        SchoolClassResponse before = classRepository.require(classId, orgId, true);
+        requirePendingCancel(before);
+        requireApprover(orgId);
+        if (actor.userId().equals(repository.lastEventActor(classId, orgId, "CANCEL_REQUESTED"))) {
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
+        }
+        String reason = before.cancelRequestReason();
+        if (repository.approveCancel(classId, orgId) == 0) {
+            throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
+        }
+        repository.insertStatusLog(classId, orgId, before.status(), "DA_HUY", reason, actor.userId());
+        repository.insertCloseEvent(classId, orgId, "CANCEL_APPROVED", actor.userId(), reason);
+        notifyRequester(orgId, classId, "Yêu cầu hủy lớp đã được duyệt",
+            "Lớp " + before.classCode() + " đã bị hủy.");
+        return classRepository.require(classId, orgId, false);
+    }
+
+    @Transactional
+    public SchoolClassResponse rejectCancel(String classId, ClassCloseRejectRequest request) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        refreshOrganization(orgId);
+
+        SchoolClassResponse before = classRepository.require(classId, orgId, true);
+        requirePendingCancel(before);
+        requireApprover(orgId);
+        String reason = requireReason(request.reason(), "reason");
+        if (repository.rejectCancel(classId, orgId) == 0) {
+            throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
+        }
+        repository.insertCloseEvent(classId, orgId, "CANCEL_REJECTED", actor.userId(), reason);
+        notifyRequester(orgId, classId, "Yêu cầu hủy lớp bị từ chối",
+            "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
         return classRepository.require(classId, orgId, false);
     }
 
@@ -133,6 +198,7 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
+        requireApprover(orgId);
         if (actor.userId().equals(repository.lastRequester(classId, orgId))) {
             throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         }
@@ -153,6 +219,7 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
+        requireApprover(orgId);
         String reason = requireReason(request.reason(), "reason");
         if (repository.rejectClose(classId, orgId) == 0) {
             throw closeStateChanged();
@@ -185,6 +252,29 @@ public class ClassStatusService {
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
         classRepository.require(classId, orgId, false);
         return repository.closeEvents(classId, orgId);
+    }
+
+    private void requirePendingCancel(SchoolClassResponse schoolClass) {
+        if (!"PENDING".equals(schoolClass.cancelState())) {
+            throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
+        }
+    }
+
+    private void requireApprover(String orgId) {
+        if (approvalPolicy != null) approvalPolicy.requireApprover(orgId);
+    }
+
+    private void notifyManagers(String orgId, String classId, String title, String body) {
+        if (notifications == null || approvalPolicy == null) return;
+        String creator = classRepository.require(classId, orgId, false).createdBy();
+        notifications.notifyAll(orgId, approvalPolicy.classManagers(orgId, creator),
+            "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
+    }
+
+    private void notifyRequester(String orgId, String classId, String title, String body) {
+        if (notifications == null) return;
+        notifications.notify(orgId, repository.lastEventActor(classId, orgId, "CANCEL_REQUESTED"),
+            "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
     }
 
     private String requireReason(String value, String field) {

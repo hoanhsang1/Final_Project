@@ -35,111 +35,132 @@ public class SchoolClassController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.view')")
     public Map<String, Object> list(
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "20") int size,
         @RequestParam(required = false) String q,
         @RequestParam(required = false) String status,
-        @RequestParam(defaultValue = "false") boolean selectable
+        @RequestParam(defaultValue = "false") boolean selectable,
+        @RequestParam(required = false) Boolean needsReassignment
     ) {
-        return service.list(page, size, q, status, selectable);
+        return service.list(page, size, q, status, selectable, needsReassignment);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.view')")
     public SchoolClassResponse get(@PathVariable String id) {
         return service.get(id);
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_CREATE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.create')")
     public ResponseEntity<SchoolClassResponse> create(@Valid @RequestBody SchoolClassRequest request) {
         SchoolClassResponse created = service.create(request);
         return ResponseEntity.created(URI.create("/classes/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.edit')")
     public SchoolClassResponse update(@PathVariable String id, @Valid @RequestBody SchoolClassUpdateRequest request) {
         return service.update(id, request);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_DELETE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.delete')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.delete(id);
     }
 
     @PutMapping("/{id}/teacher")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_ASSIGN_TEACHER')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.assign_teacher')")
     public SchoolClassResponse assignTeacher(@PathVariable String id,
                                              @Valid @RequestBody ClassTeacherAssignRequest request) {
         return service.assignTeacher(id, request);
     }
 
+    @PutMapping("/{id}/teacher/reassign")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.teacher.reassign')")
+    public SchoolClassResponse reassignTeacher(@PathVariable String id,
+                                               @Valid @RequestBody ClassTeacherAssignRequest request) {
+        return service.reassignTeacher(id, request);
+    }
+
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_CANCEL')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.cancel')")
     public SchoolClassResponse cancel(@PathVariable String id,
                                       @Valid @RequestBody ClassCancelRequest request) {
         return statusService.cancel(id, request);
     }
 
+    @PostMapping("/{id}/cancel-requests/approve")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
+    public SchoolClassResponse approveCancel(@PathVariable String id) {
+        return statusService.approveCancel(id);
+    }
+
+    @PostMapping("/{id}/cancel-requests/reject")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
+    public SchoolClassResponse rejectCancel(@PathVariable String id,
+                                            @Valid @RequestBody ClassCloseRejectRequest request) {
+        return statusService.rejectCancel(id, request);
+    }
+
     @GetMapping("/{id}/status-logs")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.view')")
     public List<ClassStatusLogResponse> statusLogs(@PathVariable String id) {
         return statusService.statusLogs(id);
     }
 
     @PostMapping("/{id}/close-requests")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_CLOSE_REQUEST')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.request_close')")
     public SchoolClassResponse requestClose(@PathVariable String id,
                                             @Valid @RequestBody ClassCloseRequest request) {
         return statusService.requestClose(id, request);
     }
 
     @PostMapping("/{id}/close-requests/approve")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_CLOSE_APPROVE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse approveClose(@PathVariable String id) {
         return statusService.approveClose(id);
     }
 
     @PostMapping("/{id}/close-requests/reject")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_CLOSE_APPROVE')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.approve_close')")
     public SchoolClassResponse rejectClose(@PathVariable String id,
                                            @Valid @RequestBody ClassCloseRejectRequest request) {
         return statusService.rejectClose(id, request);
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_REOPEN')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.reopen')")
     public SchoolClassResponse reopen(@PathVariable String id,
                                       @Valid @RequestBody ClassReopenRequest request) {
         return statusService.reopen(id, request);
     }
 
     @GetMapping("/{id}/close-events")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_VIEW')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.view')")
     public List<ClassCloseEventResponse> closeEvents(@PathVariable String id) {
         return statusService.closeEvents(id);
     }
 
     @GetMapping("/{id}/students")
-    @PreAuthorize("hasRole('OWNER') or (hasAuthority('CLASS_VIEW') and hasAuthority('STUDENT_VIEW'))")
+    @PreAuthorize("hasRole('OWNER') or (hasAuthority('class.view') and hasAuthority('student.view'))")
     public List<StudentResponse> listStudents(@PathVariable String id) {
         return service.listStudents(id);
     }
 
     @PutMapping("/{id}/students/{studentId}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.edit')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void addStudent(@PathVariable String id, @PathVariable String studentId) {
         service.addStudent(id, studentId);
     }
 
     @DeleteMapping("/{id}/students/{studentId}")
-    @PreAuthorize("hasRole('OWNER') or hasAuthority('CLASS_EDIT')")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.edit')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeStudent(@PathVariable String id, @PathVariable String studentId) {
         service.removeStudent(id, studentId);

@@ -1,4 +1,4 @@
-import { apiClient } from '../../lib/api';
+import { apiClient, unwrapList } from '../../lib/api';
 import type {
   AccountCreatePayload,
   AccountItem,
@@ -60,8 +60,8 @@ function toAdminError(error: unknown): AdminApiError {
  */
 export async function fetchPendingOrganizations(): Promise<PendingOrganization[]> {
   try {
-    const { data } = await apiClient.get<PendingOrganization[]>('/api/v1/organizations/pending');
-    return data;
+    const { data } = await apiClient.get('/api/v1/organizations/pending');
+    return unwrapList<PendingOrganization>(data);
   } catch (error) {
     throw toAdminError(error);
   }
@@ -196,8 +196,8 @@ export async function fetchOrganizations(
  */
 export async function fetchOrganizationOptions(): Promise<OrganizationOption[]> {
   try {
-    const { data } = await apiClient.get<OrganizationOption[]>('/api/v1/organizations/options');
-    return data;
+    const { data } = await apiClient.get('/api/v1/organizations/options');
+    return unwrapList<OrganizationOption>(data);
   } catch (error) {
     throw toAdminError(error);
   }

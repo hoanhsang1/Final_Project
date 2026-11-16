@@ -47,6 +47,16 @@ public class StaffProfileRepository {
         return count != null && count > 0;
     }
 
+    /** Sinh mã kế tiếp theo chuẩn: GV001, GV002… cho giáo viên; NS001… cho nhân viên. */
+    public String nextStaffCode(String orgId, String prefix) {
+        Integer max = jdbc.queryForObject("""
+            SELECT COALESCE(MAX(CAST(SUBSTRING(staff_code, ?) AS UNSIGNED)), 0)
+            FROM staff_profile
+            WHERE org_id=? AND staff_code REGEXP ?
+            """, Integer.class, prefix.length() + 1, orgId, "^" + prefix + "[0-9]+$");
+        return String.format("%s%03d", prefix, (max == null ? 0 : max) + 1);
+    }
+
     public boolean existsEmail(String orgId, String email, String excludeUserId) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM staff_profile WHERE org_id=? AND LOWER(email)=? AND user_id<>?",

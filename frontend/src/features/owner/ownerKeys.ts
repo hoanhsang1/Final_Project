@@ -14,6 +14,14 @@
 export const ownerKeys = {
   departments: () => ['owner', 'departments'] as const,
   members: (departmentId: string) => ['owner', 'departments', departmentId, 'members'] as const,
+  availablePermissions: (departmentId: string) =>
+    ['owner', 'departments', departmentId, 'available-permissions'] as const,
   positions: () => ['owner', 'positions'] as const,
+  positionImpact: (positionId: string) => ['owner', 'positions', positionId, 'impact'] as const,
   permissions: () => ['owner', 'permissions'] as const,
+  bundles: () => ['owner', 'permission-bundles'] as const,
+  generalManagers: () => ['owner', 'general-manager'] as const,
+  generalManagerCandidates: () => ['owner', 'general-manager', 'candidates'] as const,
+  delegations: () => ['owner', 'delegations'] as const,
+  myDelegations: () => ['delegations', 'me'] as const,
 };

@@ -1,27 +1,95 @@
 package com.mems.controller;
-import com.mems.security.Actor;
+
+import com.mems.dto.RoomSuggestionResponse;
+import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.mems.security.Actor;
+import com.mems.security.OrganizationModuleGuard;
+import com.mems.service.ScheduleService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Lịch học theo phòng ban. Mỗi endpoint kiểm quyền theo mã + phạm vi phòng ban,
+ * module SCHEDULE_MANAGEMENT đang bật và luôn lọc `org_id` từ JWT.
+ */
 @RestController
 @RequestMapping("/departments/{departmentId}/schedules")
+@PreAuthorize("isAuthenticated()")
 public class DepartmentScheduleController {
-    private final JdbcTemplate jdbc;
+    private static final String MODULE = "SCHEDULE_MANAGEMENT";
+    private static final Set<String> VIEW = Set.of("schedule.view");
+    private static final Set<String> CREATE = Set.of("schedule.create");
+    private static final Set<String> UPDATE = Set.of("schedule.update", "schedule.edit");
+    private static final Set<String> CANCEL = Set.of("schedule.cancel_session", "schedule.update", "schedule.edit");
+    private static final Set<String> DELETE = Set.of("schedule.delete");
+
+    private final ScheduleService schedules;
     private final Actor actor;
-    public DepartmentScheduleController(JdbcTemplate jdbc,Actor actor) { this.jdbc=jdbc;this.actor=actor; }
-    @GetMapping @PreAuthorize("hasRole('OWNER') or hasAuthority('SCHEDULE_VIEW')")
-    public List<ScheduleResponse> list(@PathVariable String departmentId) {
-        actor.requireDepartment(departmentId);
-        return jdbc.query("""
-            SELECT s.id,s.class_id,s.teacher_id,s.room_id,s.start_time,s.end_time,s.status
-            FROM session s JOIN `class` c ON c.id=s.class_id
-            WHERE c.org_id=? AND s.department_id=? AND s.deleted_at IS NULL AND c.deleted_at IS NULL
-            ORDER BY s.start_time
-            """,(rs,n) -> new ScheduleResponse(rs.getString("id"),rs.getString("class_id"),rs.getString("teacher_id"),
-                rs.getString("room_id"),rs.getTimestamp("start_time").toInstant(),rs.getTimestamp("end_time").toInstant(),
-                rs.getString("status")),actor.orgId(),departmentId);
+    private final OrganizationModuleGuard modules;
+
+    public DepartmentScheduleController(ScheduleService schedules, Actor actor,
+                                        OrganizationModuleGuard modules) {
+        this.schedules = schedules;
+        this.actor = actor;
+        this.modules = modules;
+    }
+
+    @GetMapping
+    public List<ScheduleResponse> list(@PathVariable String departmentId,
+                                       @RequestParam(required = false) Instant from,
+                                       @RequestParam(required = false) Instant to,
+                                       @RequestParam(required = false) String classId) {
+        authorize(VIEW, departmentId);
+        return schedules.list(actor.orgId(), departmentId, from, to, classId);
+    }
+
+    @PostMapping
+    public ResponseEntity<ScheduleResponse> create(@PathVariable String departmentId,
+                                                    @Valid @RequestBody ScheduleRequest request) {
+        authorize(CREATE, departmentId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(schedules.create(actor.orgId(), departmentId, request));
+    }
+
+    @PutMapping("/{sessionId}")
+    public ScheduleResponse update(@PathVariable String departmentId, @PathVariable String sessionId,
+                                   @Valid @RequestBody ScheduleRequest request) {
+        authorize(UPDATE, departmentId);
+        return schedules.update(actor.orgId(), departmentId, sessionId, request);
+    }
+
+    @PostMapping("/{sessionId}/cancel")
+    public ScheduleResponse cancel(@PathVariable String departmentId, @PathVariable String sessionId) {
+        authorize(CANCEL, departmentId);
+        return schedules.cancel(actor.orgId(), departmentId, sessionId);
+    }
+
+    @DeleteMapping("/{sessionId}")
+    public ResponseEntity<Void> delete(@PathVariable String departmentId, @PathVariable String sessionId) {
+        authorize(DELETE, departmentId);
+        schedules.delete(actor.orgId(), departmentId, sessionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Gợi ý phòng còn trống; loại phòng bảo trì/đóng và phòng có thiết bị hỏng. */
+    @GetMapping("/room-suggestions")
+    public List<RoomSuggestionResponse> roomSuggestions(@PathVariable String departmentId,
+                                                         @RequestParam(required = false) Instant startTime,
+                                                         @RequestParam(required = false) Instant endTime) {
+        authorize(CREATE, departmentId);
+        return schedules.roomSuggestions(actor.orgId(), departmentId, startTime, endTime);
+    }
+
+    private void authorize(Set<String> codes, String departmentId) {
+        modules.requireModule(actor.orgId(), MODULE);
+        actor.requireAnyPermissionIn(codes, departmentId);
     }
 }

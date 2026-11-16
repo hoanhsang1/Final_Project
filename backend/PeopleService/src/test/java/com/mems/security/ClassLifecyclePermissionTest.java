@@ -41,12 +41,12 @@ class ClassLifecyclePermissionTest {
     @Test
     @DisplayName("Các thao tác vòng đời lớp thiếu quyền đều trả 403")
     void lifecycleEndpointsRequireTheirPermission() throws Exception {
-        assertForbidden("/classes/class-1/cancel", "{\"reason\":\"Lý do\",\"version\":0}", "CLASS_VIEW");
-        assertForbidden("/classes/class-1/close-requests", "{}", "CLASS_VIEW");
-        assertForbidden("/classes/class-1/close-requests/approve", null, "CLASS_CLOSE_REQUEST");
+        assertForbidden("/classes/class-1/cancel", "{\"reason\":\"Lý do\",\"version\":0}", "class.view");
+        assertForbidden("/classes/class-1/close-requests", "{}", "class.view");
+        assertForbidden("/classes/class-1/close-requests/approve", null, "class.request_close");
         assertForbidden("/classes/class-1/close-requests/reject",
-            "{\"reason\":\"Lý do\"}", "CLASS_CLOSE_REQUEST");
-        assertForbidden("/classes/class-1/reopen", "{}", "CLASS_CLOSE_REQUEST");
+            "{\"reason\":\"Lý do\"}", "class.request_close");
+        assertForbidden("/classes/class-1/reopen", "{}", "class.request_close");
     }
 
     @Test
@@ -61,23 +61,23 @@ class ClassLifecyclePermissionTest {
         when(statusService.reopen(eq("class-1"), any())).thenReturn(response);
 
         mockMvc.perform(post("/classes/class-1/cancel")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_CANCEL")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.cancel")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Lý do\",\"version\":0}"))
             .andExpect(status().isOk());
         mockMvc.perform(post("/classes/class-1/close-requests")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_CLOSE_REQUEST")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.request_close")))
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
             .andExpect(status().isOk());
         mockMvc.perform(post("/classes/class-1/close-requests/approve")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_CLOSE_APPROVE"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.approve_close"))))
             .andExpect(status().isOk());
         mockMvc.perform(post("/classes/class-1/close-requests/reject")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_CLOSE_APPROVE")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.approve_close")))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Lý do\"}"))
             .andExpect(status().isOk());
         mockMvc.perform(post("/classes/class-1/reopen")
-                .with(jwt().authorities(new SimpleGrantedAuthority("CLASS_REOPEN")))
+                .with(jwt().authorities(new SimpleGrantedAuthority("class.reopen")))
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
             .andExpect(status().isOk());
     }

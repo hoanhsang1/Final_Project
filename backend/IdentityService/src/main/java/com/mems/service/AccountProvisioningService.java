@@ -26,6 +26,10 @@ public class AccountProvisioningService {
         Integer existing=jdbc.queryForObject("SELECT COUNT(*) FROM account WHERE username=? OR id=?",
             Integer.class,request.username(),request.userId());
         if(existing!=null && existing>0) throw new AppException(ErrorCode.ACCOUNT_EXISTS);
+        Integer emailTaken=jdbc.queryForObject(
+            "SELECT COUNT(*) FROM account WHERE org_id=? AND LOWER(email)=LOWER(?)",
+            Integer.class,request.orgId(),request.email().trim());
+        if(emailTaken!=null && emailTaken>0) throw new AppException(ErrorCode.EMAIL_EXISTS);
         jdbc.update("""
             INSERT INTO account(id,org_id,username,email,password_hash,status,must_change_password,provisioned_by)
             VALUES (?,?,?,?,?,'active',TRUE,?)

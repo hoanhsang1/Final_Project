@@ -34,15 +34,34 @@ public class IdentityDataInitializer implements ApplicationRunner {
         }
         for (var permission : PermissionCatalog.ENTRIES) {
             jdbc.update("""
-                INSERT INTO permission(code,description,module_code) VALUES (?,?,?)
-                ON DUPLICATE KEY UPDATE description=VALUES(description), module_code=VALUES(module_code)
-                """, permission.code(), permission.description(), permission.moduleCode());
+                INSERT INTO permission(code,description,module_code,allowed_scopes) VALUES (?,?,?,?)
+                ON DUPLICATE KEY UPDATE description=VALUES(description), module_code=VALUES(module_code),
+                    allowed_scopes=VALUES(allowed_scopes)
+                """, permission.code(), permission.description(), permission.moduleCode(),
+                String.join(",", new java.util.TreeSet<>(permission.allowedScopes())));
             jdbc.update("""
                 INSERT INTO role_permission(role_id,permission_id)
                 SELECT r.id,p.id FROM role r JOIN permission p ON p.code=?
-                WHERE r.code IN ('OWNER','ORG_OWNER')
+                WHERE r.code IN ('OWNER','ORG_OWNER','SUPER_ADMIN')
                 ON DUPLICATE KEY UPDATE permission_id=VALUES(permission_id)
                 """, permission.code());
+        }
+        for (var bundle : PermissionCatalog.BUNDLES) {
+            jdbc.update("""
+                INSERT INTO permission_bundle(id,code,name,description,allowed_scopes)
+                SELECT ?,?,?,?,? FROM DUAL
+                WHERE NOT EXISTS (SELECT 1 FROM permission_bundle WHERE code=?)
+                """, UUID.randomUUID().toString(), bundle.code(), bundle.name(), bundle.description(),
+                String.join(",", new java.util.TreeSet<>(bundle.allowedScopes())), bundle.code());
+            jdbc.update("DELETE FROM permission_bundle_item WHERE bundle_id=(SELECT id FROM permission_bundle WHERE code=?)",
+                bundle.code());
+            for (String permission : new java.util.TreeSet<>(bundle.permissions())) {
+                jdbc.update("""
+                    INSERT INTO permission_bundle_item(bundle_id,permission_code)
+                    SELECT id,? FROM permission_bundle WHERE code=?
+                    ON DUPLICATE KEY UPDATE permission_code=VALUES(permission_code)
+                    """, permission, bundle.code());
+            }
         }
         try {
             jdbc.update("UPDATE account SET password_hash=? WHERE username IN ('platform_admin', 'admin')", encoder.encode("123456"));

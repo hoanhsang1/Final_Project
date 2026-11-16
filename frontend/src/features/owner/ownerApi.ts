@@ -1,15 +1,28 @@
 import { isAxiosError } from 'axios';
-import { apiClient } from '../../lib/api';
-import { MSG_OWNER } from './ownerMessages';
+import { apiClient, unwrapList } from '../../lib/api';
+import { MSG_DEL, MSG_OWNER } from './ownerMessages';
 import type {
+  AssignmentHistoryItem,
   CreatedMember,
+  Delegation,
+  DelegationPayload,
+  DelegationUpdatePayload,
   Department,
+  DepartmentModuleImpact,
   DepartmentPayload,
+  GeneralManager,
+  GeneralManagerCandidate,
   Member,
+  MemberDetail,
   MemberPayload,
   Permission,
+  PermissionBundle,
   Position,
+  PositionClonePayload,
+  PositionCloneResult,
+  PositionImpact,
   PositionPayload,
+  ResignationRequest,
 } from './types';
 
 /**
@@ -61,6 +74,11 @@ async function request<T>(call: () => Promise<{ data: T }>): Promise<T> {
   }
 }
 
+/** Bọc lời gọi trả danh sách — shape lạ (HTML/object) luôn thành mảng rỗng. */
+function requestList<T>(call: () => Promise<{ data: unknown }>): Promise<T[]> {
+  return request(call).then((raw) => unwrapList<T>(raw));
+}
+
 /** Câu chữ theo mã lỗi nghiệp vụ — ưu tiên mã, không dựa vào message tiếng Anh. */
 function messageForCode(code: string | null, rawMessage?: string): string | null {
   if (rawMessage && /owners cannot remove their own access/i.test(rawMessage)) {
@@ -79,10 +97,47 @@ function messageForCode(code: string | null, rawMessage?: string): string | null
       return MSG_OWNER.IDENTITY_UNAVAILABLE;
     case 'UNKNOWN_PERMISSION':
       return MSG_OWNER.UNKNOWN_PERMISSION;
+    case 'MODULE_NOT_ENABLED':
+      return MSG_OWNER.MODULE_NOT_ENABLED;
+    case 'PERMISSION_OUT_OF_MODULE':
+      return MSG_OWNER.PERMISSION_OUT_OF_MODULE;
     case 'DEPARTMENT_NOT_FOUND':
     case 'POSITION_NOT_FOUND':
     case 'MEMBER_NOT_FOUND':
       return MSG_OWNER.NOT_FOUND;
+    case 'EMAIL_EXISTS':
+      return 'Email đã được dùng bởi nhân sự khác trong tổ chức.';
+    case 'MEMBER_NOT_ACTIVE':
+      return 'Nhân sự đã nghỉ việc, không thể thao tác thêm.';
+    case 'RESIGNATION_NOT_FOUND':
+      return 'Không tìm thấy yêu cầu nghỉ việc.';
+    case 'RESIGNATION_ALREADY_PENDING':
+      return 'Nhân sự đã có một yêu cầu nghỉ việc đang chờ duyệt.';
+    case 'RESIGNATION_NOT_PENDING':
+      return 'Yêu cầu nghỉ việc đã được xử lý bởi người khác.';
+    case 'SELF_APPROVAL_NOT_ALLOWED':
+      return 'Người tạo yêu cầu không thể tự duyệt yêu cầu của mình.';
+    case 'DELEGATION_NOT_FOUND':
+    case 'DELEGATION_NOT_ACTIVE':
+      return MSG_DEL.NOT_ACTIVE;
+    case 'DELEGATION_SELF_NOT_ALLOWED':
+      return MSG_DEL.SELF_NOT_ALLOWED;
+    case 'DELEGATION_RE_DELEGATION_FORBIDDEN':
+      return MSG_DEL.RE_DELEGATION_FORBIDDEN;
+    case 'DELEGATE_NOT_GENERAL_MANAGER':
+      return MSG_DEL.DELEGATE_NOT_MANAGER;
+    case 'DELEGATION_PERMISSION_NOT_HELD':
+      return MSG_DEL.PERMISSION_NOT_HELD;
+    case 'GENERAL_MANAGER_ALREADY_APPOINTED':
+      return MSG_DEL.ALREADY_MANAGER;
+    case 'GENERAL_MANAGER_NOT_APPOINTED':
+      return MSG_DEL.NOT_MANAGER;
+    case 'SELF_ESCALATION_NOT_ALLOWED':
+      return MSG_DEL.SELF_ESCALATION;
+    case 'DELEGATION_INVALID_WINDOW':
+      return MSG_DEL.INVALID_WINDOW;
+    case 'DELEGATION_SCOPE_NOT_SUPPORTED':
+      return MSG_DEL.SCOPE_UNSUPPORTED;
     default:
       return null;
   }
@@ -128,7 +183,7 @@ export function ownerErrorMessage(error: unknown): string {
 /* -------------------------------------------------------------------------- */
 
 export function fetchDepartments(): Promise<Department[]> {
-  return request(() => apiClient.get<Department[]>('/departments'));
+  return requestList<Department>(() => apiClient.get('/departments'));
 }
 
 export function createDepartment(payload: DepartmentPayload): Promise<Department> {
@@ -143,12 +198,29 @@ export function deleteDepartment(id: string): Promise<void> {
   return request(() => apiClient.delete<void>(`/departments/${id}`));
 }
 
+/** Quyền khả dụng của phòng — đã lọc theo module phòng + module tổ chức đang bật. */
+export function fetchDepartmentAvailablePermissions(id: string): Promise<Permission[]> {
+  return requestList<Permission>(() => apiClient.get(`/departments/${id}/available-permissions`));
+}
+
+/** Cảnh báo trước khi lưu danh sách module mới: chức danh/quyền nào sẽ mất hiệu lực. */
+export function fetchDepartmentModuleImpact(
+  id: string,
+  moduleCodes: string[],
+): Promise<DepartmentModuleImpact> {
+  return request(() =>
+    apiClient.get<DepartmentModuleImpact>(`/departments/${id}/module-impact`, {
+      params: { moduleCodes: moduleCodes.join(',') },
+    }),
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Chức vụ và danh mục quyền                                                  */
 /* -------------------------------------------------------------------------- */
 
 export function fetchPositions(): Promise<Position[]> {
-  return request(() => apiClient.get<Position[]>('/positions'));
+  return requestList<Position>(() => apiClient.get('/positions'));
 }
 
 export function createPosition(payload: PositionPayload): Promise<Position> {
@@ -163,8 +235,22 @@ export function deletePosition(id: string): Promise<void> {
   return request(() => apiClient.delete<void>(`/positions/${id}`));
 }
 
+/** Số người đang giữ chức danh — dùng để cảnh báo khi gỡ quyền. */
+export function fetchPositionImpact(id: string): Promise<PositionImpact> {
+  return request(() => apiClient.get<PositionImpact>(`/positions/${id}/impact`));
+}
+
+/** Nhân bản chức danh sang phòng khác; BE loại quyền ngoài module phòng đích. */
+export function clonePosition(id: string, payload: PositionClonePayload): Promise<PositionCloneResult> {
+  return request(() => apiClient.post<PositionCloneResult>(`/positions/${id}/clone`, payload));
+}
+
 export function fetchPermissions(): Promise<Permission[]> {
-  return request(() => apiClient.get<Permission[]>('/permissions'));
+  return requestList<Permission>(() => apiClient.get('/permissions'));
+}
+
+export function fetchPermissionBundles(): Promise<PermissionBundle[]> {
+  return requestList<PermissionBundle>(() => apiClient.get('/permission-bundles'));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -172,7 +258,7 @@ export function fetchPermissions(): Promise<Permission[]> {
 /* -------------------------------------------------------------------------- */
 
 export function fetchMembers(departmentId: string): Promise<Member[]> {
-  return request(() => apiClient.get<Member[]>(`/departments/${departmentId}/members`));
+  return requestList<Member>(() => apiClient.get(`/departments/${departmentId}/members`));
 }
 
 export function createMember(departmentId: string, payload: MemberPayload): Promise<CreatedMember> {
@@ -183,14 +269,140 @@ export function updateMemberPositions(
   departmentId: string,
   userId: string,
   positionIds: string[],
+  reason?: string,
 ): Promise<Member> {
   return request(() =>
     apiClient.put<Member>(`/departments/${departmentId}/members/${userId}/positions`, {
       positionIds,
+      ...(reason ? { reason } : {}),
     }),
+  );
+}
+
+export function fetchMemberDetail(departmentId: string, userId: string): Promise<MemberDetail> {
+  return request(() => apiClient.get<MemberDetail>(`/departments/${departmentId}/members/${userId}`));
+}
+
+export function fetchMemberAssignments(
+  departmentId: string,
+  userId: string,
+): Promise<AssignmentHistoryItem[]> {
+  return requestList<AssignmentHistoryItem>(() =>
+    apiClient.get(`/departments/${departmentId}/members/${userId}/assignments`),
   );
 }
 
 export function deleteMember(departmentId: string, userId: string): Promise<void> {
   return request(() => apiClient.delete<void>(`/departments/${departmentId}/members/${userId}`));
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Nghỉ việc                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export function fetchResignationRequests(
+  departmentId: string,
+  status?: string,
+): Promise<ResignationRequest[]> {
+  return requestList<ResignationRequest>(() =>
+    apiClient.get(`/departments/${departmentId}/resignation-requests`, {
+      params: status ? { status } : undefined,
+    }),
+  );
+}
+
+export function createResignationRequest(
+  departmentId: string,
+  userId: string,
+  reason: string,
+): Promise<ResignationRequest> {
+  return request(() =>
+    apiClient.post<ResignationRequest>(`/departments/${departmentId}/resignation-requests`, {
+      userId,
+      reason,
+    }),
+  );
+}
+
+export function approveResignation(
+  departmentId: string,
+  requestId: string,
+  note?: string,
+): Promise<ResignationRequest> {
+  return request(() =>
+    apiClient.post<ResignationRequest>(
+      `/departments/${departmentId}/resignation-requests/${requestId}/approve`,
+      { note },
+    ),
+  );
+}
+
+export function rejectResignation(
+  departmentId: string,
+  requestId: string,
+  note?: string,
+): Promise<ResignationRequest> {
+  return request(() =>
+    apiClient.post<ResignationRequest>(
+      `/departments/${departmentId}/resignation-requests/${requestId}/reject`,
+      { note },
+    ),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Tổng quản lý và ủy quyền (quy tắc 3, 7)                                    */
+/* -------------------------------------------------------------------------- */
+
+// Gateway chỉ mở các route /api/* cho hai tài nguyên mới (xem APIGateway/application.yml).
+export function fetchGeneralManagers(): Promise<GeneralManager[]> {
+  return requestList<GeneralManager>(() => apiClient.get('/api/general-manager'));
+}
+
+export function fetchGeneralManagerCandidates(): Promise<GeneralManagerCandidate[]> {
+  return requestList<GeneralManagerCandidate>(() =>
+    apiClient.get('/api/general-manager/candidates'),
+  );
+}
+
+export function appointGeneralManager(userId: string, reason?: string): Promise<GeneralManager> {
+  return request(() =>
+    apiClient.post<GeneralManager>('/api/general-manager', { userId, ...(reason ? { reason } : {}) }),
+  );
+}
+
+export function removeGeneralManager(userId: string, reason?: string): Promise<void> {
+  return request(() =>
+    apiClient.delete<void>(`/api/general-manager/${userId}`, {
+      params: reason ? { reason } : undefined,
+    }),
+  );
+}
+
+export function fetchDelegations(activeOnly = false): Promise<Delegation[]> {
+  return requestList<Delegation>(() =>
+    apiClient.get('/api/delegations', { params: { activeOnly } }),
+  );
+}
+
+/** Ủy quyền đang dành cho chính mình — dùng cho Tổng quản lý. */
+export function fetchMyDelegations(): Promise<Delegation[]> {
+  return requestList<Delegation>(() => apiClient.get('/api/delegations/me'));
+}
+
+export function createDelegation(payload: DelegationPayload): Promise<Delegation> {
+  return request(() => apiClient.post<Delegation>('/api/delegations', payload));
+}
+
+export function updateDelegation(
+  id: string,
+  payload: DelegationUpdatePayload,
+): Promise<Delegation> {
+  return request(() => apiClient.put<Delegation>(`/api/delegations/${id}`, payload));
+}
+
+export function revokeDelegation(id: string, reason?: string): Promise<Delegation> {
+  return request(() =>
+    apiClient.post<Delegation>(`/api/delegations/${id}/revoke`, { ...(reason ? { reason } : {}) }),
+  );
 }

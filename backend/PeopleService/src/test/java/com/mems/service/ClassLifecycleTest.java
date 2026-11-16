@@ -13,6 +13,7 @@ import com.mems.exception.AppException;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
+import com.mems.repository.SubjectRepository;
 import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
@@ -63,7 +64,7 @@ class ClassLifecycleTest {
         statusService = new ClassStatusService(statusRepository, classes, actor, guard);
         classService = new SchoolClassService(classes, mock(StudentRepository.class), actor, guard,
             mock(PeopleAuditService.class), mock(TeacherRepository.class), statusService,
-            "TEACHER_ASSIGNMENT");
+            mock(SubjectRepository.class), "TEACHER_ASSIGNMENT");
     }
 
     @Test

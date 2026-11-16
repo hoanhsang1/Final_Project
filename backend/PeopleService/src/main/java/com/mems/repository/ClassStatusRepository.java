@@ -103,10 +103,38 @@ public class ClassStatusRepository {
     public int cancel(String id, String orgId, long expectedVersion) {
         return jdbc.update("""
             UPDATE school_class
-            SET status = 'DA_HUY', version = version + 1, updated_at = ?
+            SET status = 'DA_HUY', cancel_state = 'NONE', cancel_request_reason = NULL,
+                version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
-              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA')
+              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA') AND cancel_state = 'NONE'
             """, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
+    }
+
+    /** Lớp còn học sinh: ghi nhận yêu cầu hủy, chờ trưởng phòng duyệt. */
+    public int requestCancel(String id, String orgId, String reason, long expectedVersion) {
+        return jdbc.update("""
+            UPDATE school_class
+            SET cancel_state = 'PENDING', cancel_request_reason = ?, version = version + 1, updated_at = ?
+            WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
+              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA') AND cancel_state = 'NONE'
+            """, reason, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
+    }
+
+    public int approveCancel(String id, String orgId) {
+        return jdbc.update("""
+            UPDATE school_class
+            SET status = 'DA_HUY', cancel_state = 'NONE', version = version + 1, updated_at = ?
+            WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND cancel_state = 'PENDING'
+              AND status IN ('CHUA_BAT_DAU', 'DANG_DIEN_RA')
+            """, Timestamp.from(Instant.now()), id, orgId);
+    }
+
+    public int rejectCancel(String id, String orgId) {
+        return jdbc.update("""
+            UPDATE school_class
+            SET cancel_state = 'NONE', cancel_request_reason = NULL, version = version + 1, updated_at = ?
+            WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND cancel_state = 'PENDING'
+            """, Timestamp.from(Instant.now()), id, orgId);
     }
 
     public int requestClose(String id, String orgId) {
@@ -114,7 +142,7 @@ public class ClassStatusRepository {
             UPDATE school_class
             SET close_state = 'PENDING', version = version + 1, updated_at = ?
             WHERE id = ? AND org_id = ? AND deleted_at IS NULL
-              AND close_state = 'NONE' AND status <> 'DA_HUY'
+              AND close_state = 'NONE' AND cancel_state = 'NONE' AND status <> 'DA_HUY'
             """, Timestamp.from(Instant.now()), id, orgId);
     }
 
@@ -162,11 +190,15 @@ public class ClassStatusRepository {
     }
 
     public String lastRequester(String classId, String orgId) {
+        return lastEventActor(classId, orgId, "REQUESTED");
+    }
+
+    public String lastEventActor(String classId, String orgId, String action) {
         List<String> rows = jdbc.queryForList("""
             SELECT actor_id FROM class_close_event
-            WHERE class_id = ? AND org_id = ? AND action = 'REQUESTED'
+            WHERE class_id = ? AND org_id = ? AND action = ?
             ORDER BY created_at DESC, id DESC LIMIT 1
-            """, String.class, classId, orgId);
+            """, String.class, classId, orgId, action);
         return rows.isEmpty() ? null : rows.get(0);
     }
 }

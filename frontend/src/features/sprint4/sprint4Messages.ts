@@ -6,6 +6,10 @@ export const MSG_S4 = {
   OPEN_MENU: 'Mở menu đào tạo',
   MENU_TEACHERS: 'Giáo viên',
   MENU_CLASSES: 'Lớp học',
+  MENU_STUDENTS: 'Sinh viên',
+  MENU_STAFF: 'Nhân sự',
+  MENU_TRANSFERS: 'Chuyển phòng ban',
+  MENU_POSITIONS: 'Chức vụ',
 
   // Trạng thái chung
   NO_PERMISSION: 'Bạn không có quyền truy cập khu vực này.',
@@ -43,7 +47,8 @@ export const MSG_TEACHER = {
   EMPTY: 'Chưa có giáo viên nào.',
 
   CREATE: 'Thêm giáo viên',
-  CREATE_HINT: 'Hệ thống tạo tài khoản đăng nhập và trả về mật khẩu tạm sau khi tạo.',
+  CREATE_HINT:
+    'Hệ thống tự sinh mã nhân sự (GV001, GV002…), tạo tài khoản đăng nhập và trả về mật khẩu tạm sau khi tạo.',
   EDIT: 'Chỉnh sửa',
   CREATED: 'Đã tạo giáo viên.',
   UPDATED: 'Đã cập nhật giáo viên.',
@@ -92,6 +97,8 @@ export const MSG_CLASS = {
   EMPTY: 'Chưa có lớp học nào.',
 
   ASSIGN: 'Gán giáo viên',
+  CREATE: 'Thêm lớp học',
+  CREATED: 'Đã tạo lớp học.',
   ASSIGN_TITLE: 'Gán/đổi giáo viên phụ trách',
   CANCEL: 'Hủy lớp',
   REQUEST_CLOSE: 'Yêu cầu đóng lớp',
@@ -134,4 +141,157 @@ export const MSG_CLASS = {
 
   APPROVE_CONFIRM: 'Duyệt yêu cầu đóng lớp này?',
   REOPEN_CONFIRM: 'Mở lại lớp này?',
+
+  // Quy tắc 13 — môn học
+  SUBJECT: 'Môn học',
+  SUBJECT_PLACEHOLDER: 'Chọn môn học',
+  SUBJECT_REQUIRED: 'Vui lòng chọn môn học để đối chiếu chuyên môn giáo viên.',
+  SUBJECT_LOAD_ERROR: 'Không tải được danh sách môn học.',
+  SUBJECT_UNASSIGNED: 'Chưa gán môn',
+
+  // Quy tắc 17 — lớp cần phân công lại
+  REASSIGN_NEEDED: 'Cần phân công lại',
+  REASSIGN_BANNER_TITLE: 'Có lớp cần phân công lại giáo viên',
+  REASSIGN_BANNER_DESC:
+    'Giáo viên phụ trách đã chuyển phòng ban hoặc nghỉ việc. Lớp vẫn giữ nguyên dữ liệu; hãy gán giáo viên mới.',
+  REASSIGN_FILTER: 'Chỉ lớp cần phân công lại',
+  REASSIGN_ACTION: 'Phân công lại',
+  REASSIGN_TITLE: 'Phân công lại giáo viên',
+  REASSIGNED: 'Đã phân công lại giáo viên.',
+  REASSIGN_REASON: 'Lý do gắn nhãn',
+
+  // Quy tắc 14 — hủy lớp cần duyệt
+  CANCEL_REQUESTED: 'Đã gửi yêu cầu hủy lớp tới trưởng phòng phụ trách đào tạo.',
+  CANCEL_REQUEST_BANNER_TITLE: 'Yêu cầu hủy lớp đang chờ duyệt',
+  CANCEL_REQUEST_BANNER_DESC:
+    'Lớp còn sinh viên nên cần trưởng phòng phụ trách đào tạo duyệt trước khi hủy.',
+  APPROVE_CANCEL: 'Duyệt hủy lớp',
+  REJECT_CANCEL: 'Từ chối hủy',
+  APPROVE_CANCEL_CONFIRM: 'Duyệt hủy lớp này? Dữ liệu lớp và sinh viên vẫn được giữ lại.',
+  CANCEL_APPROVED: 'Đã duyệt hủy lớp.',
+  CANCEL_REJECTED: 'Đã từ chối yêu cầu hủy lớp.',
+  CANCEL_REQUEST_REASON_LABEL: 'Lý do xin hủy',
+
+  // Sinh viên trong lớp
+  TAB_STUDENTS: 'Sinh viên trong lớp',
+  STUDENTS_EMPTY: 'Lớp chưa có sinh viên.',
+  STUDENTS_LOAD_ERROR: 'Không tải được danh sách sinh viên của lớp.',
+} as const;
+
+export const MSG_STAFF = {
+  TITLE: 'Nhân sự',
+  SUBTITLE: 'Toàn bộ nhân viên thuộc phòng ban, không chỉ giáo viên.',
+  LIST_LOAD_ERROR: 'Không tải được danh sách nhân sự.',
+  EMPTY: 'Phòng ban chưa có nhân viên.',
+  COL_USERNAME: 'Tên đăng nhập',
+  COL_ROLE: 'Vai trò',
+  COL_POSITIONS: 'Chức vụ',
+  COL_APPOINTED_AT: 'Ngày bổ nhiệm',
+  COL_STATUS: 'Trạng thái',
+  DEPARTMENT_LABEL: 'Phòng ban',
+  NO_POSITION: 'Chưa gán chức vụ',
+  COL_ACTIONS: 'Thao tác',
+
+  CREATE: 'Thêm nhân viên',
+  CREATED: 'Đã thêm nhân viên.',
+  CHANGE_POSITIONS: 'Chức vụ',
+  POSITIONS_UPDATED: 'Đã cập nhật chức vụ.',
+  REMOVE: 'Xóa',
+  REMOVE_TITLE: 'Xóa nhân viên',
+  REMOVE_CONFIRM: 'Nhân viên sẽ bị gỡ khỏi phòng ban và tài khoản bị vô hiệu hóa. Tiếp tục?',
+  REMOVED: 'Đã xóa nhân viên.',
+
+  STATUS_ACTIVE: 'Đang làm việc',
+  STATUS_RESIGNED: 'Đã nghỉ việc',
+  DETAIL: 'Chi tiết',
+  DETAIL_TITLE: 'Chi tiết nhân sự',
+  DETAIL_LOAD_ERROR: 'Không tải được chi tiết nhân sự.',
+  SENSITIVE_HIDDEN: 'Không có quyền xem (cần employee.view_detail)',
+  TEACHER_PROFILE: 'Hồ sơ giáo viên',
+  CONTRACT_TYPE: 'Loại hợp đồng',
+  TEACHING_STATUS: 'Trạng thái dạy',
+  NO_CLASS_LABEL: 'Chưa có lớp',
+  ASSIGNMENT_HISTORY: 'Lịch sử bổ nhiệm / thu hồi',
+  ASSIGNMENT_EMPTY: 'Chưa có lịch sử bổ nhiệm.',
+  ASSIGNMENT_POSITION: 'Chức vụ',
+  ASSIGNMENT_SCOPE: 'Phạm vi',
+  ASSIGNMENT_PERIOD: 'Hiệu lực',
+  ASSIGNMENT_STATUS: 'Trạng thái',
+  ASSIGNMENT_REASON: 'Lý do bổ nhiệm',
+  ASSIGNMENT_REVOKED: 'Thu hồi',
+  ASSIGNMENT_ASSIGNED_BY: 'Người bổ nhiệm',
+
+  RESIGN: 'Nghỉ việc',
+  RESIGN_TITLE: 'Yêu cầu nghỉ việc',
+  RESIGN_HINT:
+    'Yêu cầu chỉ cần HR duyệt một bước. Khi duyệt: tài khoản bị vô hiệu hoá, mọi chức danh bị thu hồi và lịch sử được ghi lại.',
+  RESIGN_REASON: 'Lý do nghỉ việc',
+  RESIGN_REASON_REQUIRED: 'Vui lòng nhập lý do nghỉ việc',
+  RESIGN_CREATED: 'Đã tạo yêu cầu nghỉ việc.',
+  RESIGN_INBOX: 'Hộp thư nghỉ việc',
+  RESIGN_INBOX_TITLE: 'Yêu cầu nghỉ việc chờ duyệt',
+  RESIGN_EMPTY: 'Không có yêu cầu nghỉ việc nào.',
+  RESIGN_LOAD_ERROR: 'Không tải được yêu cầu nghỉ việc.',
+  RESIGN_APPROVE: 'Duyệt',
+  RESIGN_REJECT: 'Từ chối',
+  RESIGN_APPROVED: 'Đã duyệt nghỉ việc.',
+  RESIGN_REJECTED: 'Đã từ chối yêu cầu nghỉ việc.',
+  RESIGN_APPROVE_CONFIRM:
+    'Duyệt nghỉ việc sẽ vô hiệu hoá tài khoản và thu hồi mọi chức danh của nhân sự. Tiếp tục?',
+  RESIGN_REJECT_CONFIRM: 'Từ chối yêu cầu nghỉ việc này?',
+  RESIGN_REQUESTER: 'Người yêu cầu',
+  RESIGN_REQUESTED_AT: 'Thời điểm yêu cầu',
+  RESIGN_STATUS: 'Trạng thái',
+} as const;
+
+export const ROLE_LABEL: Record<string, string> = {
+  OWNER: 'Chủ tổ chức',
+  MANAGER: 'Quản lý',
+  STAFF: 'Nhân viên',
+  STUDENT: 'Sinh viên',
+};
+
+/** Quy tắc 12 — cổng thông tin riêng của sinh viên (chỉ dữ liệu SELF/CLASS). */
+export const MSG_PORTAL = {
+  TITLE: 'Cổng thông tin sinh viên',
+  PROFILE_SECTION: 'Hồ sơ của tôi',
+  CLASSES_SECTION: 'Lớp học của tôi',
+  CLASSES_EMPTY: 'Bạn chưa được xếp vào lớp nào.',
+  LOAD_ERROR: 'Không tải được dữ liệu của bạn.',
+  NO_ACCESS: 'Bạn không có quyền truy cập cổng sinh viên.',
+  LOGOUT: 'Đăng xuất',
+} as const;
+
+export const MSG_STUDENT = {
+  TITLE: 'Sinh viên',
+  LIST_LOAD_ERROR: 'Không tải được danh sách sinh viên.',
+  EMPTY: 'Chưa có sinh viên nào.',
+
+  CREATE: 'Thêm sinh viên',
+  CREATED: 'Đã thêm sinh viên.',
+  EDIT: 'Cập nhật sinh viên',
+  UPDATED: 'Đã cập nhật sinh viên.',
+  DELETED: 'Đã xóa sinh viên.',
+  DELETE_TITLE: 'Xóa sinh viên',
+  DELETE_CONFIRM: 'Sinh viên sẽ được xóa mềm và gỡ khỏi lớp đang học. Tiếp tục?',
+  AUTO_CODE: 'Mã sinh viên do hệ thống tự sinh theo chuẩn SV001, SV002…',
+
+  SEARCH_LABEL: 'Tìm theo mã hoặc tên sinh viên',
+  STATUS_ALL: 'Tất cả trạng thái',
+  NO_CLASS: 'Chưa xếp lớp',
+
+  // Quy tắc 12 — tài khoản đăng nhập
+  COL_ACCOUNT: 'Tài khoản',
+  ACCOUNT_NONE: 'Chưa có tài khoản',
+  ACCOUNT_EMAIL_REQUIRED: 'Cần nhập email sinh viên trước khi tạo tài khoản.',
+  CREATE_ACCOUNT: 'Tạo tài khoản',
+  ACCOUNT_CREATE_TITLE: 'Tạo tài khoản đăng nhập',
+  ACCOUNT_CREATE_CONFIRM:
+    'Tạo tài khoản đăng nhập vai trò Sinh viên cho hồ sơ này? Tên đăng nhập là email của sinh viên.',
+  ACCOUNT_CREATED: 'Đã tạo tài khoản sinh viên.',
+  ACCOUNT_TEMP_TITLE: 'Đã tạo tài khoản sinh viên',
+  ACCOUNT_TEMP_LABEL: 'Mật khẩu tạm',
+  ACCOUNT_TEMP_HINT:
+    'Gửi tên đăng nhập và mật khẩu này cho sinh viên. Sinh viên bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên.',
+  ACCOUNT_TEMP_DONE: 'Tôi đã lưu mật khẩu',
 } as const;

@@ -12,5 +12,5 @@ public record ProvisionAccountRequest(
     @NotBlank(message = "TEMPORARY_PASSWORD_REQUIRED")
     @Size(min = 12, max = 72, message = "TEMPORARY_PASSWORD_INVALID") String temporaryPassword,
     @NotBlank(message = "ROLE_REQUIRED")
-    @Pattern(regexp = "MANAGER|STAFF", message = "ROLE_INVALID_PATTERN") String role,
+    @Pattern(regexp = "MANAGER|STAFF|STUDENT", message = "ROLE_INVALID_PATTERN") String role,
     @NotBlank(message = "APPOINTED_BY_REQUIRED") String appointedBy) {}

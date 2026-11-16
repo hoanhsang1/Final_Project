@@ -2,6 +2,7 @@ import { Button, Card, Flex, Result, Space, Tag, theme, Typography } from 'antd'
 import { useNavigate, useParams } from 'react-router-dom';
 import { logout } from '../../features/auth/authApi';
 import { findRole } from '../../features/auth/roles';
+import { DELEGATION_UI_ENABLED } from '../../lib/featureFlags';
 import { useAuthStore } from '../../stores/authStore';
 import { cardStyle, layoutBackground } from '../../theme';
 
@@ -66,6 +67,11 @@ export default function RolePreviewPage() {
               {role.id === 'academic-staff' && (
                 <Button type="primary" onClick={() => navigate('/to-chuc/sinh-vien')}>
                   Vào Cổng Quản lý Sinh viên & Lớp học
+                </Button>
+              )}
+              {isAuthenticated && DELEGATION_UI_ENABLED && (
+                <Button onClick={() => navigate('/uy-quyen')}>
+                  Xem quyền được ủy quyền
                 </Button>
               )}
               {isAuthenticated && <Button onClick={handleLogout}>Đăng xuất</Button>}

@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record StudentRequest(
-    @NotBlank(message = "CODE_REQUIRED")
     @Size(max = 100, message = "CODE_TOO_LONG") String studentCode,
     @NotBlank(message = "NAME_REQUIRED")
     @Size(max = 200, message = "NAME_TOO_LONG") String fullName,

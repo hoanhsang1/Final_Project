@@ -70,6 +70,18 @@ public class TeacherRepository {
         return count != null && count > 0;
     }
 
+    /** Giáo viên có chuyên môn trùng tên môn học của lớp (quy tắc 13). */
+    public boolean teachesSubject(String userId, String orgId, String subjectId) {
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*)
+            FROM teacher_specialty ts
+            JOIN specialty s ON s.id=ts.specialty_id AND s.org_id=ts.org_id AND s.is_active=TRUE
+            JOIN subject sub ON sub.id=? AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+            WHERE ts.user_id=? AND ts.org_id=? AND s.name_unaccented=sub.name_unaccented
+            """, Integer.class, subjectId, userId, orgId);
+        return count != null && count > 0;
+    }
+
     public boolean hasProfile(String userId, String orgId) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM teacher_profile WHERE user_id=? AND org_id=?", Integer.class, userId, orgId);
@@ -97,8 +109,31 @@ public class TeacherRepository {
             """, contractType, updatedBy, Timestamp.from(Instant.now()), userId, orgId);
     }
 
+    public void markResigned(String userId, String orgId) {
+        jdbc.update("""
+            UPDATE teacher_profile
+            SET teaching_status='NGHI_VIEC', version=version+1, updated_at=?
+            WHERE user_id=? AND org_id=?
+            """, Timestamp.from(Instant.now()), userId, orgId);
+    }
+
+    /** Số lớp đang chờ/đang diễn ra của giáo viên — cần phân công lại khi nghỉ việc. */
+    public long activeClassCount(String userId, String orgId) {
+        Long count = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM school_class
+            WHERE teacher_id=? AND org_id=? AND deleted_at IS NULL
+              AND status IN ('CHUA_BAT_DAU','DANG_DIEN_RA')
+            """, Long.class, userId, orgId);
+        return count == null ? 0 : count;
+    }
+
     public Map<String, Object> list(String orgId, String departmentId, String q, String specialtyId,
                                     String teachingStatus, int page, int size) {
+        return list(orgId, departmentId, q, specialtyId, teachingStatus, page, size, true);
+    }
+
+    public Map<String, Object> list(String orgId, String departmentId, String q, String specialtyId,
+                                    String teachingStatus, int page, int size, boolean includeSensitive) {
         page = normalizePage(page);
         size = normalizeSize(size);
         StringBuilder where = new StringBuilder("""
@@ -143,7 +178,8 @@ public class TeacherRepository {
             specialties.forUsers(orgId, raw.stream().map(RawTeacher::userId).toList());
         List<TeacherListItem> items = raw.stream().map(row -> {
             long classCount = row.classCount();
-            return new TeacherListItem(row.userId(), row.staffCode(), row.fullName(), row.email(), row.phone(),
+            return new TeacherListItem(row.userId(), row.staffCode(), row.fullName(),
+                includeSensitive ? row.email() : null, includeSensitive ? row.phone() : null,
                 row.departmentId(), byUser.getOrDefault(row.userId(), List.of()),
                 row.contractType(), row.teachingStatus(), classCount, classCount == 0,
                 classCount == 0 ? "Chưa có lớp" : null);
@@ -203,14 +239,15 @@ public class TeacherRepository {
 
     public List<TeacherClassResponse> classes(String userId, String orgId) {
         return jdbc.query("""
-            SELECT id, class_code, name, status, close_state
+            SELECT id, class_code, name, status, close_state, needs_reassignment, reassignment_reason
             FROM school_class
             WHERE teacher_id=? AND org_id=? AND deleted_at IS NULL
             ORDER BY class_code
             """, (rs, n) -> {
                 String closeState = rs.getString("close_state");
                 return new TeacherClassResponse(rs.getString("id"), rs.getString("class_code"),
-                    rs.getString("name"), rs.getString("status"), closeState, closeLabel(closeState));
+                    rs.getString("name"), rs.getString("status"), closeState, closeLabel(closeState),
+                    rs.getBoolean("needs_reassignment"), rs.getString("reassignment_reason"));
             }, userId, orgId);
     }
 

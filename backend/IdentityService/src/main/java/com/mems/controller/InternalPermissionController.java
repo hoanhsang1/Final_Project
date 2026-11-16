@@ -8,4 +8,8 @@ import java.util.List;
 public class InternalPermissionController {
     @GetMapping
     public List<PermissionCatalog.PermissionDefinition> permissions() { return PermissionCatalog.ENTRIES; }
+
+    /** Bundle để PeopleService mở rộng quyền của chức vụ (Identity là nguồn chuẩn). */
+    @GetMapping("/bundles")
+    public List<PermissionCatalog.BundleDefinition> bundles() { return PermissionCatalog.BUNDLES; }
 }

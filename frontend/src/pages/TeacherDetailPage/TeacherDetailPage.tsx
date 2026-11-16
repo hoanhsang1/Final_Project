@@ -272,7 +272,16 @@ export default function TeacherDetailPage() {
       {
         title: 'Tên lớp',
         dataIndex: 'name',
-        render: (value: string | null | undefined) => value || '—',
+        render: (value: string | null | undefined, record) => (
+          <Space direction="vertical" size={2}>
+            <Text>{value || '—'}</Text>
+            {record.needsReassignment ? (
+              <Tag color="orange" title={record.reassignmentReason ?? undefined}>
+                Cần phân công lại
+              </Tag>
+            ) : null}
+          </Space>
+        ),
       },
       {
         title: 'Trạng thái',

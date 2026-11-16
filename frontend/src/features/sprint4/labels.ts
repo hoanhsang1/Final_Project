@@ -51,6 +51,18 @@ export const CONTRACT_TYPE_LABEL: Record<string, string> = {
   THINH_GIANG: 'Thỉnh giảng',
 };
 
+export const STUDENT_STATUS_LABEL: Record<string, string> = {
+  active: 'Đang học',
+  inactive: 'Nghỉ học',
+  suspended: 'Đình chỉ',
+};
+
+export const STUDENT_STATUS_TAG: Record<string, string | undefined> = {
+  active: 'green',
+  inactive: 'gold',
+  suspended: 'red',
+};
+
 /** Hành động trong tab "Sự kiện đóng" (§6.5). */
 export const CLOSE_ACTION_LABEL: Record<string, string> = {
   REQUESTED: 'Gửi yêu cầu đóng',

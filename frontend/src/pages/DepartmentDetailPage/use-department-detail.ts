@@ -10,6 +10,7 @@ import {
 } from '../../features/owner/ownerApi';
 import { ownerKeys } from '../../features/owner/ownerKeys';
 import type { MemberPayload } from '../../features/owner/types';
+import { fetchSpecialties } from '../../features/sprint4/sprint4Api';
 
 export function useDepartmentDetail(departmentId: string) {
   const queryClient = useQueryClient();
@@ -39,6 +40,12 @@ export function useDepartmentDetail(departmentId: string) {
     queryFn: fetchPositions,
   });
 
+  // Chuyên môn cần cho form khi chọn chức vụ giáo viên.
+  const specialties = useQuery({
+    queryKey: ['specialties'],
+    queryFn: fetchSpecialties,
+  });
+
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ownerKeys.members(departmentId) });
     void queryClient.invalidateQueries({ queryKey: ownerKeys.departments() });
@@ -50,8 +57,8 @@ export function useDepartmentDetail(departmentId: string) {
   });
 
   const updatePositions = useMutation({
-    mutationFn: ({ userId, positionIds }: { userId: string; positionIds: string[] }) =>
-      updateMemberPositions(departmentId, userId, positionIds),
+    mutationFn: ({ userId, positionIds, reason }: { userId: string; positionIds: string[]; reason?: string }) =>
+      updateMemberPositions(departmentId, userId, positionIds, reason),
     onSuccess: invalidate,
   });
 
@@ -68,6 +75,7 @@ export function useDepartmentDetail(departmentId: string) {
     refetchDepartments: departments.refetch,
     members,
     positions,
+    specialties,
     create,
     updatePositions,
     remove,

@@ -29,6 +29,14 @@
       "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permissions/:path+"
     },
     {
+      "source": "/permission-bundles",
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permission-bundles"
+    },
+    {
+      "source": "/permission-bundles/:path+",
+      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permission-bundles/:path+"
+    },
+    {
       "source": "/students",
       "destination": "https://made-modified-prints-inclusion.trycloudflare.com/students"
     },
