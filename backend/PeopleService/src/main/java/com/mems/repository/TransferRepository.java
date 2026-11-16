@@ -146,6 +146,29 @@ public class TransferRepository {
             """, String.class, params.toArray()));
     }
 
+    /** Người dùng có đang giữ chức danh trưởng phòng ở bất kỳ phòng ban nào không. */
+    public boolean isHead(String orgId, String userId, Collection<String> headPositionNames) {
+        List<String> names = headPositionNames == null ? List.of()
+            : headPositionNames.stream().filter(Objects::nonNull).distinct().toList();
+        if (names.isEmpty()) return false;
+        List<Object> params = new ArrayList<>(List.of(orgId, userId));
+        params.addAll(names);
+        Timestamp now = Timestamp.from(Instant.now());
+        params.add(now);
+        params.add(now);
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*)
+            FROM assignment a
+            JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id AND p.deleted_at IS NULL
+            WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
+              AND a.scope_type='DEPARTMENT'
+              AND p.name IN (""" + String.join(",", Collections.nCopies(names.size(), "?")) + """
+              )
+              AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
+            """, Integer.class, params.toArray());
+        return count != null && count > 0;
+    }
+
     /**
      * Người có assignment ACTIVE trong phạm vi ORGANIZATION hoặc một trong các
      * phòng ban truyền vào — ứng viên để service lọc tiếp theo quyền hiệu lực.

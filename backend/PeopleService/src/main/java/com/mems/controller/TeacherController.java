@@ -44,6 +44,19 @@ public class TeacherController {
         return service.assignable(q, page, size);
     }
 
+    /** Self contract: hồ sơ + lớp của chính giáo viên đang đăng nhập. */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public TeacherDetailResponse me() {
+        return service.me();
+    }
+
+    @GetMapping("/me/classes")
+    @PreAuthorize("isAuthenticated()")
+    public java.util.List<TeacherClassResponse> myClasses() {
+        return service.myClasses();
+    }
+
     @GetMapping("/{staffId}")
     @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
     public TeacherDetailResponse get(@PathVariable String staffId) {

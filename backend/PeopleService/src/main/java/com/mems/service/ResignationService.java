@@ -69,28 +69,50 @@ public class ResignationService {
         return requests.list(actor.orgId(), departmentId, status);
     }
 
+    /** Yêu cầu nghỉ việc của chính người đang đăng nhập. */
+    @Transactional(readOnly = true)
+    public List<ResignationResponse> mine(String status) {
+        return requests.mine(actor.orgId(), actor.userId(), status);
+    }
+
     @Transactional
     public ResignationResponse create(String departmentId, ResignationCreateRequest request) {
         String orgId = actor.orgId();
         policy.requirePermission(departmentId, "employee.resign");
         departments.require(departmentId, orgId, false);
-        var member = members.require(request.userId(), orgId, departmentId, true);
+        return createInternal(departmentId, request.userId(), request.reason());
+    }
+
+    /** Nhân sự tự gửi yêu cầu nghỉ việc cho chính mình (không cần quyền quản lý). */
+    @Transactional
+    public ResignationResponse createSelf(ResignationCreateRequest request) {
+        if (!actor.userId().equals(request.userId()))
+            throw actor.forbidden("You can only request your own resignation");
+        String orgId = actor.orgId();
+        String departmentId = members.findDepartmentId(actor.userId(), orgId)
+            .orElseThrow(() -> new AppException(ErrorCode.MEMBER_NOT_FOUND));
+        return createInternal(departmentId, request.userId(), request.reason());
+    }
+
+    private ResignationResponse createInternal(String departmentId, String userId, String rawReason) {
+        String orgId = actor.orgId();
+        var member = members.require(userId, orgId, departmentId, true);
         if ("OWNER".equals(member.role()))
             throw actor.forbidden("Owner appointments cannot resign through this workflow");
         if (!"ACTIVE".equals(member.status()))
             throw new AppException(ErrorCode.MEMBER_NOT_ACTIVE);
-        if (requests.hasPending(orgId, request.userId()))
+        if (requests.hasPending(orgId, userId))
             throw new AppException(ErrorCode.RESIGNATION_ALREADY_PENDING);
 
         String id = UUID.randomUUID().toString();
-        String reason = request.reason().trim();
-        requests.create(id, orgId, request.userId(), departmentId, reason, actor.userId());
-        audit.record(orgId, actor.userId(), "RESIGNATION_REQUESTED", request.userId(),
+        String reason = rawReason.trim();
+        requests.create(id, orgId, userId, departmentId, reason, actor.userId());
+        audit.record(orgId, actor.userId(), "RESIGNATION_REQUESTED", userId,
             Map.of("requestId", id, "reason", reason));
         notifications.notifyAll(orgId,
-            approval.approverIds(orgId, departmentId, actor.userId(), request.userId()),
+            approval.approverIds(orgId, departmentId, actor.userId(), userId),
             "RESIGNATION_REQUESTED", "Yêu cầu nghỉ việc cần duyệt",
-            "Nhân sự " + request.userId() + " xin nghỉ việc. Lý do: " + reason,
+            "Nhân sự " + userId + " xin nghỉ việc. Lý do: " + reason,
             "RESIGNATION_REQUEST", id);
         return requests.require(id, orgId, departmentId);
     }

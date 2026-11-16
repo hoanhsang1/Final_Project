@@ -26,7 +26,7 @@ public class IdentityDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        for (String role : new String[]{"OWNER", "MANAGER", "STAFF"}) {
+        for (String role : new String[]{"OWNER", "MANAGER", "STAFF", "TEACHER", "STUDENT"}) {
             jdbc.update("""
                 INSERT INTO role(code,name,scope,description) VALUES (?,?,'organization',?)
                 ON DUPLICATE KEY UPDATE name=VALUES(name)
@@ -45,6 +45,18 @@ public class IdentityDataInitializer implements ApplicationRunner {
                 WHERE r.code IN ('OWNER','ORG_OWNER','SUPER_ADMIN')
                 ON DUPLICATE KEY UPDATE permission_id=VALUES(permission_id)
                 """, permission.code());
+        }
+        // Vai trò tự phục vụ (học sinh, giáo viên kiểu cũ) có quyền SELF cố định.
+        // Tài khoản STUDENT không đi qua chức danh nên role_permission là nguồn duy nhất.
+        for (String role : new String[]{"STUDENT", "TEACHER"}) {
+            for (String permission : new String[]{"student.self_view", "class.self_view", "schedule.self_view"}) {
+                jdbc.update("""
+                    INSERT INTO role_permission(role_id,permission_id)
+                    SELECT r.id,p.id FROM role r JOIN permission p ON p.code=?
+                    WHERE r.code=?
+                    ON DUPLICATE KEY UPDATE permission_id=VALUES(permission_id)
+                    """, permission, role);
+            }
         }
         for (var bundle : PermissionCatalog.BUNDLES) {
             jdbc.update("""

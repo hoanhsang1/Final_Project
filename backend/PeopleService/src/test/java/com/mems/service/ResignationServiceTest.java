@@ -149,6 +149,45 @@ class ResignationServiceTest {
             eq("RESIGNATION_REQUEST"), anyString());
     }
 
+    @Test
+    @DisplayName("Self-service list only returns the caller's own requests")
+    void mineListsOnlyOwnRequests() {
+        when(requests.mine(ORG, APPROVER, null)).thenReturn(java.util.List.of(pending()));
+
+        var result = service.mine(null);
+
+        org.assertj.core.api.Assertions.assertThat(result).hasSize(1);
+        verify(requests).mine(ORG, APPROVER, null);
+    }
+
+    @Test
+    @DisplayName("Self-service create resolves the caller's department and cannot target another user")
+    void createSelfUsesCallerIdentity() {
+        when(members.findDepartmentId(APPROVER, ORG)).thenReturn(java.util.Optional.of(DEPT));
+        when(members.require(APPROVER, ORG, DEPT, true)).thenReturn(new MemberResponse(
+            APPROVER, "self.user", DEPT, "STAFF", "ACTIVE", null, Instant.now(),
+            Set.of(), Set.of()));
+        when(approval.approverIds(ORG, DEPT, APPROVER, APPROVER)).thenReturn(Set.of("head-1"));
+
+        service.createSelf(new ResignationCreateRequest(APPROVER, "Lý do cá nhân"));
+
+        verify(requests).create(anyString(), eq(ORG), eq(APPROVER), eq(DEPT),
+            eq("Lý do cá nhân"), eq(APPROVER));
+    }
+
+    @Test
+    @DisplayName("Self-service create rejects a request for someone else")
+    void createSelfRejectsOtherUser() {
+        when(actor.forbidden(anyString())).thenReturn(new AppException(ErrorCode.FORBIDDEN));
+
+        assertThatThrownBy(() -> service.createSelf(new ResignationCreateRequest(EMPLOYEE, "Lý do")))
+            .isInstanceOf(AppException.class);
+
+        verify(members, never()).findDepartmentId(anyString(), anyString());
+        verify(requests, never()).create(anyString(), anyString(), anyString(), anyString(),
+            anyString(), anyString());
+    }
+
     private ResignationResponse pending() {
         return new ResignationResponse(REQUEST_ID, EMPLOYEE, "emp.user", "Nhân viên", DEPT,
             "Lý do", "PENDING", REQUESTER, "Người yêu cầu", Instant.now(),

@@ -7,8 +7,11 @@ import { PERM } from '@/lib/permissions'
 
 /** Số liệu hiển thị trên badge điều hướng; chỉ gọi API khi người dùng có quyền. */
 export function useNavBadges() {
-  const { can, isSuperAdmin } = usePermission()
-  const canSeeApprovals = can(PERM.approvalInboxView) || can(PERM.employeeApproveTransfer)
+  const { can, isSuperAdmin, session } = usePermission()
+  const canSeeApprovals =
+    can(PERM.approvalInboxView) ||
+    can(PERM.employeeApproveTransfer) ||
+    Boolean(session?.approvals?.any)
 
   const pending = usePendingOrganizations(isSuperAdmin)
   const approvals = useTransferInbox(canSeeApprovals)

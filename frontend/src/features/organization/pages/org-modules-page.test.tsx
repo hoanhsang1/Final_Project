@@ -17,6 +17,7 @@ vi.mock('@/features/organization/api', async (importOriginal) => {
     orgModulesApi: {
       ...actual.orgModulesApi,
       mine: vi.fn(),
+      status: vi.fn(),
       toggle: vi.fn(),
     },
   }
@@ -28,8 +29,17 @@ const modules: OrganizationModule[] = [
   { code: 'EQUIPMENT_MANAGEMENT', name: 'Quản lý thiết bị', isCore: false, status: 'locked', lockedByAdmin: true },
 ]
 
+/** Hàng trả về từ GET /api/v1/modules/status (snake_case như backend). */
+const statusRows = modules.map((module) => ({
+  code: module.code,
+  name: module.name,
+  is_core: module.isCore,
+  status: module.status,
+}))
+
 beforeEach(() => {
   vi.mocked(orgModulesApi.mine).mockResolvedValue(modules)
+  vi.mocked(orgModulesApi.status).mockResolvedValue(statusRows)
   vi.mocked(orgModulesApi.toggle).mockReset()
   signInAs()
 })
@@ -49,6 +59,12 @@ describe('OrgModulesPage — quản lý module tổ chức', () => {
 
   it('bật module tùy chọn sau khi xác nhận và nạp lại module cho phiên', async () => {
     vi.mocked(orgModulesApi.toggle).mockResolvedValue(undefined)
+    // Sau khi bật, FACILITY chuyển active và trạng thái nạp lại phản ánh điều đó.
+    vi.mocked(orgModulesApi.status).mockResolvedValue(
+      statusRows.map((row) =>
+        row.code === 'FACILITY_MANAGEMENT' ? { ...row, status: 'active' } : row,
+      ),
+    )
 
     renderPage(<OrgModulesPage />)
 
@@ -61,11 +77,18 @@ describe('OrgModulesPage — quản lý module tổ chức', () => {
     await waitFor(() =>
       expect(orgModulesApi.toggle).toHaveBeenCalledWith('FACILITY_MANAGEMENT', true),
     )
-    // onSuccess refetch danh sách module + hydrate module vào phiên.
+    // onSuccess refetch danh sách module + hydrate trạng thái module vào phiên.
     await waitFor(() =>
       expect(vi.mocked(orgModulesApi.mine).mock.calls.length).toBeGreaterThanOrEqual(2),
     )
-    expect(useSessionStore.getState().session?.modules).toEqual(['STUDENT_MANAGEMENT'])
+    await waitFor(() => expect(orgModulesApi.status).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(useSessionStore.getState().session?.modules).toEqual([
+        'STUDENT_MANAGEMENT',
+        'FACILITY_MANAGEMENT',
+      ]),
+    )
+    expect(useSessionStore.getState().session?.moduleStates?.FACILITY_MANAGEMENT).toBe('active')
   })
 
   it('giữ nguyên trạng thái và báo lỗi khi bật module thất bại', async () => {

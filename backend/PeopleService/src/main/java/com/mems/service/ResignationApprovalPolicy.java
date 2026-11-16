@@ -84,6 +84,24 @@ public class ResignationApprovalPolicy {
         return result;
     }
 
+    /**
+     * Người gọi có khả năng duyệt nghỉ việc ở một phòng ban nào đó (dù hiện chưa
+     * có yêu cầu): OWNER, trưởng phòng của phòng mình, người giữ quyền trực tiếp
+     * (không qua ủy quyền) trong phòng mình, hoặc Tổng quản lý có ủy quyền.
+     */
+    public boolean canApproveAny(String orgId) {
+        if (actor.owner()) return true;
+        String actorId = actor.userId();
+        String departmentId = actor.departmentIdOrNull();
+        if (departmentId != null) {
+            if (headIds(orgId, departmentId).contains(actorId)) return true;
+            var resolved = effectivePermissions.resolve(orgId, actorId, departmentId);
+            if (resolved.permissions().contains(APPROVE_PERMISSION)
+                && !resolved.delegatedPermissions().contains(APPROVE_PERMISSION)) return true;
+        }
+        return hasDelegatedPermission(orgId, actorId);
+    }
+
     public Set<String> headIds(String orgId, String departmentId) {
         Timestamp now = Timestamp.from(Instant.now());
         List<Object> params = new ArrayList<>(List.of(orgId, departmentId));

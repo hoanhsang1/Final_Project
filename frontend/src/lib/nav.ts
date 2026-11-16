@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   DoorOpen,
   FileBadge,
+  FileText,
   GraduationCap,
   Inbox,
   KeyRound,
@@ -25,7 +26,7 @@ import {
 } from 'lucide-react'
 
 import { PERM } from '@/lib/permissions'
-import type { Session } from '@/types/session'
+import type { ModuleState, Session } from '@/types/session'
 
 export type WorkspaceId = 'platform' | 'organization' | 'academic' | 'self'
 
@@ -45,6 +46,8 @@ export interface NavItem {
   /** Khớp chính xác đường dẫn (dùng cho trang gốc của workspace). */
   end?: boolean
   badge?: 'approvals' | 'notifications' | 'pendingOrganizations'
+  /** Hiện khi backend báo người dùng có khả năng duyệt (không cần mã quyền). */
+  capability?: 'approvals'
   description?: string
 }
 
@@ -88,16 +91,27 @@ export function hasAnyPermission(session: Session | null | undefined, codes: str
   return isOwner(session) || codes.some((code) => session.permissions.includes(code))
 }
 
+/** Trạng thái module; `unknown` khi chưa nạp được (không suy đoán là đã tắt). */
+export function moduleState(session: Session | null | undefined, code: string): ModuleState {
+  if (!session) return 'unknown'
+  return session.moduleStates?.[code] ?? 'unknown'
+}
+
 export function hasModule(session: Session | null | undefined, code: string): boolean {
   if (!session) return false
-  // Backend chưa cung cấp danh sách module trong JWT. Khi chưa có dữ liệu,
-  // không ẩn menu (backend vẫn chặn bằng MODULE_NOT_ENABLED và UI hiển thị lỗi).
-  if (session.modules.length === 0) return true
-  return session.modules.includes(code)
+  // Chưa nạp được trạng thái → không ẩn; backend vẫn chặn bằng MODULE_NOT_ENABLED.
+  // Chỉ ẩn khi module chưa từng đăng ký. disabled/locked vẫn cho đọc (backend cho phép đọc).
+  return moduleState(session, code) !== 'not_registered'
+}
+
+/** Ghi dữ liệu (tạo/sửa/xoá) chỉ khi module đang active. */
+export function canWriteModule(session: Session | null | undefined, code: string): boolean {
+  return moduleState(session, code) === 'active'
 }
 
 export function canSeeItem(session: Session | null, item: NavItem): boolean {
   if (!session) return false
+  if (item.capability === 'approvals' && session.approvals?.any) return true
   if (item.modules?.length && !item.modules.some((code) => hasModule(session, code))) return false
   if (!item.permissions?.length) return true
   return hasAnyPermission(session, item.permissions)
@@ -350,6 +364,15 @@ export const WORKSPACES: Workspace[] = [
             modules: ['CLASS_MANAGEMENT'],
             status: 'ready',
           },
+          {
+            id: 'my-classes',
+            label: 'Lớp của tôi',
+            to: '/dao-tao/lop-cua-toi',
+            icon: BookOpen,
+            permissions: [PERM.classSelfView],
+            modules: ['CLASS_MANAGEMENT'],
+            status: 'ready',
+          },
         ],
       },
       {
@@ -430,8 +453,16 @@ export const WORKSPACES: Workspace[] = [
             to: '/viec-cho-duyet',
             icon: Inbox,
             permissions: [PERM.approvalInboxView, PERM.employeeApproveTransfer, PERM.employeeApproveResignation, PERM.classApproveClose],
+            capability: 'approvals',
             status: 'ready',
             badge: 'approvals',
+          },
+          {
+            id: 'my-requests',
+            label: 'Yêu cầu của tôi',
+            to: '/ho-so/yeu-cau',
+            icon: FileText,
+            status: 'ready',
           },
           {
             id: 'notifications',
@@ -510,7 +541,9 @@ export function accessibleWorkspaces(session: Session | null): Workspace[] {
 export function defaultRouteFor(session: Session): string {
   if (isSuperAdmin(session)) return '/quan-tri'
   if (isOwner(session)) return '/to-chuc'
-  if (hasPermission(session, PERM.approvalInboxView)) return '/viec-cho-duyet'
+  if (hasPermission(session, PERM.approvalInboxView) || session.approvals?.any) {
+    return '/viec-cho-duyet'
+  }
   // Người quản lý nhân sự/phòng ban vào tổng quan tổ chức trước khu đào tạo.
   if (canEnterOrganizationWorkspace(session)) return '/to-chuc'
   if (canEnterAcademicWorkspace(session)) return '/dao-tao'

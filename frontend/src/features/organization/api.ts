@@ -179,6 +179,12 @@ export const orgModulesApi = {
   async toggle(code: string, enabled: boolean): Promise<void> {
     await api.patch(`/api/v1/organizations/my/modules/${code}`, { enabled })
   },
+
+  /** Trạng thái module cho mọi vai trò trong tổ chức (dùng để ẩn/hiện menu đúng). */
+  async status(): Promise<RawOrganizationModule[]> {
+    const { data } = await api.get<RawOrganizationModule[]>('/api/v1/modules/status')
+    return data
+  },
 }
 
 export const notificationsApi = {

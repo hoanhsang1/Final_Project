@@ -28,6 +28,17 @@ export interface SessionUser {
   mustChangePassword: boolean
 }
 
+/** Trạng thái module của tổ chức; `unknown` = chưa nạp được (không được suy đoán là tắt). */
+export type ModuleState = 'active' | 'disabled' | 'locked' | 'not_registered' | 'unknown'
+
+/** Quyền duyệt do backend quyết theo chức danh + uỷ quyền, không suy từ role. */
+export interface ApprovalCapabilities {
+  transfer: boolean
+  resignation: boolean
+  classLifecycle: boolean
+  any: boolean
+}
+
 export interface Session {
   user: SessionUser
   roles: RoleCode[]
@@ -44,12 +55,26 @@ export interface Session {
    * Để trống nghĩa là "chưa xác định": UI dựa vào quyền, backend vẫn chặn bằng MODULE_NOT_ENABLED.
    */
   modules: string[]
+  /** Trạng thái chi tiết từng module (active/disabled/locked/not_registered). */
+  moduleStates?: Record<string, ModuleState>
+  /** Khả năng duyệt lấy từ `/users/me/approval-capabilities`. */
+  approvals?: ApprovalCapabilities | null
   expiresAt?: number
 }
 
 export interface LoginRequest {
   username: string
   password: string
+}
+
+/** Phản hồi `/users/me/permissions` — quyền hiệu lực hiện tại (không phải JWT cũ). */
+export interface EffectivePermissionsResponse {
+  userId: string
+  orgId: string
+  departmentId: string | null
+  permissions: string[]
+  permissionScopes: Record<string, string[]>
+  delegatedPermissions: string[]
 }
 
 export interface LoginResponse {

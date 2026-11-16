@@ -63,11 +63,21 @@ public class SchoolClassRepository {
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable) {
-        return list(orgId, page, size, q, status, selectable, null);
+        return list(orgId, page, size, q, status, selectable, null, null, null);
     }
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable, Boolean needsReassignment) {
+        return list(orgId, page, size, q, status, selectable, needsReassignment, null, null);
+    }
+
+    /**
+     * @param teacherId     chỉ lớp của giáo viên này (giáo viên xem lớp của mình)
+     * @param departmentIds chỉ lớp do giáo viên/người tạo thuộc các phòng này phụ trách
+     */
+    public Map<String, Object> list(String orgId, int page, int size, String q, String status,
+                                    boolean selectable, Boolean needsReassignment,
+                                    String teacherId, Set<String> departmentIds) {
         if (page < 1) page = 1;
         if (size < 1) size = 20;
         if (size > 100) size = 100;
@@ -88,6 +98,13 @@ public class SchoolClassRepository {
         if (Boolean.TRUE.equals(needsReassignment)) {
             where.append(" AND c.needs_reassignment = TRUE ");
         }
+
+        if (teacherId != null && !teacherId.isBlank()) {
+            where.append(" AND c.teacher_id = ? ");
+            params.add(teacherId);
+        }
+
+        appendDepartmentFilter(where, params, departmentIds);
 
         if (q != null && !q.isBlank()) {
             where.append(" AND (LOWER(c.name) LIKE ? OR LOWER(c.class_code) LIKE ?) ");
@@ -315,6 +332,46 @@ public class SchoolClassRepository {
             "DELETE FROM class_student WHERE class_id = ? AND student_id = ? AND org_id = ?",
             classId, studentId, orgId
         );
+    }
+
+    /** Lớp thuộc phạm vi các phòng ban (giáo viên hoặc người tạo lớp là thành viên phòng). */
+    public boolean inDepartments(String orgId, String classId, Set<String> departmentIds) {
+        if (departmentIds == null || departmentIds.isEmpty()) return false;
+        String placeholders = String.join(",", Collections.nCopies(departmentIds.size(), "?"));
+        List<Object> params = new ArrayList<>(List.of(orgId, classId));
+        params.addAll(departmentIds);
+        params.addAll(departmentIds);
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM school_class c
+            WHERE c.org_id = ? AND c.id = ? AND c.deleted_at IS NULL
+              AND (EXISTS (SELECT 1 FROM department_member dm
+                           WHERE dm.org_id = c.org_id AND dm.user_id = c.teacher_id
+                             AND dm.department_id IN (""" + placeholders + """
+                          ))
+                OR EXISTS (SELECT 1 FROM department_member dm
+                           WHERE dm.org_id = c.org_id AND dm.user_id = c.created_by
+                             AND dm.department_id IN (""" + placeholders + """
+                          )))
+            """, Integer.class, params.toArray());
+        return count != null && count > 0;
+    }
+
+    private void appendDepartmentFilter(StringBuilder where, List<Object> params,
+                                        Set<String> departmentIds) {
+        if (departmentIds == null || departmentIds.isEmpty()) return;
+        String placeholders = String.join(",", Collections.nCopies(departmentIds.size(), "?"));
+        where.append("""
+             AND (EXISTS (SELECT 1 FROM department_member dm
+                          WHERE dm.org_id = c.org_id AND dm.user_id = c.teacher_id
+                            AND dm.department_id IN (""" + placeholders + """
+                         ))
+               OR EXISTS (SELECT 1 FROM department_member dm
+                          WHERE dm.org_id = c.org_id AND dm.user_id = c.created_by
+                            AND dm.department_id IN (""" + placeholders + """
+                         )))
+            """);
+        params.addAll(departmentIds);
+        params.addAll(departmentIds);
     }
 }
 

@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -64,7 +65,19 @@ public class SchoolClassService {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
-        return repository.list(orgId, page, size, q, status, selectable, needsReassignment);
+        return repository.list(orgId, page, size, q, status, selectable, needsReassignment,
+            null, classViewDepartments());
+    }
+
+    /** Lớp được phân công cho chính giáo viên đang đăng nhập. */
+    @Transactional
+    public Map<String, Object> myClasses(int page, int size, String q, String status, boolean selectable) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
+        teacherRepository.requireTeacher(actor.userId(), orgId, false);
+        classStatusService.refreshOrganization(orgId);
+        return repository.list(orgId, page, size, q, status, selectable, null,
+            actor.userId(), null);
     }
 
     @Transactional
@@ -72,7 +85,9 @@ public class SchoolClassService {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
-        return repository.require(id, orgId, false);
+        SchoolClassResponse schoolClass = repository.require(id, orgId, false);
+        requireClassInScope(orgId, schoolClass);
+        return schoolClass;
     }
 
     @Transactional
@@ -191,7 +206,22 @@ public class SchoolClassService {
     public List<StudentResponse> listStudents(String classId) {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
-        repository.require(classId, orgId, false);
+        SchoolClassResponse schoolClass = repository.require(classId, orgId, false);
+        requireClassInScope(orgId, schoolClass);
+        return studentRepository.findByClassId(classId, orgId);
+    }
+
+    /** Học sinh trong lớp do chính giáo viên đang đăng nhập phụ trách. */
+    @Transactional(readOnly = true)
+    public List<StudentResponse> myClassStudents(String classId) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
+        teacherRepository.requireTeacher(actor.userId(), orgId, false);
+        SchoolClassResponse schoolClass = repository.require(classId, orgId, false);
+        String teacherId = schoolClass.teacher() == null ? null : schoolClass.teacher().id();
+        if (!actor.userId().equals(teacherId)) {
+            throw actor.forbidden("Class is not assigned to you");
+        }
         return studentRepository.findByClassId(classId, orgId);
     }
 
@@ -238,6 +268,22 @@ public class SchoolClassService {
         if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
             throw new AppException(ErrorCode.VALIDATION_ERROR,
                 "endDate: must not be before startDate");
+        }
+    }
+
+    /** null = xem toàn tổ chức; ngược lại chỉ các phòng ban này. */
+    private Set<String> classViewDepartments() {
+        if (actor.owner() || actor.hasOrganizationScope("class.view")) return null;
+        Set<String> departments = actor.departmentScopes("class.view");
+        if (departments.isEmpty()) throw actor.forbidden("Missing permission in scope: class.view");
+        return departments;
+    }
+
+    private void requireClassInScope(String orgId, SchoolClassResponse schoolClass) {
+        if (actor.owner() || actor.hasOrganizationScope("class.view")) return;
+        Set<String> departments = actor.departmentScopes("class.view");
+        if (!repository.inDepartments(orgId, schoolClass.id(), departments)) {
+            throw actor.forbidden("Class is outside your department scope");
         }
     }
 }

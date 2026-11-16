@@ -54,6 +54,32 @@ public class Actor {
         return departmentId != null && tokens.contains("DEPARTMENT:" + departmentId);
     }
 
+    /** Quyền được cấp ở phạm vi ORGANIZATION (token cũ: suy từ departmentId). */
+    public boolean hasOrganizationScope(String code) {
+        if (owner()) return true;
+        Object raw = jwt().getClaim("permissionScopes");
+        if (!(raw instanceof Map<?, ?> scopes)) return departmentIdOrNull() == null;
+        Object tokensRaw = scopes.get(code);
+        return tokensRaw instanceof Collection<?> tokens && tokens.contains("ORGANIZATION");
+    }
+
+    /** Các department id được cấp quyền DEPARTMENT cho mã quyền. */
+    public Set<String> departmentScopes(String code) {
+        Object raw = jwt().getClaim("permissionScopes");
+        if (!(raw instanceof Map<?, ?> scopes)) {
+            String departmentId = departmentIdOrNull();
+            return departmentId == null ? Set.of() : Set.of(departmentId);
+        }
+        Object tokensRaw = scopes.get(code);
+        if (!(tokensRaw instanceof Collection<?> tokens)) return Set.of();
+        Set<String> departments = new LinkedHashSet<>();
+        for (Object token : tokens) {
+            String value = String.valueOf(token);
+            if (value.startsWith("DEPARTMENT:")) departments.add(value.substring("DEPARTMENT:".length()));
+        }
+        return departments;
+    }
+
     public void requirePermission(String code) {
         orgId();
         if (!hasPermission(code)) throw forbidden("Missing permission: " + code);

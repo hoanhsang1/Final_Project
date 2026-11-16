@@ -16,7 +16,7 @@ import type {
   Position,
   PositionInput,
 } from '@/features/organization/types'
-import { hydrateOwnerModules } from '@/features/auth/module-hydration'
+import { hydrateSessionContext, refreshEffectivePermissions } from '@/features/auth/module-hydration'
 import { queryKeys } from '@/lib/query-keys'
 import { useDepartmentScope } from '@/features/organization/use-scope'
 
@@ -93,7 +93,7 @@ export function useToggleOrgModule() {
       orgModulesApi.toggle(code, enabled),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.orgModules })
-      await hydrateOwnerModules()
+      await hydrateSessionContext()
     },
   })
 }
@@ -141,7 +141,11 @@ export function useUpdatePosition() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: PositionInput }) =>
       positionsApi.update(id, input),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await invalidate()
+      // Sửa chức vụ đang giữ có thể đổi quyền của chính người thao tác.
+      void refreshEffectivePermissions()
+    },
   })
 }
 
@@ -347,7 +351,11 @@ export function useUpdateMemberPositions() {
       positionIds: string[]
       reason?: string
     }) => departmentsApi.updatePositions(departmentId, userId, positionIds, reason),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await invalidate()
+      // Chức vụ của chính người dùng có thể vừa đổi → đồng bộ quyền hiệu lực.
+      void refreshEffectivePermissions()
+    },
   })
 }
 

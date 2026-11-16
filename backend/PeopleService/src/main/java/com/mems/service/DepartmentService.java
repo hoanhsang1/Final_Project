@@ -50,6 +50,12 @@ public class DepartmentService {
         return repository.list(actor.orgId(), actor.jwt().getClaimAsString("departmentId"), actor.owner());
     }
 
+    /** Danh mục phòng ban để nhân sự chọn đích khi tự xin điều chuyển (không cần quyền quản lý). */
+    @Transactional(readOnly = true)
+    public List<DepartmentResponse> transferTargets() {
+        return repository.list(actor.orgId(), null, true);
+    }
+
     @Transactional(readOnly = true)
     public DepartmentResponse get(String id) {
         actor.requirePermissionIn("department.view", id);

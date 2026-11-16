@@ -201,7 +201,8 @@ public class OrganizationModuleService {
         requireActiveOrg(orgId);
         return jdbc.queryForList("""
             SELECT m.code, m.name, m.is_core,
-                   COALESCE(om.status, 'not_registered') AS status,
+                   CASE WHEN m.is_core THEN 'active'
+                        ELSE COALESCE(om.status, 'not_registered') END AS status,
                    om.locked_by_admin, om.locked_reason, om.locked_at, om.disabled_at
             FROM module m
             LEFT JOIN organization_module om ON om.module_code = m.code AND om.org_id = ?
@@ -216,8 +217,26 @@ public class OrganizationModuleService {
         requireActiveOrg(orgId);
         return jdbc.queryForList("""
             SELECT m.code, m.name, m.is_core,
-                   COALESCE(om.status, 'not_registered') AS status,
+                   CASE WHEN m.is_core THEN 'active'
+                        ELSE COALESCE(om.status, 'not_registered') END AS status,
                    CASE WHEN om.status = 'locked' THEN TRUE ELSE FALSE END AS is_locked_by_admin
+            FROM module m
+            LEFT JOIN organization_module om ON om.module_code = m.code AND om.org_id = ?
+            WHERE m.is_active = TRUE
+            ORDER BY m.is_core DESC, m.code
+            """, orgId);
+    }
+
+    /**
+     * Trạng thái module cho mọi thành viên (không lộ lý do khoá của SUPER_ADMIN).
+     * FE dùng để phân biệt UNKNOWN / ACTIVE / DISABLED / LOCKED / NOT_REGISTERED.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> statusForMember(String orgId) {
+        return jdbc.queryForList("""
+            SELECT m.code, m.name, m.is_core,
+                   CASE WHEN m.is_core THEN 'active'
+                        ELSE COALESCE(om.status, 'not_registered') END AS status
             FROM module m
             LEFT JOIN organization_module om ON om.module_code = m.code AND om.org_id = ?
             WHERE m.is_active = TRUE

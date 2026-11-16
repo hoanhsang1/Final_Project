@@ -9,6 +9,7 @@ import type {
 } from '@/features/academic/types'
 
 export const academicKeys = {
+  myTeacher: ['teachers', 'me'] as const,
   teachers: (params: unknown) => ['teachers', params] as const,
   teacher: (id: string) => ['teachers', id] as const,
   students: (params: unknown) => ['students', params] as const,
@@ -16,6 +17,8 @@ export const academicKeys = {
   myStudent: ['students', 'me'] as const,
   myStudentClasses: ['students', 'me', 'classes'] as const,
   classes: (params: unknown) => ['classes', params] as const,
+  myClasses: (params: unknown) => ['classes', 'me', params] as const,
+  myClassStudents: (id: string) => ['classes', 'me', id, 'students'] as const,
   class: (id: string) => ['classes', id] as const,
   classStudents: (id: string) => ['classes', id, 'students'] as const,
   classLogs: (id: string) => ['classes', id, 'status-logs'] as const,
@@ -50,6 +53,15 @@ export function useTeacher(staffId: string | undefined) {
     queryKey: academicKeys.teacher(staffId ?? ''),
     queryFn: () => teachersApi.byId(staffId!),
     enabled: Boolean(staffId),
+  })
+}
+
+export function useMyTeacherProfile(enabled = true) {
+  return useQuery({
+    queryKey: academicKeys.myTeacher,
+    queryFn: () => teachersApi.me(),
+    enabled,
+    retry: false,
   })
 }
 
@@ -138,6 +150,22 @@ export function useClasses(params: {
     queryKey: academicKeys.classes(params),
     queryFn: () => classesApi.list(params),
     placeholderData: (previous) => previous,
+  })
+}
+
+export function useMyClasses(params: { page?: number; size?: number; q?: string; status?: string }) {
+  return useQuery({
+    queryKey: academicKeys.myClasses(params),
+    queryFn: () => classesApi.mine(params),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useMyClassStudents(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: academicKeys.myClassStudents(id ?? ''),
+    queryFn: () => classesApi.myStudents(id!),
+    enabled: Boolean(id) && enabled,
   })
 }
 

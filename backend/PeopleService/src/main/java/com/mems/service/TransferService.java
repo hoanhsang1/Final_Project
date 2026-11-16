@@ -85,6 +85,19 @@ public class TransferService {
             .toList();
     }
 
+    /**
+     * Người gọi có vai trò duyệt chuyển phòng (dù hiện chưa có yêu cầu nào):
+     * OWNER, trưởng phòng bất kỳ, hoặc người giữ employee.approve_transfer.
+     */
+    @Transactional(readOnly = true)
+    public boolean canDecideAny() {
+        if (actor.owner()) return true;
+        String orgId = actor.orgId();
+        if (transfers.isHead(orgId, actor.userId(), HEAD_POSITION_NAMES)) return true;
+        String departmentId = actor.departmentIdOrNull();
+        return departmentId != null && policy.hasPermission(departmentId, "employee.approve_transfer");
+    }
+
     @Transactional(readOnly = true)
     public TransferResponse detail(String id) {
         TransferResponse response = decorate(transfers.require(id, actor.orgId()));
@@ -103,27 +116,46 @@ public class TransferService {
         if (!policy.hasPermission(fromDepartmentId, "employee.transfer")
             && !policy.hasPermission(request.toDepartmentId(), "employee.transfer"))
             throw actor.forbidden("Missing permission in department: employee.transfer");
+        return createInternal(request.userId(), fromDepartmentId, request.toDepartmentId(), request.reason());
+    }
 
-        MemberResponse member = members.require(request.userId(), orgId, fromDepartmentId, true);
+    /** Nhân sự tự gửi yêu cầu chuyển phòng cho chính mình (không cần quyền quản lý). */
+    @Transactional
+    public TransferResponse createSelf(TransferCreateRequest request) {
+        if (!actor.userId().equals(request.userId()))
+            throw actor.forbidden("You can only request your own transfer");
+        String orgId = actor.orgId();
+        String fromDepartmentId = transfers.currentDepartment(orgId, actor.userId())
+            .orElseThrow(() -> new AppException(ErrorCode.MEMBER_NOT_FOUND));
+        departments.require(request.toDepartmentId(), orgId, false);
+        if (fromDepartmentId.equals(request.toDepartmentId()))
+            throw new AppException(ErrorCode.TRANSFER_SAME_DEPARTMENT);
+        return createInternal(request.userId(), fromDepartmentId, request.toDepartmentId(), request.reason());
+    }
+
+    private TransferResponse createInternal(String userId, String fromDepartmentId,
+                                            String toDepartmentId, String rawReason) {
+        String orgId = actor.orgId();
+        MemberResponse member = members.require(userId, orgId, fromDepartmentId, true);
         if ("OWNER".equals(member.role()))
             throw new AppException(ErrorCode.TRANSFER_OWNER_NOT_ALLOWED);
         if (!"ACTIVE".equals(member.status()))
             throw new AppException(ErrorCode.MEMBER_NOT_ACTIVE);
-        if (transfers.hasPending(orgId, request.userId()))
+        if (transfers.hasPending(orgId, userId))
             throw new AppException(ErrorCode.TRANSFER_ALREADY_PENDING);
 
-        requireHeads(orgId, fromDepartmentId, request.toDepartmentId());
+        requireHeads(orgId, fromDepartmentId, toDepartmentId);
 
         String id = UUID.randomUUID().toString();
-        transfers.create(id, orgId, request.userId(), fromDepartmentId, request.toDepartmentId(),
-            request.reason().trim(), actor.userId());
+        transfers.create(id, orgId, userId, fromDepartmentId, toDepartmentId,
+            rawReason.trim(), actor.userId());
 
         TransferResponse created = decorate(transfers.require(id, orgId));
         notifications.notifyAll(orgId, parties(created), "TRANSFER_REQUESTED",
             "Yêu cầu chuyển phòng ban cần duyệt", summary(created), "TRANSFER_REQUEST", id);
-        audit.record(orgId, actor.userId(), "TRANSFER_REQUESTED", request.userId(),
+        audit.record(orgId, actor.userId(), "TRANSFER_REQUESTED", userId,
             Map.of("requestId", id, "fromDepartmentId", fromDepartmentId,
-                "toDepartmentId", request.toDepartmentId()));
+                "toDepartmentId", toDepartmentId));
         return created;
     }
 

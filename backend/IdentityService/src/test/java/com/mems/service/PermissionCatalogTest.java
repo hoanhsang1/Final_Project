@@ -37,15 +37,24 @@ class PermissionCatalogTest {
     }
 
     @Test
-    @DisplayName("Quyền nhân sự cho phép cả ORGANIZATION và DEPARTMENT; quyền học sinh/lớp chỉ ORGANIZATION")
+    @DisplayName("Quyền nhân sự/lớp cho phép cả ORGANIZATION và DEPARTMENT; quyền ghi học sinh chỉ ORGANIZATION")
     void allowedScopesFollowResourceModel() {
         var byCode = PermissionCatalog.ENTRIES.stream()
             .collect(Collectors.toMap(PermissionCatalog.PermissionDefinition::code, p -> p));
 
         assertThat(byCode.get("employee.view").allowedScopes())
             .containsExactlyInAnyOrder("ORGANIZATION", "DEPARTMENT");
-        assertThat(byCode.get("class.view").allowedScopes()).containsExactly("ORGANIZATION");
+        // Trưởng phòng/HR phòng cần xem lớp trong phòng mình (PeopleService lọc dữ liệu).
+        assertThat(byCode.get("class.view").allowedScopes())
+            .containsExactlyInAnyOrder("ORGANIZATION", "DEPARTMENT");
+        assertThat(byCode.get("class.reopen").allowedScopes())
+            .containsExactlyInAnyOrder("ORGANIZATION", "DEPARTMENT");
         assertThat(byCode.get("student.create").allowedScopes()).containsExactly("ORGANIZATION");
+        // Quyền tự phục vụ phải dùng được ở cả hai phạm vi.
+        for (String code : List.of("student.self_view", "class.self_view", "schedule.self_view")) {
+            assertThat(byCode.get(code).allowedScopes())
+                .containsExactlyInAnyOrder("ORGANIZATION", "DEPARTMENT");
+        }
     }
 
     @Test

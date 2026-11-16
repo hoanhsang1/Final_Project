@@ -53,6 +53,25 @@ public class SchoolClassController {
         return service.get(id);
     }
 
+    /** Lớp được phân công cho chính giáo viên đang đăng nhập (self contract). */
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('class.self_view','class.view')")
+    public Map<String, Object> myClasses(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(required = false) String q,
+        @RequestParam(required = false) String status,
+        @RequestParam(defaultValue = "false") boolean selectable
+    ) {
+        return service.myClasses(page, size, q, status, selectable);
+    }
+
+    @GetMapping("/me/{id}/students")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('class.self_view','class.view')")
+    public List<StudentResponse> myClassStudents(@PathVariable String id) {
+        return service.myClassStudents(id);
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('OWNER') or hasAuthority('class.create')")
     public ResponseEntity<SchoolClassResponse> create(@Valid @RequestBody SchoolClassRequest request) {
@@ -145,8 +164,10 @@ public class SchoolClassController {
         return statusService.closeEvents(id);
     }
 
+    // Students of a class are visible to whoever may view that class; the service
+    // enforces department scope for DEPARTMENT-only class.view holders.
     @GetMapping("/{id}/students")
-    @PreAuthorize("hasRole('OWNER') or (hasAuthority('class.view') and hasAuthority('student.view'))")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.view')")
     public List<StudentResponse> listStudents(@PathVariable String id) {
         return service.listStudents(id);
     }

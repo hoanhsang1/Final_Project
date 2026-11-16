@@ -163,7 +163,7 @@ public class ClassStatusService {
     public List<ClassStatusLogResponse> statusLogs(String classId) {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
-        classRepository.require(classId, orgId, false);
+        requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.statusLogs(classId, orgId);
     }
 
@@ -233,6 +233,7 @@ public class ClassStatusService {
         refreshOrganization(orgId);
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
+        requirePermissionScope(orgId, before, "class.reopen");
         if (!"CLOSED".equals(before.closeState())) {
             throw closeStateChanged();
         }
@@ -248,8 +249,21 @@ public class ClassStatusService {
     public List<ClassCloseEventResponse> closeEvents(String classId) {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
-        classRepository.require(classId, orgId, false);
+        requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.closeEvents(classId, orgId);
+    }
+
+    private void requireViewScope(String orgId, SchoolClassResponse schoolClass) {
+        requirePermissionScope(orgId, schoolClass, "class.view");
+    }
+
+    /** Quyền chỉ ở phạm vi DEPARTMENT thì lớp phải do phòng ban đó phụ trách. */
+    private void requirePermissionScope(String orgId, SchoolClassResponse schoolClass, String permission) {
+        if (actor.owner() || actor.hasOrganizationScope(permission)) return;
+        Set<String> departments = actor.departmentScopes(permission);
+        if (!classRepository.inDepartments(orgId, schoolClass.id(), departments)) {
+            throw actor.forbidden("Class is outside your department scope");
+        }
     }
 
     private void requirePendingCancel(SchoolClassResponse schoolClass) {

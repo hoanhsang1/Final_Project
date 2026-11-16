@@ -418,6 +418,23 @@ class OrganizationModuleServiceTest {
 
     // ------------------------------------------------------------------ stubs
 
+    @Test
+    @DisplayName("Status for member resolves every module, including not_registered ones")
+    void statusForMemberIncludesUnregisteredModules() {
+        var rows = List.of(
+            Map.<String, Object>of("code", MODULE_STUDENT, "name", "Sinh viên",
+                "is_core", true, "status", "active"),
+            Map.<String, Object>of("code", MODULE_FACILITY, "name", "Cơ sở vật chất",
+                "is_core", false, "status", "not_registered"));
+        when(jdbc.queryForList(contains("COALESCE(om.status, 'not_registered')"), eq(ORG_ID)))
+            .thenReturn(rows);
+
+        var result = service.statusForMember(ORG_ID);
+
+        assertThat(result).isEqualTo(rows);
+        verify(jdbc).queryForList(contains("COALESCE(om.status, 'not_registered')"), eq(ORG_ID));
+    }
+
     private void stubOrg(String orgId, String status) {
         when(jdbc.queryForList(contains("FROM organization WHERE id"), eq(String.class), eq(orgId)))
             .thenReturn(List.of(status));

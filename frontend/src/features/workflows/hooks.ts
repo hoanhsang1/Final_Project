@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { refreshEffectivePermissions } from '@/features/auth/module-hydration'
 import { notificationsApi } from '@/features/organization/api'
 import type { AppNotification } from '@/features/organization/types'
 import {
@@ -39,6 +40,11 @@ export function useResignationMutations(departmentId: string | undefined) {
       resignationsApi.create(departmentId!, input),
     onSuccess: invalidate,
   })
+  const createMine = useMutation({
+    mutationFn: (input: { userId: string; reason: string }) =>
+      resignationsApi.createMine(input.userId, input.reason),
+    onSuccess: invalidate,
+  })
   const decide = useMutation({
     mutationFn: ({
       requestId,
@@ -51,7 +57,15 @@ export function useResignationMutations(departmentId: string | undefined) {
     }) => resignationsApi.decide(departmentId!, requestId, decision, note),
     onSuccess: invalidate,
   })
-  return { create, decide }
+  return { create, createMine, decide }
+}
+
+export function useMyResignations(status?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['resignation-requests', 'me', status ?? 'ALL'],
+    queryFn: () => resignationsApi.mine(status),
+    enabled,
+  })
 }
 
 export function useTransferWorkflow() {
@@ -77,6 +91,11 @@ export function useTransferWorkflow() {
       transferWorkflowApi.create(input),
     onSuccess: invalidate,
   })
+  const createMine = useMutation({
+    mutationFn: (input: { userId: string; toDepartmentId: string; reason: string }) =>
+      transferWorkflowApi.createMine(input),
+    onSuccess: invalidate,
+  })
   const decide = useMutation({
     mutationFn: ({
       id,
@@ -96,7 +115,16 @@ export function useTransferWorkflow() {
       transferWorkflowApi.cancel(id, note),
     onSuccess: invalidate,
   })
-  return { inbox, mine, create, decide, cancel }
+  return { inbox, mine, create, createMine, decide, cancel }
+}
+
+export function useTransferDepartments(enabled = true) {
+  return useQuery({
+    queryKey: ['transfer-requests', 'departments'],
+    queryFn: () => transferWorkflowApi.transferDepartments(),
+    staleTime: 5 * 60_000,
+    enabled,
+  })
 }
 
 export function useTransferDetail(id: string | undefined) {
@@ -149,6 +177,7 @@ export function useDelegationMutations() {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['delegations'] })
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    void refreshEffectivePermissions()
   }
   const create = useMutation({
     mutationFn: (input: DelegationInput) => delegationsApi.create(input),
@@ -189,6 +218,7 @@ export function useGeneralManagerMutations() {
   const queryClient = useQueryClient()
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['general-manager'] })
+    void refreshEffectivePermissions()
   }
   const appoint = useMutation({
     mutationFn: ({ userId, reason }: { userId: string; reason?: string }) =>

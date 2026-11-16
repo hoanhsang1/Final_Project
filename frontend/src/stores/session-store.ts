@@ -2,7 +2,12 @@ import { create } from 'zustand'
 
 import { claimsToSession, decodeJwt, isTokenExpired } from '@/lib/jwt'
 import { tokenStorage } from '@/lib/token-storage'
-import type { LoginResponse, Session } from '@/types/session'
+import type {
+  ApprovalCapabilities,
+  LoginResponse,
+  ModuleState,
+  Session,
+} from '@/types/session'
 
 export type SessionStatus = 'booting' | 'authenticated' | 'unauthenticated'
 
@@ -19,6 +24,16 @@ interface SessionState {
   restore: (accessToken: string, refreshToken: string | null) => void
   /** Bổ sung module đang bật sau khi nạp từ API (JWT không có claim module). */
   setModules: (codes: string[]) => void
+  /** Ghi trạng thái chi tiết của module (active/disabled/locked/not_registered). */
+  setModuleStates: (states: Record<string, ModuleState>) => void
+  /** Khả năng duyệt lấy từ backend theo chức danh + uỷ quyền. */
+  setApprovalCapabilities: (capabilities: ApprovalCapabilities | null) => void
+  /** Ghi đè quyền hiệu lực sau khi chức vụ/uỷ quyền thay đổi. */
+  mergePermissions: (payload: {
+    permissions: string[]
+    scopes?: Record<string, string[]>
+    delegatedPermissions?: string[]
+  }) => void
   clear: () => void
   finishBoot: () => void
 }
@@ -52,9 +67,13 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
 
   setTokens: (accessToken, refreshToken) => {
     const session = buildSession(accessToken)
-    // Refresh token không mang claim module: giữ kết quả đã nạp thay vì xoá trắng.
-    const loadedModules = get().session?.modules ?? []
-    if (session && loadedModules.length > 0) session.modules = loadedModules
+    // Refresh token không mang claim module/capability: giữ kết quả đã nạp.
+    const previous = get().session
+    if (session && previous) {
+      session.modules = previous.modules
+      session.moduleStates = previous.moduleStates
+      session.approvals = previous.approvals
+    }
     tokenStorage.set(accessToken, refreshToken)
     set({
       status: session ? 'authenticated' : 'unauthenticated',
@@ -80,6 +99,35 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
 
   setModules: (codes) => {
     set((state) => (state.session ? { session: { ...state.session, modules: codes } } : {}))
+  },
+
+  setModuleStates: (states) => {
+    const modules = Object.entries(states)
+      .filter(([, status]) => status === 'active')
+      .map(([code]) => code)
+    set((state) =>
+      state.session ? { session: { ...state.session, modules, moduleStates: states } } : {},
+    )
+  },
+
+  setApprovalCapabilities: (capabilities) => {
+    set((state) =>
+      state.session ? { session: { ...state.session, approvals: capabilities } } : {},
+    )
+  },
+
+  mergePermissions: ({ permissions, scopes, delegatedPermissions }) => {
+    set((state) => {
+      if (!state.session) return {}
+      return {
+        session: {
+          ...state.session,
+          permissions,
+          permissionScopes: scopes ?? state.session.permissionScopes,
+          delegatedPermissions: delegatedPermissions ?? state.session.delegatedPermissions,
+        },
+      }
+    })
   },
 
   clear: () => {

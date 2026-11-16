@@ -1,8 +1,9 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 
 import { AppShell } from '@/layouts/app-shell'
 import { SessionWatcher } from '@/layouts/session-watcher'
 import { BootSplash, GuestOnly, LandingRedirect, PermissionGuard, RequireAuth, WorkspaceGuard } from '@/routes/guards'
+import { AcademicLanding } from '@/routes/academic-landing'
 import { NotFoundPage } from '@/routes/not-found-page'
 import { PlannedPage } from '@/routes/planned-page'
 import { LoginPage } from '@/features/auth/pages/login-page'
@@ -26,10 +27,12 @@ import { ApprovalsPage } from '@/features/workflows/pages/approvals-page'
 import { DelegationsPage } from '@/features/workflows/pages/delegations-page'
 import { NotificationsPage } from '@/features/workflows/pages/notifications-page'
 import { MyDelegationsPage } from '@/features/workflows/pages/my-delegations-page'
+import { MyRequestsPage } from '@/features/workflows/pages/my-requests-page'
 import { TeachersPage } from '@/features/academic/pages/teachers-page'
 import { StudentsPage } from '@/features/academic/pages/students-page'
 import { SubjectsPage } from '@/features/academic/pages/subjects-page'
 import { ClassesPage } from '@/features/academic/pages/classes-page'
+import { MyClassesPage } from '@/features/academic/pages/my-classes-page'
 import { StudentPortalPage } from '@/features/academic/pages/student-portal-page'
 import { SchedulePage } from '@/features/schedule/pages/schedule-page'
 import { MySchedulePage } from '@/features/schedule/pages/my-schedule-page'
@@ -244,12 +247,12 @@ export function App() {
             }
           />
 
-          {/* Đào tạo: màn hình gốc chuyển tới mục đầu tiên */}
+          {/* Đào tạo: màn hình gốc chuyển tới mục đầu tiên mà người dùng dùng được */}
           <Route
             path="/dao-tao"
             element={
               <WorkspaceGuard workspaceId="academic">
-                <Navigate to="/dao-tao/giao-vien" replace />
+                <AcademicLanding />
               </WorkspaceGuard>
             }
           />
@@ -291,6 +294,16 @@ export function App() {
               <WorkspaceGuard workspaceId="academic">
                 <PermissionGuard permission={PERM.classView}>
                   <ClassesPage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/lop-cua-toi"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard permission={PERM.classSelfView}>
+                  <MyClassesPage />
                 </PermissionGuard>
               </WorkspaceGuard>
             }
@@ -391,6 +404,14 @@ export function App() {
             element={
               <WorkspaceGuard workspaceId="self">
                 <NotificationsPage />
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/ho-so/yeu-cau"
+            element={
+              <WorkspaceGuard workspaceId="self">
+                <MyRequestsPage />
               </WorkspaceGuard>
             }
           />

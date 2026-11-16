@@ -117,7 +117,24 @@ function currentAccount(config: InternalAxiosRequestConfig): MockAccount | null 
   const token = bearer(config)
   if (!token) return null
   const claims = decodeJwt(token)
-  return mockAccounts.find((account) => account.id === claims.userId) ?? null
+  const known = mockAccounts.find((account) => account.id === claims.userId)
+  if (known) return known
+  // Token dựng từ phiên test (không thuộc tài khoản demo): dựng tài khoản tạm theo claim.
+  if (!claims.userId) return null
+  return {
+    id: claims.userId,
+    username: claims.username ?? claims.userId,
+    password: '',
+    fullName: claims.fullName ?? claims.username ?? claims.userId,
+    email: '',
+    roles: claims.roles ?? [],
+    permissions: claims.permissions ?? [],
+    orgId: claims.orgId ?? null,
+    departmentId: claims.departmentId ?? null,
+    mustChangePassword: claims.mustChangePassword === true,
+    status: 'active',
+    lastLoginAt: null,
+  }
 }
 
 function isOwner(account: MockAccount) {
@@ -277,6 +294,13 @@ function isHead(userId: string, departmentId: string): boolean {
   return Boolean(member?.positionIds.includes('pos-head'))
 }
 
+/** Trưởng phòng ở bất kỳ phòng ban nào (backend xét theo chức danh toàn tổ chức). */
+function isHeadAnywhere(userId: string): boolean {
+  return mockMembers.some(
+    (item) => item.userId === userId && item.positionIds.includes('pos-head'),
+  )
+}
+
 function transferResponse(transfer: (typeof mockTransfers)[number], account: MockAccount | null) {
   return {
     id: transfer.id,
@@ -371,6 +395,20 @@ export const mockAdapter: AxiosAdapter = async (config) => {
     const account = requireAccount(config)
     if (!isOwner(account)) fail(config, 403, 'FORBIDDEN', 'Owner role required')
     return respond(config, mockOrgModules)
+  }
+
+  // Mọi vai trò: trạng thái module của tổ chức trong JWT.
+  if (method === 'get' && path === '/api/v1/modules/status') {
+    requireAccount(config)
+    return respond(
+      config,
+      mockOrgModules.map((module) => ({
+        code: module.code,
+        name: module.name,
+        is_core: module.is_core,
+        status: module.status,
+      })),
+    )
   }
 
   const myModuleMatch = path.match(/^\/api\/v1\/organizations\/my\/modules\/([A-Z_]+)$/)
@@ -852,6 +890,23 @@ export const mockAdapter: AxiosAdapter = async (config) => {
       permissions: account.permissions,
       permissionScopes: {},
       delegatedPermissions: [],
+    })
+  }
+
+  // Khả năng duyệt theo chức danh/uỷ quyền (không suy ra từ role MANAGER).
+  if (method === 'get' && path === '/users/me/approval-capabilities') {
+    const account = requireAccount(config)
+    const head = isHeadAnywhere(account.id)
+    const transfer = isOwner(account) || can(account, PERM.employeeApproveTransfer) || head
+    const resignation =
+      isOwner(account) || can(account, PERM.employeeApproveResignation) || head
+    const classLifecycle =
+      isOwner(account) || can(account, PERM.classApproveClose) || (head && can(account, PERM.classView))
+    return respond(config, {
+      transfer,
+      resignation,
+      classLifecycle,
+      any: transfer || resignation || classLifecycle,
     })
   }
 

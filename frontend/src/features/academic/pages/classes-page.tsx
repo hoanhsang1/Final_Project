@@ -256,9 +256,11 @@ function ClassDetailDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { can, isOwner, hasRole } = usePermission()
+  const { can, isOwner, session } = usePermission()
   const detail = useClass(classId ?? undefined)
-  const students = useClassStudents(classId ?? undefined, open && can(PERM.studentView))
+  // Ai xem được lớp (kể cả trưởng phòng chỉ có class.view phạm vi phòng) thì xem được sinh viên trong lớp.
+  const canViewStudents = can(PERM.classView) || can(PERM.studentView)
+  const students = useClassStudents(classId ?? undefined, open && canViewStudents)
   const logs = useClassHistory(classId ?? undefined)
   const events = useClassCloseEvents(classId ?? undefined)
   const mutations = useClassMutations()
@@ -280,8 +282,8 @@ function ClassDetailDialog({
   })
 
   const schoolClass = detail.data
-  const canDecide =
-    isOwner || can(PERM.classApproveClose) || Boolean(hasRole('MANAGER'))
+  // Duyệt huỷ/đóng lớp do ClassApprovalPolicy quyết (trưởng phòng, Tổng quản lý được uỷ quyền, chủ tổ chức).
+  const canDecide = isOwner || can(PERM.classApproveClose) || Boolean(session?.approvals?.classLifecycle)
 
   const run = (action: () => void) => {
     try {
@@ -438,7 +440,7 @@ function ClassDetailDialog({
                 </section>
               ) : null}
 
-              {can(PERM.studentView) ? (
+              {canViewStudents ? (
                 <section className="space-y-2">
                   <h3 className="text-sm font-semibold text-ink-900">Sinh viên trong lớp</h3>
                   {students.isLoading ? <Spinner label="Đang tải sinh viên…" /> : null}

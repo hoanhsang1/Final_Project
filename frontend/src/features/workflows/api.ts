@@ -45,6 +45,22 @@ export const resignationsApi = {
     )
     return data
   },
+
+  /** Tự phục vụ: yêu cầu nghỉ việc của chính mình. */
+  async createMine(userId: string, reason: string): Promise<ResignationRequest> {
+    const { data } = await api.post<ResignationRequest>('/users/me/resignation-requests', {
+      userId,
+      reason,
+    })
+    return data
+  },
+
+  async mine(status?: string): Promise<ResignationRequest[]> {
+    const { data } = await api.get<ResignationRequest[]>('/users/me/resignation-requests', {
+      params: { status: status || undefined },
+    })
+    return data
+  },
 }
 
 export const transferWorkflowApi = {
@@ -69,6 +85,24 @@ export const transferWorkflowApi = {
     reason: string
   }): Promise<TransferRequest> {
     const { data } = await api.post<TransferRequest>('/transfer-requests', input)
+    return data
+  },
+
+  /** Tự phục vụ: nhân sự xin điều chuyển cho chính mình. */
+  async createMine(input: {
+    userId: string
+    toDepartmentId: string
+    reason: string
+  }): Promise<TransferRequest> {
+    const { data } = await api.post<TransferRequest>('/users/me/transfer-requests', input)
+    return data
+  },
+
+  /** Danh mục phòng ban để chọn đích điều chuyển (không cần quyền quản lý). */
+  async transferDepartments(): Promise<{ id: string; name: string }[]> {
+    const { data } = await api.get<{ id: string; name: string }[]>(
+      '/users/me/transfer-departments',
+    )
     return data
   },
 

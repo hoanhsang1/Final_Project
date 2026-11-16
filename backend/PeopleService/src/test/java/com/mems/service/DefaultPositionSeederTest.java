@@ -31,8 +31,11 @@ class DefaultPositionSeederTest {
         assertThat(countPositions("org-new")).isEqualTo(7);
         assertThat(profileType("org-new", "Giáo viên")).isEqualTo("TEACHER");
         assertThat(profileType("org-new", "Giáo vụ")).isEqualTo("GENERAL");
+        // Giáo viên chỉ xem dữ liệu của chính mình; xem cả phòng ban là quyền của trưởng phòng.
         assertThat(permissions("org-new", "Giáo viên"))
-            .containsExactly("class.view", "schedule.view", "student.view");
+            .containsExactly("class.self_view", "schedule.self_view");
+        assertThat(permissions("org-new", "Trưởng phòng ban"))
+            .contains("class.view", "schedule.view");
         assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(47);
     }
 
@@ -48,7 +51,7 @@ class DefaultPositionSeederTest {
             JOIN position p ON p.id = pp.position_id
             WHERE p.org_id = ? AND p.name = 'Giáo viên'
             """, Integer.class, "org-twice");
-        assertThat(links).isEqualTo(3);
+        assertThat(links).isEqualTo(2);
     }
 
     @Test

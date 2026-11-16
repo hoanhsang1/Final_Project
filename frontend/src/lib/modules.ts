@@ -1,4 +1,6 @@
 /** Mã module — khớp seed DB và bảng ánh xạ ở kế hoạch 0.1. */
+import type { ModuleState } from '@/types/session'
+
 export type ModuleCode =
   | 'STUDENT_MANAGEMENT'
   | 'TEACHER_MANAGEMENT'
@@ -69,4 +71,19 @@ export function moduleLabel(code: string): string {
 /** Backend dùng `active` cho module đang bật; mọi trạng thái khác đều coi là tắt. */
 export function enabledModuleCodes(rows: { code: string; status: string }[]): string[] {
   return rows.filter((row) => row.status === 'active').map((row) => row.code)
+}
+
+/** Bản đồ trạng thái đầy đủ để phân biệt active/disabled/locked/chưa đăng ký. */
+export function moduleStatesFrom(
+  rows: { code: string; status?: string | null }[],
+): Record<string, ModuleState> {
+  const states: Record<string, ModuleState> = {}
+  for (const row of rows) {
+    const status = row.status ?? 'not_registered'
+    states[row.code] =
+      status === 'active' || status === 'disabled' || status === 'locked'
+        ? status
+        : 'not_registered'
+  }
+  return states
 }

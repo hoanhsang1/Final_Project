@@ -37,17 +37,8 @@ const STATUS_TONE: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> 
   REJECTED: 'danger',
 }
 
-function canDecideResignation(
-  isOwner: boolean,
-  hasApprovePermission: boolean,
-  delegated: boolean,
-  isManager: boolean,
-) {
-  return isOwner || hasApprovePermission || delegated || isManager
-}
-
 export function ApprovalsPage() {
-  const { can, isOwner, hasRole, session } = usePermission()
+  const { can, isOwner, session } = usePermission()
   const departments = useDepartments()
   const transfer = useTransferWorkflow()
 
@@ -67,12 +58,12 @@ export function ApprovalsPage() {
   const mutations = useResignationMutations(activeDepartmentId || undefined)
 
   const canCreate = can(PERM.employeeResign)
-  const showResignationDecisions = canDecideResignation(
-    isOwner,
-    can(PERM.employeeApproveResignation),
-    (session?.delegatedPermissions ?? []).includes(PERM.employeeApproveResignation),
-    hasRole('MANAGER'),
-  )
+  // Thẩm quyền duyệt do backend tính theo chức danh + uỷ quyền; không suy từ role MANAGER.
+  const showResignationDecisions =
+    isOwner ||
+    can(PERM.employeeApproveResignation) ||
+    Boolean(session?.approvals?.resignation) ||
+    (session?.delegatedPermissions ?? []).includes(PERM.employeeApproveResignation)
 
   const memberMap = useMemo(
     () => new Map((members.data ?? []).map((member) => [member.userId, member])),

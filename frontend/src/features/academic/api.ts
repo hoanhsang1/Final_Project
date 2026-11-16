@@ -28,6 +28,12 @@ export const teachersApi = {
     return data
   },
 
+  /** Hồ sơ giáo viên của chính người đang đăng nhập. */
+  async me(): Promise<TeacherDetail> {
+    const { data } = await api.get<TeacherDetail>('/teachers/me')
+    return data
+  },
+
   async byId(staffId: string): Promise<TeacherDetail> {
     const { data } = await api.get<TeacherDetail>(`/teachers/${staffId}`)
     return data
@@ -103,6 +109,20 @@ export const classesApi = {
     needsReassignment?: boolean
   }): Promise<PageResponse<SchoolClass>> {
     const { data } = await api.get<PageResponse<SchoolClass>>('/classes', { params })
+    return data
+  },
+
+  /** Lớp được phân công cho chính giáo viên đang đăng nhập. */
+  async mine(params: { page?: number; size?: number; q?: string; status?: string }): Promise<
+    PageResponse<SchoolClass>
+  > {
+    const { data } = await api.get<PageResponse<SchoolClass>>('/classes/me', { params })
+    return data
+  },
+
+  /** Sinh viên trong lớp mình phụ trách (chỉ chủ lớp gọi được). */
+  async myStudents(id: string): Promise<Student[]> {
+    const { data } = await api.get<Student[]>(`/classes/me/${id}/students`)
     return data
   },
 

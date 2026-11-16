@@ -5,6 +5,7 @@ import {
   canEnterAcademicWorkspace,
   canEnterOrganizationWorkspace,
   canSeeItem,
+  canWriteModule,
   defaultRouteFor,
   visibleGroups,
   WORKSPACES,
@@ -30,13 +31,15 @@ function session(overrides: Partial<Session>): Session {
   }
 }
 
-const academicWorkspace = WORKSPACES.find((workspace) => workspace.id === 'academic')!
 const organizationWorkspace = WORKSPACES.find((workspace) => workspace.id === 'organization')!
 
 function visibleItemIds(value: Session): string[] {
-  return visibleGroups(value, academicWorkspace).flatMap((group) =>
-    group.items.map((item) => item.id),
-  )
+  return visibleItemIdsFor(value, 'academic')
+}
+
+function visibleItemIdsFor(value: Session, workspaceId: string): string[] {
+  const workspace = WORKSPACES.find((item) => item.id === workspaceId)!
+  return visibleGroups(value, workspace).flatMap((group) => group.items.map((item) => item.id))
 }
 
 describe('điều hướng theo quyền hiệu lực', () => {
@@ -74,14 +77,25 @@ describe('điều hướng theo quyền hiệu lực', () => {
     expect(ids).toContain('attendance')
   })
 
-  it('module đang tắt thì ẩn mục tương ứng', () => {
+  it('module chưa đăng ký thì ẩn mục tương ứng', () => {
     const withModules = session({
       permissions: [PERM.classView, PERM.scheduleView],
-      modules: ['CLASS_MANAGEMENT'],
+      moduleStates: { CLASS_MANAGEMENT: 'active', SCHEDULE_MANAGEMENT: 'not_registered' },
     })
     const ids = visibleItemIds(withModules)
     expect(ids).toContain('classes')
     expect(ids).not.toContain('schedule')
+  })
+
+  it('module đang tắt hoặc bị khóa vẫn hiện để đọc, chỉ chặn ghi', () => {
+    const readOnly = session({
+      permissions: [PERM.classView, PERM.scheduleView],
+      moduleStates: { CLASS_MANAGEMENT: 'disabled', SCHEDULE_MANAGEMENT: 'locked' },
+    })
+    const ids = visibleItemIds(readOnly)
+    expect(ids).toContain('classes')
+    expect(ids).toContain('schedule')
+    expect(canWriteModule(readOnly, 'CLASS_MANAGEMENT')).toBe(false)
   })
 
   it('khi chưa có nguồn dữ liệu module thì không ẩn nhầm', () => {
@@ -102,6 +116,24 @@ describe('điều hướng theo quyền hiệu lực', () => {
     expect(canEnterOrganizationWorkspace(manager)).toBe(false)
     const ids = accessibleWorkspaces(manager).map((workspace) => workspace.id)
     expect(ids).not.toContain('organization')
+  })
+
+  it('người duyệt theo chức danh thấy hộp việc chờ dù không có mã quyền', () => {
+    const head = session({
+      roles: ['STAFF'],
+      permissions: [PERM.classView],
+      approvals: { transfer: true, resignation: true, classLifecycle: true, any: true },
+    })
+    const ids = visibleItemIdsFor(head, 'self')
+    expect(ids).toContain('approvals-inbox')
+    expect(defaultRouteFor(head)).toBe('/viec-cho-duyet')
+  })
+
+  it('MANAGER không có khả năng duyệt thì không thấy hộp việc chờ', () => {
+    const manager = session({ roles: ['MANAGER'], permissions: [PERM.employeeView] })
+    const ids = visibleItemIdsFor(manager, 'self')
+    expect(ids).not.toContain('approvals-inbox')
+    expect(defaultRouteFor(manager)).toBe('/to-chuc')
   })
 })
 
