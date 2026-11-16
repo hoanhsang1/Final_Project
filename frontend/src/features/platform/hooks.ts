@@ -28,6 +28,35 @@ export function useOrganizationDetail(id: string | undefined) {
   })
 }
 
+export function useOrganizationAdminModules(id: string | undefined) {
+  return useQuery({
+    queryKey: ['organizations', id ?? '', 'modules-admin'],
+    queryFn: () => organizationsApi.adminModules(id!),
+    enabled: Boolean(id),
+  })
+}
+
+export function useToggleModuleLock() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      moduleCode,
+      lock,
+      reason,
+    }: {
+      id: string
+      moduleCode: string
+      lock: boolean
+      reason: string
+    }) => organizationsApi.lockModule(id, moduleCode, { lock, reason }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['organizations', variables.id] })
+      void queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
+  })
+}
+
 export function useAuditLogs(params: Parameters<typeof organizationsApi.auditLogs>[0] = {}) {
   return useQuery({
     queryKey: queryKeys.auditLogs(params),

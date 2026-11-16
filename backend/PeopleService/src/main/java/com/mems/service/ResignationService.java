@@ -88,7 +88,7 @@ public class ResignationService {
         audit.record(orgId, actor.userId(), "RESIGNATION_REQUESTED", request.userId(),
             Map.of("requestId", id, "reason", reason));
         notifications.notifyAll(orgId,
-            approval.approverIds(orgId, departmentId, actor.userId()),
+            approval.approverIds(orgId, departmentId, actor.userId(), request.userId()),
             "RESIGNATION_REQUESTED", "Yêu cầu nghỉ việc cần duyệt",
             "Nhân sự " + request.userId() + " xin nghỉ việc. Lý do: " + reason,
             "RESIGNATION_REQUEST", id);
@@ -102,7 +102,8 @@ public class ResignationService {
         departments.require(departmentId, orgId, false);
         var resignation = requests.requireForUpdate(requestId, orgId, departmentId);
         requirePending(resignation);
-        approval.requireApprover(orgId, departmentId, resignation.requestedBy());
+        approval.requireApprover(orgId, departmentId, resignation.requestedBy(),
+            resignation.userId());
 
         var member = members.require(resignation.userId(), orgId, departmentId, true);
         if (!"ACTIVE".equals(member.status()))
@@ -144,14 +145,18 @@ public class ResignationService {
         departments.require(departmentId, orgId, false);
         var resignation = requests.requireForUpdate(requestId, orgId, departmentId);
         requirePending(resignation);
-        approval.requireApprover(orgId, departmentId, resignation.requestedBy());
+        approval.requireApprover(orgId, departmentId, resignation.requestedBy(),
+            resignation.userId());
         requests.decide(requestId, "REJECTED", actor.userId(), trimToNull(request.note()));
         audit.record(orgId, actor.userId(), "RESIGNATION_REJECTED", resignation.userId(),
             Map.of("requestId", requestId));
-        notifications.notify(orgId, resignation.requestedBy(), "RESIGNATION_REJECTED",
-            "Yêu cầu nghỉ việc bị từ chối",
-            trimToNull(request.note()) == null ? "" : request.note().trim(),
-            "RESIGNATION_REQUEST", requestId);
+        String note = trimToNull(request.note()) == null ? "" : request.note().trim();
+        for (String target : new java.util.LinkedHashSet<>(
+            List.of(resignation.requestedBy(), resignation.userId()))) {
+            notifications.notify(orgId, target, "RESIGNATION_REJECTED",
+                "Yêu cầu nghỉ việc bị từ chối", note,
+                "RESIGNATION_REQUEST", requestId);
+        }
         return requests.require(requestId, orgId, departmentId);
     }
 

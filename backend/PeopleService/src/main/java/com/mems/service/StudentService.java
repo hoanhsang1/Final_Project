@@ -43,14 +43,14 @@ public class StudentService {
     @Transactional(readOnly = true)
     public Map<String, Object> list(int page, int size, String status, String classId, String q) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         return repository.list(orgId, page, size, status, classId, q);
     }
 
     @Transactional(readOnly = true)
     public StudentResponse get(String id) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         return repository.require(id, orgId, false);
     }
 

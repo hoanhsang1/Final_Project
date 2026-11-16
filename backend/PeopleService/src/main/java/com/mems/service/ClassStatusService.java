@@ -160,7 +160,7 @@ public class ClassStatusService {
     @Transactional(readOnly = true)
     public List<ClassStatusLogResponse> statusLogs(String classId) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classRepository.require(classId, orgId, false);
         return repository.statusLogs(classId, orgId);
     }
@@ -245,7 +245,7 @@ public class ClassStatusService {
     @Transactional(readOnly = true)
     public List<ClassCloseEventResponse> closeEvents(String classId) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classRepository.require(classId, orgId, false);
         return repository.closeEvents(classId, orgId);
     }

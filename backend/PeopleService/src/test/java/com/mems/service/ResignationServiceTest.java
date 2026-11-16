@@ -77,7 +77,7 @@ class ResignationServiceTest {
     void approveUsesEscalationPolicy() {
         service.approve(DEPT, REQUEST_ID, new ResignationDecisionRequest("Đồng ý"));
 
-        verify(approval).requireApprover(ORG, DEPT, REQUESTER);
+        verify(approval).requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
         verify(identity).disableAccount(EMPLOYEE, ORG);
         verify(members).revokeAll(EMPLOYEE, ORG, APPROVER, "Nghỉ việc: Lý do");
         verify(members).markResigned(EMPLOYEE, ORG);
@@ -93,7 +93,7 @@ class ResignationServiceTest {
     @DisplayName("Self-approval aborts before any account or member mutation")
     void selfApprovalAbortsBeforeMutation() {
         doThrow(new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED))
-            .when(approval).requireApprover(ORG, DEPT, REQUESTER);
+            .when(approval).requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
 
         assertThatThrownBy(() -> service.approve(DEPT, REQUEST_ID, new ResignationDecisionRequest(null)))
             .isInstanceOf(AppException.class)
@@ -110,8 +110,12 @@ class ResignationServiceTest {
     void rejectUsesEscalationPolicy() {
         service.reject(DEPT, REQUEST_ID, new ResignationDecisionRequest("Chưa duyệt"));
 
-        verify(approval).requireApprover(ORG, DEPT, REQUESTER);
+        verify(approval).requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
         verify(requests).decide(REQUEST_ID, "REJECTED", APPROVER, "Chưa duyệt");
+        verify(notifications).notify(eq(ORG), eq(REQUESTER), eq("RESIGNATION_REJECTED"),
+            anyString(), eq("Chưa duyệt"), eq("RESIGNATION_REQUEST"), eq(REQUEST_ID));
+        verify(notifications).notify(eq(ORG), eq(EMPLOYEE), eq("RESIGNATION_REJECTED"),
+            anyString(), eq("Chưa duyệt"), eq("RESIGNATION_REQUEST"), eq(REQUEST_ID));
         verifyNoInteractions(identity);
         verify(members, never()).markResigned(anyString(), anyString());
     }
@@ -120,7 +124,7 @@ class ResignationServiceTest {
     @DisplayName("Reject is blocked when no valid approver remains")
     void rejectBlockedWithoutValidApprover() {
         doThrow(new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED))
-            .when(approval).requireApprover(ORG, DEPT, REQUESTER);
+            .when(approval).requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
 
         assertThatThrownBy(() -> service.reject(DEPT, REQUEST_ID, new ResignationDecisionRequest(null)))
             .isInstanceOf(AppException.class)
@@ -133,7 +137,7 @@ class ResignationServiceTest {
     @Test
     @DisplayName("Create notifies approvers and audits the request")
     void createNotifiesApprovers() {
-        when(approval.approverIds(ORG, DEPT, APPROVER)).thenReturn(Set.of("head-1"));
+        when(approval.approverIds(ORG, DEPT, APPROVER, EMPLOYEE)).thenReturn(Set.of("head-1"));
         when(requests.require(anyString(), eq(ORG), eq(DEPT))).thenReturn(pending());
 
         service.create(DEPT, new ResignationCreateRequest(EMPLOYEE, "Lý do"));

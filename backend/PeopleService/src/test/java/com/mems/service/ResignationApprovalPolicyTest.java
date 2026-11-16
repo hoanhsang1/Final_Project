@@ -25,14 +25,15 @@ class ResignationApprovalPolicyTest {
     private static final String ORG = "org-1";
     private static final String DEPT = "dept-1";
     private static final String REQUESTER = "requester-1";
+    private static final String EMPLOYEE = "emp-1";
     private static final String HR = "hr-1";
     private static final String HEAD = "head-1";
+    private static final String OTHER_HEAD = "head-other-dept";
     private static final String GM = "gm-1";
     private static final String OWNER = "owner-1";
 
     private JdbcTemplate jdbc;
     private Actor actor;
-    private MembershipPolicy membership;
     private EffectivePermissionsService effectivePermissions;
     private ResignationApprovalPolicy policy;
 
@@ -40,16 +41,13 @@ class ResignationApprovalPolicyTest {
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         actor = mock(Actor.class);
-        membership = mock(MembershipPolicy.class);
         effectivePermissions = mock(EffectivePermissionsService.class);
-        policy = new ResignationApprovalPolicy(jdbc, actor, membership, effectivePermissions);
+        policy = new ResignationApprovalPolicy(jdbc, actor, effectivePermissions);
 
         when(actor.userId()).thenReturn(HR);
         when(actor.owner()).thenReturn(false);
-        when(membership.hasPermission(DEPT, ResignationApprovalPolicy.APPROVE_PERMISSION))
-            .thenReturn(false);
-        when(jdbc.queryForList(contains("FROM department_member"), eq(String.class), eq(ORG), eq(DEPT)))
-            .thenReturn(List.of(REQUESTER));
+        when(jdbc.queryForList(contains("FROM department_member"), eq(String.class), eq(ORG)))
+            .thenReturn(List.of(REQUESTER, EMPLOYEE));
         when(jdbc.queryForList(contains("FROM assignment"), eq(String.class), any()))
             .thenReturn(List.of());
         when(jdbc.queryForObject(contains("p.scope='ORGANIZATION'"), eq(Integer.class),
@@ -61,22 +59,35 @@ class ResignationApprovalPolicyTest {
     }
 
     @Test
-    @DisplayName("HR with permission may approve when not the requester")
+    @DisplayName("HR with a position-derived permission may approve when not requester/subject")
     void hrWithPermissionCanApprove() {
-        when(membership.hasPermission(DEPT, ResignationApprovalPolicy.APPROVE_PERMISSION))
-            .thenReturn(true);
+        stubMembers(REQUESTER, EMPLOYEE, HR);
+        stubDirectPermission(HR);
 
-        policy.requireApprover(ORG, DEPT, REQUESTER);
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
     }
 
     @Test
     @DisplayName("The requester can never approve their own resignation")
     void requesterCannotApproveOwnRequest() {
         when(actor.userId()).thenReturn(REQUESTER);
-        when(membership.hasPermission(DEPT, ResignationApprovalPolicy.APPROVE_PERMISSION))
-            .thenReturn(true);
+        stubMembers(REQUESTER, EMPLOYEE);
+        stubDirectPermission(REQUESTER);
 
-        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER))
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.SELF_APPROVAL_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("The employee cannot approve their own resignation when HR created the request")
+    void subjectCannotApproveWhenSomeoneElseRequested() {
+        when(actor.userId()).thenReturn(EMPLOYEE);
+        stubMembers(REQUESTER, EMPLOYEE, HEAD);
+        stubHeads(EMPLOYEE);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.SELF_APPROVAL_NOT_ALLOWED));
@@ -88,7 +99,7 @@ class ResignationApprovalPolicyTest {
         when(actor.userId()).thenReturn(OWNER);
         when(actor.owner()).thenReturn(true);
 
-        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, OWNER))
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, OWNER, OWNER))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.SELF_APPROVAL_NOT_ALLOWED));
@@ -98,28 +109,58 @@ class ResignationApprovalPolicyTest {
     @DisplayName("When the only HR is the requester, the department head can approve")
     void headApprovesWhenOnlyHrIsRequester() {
         when(actor.userId()).thenReturn(HEAD);
+        stubMembers(REQUESTER, EMPLOYEE, HEAD);
         stubHeads(HEAD);
 
-        policy.requireApprover(ORG, DEPT, REQUESTER);
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
         assertThat(policy.headIds(ORG, DEPT)).contains(HEAD);
+    }
+
+    @Test
+    @DisplayName("A head from another department cannot approve")
+    void otherDepartmentHeadCannotApprove() {
+        when(actor.userId()).thenReturn(OTHER_HEAD);
+        stubMembers(REQUESTER, EMPLOYEE, OTHER_HEAD);
+        stubHeads(HEAD);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
     }
 
     @Test
     @DisplayName("When no eligible HR and no head, a delegated GM can approve")
     void delegatedGeneralManagerApprovesWhenNoHrOrHead() {
         when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM);
         stubGeneralManager(true);
 
-        policy.requireApprover(ORG, DEPT, REQUESTER);
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
     }
 
     @Test
     @DisplayName("A GM appointment without delegation is not enough")
     void generalManagerWithoutDelegationIsRejected() {
         when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM);
         stubGeneralManager(false);
 
-        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER))
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
+    }
+
+    @Test
+    @DisplayName("Delegated GM cannot skip an HR permission holder")
+    void delegatedGeneralManagerCannotSkipHr() {
+        when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, HR, GM);
+        stubDirectPermission(HR);
+        stubGeneralManager(true);
+
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
@@ -129,26 +170,59 @@ class ResignationApprovalPolicyTest {
     @DisplayName("A head cannot skip a different HR who holds the permission")
     void headCannotSkipAnotherHr() {
         when(actor.userId()).thenReturn(HEAD);
-        when(jdbc.queryForList(contains("FROM department_member"), eq(String.class), eq(ORG), eq(DEPT)))
-            .thenReturn(List.of(REQUESTER, HR));
-        when(effectivePermissions.resolve(ORG, HR, DEPT))
-            .thenReturn(new EffectivePermissionsService.EffectivePermissions(
-                Set.of(ResignationApprovalPolicy.APPROVE_PERMISSION), Map.of()));
+        stubMembers(REQUESTER, EMPLOYEE, HR, HEAD);
+        stubDirectPermission(HR);
         stubHeads(HEAD);
 
-        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER))
+        assertThatThrownBy(() -> policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
                 .isEqualTo(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED));
     }
 
     @Test
-    @DisplayName("Owner is the final level and always allowed when not the requester")
+    @DisplayName("A delegated GM in the department does not block the head")
+    void delegatedGeneralManagerDoesNotBlockHead() {
+        when(actor.userId()).thenReturn(HEAD);
+        stubMembers(REQUESTER, EMPLOYEE, GM, HEAD);
+        when(effectivePermissions.resolve(ORG, GM, DEPT))
+            .thenReturn(new EffectivePermissionsService.EffectivePermissions(
+                Set.of(ResignationApprovalPolicy.APPROVE_PERMISSION), Map.of(),
+                Set.of(ResignationApprovalPolicy.APPROVE_PERMISSION)));
+        stubHeads(HEAD);
+
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
+    }
+
+    @Test
+    @DisplayName("Owner is the final level and always allowed when not requester/subject")
     void ownerCanApproveAtFinalLevel() {
         when(actor.userId()).thenReturn(OWNER);
         when(actor.owner()).thenReturn(true);
 
-        policy.requireApprover(ORG, DEPT, REQUESTER);
+        policy.requireApprover(ORG, DEPT, REQUESTER, EMPLOYEE);
+    }
+
+    @Test
+    @DisplayName("Notification recipients exclude requester and subject")
+    void approverIdsExcludeRequesterAndSubject() {
+        stubMembers(REQUESTER, EMPLOYEE, HR);
+        stubDirectPermission(HR);
+        stubHeads(HEAD);
+
+        assertThat(policy.approverIds(ORG, DEPT, REQUESTER, EMPLOYEE))
+            .containsExactlyInAnyOrder(HR, HEAD);
+    }
+
+    private void stubMembers(String... userIds) {
+        when(jdbc.queryForList(contains("FROM department_member"), eq(String.class), eq(ORG)))
+            .thenReturn(List.of(userIds));
+    }
+
+    private void stubDirectPermission(String userId) {
+        when(effectivePermissions.resolve(ORG, userId, DEPT))
+            .thenReturn(new EffectivePermissionsService.EffectivePermissions(
+                Set.of(ResignationApprovalPolicy.APPROVE_PERMISSION), Map.of()));
     }
 
     private void stubHeads(String... userIds) {

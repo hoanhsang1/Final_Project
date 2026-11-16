@@ -33,31 +33,30 @@ public class ResignationApprovalPolicy {
 
     private final JdbcTemplate jdbc;
     private final Actor actor;
-    private final MembershipPolicy membership;
     private final EffectivePermissionsService effectivePermissions;
 
-    public ResignationApprovalPolicy(JdbcTemplate jdbc, Actor actor, MembershipPolicy membership,
+    public ResignationApprovalPolicy(JdbcTemplate jdbc, Actor actor,
                                      EffectivePermissionsService effectivePermissions) {
         this.jdbc = jdbc;
         this.actor = actor;
-        this.membership = membership;
         this.effectivePermissions = effectivePermissions;
     }
 
-    public void requireApprover(String orgId, String departmentId, String requesterId) {
+    public void requireApprover(String orgId, String departmentId, String requesterId,
+                                String subjectId) {
         String actorId = actor.userId();
-        if (requesterId != null && requesterId.equals(actorId)) {
+        if (requesterId != null && requesterId.equals(actorId)
+            || subjectId != null && subjectId.equals(actorId)) {
             throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         }
         if (actor.owner()) return;
 
-        // Level 1: any non-requester holder of the approval permission may decide.
-        if (membership.hasPermission(departmentId, APPROVE_PERMISSION)) return;
-
-        // A permission holder exists elsewhere: this actor cannot skip level 1.
-        if (hasOtherPermissionHolder(orgId, departmentId, requesterId)) {
+        // Level 1: only position-derived holders count. Delegated grants are level 3,
+        // otherwise a delegated GM could jump ahead of HR and the department head.
+        Set<String> directHolders = directPermissionHolderIds(orgId, departmentId, requesterId, subjectId);
+        if (directHolders.contains(actorId)) return;
+        if (!directHolders.isEmpty())
             throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
-        }
 
         // Level 2: department head when no eligible HR approver remains.
         if (headIds(orgId, departmentId).contains(actorId)) return;
@@ -68,17 +67,13 @@ public class ResignationApprovalPolicy {
         throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
     }
 
-    /** Recipients to notify when a request is created (requesters excluded). */
-    public Set<String> approverIds(String orgId, String departmentId, String requesterId) {
+    /** Recipients to notify when a request is created (requester and subject excluded). */
+    public Set<String> approverIds(String orgId, String departmentId, String requesterId,
+                                   String subjectId) {
         Set<String> result = new TreeSet<>(headIds(orgId, departmentId));
-        for (String userId : departmentMembers(orgId, departmentId)) {
-            if (userId.equals(requesterId)) continue;
-            if (effectivePermissions.resolve(orgId, userId, departmentId).permissions()
-                .contains(APPROVE_PERMISSION)) {
-                result.add(userId);
-            }
-        }
+        result.addAll(directPermissionHolderIds(orgId, departmentId, requesterId, subjectId));
         result.remove(requesterId);
+        result.remove(subjectId);
         return result;
     }
 
@@ -99,22 +94,27 @@ public class ResignationApprovalPolicy {
             """, String.class, params.toArray()));
     }
 
-    private boolean hasOtherPermissionHolder(String orgId, String departmentId, String requesterId) {
-        for (String userId : departmentMembers(orgId, departmentId)) {
-            if (userId.equals(requesterId)) continue;
-            if (effectivePermissions.resolve(orgId, userId, departmentId).permissions()
-                .contains(APPROVE_PERMISSION)) {
-                return true;
+    private Set<String> directPermissionHolderIds(String orgId, String departmentId,
+                                                  String requesterId, String subjectId) {
+        Set<String> holders = new TreeSet<>();
+        for (String userId : orgMembers(orgId)) {
+            if (userId.equals(requesterId) || userId.equals(subjectId)) continue;
+            EffectivePermissionsService.EffectivePermissions resolved =
+                effectivePermissions.resolve(orgId, userId, departmentId);
+            if (resolved.permissions().contains(APPROVE_PERMISSION)
+                && !resolved.delegatedPermissions().contains(APPROVE_PERMISSION)) {
+                holders.add(userId);
             }
         }
-        return false;
+        return holders;
     }
 
-    private List<String> departmentMembers(String orgId, String departmentId) {
+    /** Active members of the organization except the owner, whose bypass is level 4. */
+    private List<String> orgMembers(String orgId) {
         return jdbc.queryForList("""
             SELECT user_id FROM department_member
-            WHERE org_id=? AND department_id=? AND status='ACTIVE'
-            """, String.class, orgId, departmentId);
+            WHERE org_id=? AND status='ACTIVE' AND role<>'OWNER'
+            """, String.class, orgId);
     }
 
     private boolean hasDelegatedPermission(String orgId, String userId) {

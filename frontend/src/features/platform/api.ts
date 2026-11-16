@@ -1,8 +1,10 @@
 import { api } from '@/services/http'
 import type { PageResponse } from '@/types/api'
 import type {
+  AdminModule,
   AuditLogItem,
   ModuleCatalogItem,
+  ModuleStatus,
   OrganizationDetail,
   OrganizationListParams,
   OrganizationRow,
@@ -164,5 +166,38 @@ export const organizationsApi = {
   async moduleCatalog(): Promise<ModuleCatalogItem[]> {
     const { data } = await api.get<ModuleCatalogItem[]>('/api/v1/modules')
     return data
+  },
+
+  async adminModules(id: string): Promise<AdminModule[]> {
+    const { data } = await api.get<
+      {
+        code: string
+        name: string
+        is_core: boolean | number
+        status: string
+        locked_by_admin: string | null
+        locked_reason: string | null
+        locked_at: string | null
+        disabled_at: string | null
+      }[]
+    >(`/api/v1/organizations/${id}/modules/admin`)
+    return data.map((row) => ({
+      code: row.code,
+      name: row.name,
+      status: row.status as ModuleStatus,
+      isCore: Boolean(row.is_core),
+      lockedByAdmin: row.locked_by_admin,
+      lockedReason: row.locked_reason,
+      lockedAt: row.locked_at,
+      disabledAt: row.disabled_at,
+    }))
+  },
+
+  async lockModule(
+    id: string,
+    moduleCode: string,
+    params: { lock: boolean; reason: string },
+  ): Promise<void> {
+    await api.patch(`/api/v1/organizations/${id}/modules/${moduleCode}/lock`, params)
   },
 }

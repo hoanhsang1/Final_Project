@@ -27,10 +27,26 @@ export interface OrganizationOwner {
   status: string
 }
 
+export type ModuleStatus =
+  | 'requested'
+  | 'active'
+  | 'rejected'
+  | 'disabled'
+  | 'locked'
+  | 'not_registered'
+
 export interface OrganizationModule {
   code: string
   name: string
-  status: 'requested' | 'active' | 'rejected'
+  status: ModuleStatus
+}
+
+export interface AdminModule extends OrganizationModule {
+  isCore: boolean
+  lockedByAdmin: string | null
+  lockedReason: string | null
+  lockedAt: string | null
+  disabledAt: string | null
 }
 
 export interface OrganizationDetail {

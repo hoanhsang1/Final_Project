@@ -62,7 +62,7 @@ public class SchoolClassService {
     public Map<String, Object> list(int page, int size, String q, String status, boolean selectable,
                                     Boolean needsReassignment) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
         return repository.list(orgId, page, size, q, status, selectable, needsReassignment);
     }
@@ -70,7 +70,7 @@ public class SchoolClassService {
     @Transactional
     public SchoolClassResponse get(String id) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
         return repository.require(id, orgId, false);
     }
@@ -190,7 +190,7 @@ public class SchoolClassService {
     @Transactional(readOnly = true)
     public List<StudentResponse> listStudents(String classId) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         repository.require(classId, orgId, false);
         return studentRepository.findByClassId(classId, orgId);
     }
