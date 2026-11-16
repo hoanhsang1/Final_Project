@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5174,
       strictPort: false,
+      // Tránh watcher quét profile Chrome/cache dùng cho kiểm tra giao diện.
+      watch: {
+        ignored: ['**/.chrome-profile*/**', '**/.npm-cache/**', '**/coverage/**'],
+      },
       proxy: {
         // Backend dùng nhiều tiền tố: Identity dưới /api/v1, People ở gốc,
         // Schedule/Facility dưới /api. Phải proxy đủ để tránh CORS.

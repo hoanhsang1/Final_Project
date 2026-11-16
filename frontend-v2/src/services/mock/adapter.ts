@@ -8,7 +8,7 @@ import {
 
 import { decodeJwt } from '@/lib/jwt'
 import { ALL_PERMISSION_META, BUNDLES, PERM } from '@/lib/permissions'
-import { mockModules } from '@/services/mock/fixtures'
+import { mockModules, mockOrgModules } from '@/services/mock/fixtures'
 import {
   DEMO_ORG_ID,
   mockAccounts,
@@ -58,10 +58,18 @@ function buildToken(account: MockAccount, ttlSeconds = 900): string {
         : 'STAFF'
 
   const scopes: Record<string, string[]> = {}
+  const orgWide =
+    account.roles.includes('SUPER_ADMIN') ||
+    account.roles.includes('OWNER') ||
+    account.roles.includes('ORG_OWNER')
   for (const permission of account.permissions) {
-    scopes[permission] = account.departmentId
-      ? ['ORGANIZATION', `DEPARTMENT:${account.departmentId}`]
-      : ['ORGANIZATION']
+    // OWNER/SUPER_ADMIN: toàn tổ chức. Tài khoản phòng ban: chỉ scope phòng ban,
+    // trừ khi mock muốn mô phỏng HR được cấp scope ORGANIZATION.
+    scopes[permission] = orgWide
+      ? ['ORGANIZATION']
+      : account.departmentId
+        ? [`DEPARTMENT:${account.departmentId}`]
+        : ['ORGANIZATION']
   }
 
   const now = Math.floor(Date.now() / 1000)
@@ -357,6 +365,12 @@ export const mockAdapter: AxiosAdapter = async (config) => {
       config,
       mockModules.filter((module) => module.isActive).map(({ code, name }) => ({ code, name })),
     )
+  }
+
+  if (method === 'get' && path === '/api/v1/organizations/my/modules') {
+    const account = requireAccount(config)
+    if (!isOwner(account)) fail(config, 403, 'FORBIDDEN', 'Owner role required')
+    return respond(config, mockOrgModules)
   }
 
   // -------------------------------------------------------------- organizations

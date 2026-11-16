@@ -51,7 +51,11 @@ export default tseslint.config(
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Các export không phải component là chủ đích dùng chung (variants, factory).
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true, allowExportNames: ['buttonVariants', 'createQueryClient'] },
+      ],
       // Các form trong dialog/drawer cần reset state khi mở lại; đây là chủ đích,
       // không phải đồng bộ với hệ thống ngoài.
       'react-hooks/set-state-in-effect': 'warn',

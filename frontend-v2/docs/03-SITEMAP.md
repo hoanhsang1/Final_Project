@@ -108,8 +108,9 @@ canSeeItem = (không yêu cầu module HOẶC module đang bật)
 ```
 
 - OWNER: bypass kiểm quyền nhưng **không** bypass module.
-- Module: backend chưa trả danh sách module trong JWT → `hasModule()` coi “chưa xác định = không ẩn”;
-  backend vẫn chặn bằng `MODULE_NOT_ENABLED` và UI hiển thị lỗi tương ứng.
+- Module: JWT chưa có claim module. OWNER nạp `GET /api/v1/organizations/my/modules` sau đăng nhập
+  (`features/auth/module-hydration.ts`) và menu ẩn module đang tắt; vai trò khác vẫn coi “chưa xác
+  định = không ẩn”, backend chặn bằng `MODULE_NOT_ENABLED` và UI hiển thị lỗi tương ứng.
 - Nút hành động dùng `usePermission().can()` hoặc `<PermissionGuard>`; không dùng `role === ...`
   ngoại trừ SUPER_ADMIN/OWNER (hai bypass có thật ở backend).
 

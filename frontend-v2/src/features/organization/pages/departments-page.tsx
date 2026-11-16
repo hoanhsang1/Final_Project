@@ -209,7 +209,7 @@ export function DepartmentsPage() {
         <MiniStat label="Phòng ban" value={headcounts.departments.length} />
         <MiniStat
           label="Nhân sự"
-          value={headcounts.isScoped ? headcounts.totalEmployees : headcounts.totalEmployees}
+          value={headcounts.totalEmployees}
           hint={
             headcounts.isScoped
               ? `${headcounts.activeEmployees} đang làm việc · phòng ban của bạn`
@@ -289,7 +289,14 @@ export function DepartmentsPage() {
         )}
       </div>
 
-      <DepartmentFormDialog open={formOpen} onOpenChange={setFormOpen} department={editing} />
+      {formOpen ? (
+        <DepartmentFormDialog
+          key={editing?.id ?? 'new'}
+          open
+          onOpenChange={setFormOpen}
+          department={editing}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

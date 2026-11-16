@@ -126,7 +126,11 @@ export function OwnerDashboard() {
             <StatCard
               label="Nhân sự"
               value={headcounts.totalEmployees}
-              hint={`${headcounts.activeEmployees} đang làm việc`}
+              hint={
+                headcounts.isScoped
+                  ? `${headcounts.activeEmployees} đang làm việc · phòng ban của bạn`
+                  : `${headcounts.activeEmployees} đang làm việc`
+              }
               icon={<UsersRound className="size-4" aria-hidden="true" />}
               accent="ink"
             />
@@ -163,7 +167,9 @@ export function OwnerDashboard() {
               <div>
                 <CardTitle>Nhân sự theo phòng ban</CardTitle>
                 <p className="mt-0.5 text-sm text-ink-500">
-                  Tính từ danh sách thành viên của từng phòng ban.
+                  {headcounts.isScoped
+                    ? 'Bạn chỉ có quyền xem nhân sự trong phòng ban mình công tác.'
+                    : 'Tính từ danh sách thành viên của từng phòng ban.'}
                 </p>
               </div>
               <Badge tone="neutral">{headcounts.totalEmployees} người</Badge>

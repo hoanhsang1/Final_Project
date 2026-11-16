@@ -31,11 +31,17 @@ export function EmployeesPage() {
   const [status, setStatus] = useState<string>('all')
   const [kind, setKind] = useState<'all' | 'teacher' | 'staff'>('all')
   const [createOpenState, setCreateOpenState] = useState(false)
+  const [createKey, setCreateKey] = useState(0)
   const [selected, setSelected] = useState<EmployeeRow | null>(null)
 
   const defaultDepartmentId = searchParams.get('phongBan') ?? undefined
   const openFromQuery = searchParams.get('them') === '1' && can(PERM.employeeCreate)
   const createOpen = createOpenState || openFromQuery
+
+  const openCreate = () => {
+    setCreateKey((value) => value + 1)
+    setCreateOpenState(true)
+  }
   const effectiveDepartmentId = directory.isScoped
     ? (directory.scopedDepartmentId ?? 'all')
     : departmentId
@@ -101,7 +107,7 @@ export function EmployeesPage() {
               Làm mới
             </Button>
             {can(PERM.employeeCreate) ? (
-              <Button size="sm" onClick={() => setCreateOpenState(true)}>
+              <Button size="sm" onClick={openCreate}>
                 <Plus aria-hidden="true" />
                 Thêm nhân sự
               </Button>
@@ -249,7 +255,7 @@ export function EmployeesPage() {
               hasFilters
                 ? { label: 'Xoá bộ lọc', onClick: resetFilters }
                 : can(PERM.employeeCreate)
-                  ? { label: 'Thêm nhân sự', onClick: () => setCreateOpenState(true) }
+                  ? { label: 'Thêm nhân sự', onClick: openCreate }
                   : undefined
             }
           />
@@ -257,6 +263,7 @@ export function EmployeesPage() {
       )}
 
       <EmployeeCreateDrawer
+        key={createKey}
         open={createOpen}
         onOpenChange={closeCreate}
         defaultDepartmentId={defaultDepartmentId}

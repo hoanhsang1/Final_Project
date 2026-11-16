@@ -59,6 +59,17 @@ describe('luồng ứng dụng với dữ liệu demo', () => {
     expect(
       screen.getByRole('heading', { name: 'Việc chờ tôi duyệt', level: 3 }),
     ).toBeInTheDocument()
+
+    await waitFor(
+      () => {
+        expect(useSessionStore.getState().session?.modules).toEqual([
+          'STUDENT_MANAGEMENT',
+          'TEACHER_MANAGEMENT',
+          'CLASS_MANAGEMENT',
+        ])
+      },
+      { timeout: 12_000 },
+    )
   }, 30_000)
 
   it('điều hướng sang danh sách phòng ban từ menu đã lọc theo quyền', async () => {
@@ -73,5 +84,41 @@ describe('luồng ứng dụng với dữ liệu demo', () => {
     expect(
       await screen.findByText('Phòng Hành chính – Nhân sự', {}, { timeout: 12_000 }),
     ).toBeInTheDocument()
+  }, 30_000)
+
+  it('nạp module đang bật cho OWNER để menu lọc theo module', async () => {
+    renderApp('/dang-nhap')
+    await signIn('sample_owner', 'Sample@123456')
+    await screen.findByRole('heading', { name: 'Bảng điều khiển', level: 1 }, { timeout: 12_000 })
+
+    // Mock: STUDENT/TEACHER/CLASS đang bật, SCHEDULE chưa đăng ký.
+    await waitFor(
+      () => {
+        const modules = useSessionStore.getState().session?.modules ?? []
+        expect(modules).toEqual(
+          expect.arrayContaining(['STUDENT_MANAGEMENT', 'TEACHER_MANAGEMENT', 'CLASS_MANAGEMENT']),
+        )
+        expect(modules).not.toContain('SCHEDULE_MANAGEMENT')
+      },
+      { timeout: 8_000 },
+    )
+  }, 30_000)
+
+  it('HR chỉ thấy nhân sự trong phòng ban của mình', async () => {
+    renderApp('/dang-nhap')
+    await signIn('sample_hr', 'Sample@123456')
+
+    await screen.findByRole('heading', { name: 'Bảng điều khiển', level: 1 }, { timeout: 12_000 })
+
+    const scopeHints = await screen.findAllByText(/phòng ban của bạn/i, {}, { timeout: 12_000 })
+    expect(scopeHints.length).toBeGreaterThan(0)
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Phòng Hành chính – Nhân sự')).toBeInTheDocument()
+        expect(screen.queryByText('Tổ Toán – Tin')).not.toBeInTheDocument()
+      },
+      { timeout: 12_000 },
+    )
   }, 30_000)
 })

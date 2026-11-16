@@ -17,6 +17,8 @@ interface SessionState {
   setTokens: (accessToken: string, refreshToken: string) => void
   /** Khôi phục phiên từ token còn hiệu lực khi tải lại trang. */
   restore: (accessToken: string, refreshToken: string | null) => void
+  /** Bổ sung module đang bật sau khi nạp từ API (JWT không có claim module). */
+  setModules: (codes: string[]) => void
   clear: () => void
   finishBoot: () => void
 }
@@ -50,6 +52,9 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
 
   setTokens: (accessToken, refreshToken) => {
     const session = buildSession(accessToken)
+    // Refresh token không mang claim module: giữ kết quả đã nạp thay vì xoá trắng.
+    const loadedModules = get().session?.modules ?? []
+    if (session && loadedModules.length > 0) session.modules = loadedModules
     tokenStorage.set(accessToken, refreshToken)
     set({
       status: session ? 'authenticated' : 'unauthenticated',
@@ -71,6 +76,10 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       accessToken,
       refreshToken,
     })
+  },
+
+  setModules: (codes) => {
+    set((state) => (state.session ? { session: { ...state.session, modules: codes } } : {}))
   },
 
   clear: () => {

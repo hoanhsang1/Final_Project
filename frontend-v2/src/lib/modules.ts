@@ -65,3 +65,8 @@ export const MODULE_CATALOG: ModuleMeta[] = [
 export function moduleLabel(code: string): string {
   return MODULE_CATALOG.find((module) => module.code === code)?.label ?? code
 }
+
+/** Backend dùng `active` cho module đang bật; mọi trạng thái khác đều coi là tắt. */
+export function enabledModuleCodes(rows: { code: string; status: string }[]): string[] {
+  return rows.filter((row) => row.status === 'active').map((row) => row.code)
+}

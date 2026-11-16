@@ -1,5 +1,5 @@
 import { GraduationCap, Info, UserPlus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -76,16 +76,15 @@ export function EmployeeCreateDrawer({
   const specialties = useSpecialties()
   const createMember = useCreateMember()
 
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [form, setForm] = useState<FormState>(() => ({
+    ...EMPTY_FORM,
+    departmentId: defaultDepartmentId ?? departments.data?.[0]?.id ?? '',
+  }))
   const [errors, setErrors] = useState<Errors>({})
   const [tempPassword, setTempPassword] = useState<TempPasswordInfo | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const firstDepartment = defaultDepartmentId ?? departments.data?.[0]?.id ?? ''
-    setForm({ ...EMPTY_FORM, departmentId: firstDepartment })
-    setErrors({})
-  }, [open, defaultDepartmentId, departments.data])
+  // Cha truyền `key` mới mỗi lần mở drawer để form được khởi tạo lại,
+  // tránh phải reset bằng effect.
 
   const selectedPositions = useMemo(
     () => (positions.data ?? []).filter((position) => form.positionIds.includes(position.id)),

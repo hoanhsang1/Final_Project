@@ -109,7 +109,7 @@ public final class PermissionCatalog {
             Set.of("student.view", "student.create", "student.edit", "student.delete",
                 "student.create_account", "class.view", "class.create", "class.edit",
                 "class.delete", "class.assign_teacher", "class.teacher.reassign",
-                "class.cancel", "class.request_close", "class.approve_close", "class.reopen"),
+                "class.cancel", "class.request_close", "class.reopen"),
             Set.of(SCOPE_ORGANIZATION)),
         new BundleDefinition("SCHEDULE_MANAGEMENT", "Quản lý lịch học",
             "Quản lý lịch học của phòng ban",

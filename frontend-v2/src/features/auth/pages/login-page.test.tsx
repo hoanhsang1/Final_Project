@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest'
 import { AppProviders } from '@/app/providers'
 import { LoginPage } from '@/features/auth/pages/login-page'
 
-function renderLogin() {
+function renderLogin(state?: unknown) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[{ pathname: '/dang-nhap', state }]}>
       <AppProviders>
         <LoginPage />
       </AppProviders>
@@ -36,6 +36,11 @@ describe('LoginPage', () => {
       'href',
       '/dang-ky',
     )
+  })
+
+  it('hiển thị thông báo 401 khi phiên trước hết hạn', () => {
+    renderLogin({ expired: true })
+    expect(screen.getByText('Phiên đăng nhập đã hết hạn (401)')).toBeInTheDocument()
   })
 
   it('cho phép hiện mật khẩu để kiểm tra khi nhập', async () => {

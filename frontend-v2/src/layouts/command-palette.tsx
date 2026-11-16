@@ -1,5 +1,5 @@
 import { CornerDownLeft, Search } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -52,15 +52,13 @@ export function CommandPalette() {
     )
   }, [entries, query])
 
-  useEffect(() => {
-    if (!open) return
+  // Mở palette luôn bắt đầu ở trạng thái sạch; không dùng effect để tránh
+  // thêm một vòng render và cảnh báo set-state-in-effect.
+  const openPalette = () => {
     setQuery('')
     setActiveIndex(0)
-  }, [open])
-
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [query])
+    setOpen(true)
+  }
 
   const go = (entry: Entry | undefined) => {
     if (!entry) return
@@ -70,7 +68,7 @@ export function CommandPalette() {
 
   return (
     <>
-      <SearchTrigger onOpen={() => setOpen(true)} />
+      <SearchTrigger onOpen={openPalette} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           hideClose
@@ -84,7 +82,10 @@ export function CommandPalette() {
             <input
               autoFocus
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setActiveIndex(0)
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'ArrowDown') {
                   event.preventDefault()

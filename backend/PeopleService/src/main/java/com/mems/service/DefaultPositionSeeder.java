@@ -24,16 +24,30 @@ import java.util.UUID;
 public class DefaultPositionSeeder {
     private static final Logger log = LoggerFactory.getLogger(DefaultPositionSeeder.class);
 
-    // Keep in sync with IdentityService PermissionCatalog.ENTRIES.
-    private static final Set<String> ALL_PERMISSIONS = Set.of(
+    /**
+     * Quản trị viên tổ chức: 4 operational bundles + explicit HR permissions.
+     * Excludes: class.approve_close (DEC-02, kế hoạch v2 §0.3),
+     *           delegation.*, general_manager.*, org.module.toggle, org.audit.view (DEC-05).
+     * Keep in sync with PermissionCatalog.ENTRIES.
+     */
+    private static final Set<String> ORG_ADMIN_PERMISSIONS = Set.of(
+        // HR
         "employee.view", "employee.create", "employee.edit", "employee.delete",
-        "employee.reset_password", "employee.assign_position", "position.view", "position.manage",
+        "employee.reset_password", "employee.assign_position", "employee.view_detail",
+        "employee.resign", "employee.approve_resignation", "employee.transfer",
+        "employee.approve_transfer",
+        "position.view", "position.manage",
         "department.view", "department.manage",
+        // Academic (class.approve_close intentionally absent per DEC-02)
         "student.view", "student.create", "student.edit", "student.delete",
-        "class.view", "class.create", "class.edit", "class.delete", "class.assign_teacher",
-        "class.cancel", "class.request_close", "class.approve_close", "class.reopen",
+        "student.create_account",
+        "class.view", "class.create", "class.edit", "class.delete",
+        "class.assign_teacher", "class.teacher.reassign",
+        "class.cancel", "class.request_close", "class.reopen",
+        // Schedule
         "schedule.view", "schedule.create", "schedule.edit", "schedule.update",
         "schedule.cancel_session", "schedule.delete",
+        // Facility
         "facility.view", "facility.manage",
         "facility.room.view", "facility.room.create", "facility.room.update", "facility.room.delete",
         "facility.equipment.view", "facility.equipment.create", "facility.equipment.update",
@@ -45,7 +59,7 @@ public class DefaultPositionSeeder {
 
     private static final List<DefaultPosition> DEFAULTS = List.of(
         new DefaultPosition("Quản trị viên tổ chức", "Quản trị toàn bộ tổ chức", "GENERAL",
-            "ORGANIZATION", ALL_PERMISSIONS,
+            "ORGANIZATION", ORG_ADMIN_PERMISSIONS,
             Set.of("HR_MANAGEMENT", "ACADEMIC_MANAGEMENT", "SCHEDULE_MANAGEMENT", "FACILITY_MANAGEMENT")),
         new DefaultPosition("Giáo vụ", "Quản lý lớp học và sinh viên", "GENERAL",
             "ORGANIZATION", Set.of(

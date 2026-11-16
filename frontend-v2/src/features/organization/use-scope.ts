@@ -1,19 +1,18 @@
 import { useSession } from '@/features/auth/hooks'
-import { isOwner } from '@/lib/nav'
+import { resolveDepartmentScope } from '@/lib/scope'
 
 /**
- * Phạm vi phòng ban của người đang đăng nhập.
- * OWNER/SUPER_ADMIN xem toàn tổ chức; người có departmentId chỉ được xem phòng ban đó
- * (backend trả 403 nếu gọi thành viên của phòng khác).
+ * Phạm vi phòng ban của người đang đăng nhập, suy ra từ quyền hiệu lực.
+ * OWNER hoặc người có quyền scope ORGANIZATION xem toàn tổ chức; còn lại
+ * giới hạn theo `departmentId` trong JWT.
  */
 export function useDepartmentScope() {
   const session = useSession()
-  const scopedDepartmentId =
-    session && !isOwner(session) ? (session.user.departmentId ?? null) : null
-
+  const scope = resolveDepartmentScope(session)
   return {
     session,
-    isScoped: Boolean(scopedDepartmentId),
-    scopedDepartmentId,
+    ...scope,
+    // Tương thích với tên cũ đang dùng trong hook/trang.
+    scopedDepartmentId: scope.departmentId,
   }
 }

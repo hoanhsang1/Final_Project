@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import { authApi } from '@/features/auth/api'
+import { hydrateOwnerModules } from '@/features/auth/module-hydration'
 import { hasAnyPermission, hasPermission, isOwner, isSuperAdmin } from '@/lib/nav'
 import { queryKeys } from '@/lib/query-keys'
 import { useSessionStore } from '@/stores/session-store'
@@ -31,7 +32,10 @@ export function useLoginMutation() {
   const loginSuccess = useSessionStore((state) => state.loginSuccess)
   return useMutation({
     mutationFn: (payload: LoginRequest) => authApi.login(payload),
-    onSuccess: (response) => loginSuccess(response),
+    onSuccess: (response) => {
+      loginSuccess(response)
+      void hydrateOwnerModules()
+    },
   })
 }
 

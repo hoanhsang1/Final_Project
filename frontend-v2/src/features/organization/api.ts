@@ -7,6 +7,8 @@ import type {
   DepartmentInput,
   Member,
   MemberDetail,
+  OrganizationModule,
+  OrganizationModuleStatus,
   Position,
   Specialty,
   TransferRequest,
@@ -104,6 +106,28 @@ export const transfersApi = {
   async inbox(): Promise<TransferRequest[]> {
     const { data } = await api.get<TransferRequest[]>('/transfer-requests/inbox')
     return data
+  },
+}
+
+interface RawOrganizationModule {
+  code: string
+  name: string
+  is_core?: boolean | number
+  status?: string
+  is_locked_by_admin?: boolean | number
+}
+
+export const orgModulesApi = {
+  /** Chỉ OWNER gọi được: tổ chức lấy từ JWT, không truyền orgId. */
+  async mine(): Promise<OrganizationModule[]> {
+    const { data } = await api.get<RawOrganizationModule[]>('/api/v1/organizations/my/modules')
+    return data.map((row) => ({
+      code: row.code,
+      name: row.name,
+      isCore: row.is_core === true || row.is_core === 1,
+      status: (row.status ?? 'not_registered') as OrganizationModuleStatus,
+      lockedByAdmin: row.is_locked_by_admin === true || row.is_locked_by_admin === 1,
+    }))
   },
 }
 

@@ -19,7 +19,7 @@ export function SessionWatcher() {
       toast.error('Phiên đăng nhập đã hết hạn', {
         description: 'Vui lòng đăng nhập lại để tiếp tục.',
       })
-      navigate('/dang-nhap', { replace: true })
+      navigate('/dang-nhap', { replace: true, state: { expired: true } })
     }
     window.addEventListener('mems:session-expired', handler)
     return () => window.removeEventListener('mems:session-expired', handler)

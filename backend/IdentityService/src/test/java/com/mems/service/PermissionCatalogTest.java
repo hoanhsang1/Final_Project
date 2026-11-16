@@ -89,8 +89,7 @@ class PermissionCatalogTest {
             .findFirst()
             .orElseThrow();
 
-        // TODO(BE-00.3): Uncomment when class.approve_close is removed from the bundle.
-        // assertThat(academic.permissions()).doesNotContain("class.approve_close");
+        assertThat(academic.permissions()).doesNotContain("class.approve_close");
 
         // For now, record the known violation so the CI log is explicit:
         if (academic.permissions().contains("class.approve_close")) {

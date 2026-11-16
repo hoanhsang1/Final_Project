@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Alert } from '@/components/ui/feedback'
@@ -36,20 +36,14 @@ export function DepartmentFormDialog({
 }) {
   const create = useCreateDepartment()
   const update = useUpdateDepartment()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [moduleCodes, setModuleCodes] = useState<string[]>([])
+  // Component được mount mỗi lần mở (key theo phòng ban) nên state khởi tạo
+  // trực tiếp từ props, không cần effect reset.
+  const [name, setName] = useState(department?.name ?? '')
+  const [description, setDescription] = useState(department?.description ?? '')
+  const [moduleCodes, setModuleCodes] = useState<string[]>(department?.modules ?? [])
   const [errors, setErrors] = useState<FormErrors>({})
 
   const isEdit = Boolean(department)
-
-  useEffect(() => {
-    if (!open) return
-    setName(department?.name ?? '')
-    setDescription(department?.description ?? '')
-    setModuleCodes(department?.modules ?? [])
-    setErrors({})
-  }, [open, department])
 
   const toggleModule = (code: string) => {
     setModuleCodes((current) => {

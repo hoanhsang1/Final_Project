@@ -30,7 +30,13 @@ export function DepartmentDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createKey, setCreateKey] = useState(0)
   const [selected, setSelected] = useState<EmployeeRow | null>(null)
+
+  const openCreate = () => {
+    setCreateKey((value) => value + 1)
+    setCreateOpen(true)
+  }
 
   const members = useMemo(
     () => directory.rows.filter((row) => row.departmentId === id),
@@ -95,7 +101,7 @@ export function DepartmentDetailPage() {
         actions={
           <>
             {can(PERM.employeeCreate) ? (
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Button size="sm" onClick={openCreate}>
                 <Plus aria-hidden="true" />
                 Thêm nhân sự
               </Button>
@@ -142,11 +148,19 @@ export function DepartmentDetailPage() {
             isLoading={directory.isLoading}
             onOpen={setSelected}
             showDepartment={false}
-            emptyTitle="Phòng ban chưa có nhân sự"
-            emptyDescription="Thêm nhân sự và gán chức vụ để bắt đầu phân công công việc."
+            emptyTitle={
+              directory.isScoped && directory.scopedDepartmentId !== id
+                ? 'Ngoài phạm vi phòng ban của bạn'
+                : 'Phòng ban chưa có nhân sự'
+            }
+            emptyDescription={
+              directory.isScoped && directory.scopedDepartmentId !== id
+                ? 'Bạn chỉ xem được nhân sự của phòng ban mình công tác.'
+                : 'Thêm nhân sự và gán chức vụ để bắt đầu phân công công việc.'
+            }
             emptyAction={
-              can(PERM.employeeCreate)
-                ? { label: 'Thêm nhân sự', onClick: () => setCreateOpen(true) }
+              can(PERM.employeeCreate) && (!directory.isScoped || directory.scopedDepartmentId === id)
+                ? { label: 'Thêm nhân sự', onClick: openCreate }
                 : undefined
             }
           />
@@ -202,9 +216,12 @@ export function DepartmentDetailPage() {
         </div>
       </div>
 
-      <DepartmentFormDialog open={editOpen} onOpenChange={setEditOpen} department={data} />
+      {editOpen ? (
+        <DepartmentFormDialog key={data.id} open onOpenChange={setEditOpen} department={data} />
+      ) : null}
 
       <EmployeeCreateDrawer
+        key={createKey}
         open={createOpen}
         onOpenChange={setCreateOpen}
         defaultDepartmentId={data.id}

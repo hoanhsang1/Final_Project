@@ -48,9 +48,12 @@ Trạng thái dùng trong tài liệu:
 JWT **không có**: họ tên, email, tên tổ chức, danh sách module. FE:
 - hiển thị `username` nếu thiếu họ tên;
 - tổ chức hiển thị tên nếu mock, nếu không hiển thị `Tổ chức · <8 ký tự id>`;
-- menu không ẩn theo module khi chưa có dữ liệu module.
+- OWNER nạp module đang bật từ `GET /api/v1/organizations/my/modules` (§1.3) và menu ẩn module
+  đang tắt; vai trò khác chưa có nguồn module nên không ẩn (backend vẫn chặn bằng
+  `MODULE_NOT_ENABLED`).
 
-**PROPOSED**: bổ sung claim `fullName`, `orgName`, `modules[]` hoặc endpoint `GET /api/v1/me`.
+**PROPOSED**: bổ sung claim `fullName`, `orgName`, `modules[]` hoặc endpoint `GET /api/v1/me`
+để mọi vai trò (không chỉ OWNER) lọc được menu theo module.
 
 ### 1.2 Bảng điều khiển Quản trị hệ thống
 
@@ -77,6 +80,8 @@ FE chuẩn hoá về camelCase và `status` lowercase.
 | GET | `/positions` | OWNER/MANAGER/STAFF | IMPLEMENTED · FE-INTEGRATED |
 | GET | `/transfer-requests/inbox` | đăng nhập (server lọc `actionableSteps`) | IMPLEMENTED · FE-INTEGRATED |
 | GET | `/notifications` | đăng nhập (≤50, mới nhất) | IMPLEMENTED · FE-INTEGRATED |
+| GET | `/api/v1/organizations/my/modules` | ROLE_OWNER (org lấy từ JWT) | IMPLEMENTED · FE-INTEGRATED · FE-TESTED (mock) |
+| PATCH | `/api/v1/organizations/my/modules/{code}` | ROLE_OWNER | IMPLEMENTED · PLANNED (màn module FE-01) |
 
 Không có endpoint tổng hợp → dashboard tự ghép số liệu thật (đếm phòng ban, cộng nhân sự theo
 phòng, đếm chức vụ, đọc hộp duyệt, đếm thông báo chưa đọc). Không có số liệu giả, không sparkline
@@ -118,6 +123,12 @@ Quy tắc quyền backend (MembershipPolicy): HR chỉ gán chức vụ có quy�
 `ORGANIZATION` chỉ Owner gán. FE ẩn/khóa chức vụ cấp tổ chức với người không phải Owner; backend
 vẫn kiểm lại và trả `SELF_ESCALATION_NOT_ALLOWED`.
 
+**Phạm vi phòng ban:** người có `departmentId` (ví dụ HR) chỉ được gọi thành viên của phòng mình —
+backend trả 403 với phòng khác (scope `DEPARTMENT`). Vì vậy `useEmployeeDirectory` và
+`useHeadcounts` chỉ tải phòng ban trong phạm vi; trang Nhân sự khóa bộ lọc phòng ban và hiển thị
+thông báo; trang Phòng ban hiển thị “—” cho số nhân sự ngoài phạm vi. OWNER (`departmentId=null`)
+xem toàn tổ chức.
+
 Tạo nhân sự trả `{member, temporaryPassword, mustChangePassword:true}` — FE hiển thị modal một lần,
 không cho đóng ngoài ý muốn, có nút sao chép; lỗi `ACCOUNT_EXISTS` thì **không** hiện mật khẩu tạm.
 
@@ -156,7 +167,7 @@ không cho đóng ngoài ý muốn, có nút sao chép; lỗi `ACCOUNT_EXISTS` t
 |---|---|---|---|---|
 | 1 | Tên quyền | Sơ đồ v2 dùng `class.view`, `employee.transfer` | `PermissionCatalog` 51 mã dạng dotted (khớp); tài liệu Sprint 4 cũ dùng `CLASS_VIEW`, `PEOPLE_EDIT` | FE chỉ dùng dotted; legacy UPPER_SNAKE không dùng |
 | 2 | Module CSVC | `docs/api.md` nói `FACILITY_MANAGEMENT` không tồn tại | Có trong migration 16–26 và guard | Danh mục module FE lấy theo hằng số hiển thị, không hard-code điều hướng |
-| 3 | Bật/tắt module | Kế hoạch: OWNER bật/tắt | Tại thời điểm đọc: chỉ `PUT /organizations/{id}/modules` cho SUPER_ADMIN | Màn OWNER để PLANNED; không tự gọi endpoint sai |
+| 3 | Bật/tắt module | Kế hoạch: OWNER bật/tắt | Đã có `OwnerModuleController`: `GET /my/modules` + `PATCH /my/modules/{code}`; SUPER_ADMIN có `PUT /organizations/{id}/modules` và lock | FE đọc danh sách module cho OWNER để lọc menu; màn bật/tắt để FE-01 |
 | 4 | Lý do từ chối tổ chức | Phải lưu và hiển thị | Backend nhận nhưng **không lưu** | FE vẫn bắt buộc nhập, không hiển thị lại |
 | 5 | Họ tên nhân sự | Bảng nhân sự cần họ tên | `MemberResponse` không có | FE làm giàu từ chi tiết (giới hạn 30) |
 | 6 | `GET /me` | Kế hoạch 1.1 | Chưa có | Hồ sơ đọc từ JWT |
@@ -164,17 +175,18 @@ không cho đóng ngoài ý muốn, có nút sao chép; lỗi `ACCOUNT_EXISTS` t
 | 8 | Hủy lớp có sinh viên | Sơ đồ: yêu cầu + duyệt | Sprint 4: hủy ngay; code có thêm `cancel-requests/approve` | Chưa làm UI lớp nên chưa ảnh hưởng |
 | 9 | Đóng lớp đổi `status`? | Đặc tả: `closeState=CLOSED` **và** `status=DA_KET_THUC` | Code chỉ đổi `closeState` | Sẽ ảnh hưởng badge khi làm FE lớp |
 | 10 | Bước nhân viên khi chuyển phòng | DEC-01 còn mở (xác nhận hay đồng ý) | Code có bước `EMPLOYEE` bắt buộc duyệt | UI điều chuyển phải chờ chốt |
-| 11 | Danh mục module trong JWT | — | Không có | Menu không lọc theo module được; dựa vào quyền |
+| 11 | Danh mục module trong JWT | — | Không có | OWNER lọc được menu nhờ `GET /my/modules`; MANAGER/STAFF/giáo viên/sinh viên chưa có nguồn module → menu không ẩn (chờ claim `modules[]` hoặc endpoint tương đương) |
 
-Ghi chú: trong thời gian thực hiện, working tree backend xuất hiện thêm thay đổi module toggle
-(`28_…sql`, `29_…sql`, `OwnerModuleController`, `AdminModuleController`) **không do FE-00 tạo**.
-FE-00 không tích hợp các endpoint mới này; cần đọc lại contract trước khi làm màn module.
+Ghi chú: thay đổi module toggle backend (`28_…sql`, `29_…sql`, `OwnerModuleController`,
+`AdminModuleController`) **không do FE-00 tạo**. FE đã tích hợp **chỉ endpoint đọc**
+`GET /api/v1/organizations/my/modules`; các endpoint ghi (PATCH toggle, PUT của SA, lock) để FE-01.
+FE không tự suy ra quyền/module từ dữ liệu khác.
 
 ## 4. Xử lý lỗi & trạng thái UI
 
 | Tình huống | UI |
 |---|---|
-| 401 hết access token | Interceptor gọi refresh một lần, xếp hàng các request khác, retry; thất bại → xoá phiên + về `/dang-nhap` + toast |
+| 401 hết access token | Interceptor gọi refresh một lần, xếp hàng các request khác, retry; thất bại → xoá phiên + về `/dang-nhap` + toast + **banner cảnh báo 401 cố định** trên trang đăng nhập |
 | 403 | Trang `ForbiddenState` hoặc toast theo ngữ cảnh; không đăng xuất |
 | 404 collection (endpoint chưa có) | `ErrorState` + “thử lại”; ghi rõ tính năng chờ backend |
 | 409 nghiệp vụ | Toast theo mã đã dịch (ví dụ `DEPARTMENT_NOT_EMPTY`) |

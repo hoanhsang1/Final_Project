@@ -1,4 +1,4 @@
-import { Toaster as SonnerToaster, toast } from 'sonner'
+import { Toaster as SonnerToaster } from 'sonner'
 
 /** Cấu hình toast dùng chung; gọi qua `toast` của sonner. */
 export function Toaster() {
@@ -23,5 +23,3 @@ export function Toaster() {
     />
   )
 }
-
-export { toast }

@@ -55,7 +55,7 @@ Biểu tượng bình thí nghiệm trên topbar (chỉ hiện ở chế độ m
 | `npm run build` | `tsc -b` + build production |
 | `npm run preview` | Xem bản build |
 | `npm run lint` | ESLint (0 error; cảnh báo `set-state-in-effect` có chủ đích) |
-| `npm test` | Vitest + Testing Library (40 test) |
+| `npm test` | Vitest + Testing Library (45 test) |
 | `npm run format` | Prettier |
 
 ## Cấu trúc
@@ -102,3 +102,6 @@ src/
   `ENRICH_LIMIT`), chờ backend bổ sung trường.
 - Chức vụ, điều chuyển, ủy quyền, đào tạo, lịch, CSVC, thông báo là **PLANNED** — đã có sitemap,
   quyền và API dự kiến, chưa có giao diện hoạt động.
+- Module đang bật: OWNER nạp từ `GET /api/v1/organizations/my/modules` sau đăng nhập nên menu ẩn
+  module đã tắt. MANAGER/STAFF/giáo viên/sinh viên chưa có nguồn module (JWT không có claim) nên
+  menu chỉ lọc theo quyền; backend vẫn chặn bằng `MODULE_NOT_ENABLED`.

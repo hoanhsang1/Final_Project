@@ -33,7 +33,7 @@ class DefaultPositionSeederTest {
         assertThat(profileType("org-new", "Giáo vụ")).isEqualTo("GENERAL");
         assertThat(permissions("org-new", "Giáo viên"))
             .containsExactly("class.view", "schedule.view", "student.view");
-        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(41);
+        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(47);
     }
 
     @Test

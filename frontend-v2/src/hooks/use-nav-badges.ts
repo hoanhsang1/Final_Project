@@ -12,7 +12,8 @@ export function useNavBadges() {
 
   const pending = usePendingOrganizations(isSuperAdmin)
   const approvals = useTransferInbox(canSeeApprovals)
-  const notifications = useNotifications(true)
+  // SUPER_ADMIN không thuộc tổ chức nào nên không có hộp thông báo cấp tổ chức.
+  const notifications = useNotifications(!isSuperAdmin)
 
   const unreadNotifications = useMemo(
     () => (notifications.data ?? []).filter((item) => !item.readAt).length,

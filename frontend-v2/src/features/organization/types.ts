@@ -12,6 +12,23 @@ export interface DepartmentInput {
   moduleCodes: string[]
 }
 
+/** Trạng thái module của tổ chức — `active` là module đang bật. */
+export type OrganizationModuleStatus =
+  | 'active'
+  | 'disabled'
+  | 'locked'
+  | 'not_registered'
+  | 'requested'
+  | 'rejected'
+
+export interface OrganizationModule {
+  code: string
+  name: string
+  isCore: boolean
+  status: OrganizationModuleStatus
+  lockedByAdmin: boolean
+}
+
 export interface Position {
   id: string
   name: string

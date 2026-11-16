@@ -1,145 +1,204 @@
-export interface StudentItem {
-  id: string;
-  orgId: string;
-  studentCode: string;
-  fullName: string;
-  dateOfBirth?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  status: 'active' | 'inactive' | 'suspended';
-  classId?: string | null;
-  classCode?: string | null;
-  className?: string | null;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string | null;
+export interface Department {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  modules: string[]
 }
 
-export interface StudentPayload {
-  studentCode: string;
-  fullName: string;
-  dateOfBirth?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  status?: string;
+export interface DepartmentInput {
+  name: string
+  description?: string
+  moduleCodes: string[]
 }
 
-export interface StudentUpdatePayload {
-  fullName: string;
-  dateOfBirth?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  status?: string;
+/** Trạng thái module của tổ chức — `active` là module đang bật. */
+export type OrganizationModuleStatus =
+  | 'active'
+  | 'disabled'
+  | 'locked'
+  | 'not_registered'
+  | 'requested'
+  | 'rejected'
+
+export interface OrganizationModule {
+  code: string
+  name: string
+  isCore: boolean
+  status: OrganizationModuleStatus
+  lockedByAdmin: boolean
 }
 
-export interface StudentListQuery {
-  page?: number;
-  size?: number;
-  status?: string;
-  classId?: string;
-  q?: string;
+export interface Position {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  permissions: string[]
+  profileType: 'TEACHER' | 'GENERAL' | 'MANAGER' | 'STAFF' | null
+  bundleCodes: string[]
+  scope: 'ORGANIZATION' | 'DEPARTMENT'
+  departmentId: string | null
 }
 
-export interface SchoolClassItem {
-  id: string;
-  orgId: string;
-  classCode: string;
-  name: string;
-  academicYear?: string | null;
-  status: 'active' | 'inactive' | 'archived';
-  studentCount: number;
-  createdBy: string;
-  createdAt: string;
-  updatedAt?: string | null;
+export interface Specialty {
+  id: string
+  name: string
 }
 
-export interface SchoolClassPayload {
-  classCode: string;
-  name: string;
-  academicYear?: string | null;
-  status?: string;
+export interface Member {
+  userId: string
+  username: string
+  departmentId: string
+  role: 'OWNER' | 'MANAGER' | 'STAFF'
+  status: 'ACTIVE' | 'RESIGNED'
+  appointedBy: string | null
+  appointedAt: string
+  positionIds: string[]
+  permissions: string[]
 }
 
-export interface SchoolClassUpdatePayload {
-  name: string;
-  academicYear?: string | null;
-  status?: string;
+export interface AssignmentHistoryItem {
+  id: string
+  positionId: string
+  positionName: string
+  scopeType: 'ORGANIZATION' | 'DEPARTMENT'
+  departmentId: string | null
+  effectiveFrom: string
+  effectiveTo: string | null
+  status: 'ACTIVE' | 'REVOKED'
+  assignedByName: string | null
+  assignedAt: string
+  reason: string | null
+  revokedAt: string | null
+  revokedByName: string | null
+  revokedReason: string | null
 }
 
-export interface SchoolClassListQuery {
-  page?: number;
-  size?: number;
-  q?: string;
-  status?: string;
+export interface MemberDetail extends Member {
+  departmentName: string
+  fullName: string | null
+  email: string | null
+  phone: string | null
+  staffCode: string | null
+  teacher: boolean
+  contractType: 'CO_HUU' | 'THINH_GIANG' | null
+  teachingStatus: 'DANG_DAY' | 'TAM_NGHI' | 'NGHI_VIEC' | null
+  classCount: number
+  classLabel: string | null
+  assignmentHistory: AssignmentHistoryItem[]
 }
 
-export interface DepartmentItem {
-  id: string;
-  name: string;
-  description?: string | null;
-  createdAt: string;
-  modules: string[];
+export interface CreateMemberInput {
+  departmentId: string
+  username: string
+  email: string
+  role: 'MANAGER' | 'STAFF'
+  positionIds: string[]
+  staffCode?: string
+  fullName?: string
+  phone?: string
+  teacherProfile?: {
+    specialtyIds: string[]
+    contractType?: 'CO_HUU' | 'THINH_GIANG'
+  }
 }
 
-export interface DepartmentPayload {
-  name: string;
-  description?: string | null;
-  moduleCodes: string[];
+export interface CreatedMember {
+  member: Member
+  temporaryPassword: string
+  mustChangePassword: boolean
 }
 
-export interface PageResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  size: number;
+export interface TransferStep {
+  step: 'SOURCE_HEAD' | 'TARGET_HEAD' | 'HR' | 'EMPLOYEE'
+  decision: 'PENDING' | 'APPROVED' | 'REJECTED'
+  decidedBy: string | null
+  decidedByName: string | null
+  decidedAt: string | null
+  note: string | null
 }
 
-export interface PermissionItem {
-  code: string;
-  description: string;
-  moduleCode?: string | null;
+export interface TransferRequest {
+  id: string
+  userId: string
+  username: string
+  fullName: string | null
+  fromDepartmentId: string
+  fromDepartmentName: string
+  toDepartmentId: string
+  toDepartmentName: string
+  reason: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  requestedByName: string
+  requestedAt: string
+  appliedAt: string | null
+  steps: TransferStep[]
+  actionableSteps: TransferStep['step'][]
 }
 
-export interface PositionItem {
-  id: string;
-  name: string;
-  description?: string | null;
-  createdAt: string;
-  permissions: string[];
+export interface AppNotification {
+  id: string
+  type: string
+  title: string
+  body: string
+  entityType: string
+  entityId: string
+  readAt: string | null
+  createdAt: string
 }
 
-export interface PositionPayload {
-  name: string;
-  description?: string | null;
-  permissions: string[];
+/** Dòng tổng hợp cho danh bạ nhân sự toàn tổ chức. */
+export interface EmployeeRow extends Member {
+  departmentName: string
+  fullName?: string | null
+  staffCode?: string | null
+  email?: string | null
+  teacher: boolean
+  teachingStatus: MemberDetail['teachingStatus']
+  positionNames: string[]
+  enriched: boolean
 }
 
-export interface DepartmentMemberItem {
-  userId: string;
-  username: string | null;
-  departmentId: string;
-  role: 'MANAGER' | 'STAFF';
-  appointedBy: string;
-  appointedAt: string;
-  positionIds: string[];
-  permissions: string[];
+export const ROLE_LABELS: Record<string, string> = {
+  OWNER: 'Chủ tổ chức',
+  MANAGER: 'Quản lý phòng ban',
+  STAFF: 'Nhân viên',
 }
 
-export interface CreateMemberPayload {
-  username: string;
-  email: string;
-  role: 'MANAGER' | 'STAFF';
-  positionIds: string[];
+export const MEMBER_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Đang làm việc',
+  RESIGNED: 'Đã nghỉ việc',
 }
 
-export interface CreatedMemberResult {
-  member: DepartmentMemberItem;
-  temporaryPassword?: string;
-  mustChangePassword?: boolean;
+export const TEACHING_STATUS_LABELS: Record<string, string> = {
+  DANG_DAY: 'Đang dạy',
+  TAM_NGHI: 'Tạm nghỉ',
+  NGHI_VIEC: 'Nghỉ việc',
 }
 
-export interface ResetPasswordResult {
-  temporaryPassword: string;
+export const CONTRACT_TYPE_LABELS: Record<string, string> = {
+  CO_HUU: 'Cơ hữu',
+  THINH_GIANG: 'Thỉnh giảng',
 }
 
+export const TRANSFER_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Đang chờ duyệt',
+  APPROVED: 'Đã áp dụng',
+  REJECTED: 'Bị từ chối',
+  CANCELLED: 'Đã huỷ',
+}
 
+export const TRANSFER_STEP_LABELS: Record<string, string> = {
+  SOURCE_HEAD: 'Trưởng phòng cũ',
+  TARGET_HEAD: 'Trưởng phòng mới',
+  HR: 'Nhân sự',
+  EMPLOYEE: 'Nhân viên xác nhận',
+}
+
+export const TRANSFER_STEP_ORDER: TransferStep['step'][] = [
+  'SOURCE_HEAD',
+  'TARGET_HEAD',
+  'HR',
+  'EMPLOYEE',
+]

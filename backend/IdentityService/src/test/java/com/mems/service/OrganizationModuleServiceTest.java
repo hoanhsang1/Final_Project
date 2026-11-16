@@ -1,11 +1,13 @@
 package com.mems.service;
 
+import com.mems.client.PeopleModuleClient;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.util.List;
 import java.util.Map;
@@ -34,11 +36,15 @@ import static org.mockito.Mockito.*;
  *  T-11  SUPER_ADMIN lock without reason → error
  *  T-12  SUPER_ADMIN cannot lock a core module
  *  T-13  Legacy module code resolved via module_legacy_map
+ *  T-14  Pending workflows block module disable
+ *  T-15  PeopleService unavailable → fail-closed (throws MODULE_PENDING_WORKFLOWS)
+ *  T-16  No pending workflows → allow disable
  */
 class OrganizationModuleServiceTest {
 
     private JdbcTemplate jdbc;
     private OrganizationApprovalService approvalService;
+    private PeopleModuleClient peopleModuleClient;
     private OrganizationModuleService service;
 
     private static final String ORG_ID = "org-001";
@@ -50,10 +56,13 @@ class OrganizationModuleServiceTest {
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         approvalService = mock(OrganizationApprovalService.class);
-        service = new OrganizationModuleService(jdbc, approvalService);
+        peopleModuleClient = mock(PeopleModuleClient.class);
+        service = new OrganizationModuleService(jdbc, approvalService, peopleModuleClient);
 
         // Default: org is active
         stubOrg(ORG_ID, "active");
+        // Default: no pending workflows
+        when(peopleModuleClient.pendingWorkflowCount(any(), any())).thenReturn(0);
     }
 
     // ------------------------------------------------------------------ T-01
@@ -257,6 +266,57 @@ class OrganizationModuleServiceTest {
 
         verify(jdbc).update(contains("SET status = ?"),
             eq("active"), isNull(), eq(ORG_ID), eq(MODULE_FACILITY));
+    }
+
+    // ------------------------------------------------------------------ T-14
+
+    @Test
+    @DisplayName("T-14: Pending workflows (count > 0) block module disable")
+    void pendingWorkflowsBlockModuleDisable() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY)).thenReturn(3);
+
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.MODULE_PENDING_WORKFLOWS));
+    }
+
+    // ------------------------------------------------------------------ T-15
+
+    @Test
+    @DisplayName("T-15: PeopleService unavailable → fail-closed → MODULE_PENDING_WORKFLOWS")
+    void peopleServiceUnavailableFailsClosed() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY))
+            .thenThrow(new ResourceAccessException("Connection refused"));
+
+        assertThatThrownBy(() -> service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.MODULE_PENDING_WORKFLOWS));
+    }
+
+    // ------------------------------------------------------------------ T-16
+
+    @Test
+    @DisplayName("T-16: No pending workflows → module disable allowed")
+    void noPendingWorkflowsAllowDisable() {
+        stubModule(MODULE_FACILITY, false);
+        stubNoLegacyMap(MODULE_FACILITY);
+        stubOrgModule(ORG_ID, MODULE_FACILITY, "active", null);
+        when(peopleModuleClient.pendingWorkflowCount(ORG_ID, MODULE_FACILITY)).thenReturn(0);
+        stubUpdateAndAudit();
+
+        // Should complete without throwing
+        service.ownerToggle(ORG_ID, MODULE_FACILITY, false, ACTOR_ID);
+
+        verify(jdbc).update(contains("SET status = ?"),
+            eq("disabled"), any(), eq(ORG_ID), eq(MODULE_FACILITY));
     }
 
     // ------------------------------------------------------------------ stubs

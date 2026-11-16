@@ -244,6 +244,24 @@ export const mockModules: MockModule[] = [
   { code: 'FACILITY_MANAGEMENT', name: 'Quản lý cơ sở vật chất', isActive: true },
 ]
 
+const CORE_MODULES = new Set([
+  'STUDENT_MANAGEMENT',
+  'TEACHER_MANAGEMENT',
+  'CLASS_MANAGEMENT',
+  'SCHEDULE_MANAGEMENT',
+])
+
+/** Khớp seed 15_sprint4_sample.sql: tổ chức demo bật 3 module, còn lại chưa đăng ký. */
+export const mockOrgModules = mockModules.map((module) => ({
+  code: module.code,
+  name: module.name,
+  is_core: CORE_MODULES.has(module.code),
+  status: ['STUDENT_MANAGEMENT', 'TEACHER_MANAGEMENT', 'CLASS_MANAGEMENT'].includes(module.code)
+    ? 'active'
+    : 'not_registered',
+  is_locked_by_admin: false,
+}))
+
 export const mockAccounts: MockAccount[] = [
   {
     id: 'acc-super-1',

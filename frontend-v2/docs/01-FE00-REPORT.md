@@ -175,13 +175,14 @@ lịch/điểm danh/đổi lịch, CSVC, thông báo, việc chờ duyệt, cổ
 |---|---|---|
 | Type-check | `npx tsc -b` | pass (0 lỗi) |
 | Lint | `npm run lint` | **0 error**, 7 warning `react-hooks/set-state-in-effect` (reset form khi mở dialog — có chủ đích) |
-| Unit/UI test | `npm test` | **40 test / 8 file pass** (7,6 s) |
-| Build | `npm run build` | pass; `dist` ~726 KB JS (216 KB gzip), CSS 55 KB (10,6 KB gzip) |
+| Unit/UI test | `npm test` | **45 test / 9 file pass** (xem mục 12) |
+| Build | `npm run build` | pass; `dist` ~729 KB JS (217 KB gzip), CSS 55 KB (10,6 KB gzip) |
 | Visual E2E | Chrome headless qua CDP + `scripts/visual-check.mjs` | 10 ảnh, **0 console error / 0 page error** |
 
 Test có ý nghĩa nhất:
 - `app-flow.test.tsx` — chưa đăng nhập bị chặn; đăng nhập `sample_owner` → dashboard hiển thị dữ
-  liệu thật từ mock (5 phòng ban, 14 nhân sự); menu điều hướng sang phòng ban.
+  liệu thật từ mock (5 phòng ban, 14 nhân sự); menu điều hướng sang phòng ban; OWNER nạp đúng tập
+  module `active`; HR chỉ thấy nhân sự phòng mình.
 - `nav.test.ts` — giáo viên chỉ thấy mục theo quyền; MANAGER không tự có quyền; OWNER bypass; module
   tắt thì ẩn; chưa có dữ liệu module thì không ẩn nhầm; route mặc định theo vai trò.
 - `jwt.test.ts` — claim tiếng Việt giải mã đúng UTF-8 (lỗi thật đã phát hiện qua ảnh chụp và sửa),
@@ -195,7 +196,7 @@ tự động trong CI (script hiện cần Chrome cài sẵn).
 
 ## 10. File Change Report
 
-**Thêm mới** `frontend-v2/` — 107 file trong `src/` (12.749 dòng), gồm:
+**Thêm mới** `frontend-v2/` — 110 file trong `src/` (13.007 dòng), gồm:
 - 24 component UI, 10 layout/route, 3 feature, 10 trang, 15 file hạ tầng (http, jwt, nav, quyền, mock).
 - 8 file test (40 test), setup.
 - Cấu hình: `package.json`, `vite.config.ts`, `vitest.config.ts`, `tsconfig*.json`, `eslint.config.js`,
@@ -227,3 +228,46 @@ testing-library, jsdom, eslint + plugin, prettier, typescript. Lý do chọn ở
 Điều kiện trước FE-01/FE-02: chốt hợp đồng `MemberResponse` (thêm họ tên/mã NV) và thống nhất
 endpoint module của OWNER; trước FE-03: chốt DEC-01 (bước nhân viên xác nhận) và enum trạng thái
 yêu cầu chuyển phòng.
+
+## 12. Cập nhật tiếp nhận FE-00 — 16/11/2026
+
+Đối chiếu lại checklist FE-00 với code hiện tại, không xây lại phần đã có. Kiểm tra thực tế:
+`tsc -b` 0 lỗi · `npm run lint` 0 error / 7 warning có chủ đích · `npm test` **45 test / 9 file** ·
+`npm run build` pass.
+
+Bổ sung:
+
+1. **Menu theo module (điều kiện 4.3).** Backend đã có `GET /api/v1/organizations/my/modules`
+   (`OwnerModuleController`, migrations 28–29). FE nạp module đang bật (`status = active`) sau
+   đăng nhập/khôi phục phiên, giữ nguyên qua refresh token, nhờ đó menu OWNER ẩn module đã tắt.
+   Vai trò khác chưa có nguồn module → giữ “chưa xác định = không ẩn”; backend vẫn chặn bằng
+   `MODULE_NOT_ENABLED`. Endpoint ghi module (PATCH toggle, PUT/lock của SUPER_ADMIN) để FE-01.
+2. **Xử lý 401 (điều kiện 4.4).** Refresh thất bại → `SessionWatcher` đưa về `/dang-nhap` kèm state
+   `expired`; trang đăng nhập hiện banner cố định “Phiên đăng nhập đã hết hạn (401)” thay vì chỉ
+   toast vài giây. 403 và 404 giữ nguyên (`ForbiddenState`, `NotFoundPage`).
+
+Kiểm chứng API: đối chiếu toàn bộ đường dẫn FE gọi với controller backend — không có endpoint tự tạo.
+
+File thay đổi chính: `lib/modules.ts`, `features/organization/{api,types}.ts`,
+`stores/session-store.ts`, `features/auth/{module-hydration.ts,hooks.ts,bootstrap.ts}`,
+`layouts/session-watcher.tsx`, `features/auth/pages/login-page.tsx`,
+`services/mock/{fixtures,adapter}.ts`, test và tài liệu `README`, `03-SITEMAP`, `04-INTEGRATION-MATRIX`.
+
+### 12.1 Kiểm chứng lại phần tiếp nhận (lượt này)
+
+Đã đối chiếu từng thay đổi với backend và giữ lại vì đúng contract:
+
+1. `GET /api/v1/organizations/my/modules` tồn tại trong `OwnerModuleController`; `SecurityConfig`
+   đặt matcher `/api/v1/organizations/my/**` **trước** wildcard `organizations/**` và yêu cầu
+   `ROLE_OWNER` → OWNER gọi được, SUPER_ADMIN không bị ảnh hưởng.
+2. `OrganizationModuleService.listForOwner` trả đúng các khóa FE đang đọc: `code`, `name`,
+   `is_core`, `status` (`active|disabled|locked|not_registered`), `is_locked_by_admin`.
+3. Chỉ OWNER nạp module; MANAGER/STAFF/giáo viên/sinh viên không gọi endpoint này (tránh 403) và
+   menu của họ vẫn “chưa xác định = không ẩn” — đúng thiết kế.
+4. Banner 401 dùng `location.state.expired`, không phụ thuộc toast; 403/404 giữ nguyên.
+5. Bổ sung 2 test tích hợp: nạp module OWNER đúng tập `active`; HR chỉ thấy nhân sự phòng mình.
+   Tổng **45 test / 9 file**.
+6. Sửa thêm một rủi ro phát hiện khi rà: dashboard/nhân sự trước đây gọi thành viên **mọi** phòng
+   ban, sẽ 403 với HR (scope `DEPARTMENT`). Nay `useEmployeeDirectory`/`useHeadcounts` giới hạn
+   theo `departmentId`, trang Nhân sự khóa bộ lọc phòng ban, trang Phòng ban hiển thị “—” ngoài
+   phạm vi.

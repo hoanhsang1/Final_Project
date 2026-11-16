@@ -1,6 +1,6 @@
 import { Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Alert } from '@/components/ui/feedback'
@@ -24,6 +24,8 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ username?: string; password?: string; form?: string }>({})
   const login = useLoginMutation()
+  const location = useLocation()
+  const sessionExpired = Boolean((location.state as { expired?: boolean } | null)?.expired)
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -60,7 +62,7 @@ export function LoginPage() {
             <ShieldCheck className="size-3" aria-hidden="true" />
             Cổng quản trị
           </Badge>
-          {isMockMode ? (
+          {isMockMode && !import.meta.env.PROD ? (
             <Badge tone="warning" size="sm">
               Dữ liệu demo
             </Badge>
@@ -71,6 +73,12 @@ export function LoginPage() {
         <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
           Dùng tài khoản được tổ chức cấp. Quyền truy cập phụ thuộc chức vụ và ủy quyền của bạn.
         </p>
+
+        {sessionExpired ? (
+          <Alert tone="warning" className="mt-5" title="Phiên đăng nhập đã hết hạn (401)">
+            Vì lý do an toàn, phiên làm việc trước đã bị đóng. Đăng nhập lại để tiếp tục.
+          </Alert>
+        ) : null}
 
         {errors.form ? (
           <Alert tone="danger" className="mt-5" title="Không đăng nhập được">
@@ -142,7 +150,7 @@ export function LoginPage() {
           </Button>
         </form>
 
-        {isMockMode ? (
+        {isMockMode && !import.meta.env.PROD ? (
           <div className="mt-7 rounded-md border border-dashed border-line-strong bg-surface-muted px-3.5 py-3">
             <p className="text-2xs font-semibold uppercase tracking-[0.1em] text-ink-400">
               Tài khoản demo

@@ -1,7 +1,10 @@
 package com.mems.service;
 
+import com.mems.client.PeopleModuleClient;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +30,17 @@ import java.util.UUID;
 @Service
 public class OrganizationModuleService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrganizationModuleService.class);
+
     private final JdbcTemplate jdbc;
     private final OrganizationApprovalService approvalService;
+    private final PeopleModuleClient peopleModuleClient;
 
-    public OrganizationModuleService(JdbcTemplate jdbc, OrganizationApprovalService approvalService) {
+    public OrganizationModuleService(JdbcTemplate jdbc, OrganizationApprovalService approvalService,
+                                     PeopleModuleClient peopleModuleClient) {
         this.jdbc = jdbc;
         this.approvalService = approvalService;
+        this.peopleModuleClient = peopleModuleClient;
     }
 
     // ------------------------------------------------------------------ owner
@@ -168,31 +176,38 @@ public class OrganizationModuleService {
 
     /**
      * Checks whether pending workflows would be broken by disabling this module.
-     * Currently checks:
-     *  - SCHEDULE_MANAGEMENT: open schedule sessions
-     *  - FACILITY_MANAGEMENT: pending facility issue reports
-     * Extend as more modules/workflows are added.
+     * Calls PeopleService via internal HTTP API (fail-closed: any exception blocks the disable).
+     *
+     * <p>Module mapping (kế hoạch v2 §0.2):
+     * <ul>
+     *   <li>STUDENT_MANAGEMENT — class close/cancel requests pending</li>
+     *   <li>FACILITY_MANAGEMENT — transfer requests pending</li>
+     *   <li>SCHEDULE_MANAGEMENT — no dedicated approval workflow yet; allowed</li>
+     *   <li>Others — not yet tracked; allowed</li>
+     * </ul>
+     * </p>
      */
     private void checkNoPendingWorkflows(String orgId, String moduleCode) {
-        // These checks call identity DB; cross-service checks noted as BLOCKED (see report).
-        switch (moduleCode) {
-            case "SCHEDULE_MANAGEMENT" -> {
-                // No cross-service check available from IdentityService.
-                // ScheduleService guard prevents writes after disable; no cross-service block needed here.
-                // Note: full pending workflow check (DEC-11) deferred to inter-service call in BE-00.3.
-            }
-            case "FACILITY_MANAGEMENT" -> {
-                // Same reasoning — FacilityService guard handles write-block post-disable.
-            }
-            case "STUDENT_MANAGEMENT", "TEACHER_MANAGEMENT", "CLASS_MANAGEMENT" -> {
-                // Core — will never reach this branch; guarded above.
-            }
-            default -> {
-                // Unknown optional module — allow; no known pending workflow structure.
-            }
+        // Only modules whose pending workflows are tracked in PeopleService need a cross-service call.
+        if (!"STUDENT_MANAGEMENT".equals(moduleCode) && !"FACILITY_MANAGEMENT".equals(moduleCode)) {
+            return;
         }
-        // Placeholder: when internal APIs exist, call them here and throw
-        // ErrorCode.MODULE_PENDING_WORKFLOWS with the list of blocking items.
+        try {
+            int pending = peopleModuleClient.pendingWorkflowCount(orgId, moduleCode);
+            if (pending > 0) {
+                throw new AppException(ErrorCode.MODULE_PENDING_WORKFLOWS,
+                    "Cannot disable module: " + pending + " pending workflow(s)");
+            }
+        } catch (AppException appEx) {
+            // Re-throw application exceptions as-is (e.g. MODULE_PENDING_WORKFLOWS from above).
+            throw appEx;
+        } catch (Exception ex) {
+            // Fail-closed: PeopleService unavailable → block the disable.
+            log.warn("PeopleService unavailable when checking pending workflows for module={} org={}: {}",
+                moduleCode, orgId, ex.toString());
+            throw new AppException(ErrorCode.MODULE_PENDING_WORKFLOWS,
+                "Cannot disable module: pending workflow status is unknown (service unavailable)");
+        }
     }
 
     private void requireActiveOrg(String orgId) {

@@ -18,6 +18,9 @@ import java.util.TreeSet;
  * <p>Mặc định (chưa chốt): trưởng phòng ban phụ trách module
  * {@value #MODULE_CODE} của tổ chức. Muốn đổi người duyệt, chỉ sửa
  * {@link #responsibleHeadIds(String)}.</p>
+ *
+ * <p>Escalation (kế hoạch v2 §1.5): nếu không có trưởng phòng nào được tìm thấy,
+ * một Tổng quản lý đang hoạt động cũng có thể duyệt.</p>
  */
 @Service
 public class ClassApprovalPolicy {
@@ -37,12 +40,26 @@ public class ClassApprovalPolicy {
     }
 
     public boolean canApprove(String orgId) {
-        return actor.owner() || responsibleHeadIds(orgId).contains(actor.userId());
+        return actor.owner()
+            || responsibleHeadIds(orgId).contains(actor.userId())
+            || isActiveGeneralManager(orgId, actor.userId());
     }
 
     public void requireApprover(String orgId) {
         if (!canApprove(orgId)) {
             throw new AppException(ErrorCode.CLASS_APPROVER_NOT_ALLOWED);
+        }
+    }
+
+    /**
+     * Requires that the actor can approve AND is not the same person as the requester.
+     * Use this variant for close/cancel approval to enforce the self-approval rule
+     * (kế hoạch v2 §1.5).
+     */
+    public void requireApproverNotSelf(String orgId, String requesterId) {
+        requireApprover(orgId);
+        if (requesterId != null && requesterId.equals(actor.userId())) {
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         }
     }
 
@@ -63,6 +80,25 @@ public class ClassApprovalPolicy {
               AND p.name IN (?,?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, String.class, params.toArray()));
+    }
+
+    /**
+     * Returns true if the user currently holds an active Tổng quản lý assignment
+     * (kế hoạch v2 §1.5 — escalation path when no responsible head is found).
+     */
+    public boolean isActiveGeneralManager(String orgId, String userId) {
+        Timestamp now = Timestamp.from(Instant.now());
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*)
+            FROM assignment a
+            JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id
+            WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
+              AND p.deleted_at IS NULL AND p.scope='ORGANIZATION'
+              AND p.name=?
+              AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
+            """, Integer.class, orgId, userId,
+            com.mems.service.GeneralManagerService.GENERAL_MANAGER_POSITION_NAME, now, now);
+        return count != null && count > 0;
     }
 
     /** Người quản lý lớp: người tạo lớp + trưởng phòng phụ trách đào tạo. */
