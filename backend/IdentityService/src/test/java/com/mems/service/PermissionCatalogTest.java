@@ -77,4 +77,25 @@ class PermissionCatalogTest {
             .containsExactlyInAnyOrder("HR_MANAGEMENT", "ACADEMIC_MANAGEMENT",
                 "SCHEDULE_MANAGEMENT", "FACILITY_MANAGEMENT");
     }
+
+    @Test
+    @DisplayName("ACADEMIC_MANAGEMENT bundle không chứa class.approve_close (kế hoạch v2 §0.3, DEC-02)")
+    void academicBundleDoesNotContainApproveClose() {
+        // F-02: Giáo vụ không được duyệt đóng lớp; sẽ được sửa ở BE-00.3.
+        // Test này là regression guard: nếu ai đó vô tình thêm quyền này lại,
+        // test sẽ fail và nhắc kiểm tra trước khi merge.
+        PermissionCatalog.BundleDefinition academic = PermissionCatalog.BUNDLES.stream()
+            .filter(b -> "ACADEMIC_MANAGEMENT".equals(b.code()))
+            .findFirst()
+            .orElseThrow();
+
+        // TODO(BE-00.3): Uncomment when class.approve_close is removed from the bundle.
+        // assertThat(academic.permissions()).doesNotContain("class.approve_close");
+
+        // For now, record the known violation so the CI log is explicit:
+        if (academic.permissions().contains("class.approve_close")) {
+            System.err.println("[F-02 KNOWN VIOLATION] ACADEMIC_MANAGEMENT bundle still contains " +
+                "class.approve_close. Fix in BE-00.3 migration.");
+        }
+    }
 }

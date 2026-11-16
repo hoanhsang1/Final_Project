@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config';
 /**
  * Đích của proxy khi dev/preview.
  *
- * Mọi request (auth, organization, departments, positions, permissions, students, classes)
- * đều đi qua API Gateway (`127.0.0.1:8080`). Khi cần trỏ sang BE đã deploy
+ * Mọi request (auth, organization, departments, positions, permissions,
+ * permission-bundles, students, classes) đều đi qua API Gateway (`127.0.0.1:8080`). Khi cần trỏ sang BE đã deploy
  * (tunnel/remote) thì đặt biến môi trường, KHÔNG sửa file:
  *
  *   VITE_API_TARGET=https://xxx.trycloudflare.com npm run dev

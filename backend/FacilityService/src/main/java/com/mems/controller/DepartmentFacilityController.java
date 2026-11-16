@@ -48,7 +48,7 @@ public class DepartmentFacilityController {
 
     @GetMapping
     public List<FacilityResponse> legacyList(@PathVariable String departmentId) {
-        authorize(ROOM_VIEW, departmentId);
+        authorizeRead(ROOM_VIEW, departmentId);
         return facilities.listRooms(actor.orgId(), departmentId).stream()
             .map(room -> new FacilityResponse(room.id(), room.code(), room.name(), room.capacity(), room.status()))
             .toList();
@@ -58,7 +58,7 @@ public class DepartmentFacilityController {
 
     @GetMapping("/rooms")
     public List<RoomResponse> rooms(@PathVariable String departmentId) {
-        authorize(ROOM_VIEW, departmentId);
+        authorizeRead(ROOM_VIEW, departmentId);
         return facilities.listRooms(actor.orgId(), departmentId);
     }
 
@@ -89,7 +89,7 @@ public class DepartmentFacilityController {
 
     @GetMapping("/equipment")
     public List<EquipmentResponse> equipment(@PathVariable String departmentId) {
-        authorize(EQUIPMENT_VIEW, departmentId);
+        authorizeRead(EQUIPMENT_VIEW, departmentId);
         return facilities.listEquipment(actor.orgId(), departmentId);
     }
 
@@ -122,7 +122,7 @@ public class DepartmentFacilityController {
     @GetMapping("/issues")
     public List<IssueResponse> issues(@PathVariable String departmentId,
                                       @RequestParam(required = false) String status) {
-        authorize(ISSUE_VIEW, departmentId);
+        authorizeRead(ISSUE_VIEW, departmentId);
         return facilities.listIssues(actor.orgId(), departmentId, status);
     }
 
@@ -141,7 +141,12 @@ public class DepartmentFacilityController {
     }
 
     private void authorize(Set<String> codes, String departmentId) {
-        modules.requireModule(actor.orgId(), MODULE);
+        modules.requireModuleForWrite(actor.orgId(), MODULE);
+        actor.requireAnyPermissionIn(codes, departmentId);
+    }
+
+    private void authorizeRead(Set<String> codes, String departmentId) {
+        modules.requireModuleReadable(actor.orgId(), MODULE);
         actor.requireAnyPermissionIn(codes, departmentId);
     }
 }

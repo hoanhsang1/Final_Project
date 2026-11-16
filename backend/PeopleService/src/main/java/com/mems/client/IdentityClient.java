@@ -68,6 +68,23 @@ public class IdentityClient {
         }
     }
 
+    /** Returns full module status rows (code, status, is_core, is_locked_by_admin). */
+    public List<java.util.Map<String, Object>> moduleStatus(String orgId) {
+        try {
+            var response = http.exchange(
+                "/internal/orgs/{orgId}/modules/status",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<java.util.Map<String, Object>>>() {},
+                orgId
+            );
+            if (response.getBody() == null) throw unavailable(null);
+            return response.getBody();
+        } catch (RestClientException ex) {
+            throw unavailable(ex);
+        }
+    }
+
     public void createAccount(String id, String orgId, MemberRequest request, String password, String actorId) {
         try {
             http.postForEntity("/internal/accounts", Map.of(

@@ -57,12 +57,14 @@ export default function MyDelegationsPage() {
           <Button onClick={handleLogout}>Đăng xuất</Button>
         </Flex>
 
-        <Alert
-          type="info"
-          showIcon
-          message={MSG_DEL.MY_REVOKED_NOTE}
-          style={{ marginBottom: token.margin }}
-        />
+        {DELEGATION_UI_ENABLED && (
+          <Alert
+            type="info"
+            showIcon
+            message={MSG_DEL.MY_REVOKED_NOTE}
+            style={{ marginBottom: token.margin }}
+          />
+        )}
 
         {!DELEGATION_UI_ENABLED ? (
           <Alert type="info" showIcon message={MSG_DEL.MY_DISABLED} />
