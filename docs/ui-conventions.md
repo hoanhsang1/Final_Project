@@ -360,6 +360,29 @@ Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
    hook `matchMedia` riêng và không để CSS quyết định ẩn/hiện cột bên — hai nguồn sẽ
    lệch nhau (JS nghĩ desktop, CSS nghĩ mobile).
 
+### 6.9 Cạm bẫy phát hiện khi port P3c (danh sách lớp — `Table` đầu tiên)
+
+1. `Table<T>` buộc `T extends Record<string, unknown>`. DTO là `interface` nên **không**
+   có index signature và bị từ chối. Cách chữa rẻ nhất: alias tại chỗ dùng
+   `type ClassRow = ClassListItem & Record<string, unknown>`, rồi `Table<ClassRow>` —
+   đừng nới lỏng DTO trong `features/` (mọi trang khác sẽ mất kiểm kiểu theo).
+2. `useTablePagination` **chỉ vẽ điều khiển phân trang**, KHÔNG cắt `data`. Nghĩa là
+   truyền dữ liệu đã phân trang ở server vào `Table` là đúng: `totalItems={total}` lấy
+   từ BE, `data` là một trang. Đừng `slice()` thêm lần nữa.
+3. Ô bảng là `renderCell: (item) => ReactNode` — **không** phải `render(value, record)`
+   của antd. `align: 'end'` thay `'right'`; bề rộng `pixel(n)`/`proportional(n, { minWidth })`.
+4. `Selector` render **listbox ẩn chứa đúng nhãn option**. Test `getByText('Đang diễn ra')`
+   sẽ khớp 2 lần (badge trong bảng + option của bộ lọc). Phải scope:
+   `within(screen.getByRole('table')).getByText(...)`.
+5. `PageLoading` có **hai** `role="status"`: `<div aria-busy>` của mình và `<span>`
+   của `VisuallyHidden`. Truy vấn theo chữ "Đang tải…", không theo role.
+6. `TextInput`/`Selector` **không** nhận `className`/`style` ở gốc (field là một cụm
+   label + control + status); muốn đặt bề rộng dùng prop `width`, muốn style cả cụm
+   dùng `containerStyle`. `Input.Search` → `TextInput type="search"` (role `searchbox`,
+   `startIcon="search"`, `hasClear`, `onEnter`) + một `Button` "Tìm" riêng.
+7. `Text` bên trong `Link` không tự đặt `font-variant-numeric`, nên `style={numericStyle}`
+   trên `AppLink` kế thừa xuống chữ hiển thị — cách rẻ nhất để mã lớp thẳng cột.
+
 ## 7. Sáu khối dùng chung (v2)
 
 | Khối | Spec v2 |
@@ -440,6 +463,10 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
   và CSS của mình, breakpoint duy nhất là `useMediaQuery('(min-width: 1024px)')`. Trang
   con vẫn có thể còn antd — đó là dạng lai được phép cho tới P4; chỉ **không** trộn
   hai bên trong cùng một component.
+- Trang Sprint 4 port **từng trang một**: `ClassesPage` đã là Astryx thuần
+  (`Table` + `Badge` + `Selector` + `Banner`); `TeachersPage`, `TeacherDetailPage`,
+  `ClassDetailPage` còn antd. Bảng của Astryx **không** dùng class `.ant-table*`, nên
+  E2E chạm trang nào thì sửa khi port trang đó.
 - E2E không bám class `.ant-*` của layout nữa: dùng `navigation`/`link`/`dialog` +
   `aria-label` của mình.
 - i18n: Astryx `vi-VN`, antd `vi_VN`. Chuỗi của mình vẫn nằm trong code, không phụ

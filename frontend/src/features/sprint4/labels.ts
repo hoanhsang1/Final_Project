@@ -2,8 +2,10 @@
  * Nhãn hiển thị + định dạng ngày cho Sprint 4.
  *
  * Một nguồn duy nhất cho §7 (nhãn trạng thái) để 4 màn hình không lệch nhau.
- * Không hardcode màu hex — dùng bảng màu preset của antd `Tag`.
+ * Không hardcode màu hex — mỗi trạng thái có một *biến thể* (`Badge` của Astryx
+ * hoặc tên màu preset của antd `Tag`) để hai bên không lệch nhau trong lúc port.
  */
+import type { BadgeVariant } from '@astryxdesign/core';
 import dayjs from 'dayjs';
 
 export const CLASS_STATUS_LABEL: Record<string, string> = {
@@ -21,6 +23,19 @@ export const CLASS_STATUS_TAG: Record<string, string | undefined> = {
   DA_HUY: 'red',
 };
 
+/**
+ * §7 — biến thể `Badge` cho trạng thái lớp (bản Astryx của `CLASS_STATUS_TAG`).
+ *
+ * Chữ trong badge luôn đi kèm, nên màu chỉ là tín hiệu phụ (BR-08: không dùng
+ * màu làm kênh thông tin duy nhất).
+ */
+export const CLASS_STATUS_BADGE: Record<string, BadgeVariant> = {
+  CHUA_BAT_DAU: 'neutral',
+  DANG_DIEN_RA: 'info',
+  DA_KET_THUC: 'success',
+  DA_HUY: 'error',
+};
+
 export const CLOSE_STATE_LABEL: Record<string, string> = {
   NONE: '',
   PENDING: 'Chờ duyệt đóng',
@@ -32,6 +47,13 @@ export const CLOSE_STATE_TAG: Record<string, string | undefined> = {
   NONE: undefined,
   PENDING: 'gold',
   CLOSED: undefined,
+};
+
+/** §7 — biến thể `Badge` cho trạng thái đóng lớp (bản Astryx của `CLOSE_STATE_TAG`). */
+export const CLOSE_STATE_BADGE: Record<string, BadgeVariant> = {
+  NONE: 'neutral',
+  PENDING: 'warning',
+  CLOSED: 'neutral',
 };
 
 export const TEACHING_STATUS_LABEL: Record<string, string> = {

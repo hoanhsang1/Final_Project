@@ -17,6 +17,7 @@ export const MSG_S4 = {
   CREATE: 'Tạo mới',
   CONFIRM: 'Xác nhận',
   CLOSE: 'Đóng',
+  SEARCH: 'Tìm',
   LOADING: 'Đang tải…',
   COPY: 'Sao chép',
   COPIED: 'Đã sao chép.',
@@ -116,6 +117,8 @@ export const MSG_CLASS = {
   STATUS_ALL: 'Tất cả trạng thái',
   TEACHER_UNASSIGNED: 'Chưa phân công',
   TEACHER_SECTION: 'Giáo viên phụ trách',
+  /** Tên cho `nav` phân trang — hai landmark cùng tên là lỗi axe. */
+  PAGINATION_LABEL: 'Phân trang danh sách lớp',
 
   ASSIGN_SEARCH_LABEL: 'Tìm giáo viên theo mã hoặc họ tên',
   ASSIGN_EMPTY: 'Không có giáo viên phù hợp để gán.',
@@ -135,3 +138,14 @@ export const MSG_CLASS = {
   APPROVE_CONFIRM: 'Duyệt yêu cầu đóng lớp này?',
   REOPEN_CONFIRM: 'Mở lại lớp này?',
 } as const;
+
+/**
+ * Dòng tổng số phía trên bảng — "12 lớp".
+ *
+ * Tách khỏi `MSG_CLASS` vì `MSG_CLASS` chỉ chứa chuỗi tĩnh (`as const`); câu này
+ * cần nội suy số, và số đó phải khớp `total` BE trả về chứ không phải số dòng
+ * đang hiện trên trang.
+ */
+export function classTotalLabel(total: number): string {
+  return `${total} lớp`;
+}
