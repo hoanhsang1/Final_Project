@@ -20,7 +20,7 @@ Tài liệu kèm theo: [Design System](02-DESIGN-SYSTEM.md) · [Sitemap](03-SITE
 | Vấn đề kiến trúc | Menu admin/owner tĩnh, chỉ chặn theo role; quyền hiệu lực chỉ được dùng ở menu Đào tạo; guard và menu lệch nhau (menu Chức vụ yêu cầu `employee.*` nhưng route yêu cầu `position.manage`) |
 | Vấn đề dữ liệu | `MemberResponse` thiếu họ tên/email → bảng nhân sự cũ hiển thị `userId`; 3 nhóm tiền tố API; snake_case lẫn camelCase; lỗi 500 khi thiếu field đăng nhập |
 | Vấn đề UX | Mỗi module một trang CRUD; dashboard không có nội dung; nhiều route chết (`/to-chuc/sinh-vien`, `/xem-thu/*`); phụ thuộc AntD khiến khó tạo bản sắc |
-| Kết luận | **Không gia cố tiếp**. Xây mới trong `frontend-v2/`, giữ contract đã xác minh, không giữ layout/màu/UX |
+| Kết luận | **Không gia cố tiếp**. Xây mới trong `frontend/`, giữ contract đã xác minh, không giữ layout/màu/UX |
 
 ## 2. User Role & Sitemap Analysis
 
@@ -106,7 +106,7 @@ lib — jwt, permission, nav, format, error, query keys
 ## 6. Folder Structure
 
 ```
-frontend-v2/
+frontend/
   docs/                     báo cáo, ảnh
   scripts/visual-check.mjs  chụp ảnh kiểm tra bằng Chrome
   src/
@@ -175,7 +175,7 @@ lịch/điểm danh/đổi lịch, CSVC, thông báo, việc chờ duyệt, cổ
 |---|---|---|
 | Type-check | `npx tsc -b` | pass (0 lỗi) |
 | Lint | `npm run lint` | **0 error**, 7 warning `react-hooks/set-state-in-effect` (reset form khi mở dialog — có chủ đích) |
-| Unit/UI test | `npm test` | **45 test / 9 file pass** (xem mục 12) |
+| Unit/UI test | `npm test` | **53 test / 10 file pass** (xem mục 13) |
 | Build | `npm run build` | pass; `dist` ~729 KB JS (217 KB gzip), CSS 55 KB (10,6 KB gzip) |
 | Visual E2E | Chrome headless qua CDP + `scripts/visual-check.mjs` | 10 ảnh, **0 console error / 0 page error** |
 
@@ -196,9 +196,9 @@ tự động trong CI (script hiện cần Chrome cài sẵn).
 
 ## 10. File Change Report
 
-**Thêm mới** `frontend-v2/` — 110 file trong `src/` (13.007 dòng), gồm:
+**Thêm mới** `frontend/` — 115 file trong `src/` (13.953 dòng), gồm:
 - 24 component UI, 10 layout/route, 3 feature, 10 trang, 15 file hạ tầng (http, jwt, nav, quyền, mock).
-- 8 file test (40 test), setup.
+- 10 file test (53 test), setup.
 - Cấu hình: `package.json`, `vite.config.ts`, `vitest.config.ts`, `tsconfig*.json`, `eslint.config.js`,
   `.prettierrc.json`, `.env*`, `.gitignore`, `index.html`.
 - Tài liệu: `README.md`, `docs/01..04`, 10 ảnh PNG, `scripts/visual-check.mjs`.
@@ -232,7 +232,7 @@ yêu cầu chuyển phòng.
 ## 12. Cập nhật tiếp nhận FE-00 — 16/11/2026
 
 Đối chiếu lại checklist FE-00 với code hiện tại, không xây lại phần đã có. Kiểm tra thực tế:
-`tsc -b` 0 lỗi · `npm run lint` 0 error / 7 warning có chủ đích · `npm test` **45 test / 9 file** ·
+`tsc -b` 0 lỗi · `npm run lint` 0 error / 0 warning · `npm test` **53 test / 10 file** ·
 `npm run build` pass.
 
 Bổ sung:
@@ -265,9 +265,58 @@ File thay đổi chính: `lib/modules.ts`, `features/organization/{api,types}.ts
 3. Chỉ OWNER nạp module; MANAGER/STAFF/giáo viên/sinh viên không gọi endpoint này (tránh 403) và
    menu của họ vẫn “chưa xác định = không ẩn” — đúng thiết kế.
 4. Banner 401 dùng `location.state.expired`, không phụ thuộc toast; 403/404 giữ nguyên.
-5. Bổ sung 2 test tích hợp: nạp module OWNER đúng tập `active`; HR chỉ thấy nhân sự phòng mình.
-   Tổng **45 test / 9 file**.
+5. Bổ sung test tích hợp: nạp module OWNER đúng tập `active`; HR chỉ thấy nhân sự phòng mình.
+   Tổng **53 test / 10 file** (xem mục 13).
 6. Sửa thêm một rủi ro phát hiện khi rà: dashboard/nhân sự trước đây gọi thành viên **mọi** phòng
    ban, sẽ 403 với HR (scope `DEPARTMENT`). Nay `useEmployeeDirectory`/`useHeadcounts` giới hạn
    theo `departmentId`, trang Nhân sự khóa bộ lọc phòng ban, trang Phòng ban hiển thị “—” ngoài
    phạm vi.
+
+---
+
+## 13. FE-00.1 & FE-01 (16/11/2026)
+
+### 13.1 Hợp nhất về một frontend duy nhất
+
+- Toàn bộ source mới đã chuyển vào `frontend/`; dev server đang chạy tại **http://localhost:5173/**
+  phục vụ đúng app mới (Vite tự nạp lại cấu hình, không tạo server mới).
+- Đã thay UI Ant Design bằng Design System Tailwind + Radix; xoá `e2e/`, Playwright config,
+  `vercel.json`, `dist` cũ; giữ tài liệu `frontend/docs/superpowers`.
+- `frontend-v2/` đã được hợp nhất và xoá phần source; còn lại một thư mục `node_modules` rác do
+  file `.node` bị khoá bởi tiến trình Windows (không ảnh hưởng app, có thể xoá sau khi khởi động lại máy).
+
+### 13.2 FE-00.1 — tích hợp backend & phân quyền
+
+- **Probe backend thật**: login OK; organizations/pending/audit/detail/departments/members/
+  positions/specialties OK. `notifications`, `transfer-requests/inbox`, `organizations/my/modules`,
+  `modules/admin` trả 404/403 → ghi **BLOCKED** trong
+  [BACKEND_DEPENDENCIES.md](BACKEND_DEPENDENCIES.md), không tuyên bố tích hợp thành công.
+- JWT bản chạy thiếu `permissionScopes` và dùng mã quyền legacy; FE thêm
+  `resolveDepartmentScope()` (`lib/scope.ts`): ưu tiên scope ORGANIZATION nếu có, fallback
+  `departmentId` khi token cũ → HR DEPARTMENT bị giới hạn, HR ORGANIZATION xem liên phòng ban.
+- 7 lint warning còn lại đã xử lý: reset form bằng `key`/mount thay vì effect, palette reset trong
+  handler, cấu hình `allowExportNames` cho export có chủ đích → **0 warning**.
+- Demo account/role switcher chỉ render khi `!PROD && mock`; mock nạp động nên bản API không tải
+  dữ liệu demo.
+
+### 13.3 FE-01 — chi tiết tổ chức & module OWNER
+
+| Hạng mục | Trạng thái | Ghi chú |
+|---|---|---|
+| SA chi tiết tổ chức `/quan-tri/to-chuc/:id` | **DONE (real API)** | GET detail 200; duyệt/từ chối/tạm ngưng/kích hoạt; link từ danh sách |
+| OWNER module `/to-chuc/module` | **DONE (mock) / BLOCKED (real)** | Bật/tắt module tùy chọn, chặn module lõi & module bị khóa; runtime hiện 403 |
+| Khóa module cấp SUPER_ADMIN | **BLOCKED** | `GET /modules/admin` và `PATCH …/lock` runtime 404; chưa dựng UI |
+| Danh mục module toàn cục | **BLOCKED** | Chưa có API ghi danh mục; giữ PLANNED |
+
+Test mới: OWNER bật module từ màn quản lý; SUPER_ADMIN mở chi tiết tổ chức từ danh sách; scope
+DEPARTMENT/ORGANIZATION (6 unit test). Tổng **53 test / 10 file**.
+
+### 13.4 Trạng thái kiểm thử cuối
+
+- `npx tsc -b`: pass.
+- `npm run lint`: 0 error, 0 warning.
+- `npm test`: **53/53 pass**.
+- `npm run build`: pass (~746 KB JS / 220 KB gzip).
+- `http://localhost:5173/` và `/src/main.tsx`: HTTP 200, phục vụ app mới.
+- Kiểm thử backend thật chỉ ở mức probe endpoint (không có browser E2E do môi trường sandbox chặn
+  Chrome); mọi tuyên bố “real” đều kèm mã HTTP thực tế.

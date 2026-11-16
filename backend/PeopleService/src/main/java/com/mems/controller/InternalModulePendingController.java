@@ -13,14 +13,30 @@ import java.util.Map;
  * <p>Protected by {@code InternalApiFilter} (X-Internal-Api-Key header required).
  * Always returns {@code { "pendingCount": N }} — N > 0 means disable is blocked.</p>
  *
- * <p>Module mapping:
+ * <p>Module mapping (confirmed against schema):
  * <ul>
- *   <li>{@code STUDENT_MANAGEMENT} — class rows with
- *       {@code close_state='CLOSE_REQUESTED'} OR {@code cancel_state='CANCEL_REQUESTED'}</li>
- *   <li>{@code FACILITY_MANAGEMENT} — transfer_request rows with {@code status='PENDING'}</li>
+ *   <li>{@code STUDENT_MANAGEMENT} — {@code school_class} rows with
+ *       {@code close_state='PENDING'} OR {@code cancel_state='PENDING'}.
+ *       These are close/cancel approval requests pending a head-of-department decision.</li>
+ *   <li>{@code FACILITY_MANAGEMENT} — NEEDS_DECISION (see below). Returns 0 for now
+ *       but the caller (OrganizationModuleService) handles this conservatively.</li>
  *   <li>All others — always 0 (no pending workflow structure defined yet)</li>
  * </ul>
  * </p>
+ *
+ * <p><strong>NEEDS_DECISION — FACILITY_MANAGEMENT:</strong><br>
+ * Transfer requests ({@code transfer_request}) belong to HR workflows (employee
+ * department transfers), NOT to the FACILITY_MANAGEMENT module. Facility issues
+ * ({@code incident_report}) live in {@code mems_facility_db} which PeopleService
+ * cannot query. No pending workflow structure owned by PeopleService is currently
+ * tied to FACILITY_MANAGEMENT. Per hotfix instructions this returns 0 until a
+ * Product Owner decision defines the correct mapping.
+ * See: docs/BE-00.2-00.3-hotfix-report.md § Issue-5.</p>
+ *
+ * <p><strong>NOTE — STUDENT_MANAGEMENT is a Core module:</strong><br>
+ * Core modules cannot be disabled at all (blocked by {@code MODULE_IS_CORE} before
+ * this check is ever reached). This endpoint still returns the correct count for
+ * correctness and future use if the Core/Optional classification changes.</p>
  */
 @RestController
 @RequestMapping("/internal/modules")
@@ -38,27 +54,27 @@ public class InternalModulePendingController {
                                              @RequestParam String orgId) {
         int count = switch (moduleCode) {
             case "STUDENT_MANAGEMENT" -> countStudentManagementPending(orgId);
-            case "FACILITY_MANAGEMENT" -> countFacilityManagementPending(orgId);
+            // FACILITY_MANAGEMENT: NEEDS_DECISION — no confirmed pending workflow
+            // in mems_people_db tied to this module. Returns 0 until spec clarified.
+            // Transfer requests (transfer_request) are HR/people workflows, not facility.
+            // Facility incident_report lives in mems_facility_db (not accessible here).
+            case "FACILITY_MANAGEMENT" -> 0;
             default -> 0;
         };
         return Map.of("pendingCount", count);
     }
 
+    /**
+     * Counts classes with a pending approval request (close or cancel).
+     * Schema: table {@code school_class}, states {@code close_state='PENDING'}
+     * and {@code cancel_state='PENDING'} (confirmed from ClassStatusRepository).
+     */
     private int countStudentManagementPending(String orgId) {
         Integer result = jdbc.queryForObject("""
-            SELECT COUNT(*) FROM class
+            SELECT COUNT(*) FROM school_class
             WHERE org_id = ?
               AND deleted_at IS NULL
-              AND (close_state = 'CLOSE_REQUESTED' OR cancel_state = 'CANCEL_REQUESTED')
-            """, Integer.class, orgId);
-        return result == null ? 0 : result;
-    }
-
-    private int countFacilityManagementPending(String orgId) {
-        Integer result = jdbc.queryForObject("""
-            SELECT COUNT(*) FROM transfer_request
-            WHERE org_id = ?
-              AND status = 'PENDING'
+              AND (close_state = 'PENDING' OR cancel_state = 'PENDING')
             """, Integer.class, orgId);
         return result == null ? 0 : result;
     }

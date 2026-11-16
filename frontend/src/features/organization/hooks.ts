@@ -15,6 +15,7 @@ import type {
   EmployeeRow,
   Position,
 } from '@/features/organization/types'
+import { hydrateOwnerModules } from '@/features/auth/module-hydration'
 import { queryKeys } from '@/lib/query-keys'
 import { useDepartmentScope } from '@/features/organization/use-scope'
 
@@ -68,7 +69,6 @@ export function useToggleOrgModule() {
       orgModulesApi.toggle(code, enabled),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.orgModules })
-      const { hydrateOwnerModules } = await import('@/features/auth/module-hydration')
       await hydrateOwnerModules()
     },
   })

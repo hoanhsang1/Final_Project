@@ -1,17 +1,20 @@
-# MEMS Frontend v2 — FE-00
+# MEMS Frontend — FE-00.1 / FE-01
 
-Frontend mới của **MEMS (Modular Education Management System)**, xây dựng lại từ đầu trong
-`frontend-v2/`. Frontend cũ trong `frontend/` **không bị sửa và không bị xoá**.
+Frontend duy nhất của **MEMS (Modular Education Management System)**, nằm trong `frontend/` và
+phục vụ tại `http://localhost:5173/`. Toàn bộ mã Ant Design cũ đã được thay bằng kiến trúc
+React 19 + TypeScript + Vite + Tailwind v4 + Radix (giữ lại các contract API tốt).
 
-> Trạng thái: **FE-00 — nền tảng + 4 màn hình mẫu**. Chưa phải bản tích hợp toàn bộ backend.
-> Xem [báo cáo FE-00](docs/01-FE00-REPORT.md) và [ma trận tích hợp](docs/04-INTEGRATION-MATRIX.md).
+> Trạng thái: **FE-00.1 + FE-01 (một phần)** — nền tảng, phòng ban/nhân sự, chi tiết tổ chức,
+> quản lý module OWNER. Các module nghiệp vụ còn lại giữ route PLANNED đúng phạm vi.
+> Xem [báo cáo](docs/01-FE00-REPORT.md), [ma trận tích hợp](docs/04-INTEGRATION-MATRIX.md) và
+> [phụ thuộc backend](docs/BACKEND_DEPENDENCIES.md).
 
 ## Chạy nhanh
 
 ```bash
-cd frontend-v2
+cd frontend
 npm install
-npm run dev          # http://localhost:5174
+npm run dev          # http://localhost:5173
 ```
 
 Mặc định chạy ở **chế độ dữ liệu demo** (`VITE_DATA_SOURCE=mock`): toàn bộ dữ liệu nằm trong
@@ -33,6 +36,11 @@ VITE_ENABLE_DEMO_TOOLBAR=false
    `/teachers`, `/specialties`, `/transfer-requests`, `/notifications` sang gateway (backend
    không bật CORS nên bắt buộc đi qua proxy).
 
+> **Cảnh báo runtime:** backend đang chạy trên máy là bản build cũ hơn source repo (JWT thiếu
+> `permissionScopes`, quyền legacy UPPER_SNAKE; `/notifications`, `/transfer-requests/inbox`,
+> `/organizations/my/modules` trả 404/403). Vì vậy chế độ `api` mới chỉ xác minh được đăng nhập,
+> tổ chức, phòng ban, nhân sự cơ bản. Chi tiết và danh sách BLOCKED: [BACKEND_DEPENDENCIES.md](docs/BACKEND_DEPENDENCIES.md).
+
 ## Tài khoản demo
 
 | Tài khoản | Mật khẩu | Vai trò | Ghi chú |
@@ -51,11 +59,11 @@ Biểu tượng bình thí nghiệm trên topbar (chỉ hiện ở chế độ m
 
 | Lệnh | Việc |
 |---|---|
-| `npm run dev` | Dev server cổng 5174 |
+| `npm run dev` | Dev server cổng 5173 |
 | `npm run build` | `tsc -b` + build production |
 | `npm run preview` | Xem bản build |
 | `npm run lint` | ESLint (0 error; cảnh báo `set-state-in-effect` có chủ đích) |
-| `npm test` | Vitest + Testing Library (45 test) |
+| `npm test` | Vitest + Testing Library (53 test) |
 | `npm run format` | Prettier |
 
 ## Cấu trúc

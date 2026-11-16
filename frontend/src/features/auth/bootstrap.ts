@@ -1,4 +1,5 @@
 import { hydrateOwnerModules } from '@/features/auth/module-hydration'
+import { authApi } from '@/features/auth/api'
 import { isTokenExpired } from '@/lib/jwt'
 import { tokenStorage } from '@/lib/token-storage'
 import { useSessionStore } from '@/stores/session-store'
@@ -23,7 +24,6 @@ export async function bootstrapSession(): Promise<void> {
 
   if (refreshToken) {
     try {
-      const { authApi } = await import('@/features/auth/api')
       const response = await authApi.refresh(refreshToken)
       store.loginSuccess(response)
       void hydrateOwnerModules()

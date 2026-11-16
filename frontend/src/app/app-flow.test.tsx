@@ -62,11 +62,16 @@ describe('luồng ứng dụng với dữ liệu demo', () => {
 
     await waitFor(
       () => {
-        expect(useSessionStore.getState().session?.modules).toEqual([
-          'STUDENT_MANAGEMENT',
-          'TEACHER_MANAGEMENT',
-          'CLASS_MANAGEMENT',
-        ])
+        const modules = useSessionStore.getState().session?.modules ?? []
+        expect(modules).toEqual(
+          expect.arrayContaining([
+            'STUDENT_MANAGEMENT',
+            'TEACHER_MANAGEMENT',
+            'CLASS_MANAGEMENT',
+            'SCHEDULE_MANAGEMENT',
+          ]),
+        )
+        expect(modules).not.toContain('FACILITY_MANAGEMENT')
       },
       { timeout: 12_000 },
     )

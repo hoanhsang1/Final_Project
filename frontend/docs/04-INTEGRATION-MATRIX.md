@@ -13,9 +13,10 @@ Trạng thái dùng trong tài liệu:
 | **PROPOSED** | FE đề xuất, chưa có trong backend |
 | **UNVERIFIED** | Chưa kiểm chứng được |
 
-> **Quan trọng:** FE-00 chưa chạy với backend thật trong môi trường này. Toàn bộ “FE-TESTED” là
-> test tự động trên mock adapter trả **đúng shape** đã đọc từ code backend; tích hợp thật phải
-> được kiểm lại khi dựng docker-compose.
+> **Quan trọng:** FE-00/FE-01 chưa chạy được toàn bộ với backend thật trong môi trường này. Backend
+> đang chạy là bản cũ: JWT thiếu `permissionScopes`, quyền legacy UPPER_SNAKE, một số route 404/403.
+> Kết quả probe thật và danh sách BLOCKED nằm ở [BACKEND_DEPENDENCIES.md](BACKEND_DEPENDENCIES.md).
+> Test tự động của FE chạy trên mock adapter trả đúng shape đọc từ source controller.
 
 ## 0. Quy ước chung
 
@@ -64,8 +65,10 @@ JWT **không có**: họ tên, email, tên tổ chức, danh sách module. FE:
 | PATCH | `/api/v1/organizations/{id}/approve` | không body | SUPER_ADMIN | IMPLEMENTED · FE-INTEGRATED |
 | PATCH | `/api/v1/organizations/{id}/reject` | `{reason}` (BE hiện **bỏ qua** lý do) | SUPER_ADMIN | IMPLEMENTED · FE-INTEGRATED |
 | GET | `/api/v1/audit-logs` | `page,size,action,organizationId,keyword` | SUPER_ADMIN | IMPLEMENTED · FE-INTEGRATED |
-| GET | `/api/v1/organizations/{id}` | — | SUPER_ADMIN | IMPLEMENTED · PLANNED (màn chi tiết) |
-| PATCH | `/api/v1/organizations/{id}/suspend|reactivate` | `{reason?}` | SUPER_ADMIN | IMPLEMENTED · PLANNED |
+| GET | `/api/v1/organizations/{id}` | — | SUPER_ADMIN | IMPLEMENTED · FE-INTEGRATED · **real 200** |
+| PATCH | `/api/v1/organizations/{id}/suspend|reactivate` | `{reason?}` | SUPER_ADMIN | IMPLEMENTED · FE-INTEGRATED |
+| GET | `/api/v1/organizations/{id}/modules/admin` | — | SUPER_ADMIN | IMPLEMENTED (source) · **real 404 → BLOCKED** |
+| PATCH | `/api/v1/organizations/{id}/modules/{code}/lock` | `{lock,reason}` | SUPER_ADMIN | IMPLEMENTED (source) · **real 404 → BLOCKED** |
 | PUT | `/api/v1/organizations/{id}/modules` | `{modules:string[]}` (tập đầy đủ) | SUPER_ADMIN | IMPLEMENTED · PLANNED (chưa có UI) |
 
 Response org list dùng **snake_case** (`org_type`, `created_at`, `owner_username`, `owner_email`);
@@ -80,8 +83,8 @@ FE chuẩn hoá về camelCase và `status` lowercase.
 | GET | `/positions` | OWNER/MANAGER/STAFF | IMPLEMENTED · FE-INTEGRATED |
 | GET | `/transfer-requests/inbox` | đăng nhập (server lọc `actionableSteps`) | IMPLEMENTED · FE-INTEGRATED |
 | GET | `/notifications` | đăng nhập (≤50, mới nhất) | IMPLEMENTED · FE-INTEGRATED |
-| GET | `/api/v1/organizations/my/modules` | ROLE_OWNER (org lấy từ JWT) | IMPLEMENTED · FE-INTEGRATED · FE-TESTED (mock) |
-| PATCH | `/api/v1/organizations/my/modules/{code}` | ROLE_OWNER | IMPLEMENTED · PLANNED (màn module FE-01) |
+| GET | `/api/v1/organizations/my/modules` | ROLE_OWNER (org lấy từ JWT) | IMPLEMENTED · FE-INTEGRATED · FE-TESTED (mock); **real 403 → BLOCKED** |
+| PATCH | `/api/v1/organizations/my/modules/{code}` | ROLE_OWNER · `{enabled}` | IMPLEMENTED · FE-INTEGRATED · FE-TESTED (mock); **real 403 → BLOCKED** |
 
 Không có endpoint tổng hợp → dashboard tự ghép số liệu thật (đếm phòng ban, cộng nhân sự theo
 phòng, đếm chức vụ, đọc hộp duyệt, đếm thông báo chưa đọc). Không có số liệu giả, không sparkline

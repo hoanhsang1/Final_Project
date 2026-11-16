@@ -31,6 +31,7 @@ sidebar cho đổi không gian. Không gian không có mục nào hiển thị t
 | Danh mục module | `/quan-tri/module` | SUPER_ADMIN | PLANNED |
 | Tài khoản | `/quan-tri/tai-khoan` | SUPER_ADMIN | PLANNED |
 | Nhật ký hệ thống | `/quan-tri/nhat-ky` | SUPER_ADMIN | PLANNED |
+| Chi tiết tổ chức | `/quan-tri/to-chuc/:id` | SUPER_ADMIN | ✓ (duyệt/từ chối/tạm ngưng/kích hoạt) |
 
 ### Tổ chức (`/to-chuc`)
 
@@ -42,7 +43,7 @@ sidebar cho đổi không gian. Không gian không có mục nào hiển thị t
 | Cơ cấu | Nhân sự | `/to-chuc/nhan-su` | `employee.view` | ✓ (route guard) |
 | Cơ cấu | Điều chuyển | `/to-chuc/chuyen-phong` | `employee.transfer` \| `employee.approve_transfer` \| `employee.view` | PLANNED |
 | Quản trị | Tổng quản lý & ủy quyền | `/to-chuc/uy-quyen` | `employee.assign_position` | PLANNED |
-| Quản trị | Module của tổ chức | `/to-chuc/module` | `org.module.toggle` | PLANNED |
+| Quản trị | Module của tổ chức | `/to-chuc/module` | `org.module.toggle` | ✓ (mock; backend đang chạy 403 → BLOCKED) |
 | Quản trị | Nhật ký tổ chức | `/to-chuc/nhat-ky` | `org.audit.view` | PLANNED |
 
 Trang chi tiết: `/to-chuc/phong-ban/:id` (✓), `/to-chuc/nhan-su/:id` không tồn tại — hồ sơ mở
