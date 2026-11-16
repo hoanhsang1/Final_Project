@@ -56,9 +56,12 @@ export const MSG_TEACHER = {
   STATUS_ALL: 'Tất cả trạng thái dạy',
   NO_CLASS: 'Chưa có lớp',
   COL_CLASSES: 'Lớp đang phụ trách',
+  /** Tên cho `nav` phân trang — hai landmark cùng tên là lỗi axe. */
+  PAGINATION_LABEL: 'Phân trang danh sách giáo viên',
 
   // Chuyên môn
   MANAGE_SPECIALTIES: 'Quản lý chuyên môn',
+  SPECIALTY_ADD: 'Thêm',
   SPECIALTY_PLACEHOLDER: 'Tên chuyên môn mới',
   SPECIALTY_CREATED: 'Đã thêm chuyên môn.',
   SPECIALTY_LOAD_ERROR: 'Không tải được danh sách chuyên môn.',
@@ -148,4 +151,14 @@ export const MSG_CLASS = {
  */
 export function classTotalLabel(total: number): string {
   return `${total} lớp`;
+}
+
+/**
+ * Dòng tổng số phía trên bảng giáo viên — "12 giáo viên".
+ *
+ * Cùng lý do như `classTotalLabel`: số này là `total` của BE, không phải số
+ * dòng đang hiện trên một trang.
+ */
+export function teacherTotalLabel(total: number): string {
+  return `${total} giáo viên`;
 }

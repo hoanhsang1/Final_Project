@@ -1,33 +1,42 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
+  Badge,
+  Banner,
   Button,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
+  Dialog,
+  DialogHeader,
+  HStack,
+  MultiSelector,
+  pixel,
+  proportional,
+  Selector,
+  Stack,
   Table,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+  Text,
+  TextInput,
+  useTablePagination,
+  VStack,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CSSProperties, FormEvent } from 'react';
+import { useState } from 'react';
+import { AppLink } from '../../components/AppLink/AppLink';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
-import { useNotify } from '../../hooks/useNotify';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import { canEditTeachers, canViewTeachers, isOwnerRole } from '../../features/auth/permissions';
 import {
   CONTRACT_TYPE_LABEL,
+  TEACHING_STATUS_BADGE,
   TEACHING_STATUS_LABEL,
-  TEACHING_STATUS_TAG,
   labelOf,
 } from '../../features/sprint4/labels';
-import { MSG_S4, MSG_TEACHER } from '../../features/sprint4/sprint4Messages';
+import {
+  MSG_S4,
+  MSG_TEACHER,
+  teacherTotalLabel,
+} from '../../features/sprint4/sprint4Messages';
 import {
   createSpecialty,
   createTeacher,
@@ -42,10 +51,37 @@ import type {
   TeacherCreatedResponse,
   TeacherListItem,
 } from '../../features/sprint4/types';
+import { useFormState } from '../../hooks/useFormState';
+import { useNotify } from '../../hooks/useNotify';
 import { useAuthStore } from '../../stores/authStore';
-import { color, numericStyle } from '../../theme';
+import { numericStyle } from '../../theme';
 
-const { Text } = Typography;
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn
+ * `TeacherListItem` là interface nên không có index signature. Giao thêm
+ * `Record<string, unknown>` để thoả ràng buộc mà **không** nới lỏng DTO — xem
+ * `docs/ui-conventions.md` mục 6.9.
+ */
+type TeacherRow = TeacherListItem & Record<string, unknown>;
+
+/**
+ * Giá trị form "Thêm giáo viên" (§4.1 + §4.4).
+ *
+ * Là `type` chứ không phải `interface`: `useFormState<T>` cũng buộc
+ * `T extends Record<string, unknown>`, và chỉ type alias của object literal mới
+ * có index signature ngầm.
+ */
+type TeacherFormValues = {
+  staffCode: string;
+  fullName: string;
+  username: string;
+  email: string;
+  phone: string;
+  departmentId: string;
+  positionIds: string[];
+  specialtyIds: string[];
+  contractType: ContractType | null;
+};
 
 /** §7 — 3 trạng thái dạy. */
 const TEACHING_STATUS_OPTIONS = [
@@ -59,28 +95,31 @@ const CONTRACT_TYPE_OPTIONS = [
   { value: 'THINH_GIANG', label: CONTRACT_TYPE_LABEL.THINH_GIANG },
 ];
 
-/** Giá trị form "Thêm giáo viên" (§4.1 + §4.4). */
-interface TeacherFormValues {
-  staffCode: string;
-  fullName: string;
-  username: string;
-  email: string;
-  phone: string;
-  departmentId: string;
-  positionIds: string[];
-  specialtyIds: string[];
-  contractType?: ContractType;
-}
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
+/** Khớp ràng buộc BE (§4.1) và giống `RegisterPage` để hai form không lệch nhau. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,100}$/;
+const PHONE_PATTERN = /^(\+84|0)\d{9,10}$/;
 
 /**
- * Màn 1 + 2 — danh sách giáo viên và modal tạo giáo viên.
+ * Ô nửa hàng của form: đủ rộng thì hai cột, hẹp thì tự xuống một cột.
+ *
+ * `FormLayout direction="horizontal"` cũng cho hai cột nhưng **không** tự thu về
+ * một cột ở màn hình hẹp (chỉ `horizontal-labels` mới thu), nên ở 320px hai ô sẽ
+ * bị bóp. `HStack wrap` + `flex-basis` cho cùng bố cục mà vẫn dùng được ở 320px.
+ */
+const HALF_FIELD: CSSProperties = { flex: '1 1 240px', minWidth: 0 };
+
+/**
+ * Màn 1 + 2 — danh sách giáo viên và dialog tạo giáo viên.
  *
  * - Lọc theo `q`, `specialtyId`, `teachingStatus`; phân trang `page`, `size` (§3).
- * - Tạo bằng cách B `POST /api/teachers` (§4.2) và hiện modal mật khẩu tạm (§4.3).
+ * - Tạo bằng cách B `POST /api/teachers` (§4.2) rồi hiện dialog mật khẩu tạm (§4.3).
  * - 5 state: loading / empty / error / success / không có quyền.
+ * - BR-08: trạng thái dạy luôn là `Badge` **kèm chữ**, màu chỉ là tín hiệu phụ.
  */
 export default function TeachersPage() {
-  const { token } = theme.useToken();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const backendRoles = useAuthStore((s) => s.backendRoles);
@@ -102,8 +141,52 @@ export default function TeachersPage() {
   const [specOpen, setSpecOpen] = useState(false);
   const [specError, setSpecError] = useState<string | null>(null);
 
-  const [createForm] = Form.useForm<TeacherFormValues>();
-  const [specForm] = Form.useForm<{ name: string }>();
+  const form = useFormState<TeacherFormValues>(
+    {
+      staffCode: '',
+      fullName: '',
+      username: '',
+      email: '',
+      phone: '',
+      departmentId: '',
+      positionIds: [],
+      specialtyIds: [],
+      contractType: null,
+    },
+    {
+      staffCode: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập mã nhân sự';
+        return value.trim().length <= 50 ? undefined : 'Mã nhân sự tối đa 50 ký tự';
+      },
+      fullName: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập họ tên';
+        return value.trim().length <= 200 ? undefined : 'Họ tên tối đa 200 ký tự';
+      },
+      username: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập tên đăng nhập';
+        return USERNAME_PATTERN.test(value.trim())
+          ? undefined
+          : 'Chỉ dùng chữ, số và . _ - (3–100 ký tự)';
+      },
+      email: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập email';
+        return EMAIL_PATTERN.test(value.trim()) ? undefined : 'Email không hợp lệ';
+      },
+      phone: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập số điện thoại';
+        return PHONE_PATTERN.test(value.trim()) ? undefined : 'Số điện thoại không hợp lệ';
+      },
+      departmentId: (value) => (value ? undefined : 'Vui lòng chọn bộ phận'),
+      positionIds: (value) =>
+        value.length > 0 ? undefined : 'Cần chọn chức vụ Giáo viên',
+      specialtyIds: (value) => (value.length > 0 ? undefined : MSG_TEACHER.SPECIALTY_REQUIRED),
+    },
+  );
+
+  const specForm = useFormState<{ name: string }>(
+    { name: '' },
+    { name: (value) => (value.trim() ? undefined : 'Nhập tên chuyên môn') },
+  );
 
   const listQuery = useQuery({
     queryKey: ['teachers', { page, size, keyword, specialtyId, teachingStatus }],
@@ -142,7 +225,7 @@ export default function TeachersPage() {
       notify.success(MSG_TEACHER.CREATED);
       setCreateError(null);
       setCreateOpen(false);
-      createForm.resetFields();
+      form.reset();
       // §4.3 — mật khẩu tạm chỉ hiện một lần, ngay sau khi tạo.
       setCreatedTeacher(created);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
@@ -155,7 +238,7 @@ export default function TeachersPage() {
     onSuccess: () => {
       notify.success(MSG_TEACHER.SPECIALTY_CREATED);
       setSpecError(null);
-      specForm.resetFields();
+      specForm.reset();
       queryClient.invalidateQueries({ queryKey: ['specialties'] });
     },
     onError: (error) => setSpecError(sprint4ErrorMessage(error)),
@@ -173,100 +256,134 @@ export default function TeachersPage() {
   const positionOptions = teacherPositions.map((p) => ({ value: p.id, label: p.name }));
   const missingTeacherPosition = hasProfileType && teacherPositions.length === 0;
 
-  const departmentOptions = (departmentsQuery.data ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const departmentOptions = (departmentsQuery.data ?? []).map((d) => ({
+    value: d.id,
+    label: d.name,
+  }));
 
-  const columns = useMemo<ColumnsType<TeacherListItem>>(() => {
-    const base: ColumnsType<TeacherListItem> = [
-      {
-        title: 'Mã nhân sự',
-        dataIndex: 'staffCode',
-        width: 130,
-        render: (value: string | null | undefined) =>
-          value ? (
-            <span style={{ ...numericStyle, color: color.textSecondary }}>{value}</span>
-          ) : (
-            '—'
-          ),
-      },
-      {
-        title: 'Họ tên',
-        key: 'fullName',
-        render: (_, record) => (
-          <Link to={`/dao-tao/giao-vien/${record.userId}`}>{record.fullName || record.userId}</Link>
+  // Server là nguồn sự thật cho phân trang (§3): dùng số BE trả về để nhãn
+  // `aria-rowindex` và số trang khớp dữ liệu đang hiện.
+  const currentPage = listQuery.data?.page ?? page;
+  const pageSize = listQuery.data?.size ?? size;
+  const total = listQuery.data?.total ?? 0;
+  const rows = (listQuery.data?.items ?? []) as TeacherRow[];
+
+  const pagination = useTablePagination<TeacherRow>({
+    page: currentPage,
+    onPageChange: setPage,
+    totalItems: total,
+    pageSize,
+    onPageSizeChange: (next) => {
+      setSize(next);
+      setPage(1);
+    },
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
+    label: MSG_TEACHER.PAGINATION_LABEL,
+  });
+
+  const columns: TableColumn<TeacherRow>[] = [
+    {
+      key: 'staffCode',
+      header: 'Mã nhân sự',
+      width: pixel(130),
+      renderCell: (row) =>
+        row.staffCode ? (
+          <Text type="supporting" style={numericStyle}>
+            {row.staffCode}
+          </Text>
+        ) : (
+          '—'
         ),
-      },
-      {
-        title: 'Email',
-        dataIndex: 'email',
-        width: 220,
-        render: (value: string | null | undefined) => value || '—',
-      },
-      {
-        title: 'Số điện thoại',
-        dataIndex: 'phone',
-        width: 150,
-        render: (value: string | null | undefined) => value || '—',
-      },
-      {
-        title: 'Chuyên môn',
-        key: 'specialties',
-        render: (_, record) =>
-          record.specialties && record.specialties.length > 0
-            ? record.specialties.map((s) => s.name).join(', ')
-            : '—',
-      },
-      {
-        title: 'Loại hợp đồng',
-        dataIndex: 'contractType',
-        width: 150,
-        render: (value: string | null | undefined) => labelOf(CONTRACT_TYPE_LABEL, value),
-      },
-      {
-        title: 'Trạng thái dạy',
-        dataIndex: 'teachingStatus',
-        width: 150,
-        render: (value: string | null | undefined) =>
-          value ? (
-            <Tag color={TEACHING_STATUS_TAG[value]}>{labelOf(TEACHING_STATUS_LABEL, value)}</Tag>
-          ) : (
-            '—'
-          ),
-      },
-      {
-        title: MSG_TEACHER.COL_CLASSES,
-        key: 'classes',
-        width: 160,
-        // §3 — server tính `noClass`/`classLabel`, FE không tự đếm lại.
-        render: (_, record) =>
-          record.noClass ? (
-            <Text type="secondary">{record.classLabel || MSG_TEACHER.NO_CLASS}</Text>
-          ) : (
-            <span style={numericStyle}>{`${record.classCount ?? 0} lớp`}</span>
-          ),
-      },
-    ];
-
-    if (!canEdit) return base;
-    return [
-      ...base,
-      {
-        title: 'Thao tác',
-        key: 'actions',
-        width: 90,
-        render: (_, record) => (
-          <Link to={`/dao-tao/giao-vien/${record.userId}?edit=1`}>{MSG_TEACHER.EDIT}</Link>
+    },
+    {
+      key: 'fullName',
+      header: 'Họ tên',
+      width: proportional(1, { minWidth: 180 }),
+      renderCell: (row) => (
+        <AppLink to={`/dao-tao/giao-vien/${row.userId}`} weight="medium">
+          {row.fullName || row.userId}
+        </AppLink>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      width: pixel(220),
+      renderCell: (row) => row.email || '—',
+    },
+    {
+      key: 'phone',
+      header: 'Số điện thoại',
+      width: pixel(150),
+      renderCell: (row) =>
+        row.phone ? (
+          <Text style={numericStyle}>{row.phone}</Text>
+        ) : (
+          '—'
         ),
-      },
-    ];
-  }, [canEdit]);
+    },
+    {
+      key: 'specialties',
+      header: 'Chuyên môn',
+      width: pixel(200),
+      renderCell: (row) =>
+        row.specialties && row.specialties.length > 0
+          ? row.specialties.map((s) => s.name).join(', ')
+          : '—',
+    },
+    {
+      key: 'contractType',
+      header: 'Loại hợp đồng',
+      width: pixel(150),
+      renderCell: (row) => labelOf(CONTRACT_TYPE_LABEL, row.contractType),
+    },
+    {
+      key: 'teachingStatus',
+      header: 'Trạng thái dạy',
+      width: pixel(150),
+      renderCell: (row) =>
+        row.teachingStatus ? (
+          <Badge
+            variant={TEACHING_STATUS_BADGE[row.teachingStatus]}
+            label={labelOf(TEACHING_STATUS_LABEL, row.teachingStatus)}
+          />
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'classes',
+      header: MSG_TEACHER.COL_CLASSES,
+      width: pixel(160),
+      // §3 — server tính `noClass`/`classLabel`, FE không tự đếm lại.
+      renderCell: (row) =>
+        row.noClass ? (
+          <Text type="supporting">{row.classLabel || MSG_TEACHER.NO_CLASS}</Text>
+        ) : (
+          <Text hasTabularNumbers>{`${row.classCount ?? 0} lớp`}</Text>
+        ),
+    },
+  ];
 
-  const onTableChange = (pagination: TablePaginationConfig) => {
-    if (pagination.current) setPage(pagination.current);
-    if (pagination.pageSize) setSize(pagination.pageSize);
+  if (canEdit) {
+    columns.push({
+      key: 'actions',
+      header: 'Thao tác',
+      width: pixel(90),
+      renderCell: (row) => (
+        <AppLink to={`/dao-tao/giao-vien/${row.userId}?edit=1`}>{MSG_TEACHER.EDIT}</AppLink>
+      ),
+    });
+  }
+
+  /** Áp từ khoá đang gõ và quay về trang 1 — dùng cho cả Enter lẫn nút "Tìm". */
+  const applySearch = () => {
+    setKeyword(keywordInput);
+    setPage(1);
   };
 
   const openCreate = () => {
-    createForm.resetFields();
+    form.reset();
     setCreateError(null);
     setCreateOpen(true);
   };
@@ -274,11 +391,11 @@ export default function TeachersPage() {
   const closeCreate = () => {
     setCreateOpen(false);
     setCreateError(null);
-    createForm.resetFields();
+    form.reset();
   };
 
   const openSpecialties = () => {
-    specForm.resetFields();
+    specForm.reset();
     setSpecError(null);
     setSpecOpen(true);
   };
@@ -286,7 +403,33 @@ export default function TeachersPage() {
   const closeSpecialties = () => {
     setSpecOpen(false);
     setSpecError(null);
-    specForm.resetFields();
+    specForm.reset();
+  };
+
+  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.validate()) return;
+
+    createMut.mutate({
+      departmentId: form.values.departmentId,
+      username: form.values.username.trim(),
+      email: form.values.email.trim(),
+      role: 'STAFF',
+      positionIds: form.values.positionIds,
+      staffCode: form.values.staffCode.trim(),
+      fullName: form.values.fullName.trim(),
+      phone: form.values.phone.trim(),
+      teacherProfile: {
+        specialtyIds: form.values.specialtyIds,
+        contractType: form.values.contractType,
+      },
+    });
+  };
+
+  const handleAddSpecialty = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!specForm.validate()) return;
+    createSpecMut.mutate(specForm.values.name.trim());
   };
 
   const copyTemporaryPassword = async () => {
@@ -300,359 +443,448 @@ export default function TeachersPage() {
   };
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         title={MSG_TEACHER.TITLE}
         extra={
           canEdit ? (
-            <Space wrap>
-              <Button onClick={openSpecialties}>{MSG_TEACHER.MANAGE_SPECIALTIES}</Button>
-              <Button type="primary" onClick={openCreate}>
-                {MSG_TEACHER.CREATE}
-              </Button>
-            </Space>
+            <>
+              <Button
+                variant="secondary"
+                size="lg"
+                label={MSG_TEACHER.MANAGE_SPECIALTIES}
+                onClick={openSpecialties}
+              />
+              <Button
+                variant="primary"
+                size="lg"
+                label={MSG_TEACHER.CREATE}
+                onClick={openCreate}
+              />
+            </>
           ) : undefined
         }
       >
         {canView ? (
-          <Flex
-            gap={token.marginSM}
-            wrap="wrap"
-            justify="space-between"
-            style={{ marginTop: token.marginXS }}
-          >
-            <Flex gap={token.marginSM} wrap="wrap">
-              <Select
-                allowClear
-                aria-label={MSG_TEACHER.SPECIALTY_ALL}
+          <HStack gap={3} wrap="wrap" justify="between" align="end">
+            <HStack gap={3} wrap="wrap">
+              <Selector
+                label={MSG_TEACHER.SPECIALTY_ALL}
+                isLabelHidden
+                hasClear
                 placeholder={MSG_TEACHER.SPECIALTY_ALL}
                 options={specialtyOptions}
-                loading={specialtiesQuery.isLoading}
-                value={specialtyId}
+                isLoading={specialtiesQuery.isLoading}
+                value={specialtyId ?? null}
+                width={220}
                 onChange={(value) => {
-                  setSpecialtyId(value);
+                  setSpecialtyId(value ?? undefined);
                   setPage(1);
                 }}
-                style={{ minWidth: 200 }}
               />
-              <Select
-                allowClear
-                aria-label={MSG_TEACHER.STATUS_ALL}
+              <Selector
+                label={MSG_TEACHER.STATUS_ALL}
+                isLabelHidden
+                hasClear
                 placeholder={MSG_TEACHER.STATUS_ALL}
                 options={TEACHING_STATUS_OPTIONS}
-                value={teachingStatus}
+                value={teachingStatus ?? null}
+                width={220}
                 onChange={(value) => {
-                  setTeachingStatus(value);
+                  setTeachingStatus(value ?? undefined);
                   setPage(1);
                 }}
-                style={{ minWidth: 200 }}
               />
-            </Flex>
-            <Input.Search
-              allowClear
-              aria-label={MSG_TEACHER.SEARCH_LABEL}
-              placeholder={MSG_TEACHER.SEARCH_LABEL}
-              value={keywordInput}
-              onChange={(event) => {
-                const next = event.target.value;
-                setKeywordInput(next);
-                // Xoá nhanh: bỏ luôn điều kiện lọc thay vì phải bấm nút tìm.
-                if (next === '') {
-                  setKeyword('');
-                  setPage(1);
-                }
-              }}
-              onSearch={(value) => {
-                setKeyword(value);
-                setPage(1);
-              }}
-              style={{ width: 300 }}
-            />
-          </Flex>
+            </HStack>
+
+            <HStack gap={2} wrap="wrap" align="end">
+              <TextInput
+                type="search"
+                label={MSG_TEACHER.SEARCH_LABEL}
+                isLabelHidden
+                startIcon="search"
+                enterKeyHint="search"
+                hasClear
+                placeholder={MSG_TEACHER.SEARCH_LABEL}
+                value={keywordInput}
+                width={300}
+                onChange={(value) => {
+                  setKeywordInput(value);
+                  // Xoá nhanh: bỏ luôn điều kiện lọc thay vì phải bấm nút tìm.
+                  if (value === '') {
+                    setKeyword('');
+                    setPage(1);
+                  }
+                }}
+                onEnter={applySearch}
+              />
+              <Button variant="secondary" size="lg" label={MSG_S4.SEARCH} onClick={applySearch} />
+            </HStack>
+          </HStack>
         ) : null}
       </PageHeader>
 
       {!canView ? (
         <ForbiddenNotice />
       ) : listQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={MSG_TEACHER.LIST_LOAD_ERROR}
+        <Banner
+          status="error"
+          title={MSG_TEACHER.LIST_LOAD_ERROR}
           description={sprint4ErrorMessage(listQuery.error)}
-          action={
-            <Button size="small" onClick={() => listQuery.refetch()}>
-              {MSG_S4.RETRY}
-            </Button>
+          collapsible={false}
+          role="alert"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.RETRY}
+              onClick={() => listQuery.refetch()}
+            />
           }
         />
+      ) : listQuery.isLoading ? (
+        <PageLoading />
       ) : (
-        <Table<TeacherListItem>
-          rowKey="userId"
-          loading={listQuery.isLoading}
-          columns={columns}
-          dataSource={listQuery.data?.items ?? []}
-          locale={{ emptyText: <EmptyState description={MSG_TEACHER.EMPTY} /> }}
-          onChange={onTableChange}
-          pagination={{
-            current: listQuery.data?.page ?? page,
-            pageSize: listQuery.data?.size ?? size,
-            total: listQuery.data?.total ?? 0,
-            showSizeChanger: true,
-            showTotal: (total) => `${total} giáo viên`,
-          }}
-          scroll={{ x: 1120 }}
-        />
+        <Stack direction="vertical" gap={3}>
+          <Text type="supporting">{teacherTotalLabel(total)}</Text>
+          <Table<TeacherRow>
+            data={rows}
+            columns={columns}
+            idKey="userId"
+            hasHover
+            textOverflow="truncate"
+            // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự
+            // trong mảng một trang.
+            rowIndexStart={(currentPage - 1) * pageSize + 1}
+            rowCount={total}
+            emptyState={<EmptyState description={MSG_TEACHER.EMPTY} compact />}
+            plugins={{ pagination }}
+          />
+        </Stack>
       )}
 
-      {/* Màn 2 — tạo giáo viên (§4). */}
-      <Modal
-        title={MSG_TEACHER.CREATE}
-        open={createOpen}
-        onCancel={closeCreate}
-        onOk={() => createForm.submit()}
-        okText={MSG_S4.CREATE}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={createMut.isPending}
+      {/* Màn 2 — tạo giáo viên (§4). `purpose="form"`: bấm ra ngoài KHÔNG đóng
+          để không mất dữ liệu đang nhập; ESC vẫn đóng như bản antd. */}
+      <Dialog
+        isOpen={createOpen}
+        onOpenChange={(open) => {
+          if (!open) closeCreate();
+        }}
+        purpose="form"
         width={720}
-        forceRender
       >
-        {createError && (
-          <Alert
-            type="error"
-            showIcon
-            role="alert"
-            message={createError}
-            style={{ marginBottom: token.margin }}
-          />
-        )}
-        {missingTeacherPosition && (
-          <Alert
-            type="warning"
-            showIcon
-            message={MSG_TEACHER.POSITION_EMPTY_TEACHER}
-            style={{ marginBottom: token.margin }}
-          />
-        )}
+        <DialogHeader
+          title={MSG_TEACHER.CREATE}
+          onOpenChange={(open) => {
+            if (!open) closeCreate();
+          }}
+        />
 
-        <Form
-          form={createForm}
-          layout="vertical"
-          requiredMark
-          onFinish={(values) =>
-            createMut.mutate({
-              departmentId: values.departmentId,
-              username: values.username.trim(),
-              email: values.email.trim(),
-              role: 'STAFF',
-              positionIds: values.positionIds,
-              staffCode: values.staffCode.trim(),
-              fullName: values.fullName.trim(),
-              phone: values.phone.trim(),
-              teacherProfile: {
-                specialtyIds: values.specialtyIds,
-                contractType: values.contractType ?? null,
-              },
-            })
-          }
-        >
-          <Flex gap={token.marginSM} wrap="wrap">
-            <Form.Item
-              name="staffCode"
-              label="Mã nhân sự"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập mã nhân sự' },
-                { max: 50, message: 'Mã nhân sự tối đa 50 ký tự' },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="VD: GV001" />
-            </Form.Item>
-            <Form.Item
-              name="fullName"
-              label="Họ tên"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập họ tên' },
-                { max: 200, message: 'Họ tên tối đa 200 ký tự' },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="Nguyễn Văn An" />
-            </Form.Item>
-          </Flex>
-
-          <Flex gap={token.marginSM} wrap="wrap">
-            <Form.Item
-              name="username"
-              label="Tên đăng nhập"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập tên đăng nhập' },
-                {
-                  pattern: /^[a-zA-Z0-9._-]{3,100}$/,
-                  message: 'Chỉ dùng chữ, số và . _ - (3–100 ký tự)',
-                },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="gv.an" />
-            </Form.Item>
-            <Form.Item
-              name="email"
-              label="Email"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập email' },
-                { type: 'email', message: 'Email không hợp lệ' },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="an@example.edu.vn" />
-            </Form.Item>
-          </Flex>
-
-          <Flex gap={token.marginSM} wrap="wrap">
-            <Form.Item
-              name="phone"
-              label="Số điện thoại"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[
-                { required: true, message: 'Vui lòng nhập số điện thoại' },
-                { pattern: /^(\+84|0)\d{9,10}$/, message: 'Số điện thoại không hợp lệ' },
-              ]}
-            >
-              <Input autoComplete="off" placeholder="0901234567" />
-            </Form.Item>
-            <Form.Item
-              name="departmentId"
-              label="Bộ phận"
-              style={{ flex: 1, minWidth: 220 }}
-              rules={[{ required: true, message: 'Vui lòng chọn bộ phận' }]}
-            >
-              <Select
-                options={departmentOptions}
-                loading={departmentsQuery.isLoading}
-                placeholder="Chọn bộ phận"
+        <form noValidate onSubmit={handleCreateSubmit} style={{ marginTop: 'var(--spacing-4)' }}>
+          <VStack gap={4}>
+            {createError ? (
+              <Banner
+                status="error"
+                title={createError}
+                collapsible={false}
+                role="alert"
               />
-            </Form.Item>
-          </Flex>
+            ) : null}
+            {missingTeacherPosition ? (
+              <Banner
+                status="warning"
+                title={MSG_TEACHER.POSITION_EMPTY_TEACHER}
+                collapsible={false}
+              />
+            ) : null}
 
-          <Form.Item
-            name="positionIds"
-            label="Chức vụ"
-            rules={[
-              { required: true, type: 'array', min: 1, message: 'Cần chọn chức vụ Giáo viên' },
-            ]}
-          >
-            <Select
-              mode="multiple"
-              options={positionOptions}
-              loading={positionsQuery.isLoading}
+            <HStack gap={3} wrap="wrap">
+              <TextInput
+                label="Mã nhân sự"
+                value={form.values.staffCode}
+                onChange={(value) => form.setValue('staffCode', value)}
+                placeholder="VD: GV001"
+                autoComplete="off"
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('staffCode')
+                    ? { type: 'error', message: form.errorOf('staffCode') }
+                    : undefined
+                }
+              />
+              <TextInput
+                label="Họ tên"
+                value={form.values.fullName}
+                onChange={(value) => form.setValue('fullName', value)}
+                placeholder="Nguyễn Văn An"
+                autoComplete="off"
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('fullName')
+                    ? { type: 'error', message: form.errorOf('fullName') }
+                    : undefined
+                }
+              />
+            </HStack>
+
+            <HStack gap={3} wrap="wrap">
+              <TextInput
+                label="Tên đăng nhập"
+                value={form.values.username}
+                onChange={(value) => form.setValue('username', value)}
+                placeholder="gv.an"
+                autoComplete="off"
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('username')
+                    ? { type: 'error', message: form.errorOf('username') }
+                    : undefined
+                }
+              />
+              <TextInput
+                label="Email"
+                type="email"
+                value={form.values.email}
+                onChange={(value) => form.setValue('email', value)}
+                placeholder="an@example.edu.vn"
+                autoComplete="off"
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('email')
+                    ? { type: 'error', message: form.errorOf('email') }
+                    : undefined
+                }
+              />
+            </HStack>
+
+            <HStack gap={3} wrap="wrap">
+              <TextInput
+                label="Số điện thoại"
+                type="tel"
+                value={form.values.phone}
+                onChange={(value) => form.setValue('phone', value)}
+                placeholder="0901234567"
+                autoComplete="off"
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('phone')
+                    ? { type: 'error', message: form.errorOf('phone') }
+                    : undefined
+                }
+              />
+              <Selector
+                label="Bộ phận"
+                placeholder="Chọn bộ phận"
+                options={departmentOptions}
+                isLoading={departmentsQuery.isLoading}
+                value={form.values.departmentId || undefined}
+                onChange={(value) => form.setValue('departmentId', value)}
+                isDisabled={createMut.isPending}
+                aria-required="true"
+                containerStyle={HALF_FIELD}
+                status={
+                  form.errorOf('departmentId')
+                    ? { type: 'error', message: form.errorOf('departmentId') }
+                    : undefined
+                }
+              />
+            </HStack>
+
+            <MultiSelector
+              label="Chức vụ"
               placeholder="Chọn ít nhất một chức vụ Giáo viên"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="specialtyIds"
-            label="Chuyên môn"
-            rules={[
-              { required: true, type: 'array', min: 1, message: MSG_TEACHER.SPECIALTY_REQUIRED },
-            ]}
-          >
-            <Select
-              mode="multiple"
-              options={specialtyOptions}
-              loading={specialtiesQuery.isLoading}
-              placeholder="Chọn chuyên môn"
-            />
-          </Form.Item>
-
-          <Form.Item name="contractType" label="Loại hợp đồng">
-            <Select allowClear options={CONTRACT_TYPE_OPTIONS} placeholder="Không bắt buộc" />
-          </Form.Item>
-
-          {specialtiesQuery.isError && (
-            <Alert type="warning" showIcon message={MSG_TEACHER.SPECIALTY_LOAD_ERROR} />
-          )}
-        </Form>
-      </Modal>
-
-      {/* §4.3 — modal mật khẩu tạm, không đóng khi bấm ra ngoài. */}
-      <Modal
-        title={MSG_TEACHER.TEMP_PASSWORD_TITLE}
-        open={!!createdTeacher}
-        onCancel={() => setCreatedTeacher(null)}
-        maskClosable={false}
-        // Mật khẩu tạm chỉ hiện một lần — chặn cả ESC để không mất do bấm nhầm.
-        keyboard={false}
-        footer={
-          <Button type="primary" onClick={() => setCreatedTeacher(null)}>
-            {MSG_TEACHER.TEMP_PASSWORD_DONE}
-          </Button>
-        }
-        width={520}
-      >
-        {createdTeacher ? (
-          <Flex vertical gap={token.marginSM}>
-            <Text>
-              <Text strong>{createdTeacher.fullName || '—'}</Text>
-              {createdTeacher.staffCode ? ` — ${createdTeacher.staffCode}` : null}
-            </Text>
-            <Alert type="warning" showIcon message={MSG_TEACHER.TEMP_PASSWORD_HINT} />
-            <Text strong>{MSG_TEACHER.TEMP_PASSWORD_LABEL}</Text>
-            <Input
-              readOnly
-              aria-label={MSG_TEACHER.TEMP_PASSWORD_LABEL}
-              value={createdTeacher.temporaryPassword}
-              addonAfter={
-                <Button size="small" onClick={copyTemporaryPassword}>
-                  {MSG_S4.COPY}
-                </Button>
+              options={positionOptions}
+              isLoading={positionsQuery.isLoading}
+              value={form.values.positionIds}
+              onChange={(value) => form.setValue('positionIds', value)}
+              isDisabled={createMut.isPending}
+              aria-required="true"
+              status={
+                form.errorOf('positionIds')
+                  ? { type: 'error', message: form.errorOf('positionIds') }
+                  : undefined
               }
             />
-          </Flex>
-        ) : null}
-      </Modal>
 
-      {/* Màn 4 — danh mục chuyên môn (modal). */}
-      <Modal
-        title={MSG_TEACHER.MANAGE_SPECIALTIES}
-        open={specOpen}
-        onCancel={closeSpecialties}
-        footer={null}
-        forceRender
+            <MultiSelector
+              label="Chuyên môn"
+              placeholder="Chọn chuyên môn"
+              options={specialtyOptions}
+              isLoading={specialtiesQuery.isLoading}
+              value={form.values.specialtyIds}
+              onChange={(value) => form.setValue('specialtyIds', value)}
+              isDisabled={createMut.isPending}
+              aria-required="true"
+              status={
+                form.errorOf('specialtyIds')
+                  ? { type: 'error', message: form.errorOf('specialtyIds') }
+                  : undefined
+              }
+            />
+
+            <Selector
+              label="Loại hợp đồng"
+              placeholder="Không bắt buộc"
+              hasClear
+              options={CONTRACT_TYPE_OPTIONS}
+              value={form.values.contractType}
+              onChange={(value) => form.setValue('contractType', value as ContractType | null)}
+              isDisabled={createMut.isPending}
+            />
+
+            {specialtiesQuery.isError ? (
+              <Banner
+                status="warning"
+                title={MSG_TEACHER.SPECIALTY_LOAD_ERROR}
+                collapsible={false}
+              />
+            ) : null}
+
+            <HStack justify="end" gap={2}>
+              <Button
+                variant="secondary"
+                size="lg"
+                label={MSG_S4.CANCEL}
+                onClick={closeCreate}
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                label={MSG_S4.CREATE}
+                isLoading={createMut.isPending}
+              />
+            </HStack>
+          </VStack>
+        </form>
+      </Dialog>
+
+      {/* §4.3 — dialog mật khẩu tạm. `purpose="required"` chặn CẢ ESC lẫn bấm ra
+          ngoài, và không render nút đóng ở header: mật khẩu chỉ hiện một lần nên
+          người dùng phải bấm "Tôi đã lưu mật khẩu" để đóng. */}
+      <Dialog
+        isOpen={!!createdTeacher}
+        onOpenChange={(open) => {
+          if (!open) setCreatedTeacher(null);
+        }}
+        purpose="required"
+        width={520}
       >
-        <Flex vertical gap={token.marginSM}>
-          {specError && <Alert type="error" showIcon role="alert" message={specError} />}
-          <Form form={specForm} layout="inline" onFinish={(values) => createSpecMut.mutate(values.name)}>
-            <Form.Item
-              name="name"
-              rules={[{ required: true, message: 'Nhập tên chuyên môn' }]}
-              style={{ flex: 1, minWidth: 200 }}
-            >
-              <Input aria-label={MSG_TEACHER.SPECIALTY_PLACEHOLDER} placeholder={MSG_TEACHER.SPECIALTY_PLACEHOLDER} />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={createSpecMut.isPending}>
-                Thêm
-              </Button>
-            </Form.Item>
-          </Form>
+        <DialogHeader title={MSG_TEACHER.TEMP_PASSWORD_TITLE} />
+        {createdTeacher ? (
+          <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+            <Text>
+              <Text weight="semibold">{createdTeacher.fullName || '—'}</Text>
+              {createdTeacher.staffCode ? ` — ${createdTeacher.staffCode}` : null}
+            </Text>
+            <Banner
+              status="warning"
+              title={MSG_TEACHER.TEMP_PASSWORD_HINT}
+              collapsible={false}
+            />
+            <HStack gap={2} align="end">
+              <TextInput
+                label={MSG_TEACHER.TEMP_PASSWORD_LABEL}
+                value={createdTeacher.temporaryPassword}
+                onChange={() => {}}
+                isReadOnly
+                containerStyle={{ flex: 1, minWidth: 0 }}
+              />
+              <Button
+                variant="secondary"
+                size="lg"
+                label={MSG_S4.COPY}
+                onClick={copyTemporaryPassword}
+              />
+            </HStack>
+            <HStack justify="end">
+              <Button
+                variant="primary"
+                size="lg"
+                label={MSG_TEACHER.TEMP_PASSWORD_DONE}
+                onClick={() => setCreatedTeacher(null)}
+              />
+            </HStack>
+          </VStack>
+        ) : null}
+      </Dialog>
+
+      {/* Màn 4 — danh mục chuyên môn (dialog). */}
+      <Dialog
+        isOpen={specOpen}
+        onOpenChange={(open) => {
+          if (!open) closeSpecialties();
+        }}
+        width={480}
+      >
+        <DialogHeader
+          title={MSG_TEACHER.MANAGE_SPECIALTIES}
+          onOpenChange={(open) => {
+            if (!open) closeSpecialties();
+          }}
+        />
+
+        <VStack gap={4} style={{ marginTop: 'var(--spacing-4)' }}>
+          {specError ? (
+            <Banner status="error" title={specError} collapsible={false} role="alert" />
+          ) : null}
+
+          <form noValidate onSubmit={handleAddSpecialty}>
+            <HStack gap={2} align="end">
+              <TextInput
+                label={MSG_TEACHER.SPECIALTY_PLACEHOLDER}
+                isLabelHidden
+                placeholder={MSG_TEACHER.SPECIALTY_PLACEHOLDER}
+                value={specForm.values.name}
+                onChange={(value) => specForm.setValue('name', value)}
+                isDisabled={createSpecMut.isPending}
+                containerStyle={{ flex: 1, minWidth: 0 }}
+                status={
+                  specForm.errorOf('name')
+                    ? { type: 'error', message: specForm.errorOf('name') }
+                    : undefined
+                }
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                label={MSG_TEACHER.SPECIALTY_ADD}
+                isLoading={createSpecMut.isPending}
+              />
+            </HStack>
+          </form>
 
           {specialtiesQuery.isLoading ? (
-            <Text type="secondary">{MSG_S4.LOADING}</Text>
+            <Text type="supporting">{MSG_S4.LOADING}</Text>
           ) : specialtiesQuery.isError ? (
-            <Alert type="error" showIcon message={MSG_TEACHER.SPECIALTY_LOAD_ERROR} />
+            <Banner
+              status="error"
+              title={MSG_TEACHER.SPECIALTY_LOAD_ERROR}
+              collapsible={false}
+              role="alert"
+            />
           ) : specialties.length === 0 ? (
             <EmptyState compact description={MSG_TEACHER.SPECIALTY_EMPTY} />
           ) : (
-            <Space wrap>
+            <HStack gap={2} wrap="wrap">
               {specialties.map((specialty) => (
-                <Tag key={specialty.id}>{specialty.name}</Tag>
+                <Badge key={specialty.id} label={specialty.name} />
               ))}
-            </Space>
+            </HStack>
           )}
-        </Flex>
-      </Modal>
-    </Flex>
+        </VStack>
+      </Dialog>
+    </Stack>
   );
 }

@@ -68,6 +68,19 @@ export const TEACHING_STATUS_TAG: Record<string, string | undefined> = {
   NGHI_VIEC: undefined,
 };
 
+/**
+ * §7 — biến thể `Badge` cho trạng thái dạy (bản Astryx của `TEACHING_STATUS_TAG`).
+ *
+ * "Nghỉ việc" dùng `neutral` (không phải `error`): đây là trạng thái hồ sơ đã
+ * khép lại, không phải lỗi cần sửa — tô đỏ sẽ khiến danh sách trông như đang có
+ * sự cố.
+ */
+export const TEACHING_STATUS_BADGE: Record<string, BadgeVariant> = {
+  DANG_DAY: 'success',
+  TAM_NGHI: 'warning',
+  NGHI_VIEC: 'neutral',
+};
+
 export const CONTRACT_TYPE_LABEL: Record<string, string> = {
   CO_HUU: 'Cơ hữu',
   THINH_GIANG: 'Thỉnh giảng',

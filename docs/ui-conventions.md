@@ -383,6 +383,32 @@ Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
 7. `Text` bên trong `Link` không tự đặt `font-variant-numeric`, nên `style={numericStyle}`
    trên `AppLink` kế thừa xuống chữ hiển thị — cách rẻ nhất để mã lớp thẳng cột.
 
+### 6.10 Cạm bẫy phát hiện khi port P3c-2 (giáo viên — `Dialog` + form đầu tiên)
+
+1. `Dialog` **không** có `footer`/`okText`/`cancelText` như `Modal`: nút nằm trong
+   `children`. `DialogHeader` chỉ render nút X khi truyền `onOpenChange` — muốn dialog
+   không có lối đóng ở header (mật khẩu tạm, chỉ hiện một lần) thì **cố ý** bỏ prop đó
+   và để người dùng đóng bằng nút trong thân.
+2. `purpose` quyết định hành vi đóng: `required` chặn **cả** ESC lẫn bấm ra ngoài;
+   `form` chặn bấm ra ngoài nhưng cho ESC; `info` (mặc định) cho cả hai. Thay
+   `maskClosable={false}` của antd bằng `purpose="form"` cho form nhập liệu — ESC vẫn
+   đóng được như bản cũ.
+3. `Dialog` render `<dialog>` **luôn**, kể cả khi đóng; nội dung ẩn bằng UA stylesheet
+   `dialog:not([open])`. Hệ quả khi test: chuỗi có mặt ở cả trang lẫn dialog (tên nút
+   header trùng tiêu đề dialog) phải truy bằng **role** chứ đừng `getByText`; còn
+   `getByRole('option')` vẫn rõ ràng vì chỉ listbox đang mở mới hiện.
+4. `Select mode="multiple"` → `MultiSelector` (`value: string[]`, `onChange(string[])`,
+   `status`, `width`, `containerStyle`); `Input.Search` trong dialog → `TextInput
+   type="search"` + một `Button` riêng, y như ở toolbar.
+5. `useFormState<T>` buộc `T extends Record<string, unknown>` giống `Table<T>` ⇒ khai
+   giá trị form bằng `type` alias, **không** `interface` (interface không có index
+   signature ngầm). Required đánh `aria-required="true"` trên control, không dùng
+   `isRequired` (chèn chữ vào `<label>`).
+6. `FormLayout direction="horizontal"` **không** tự thu về một cột ở màn hẹp (chỉ
+   `horizontal-labels` mới thu) ⇒ giữ bố cục hai cột bằng `HStack wrap` +
+   `containerStyle={{ flex: '1 1 240px', minWidth: 0 }}` trên từng field; ở 320px hai
+   ô tự xuống một cột mà không cần JS.
+
 ## 7. Sáu khối dùng chung (v2)
 
 | Khối | Spec v2 |
@@ -463,10 +489,10 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
   và CSS của mình, breakpoint duy nhất là `useMediaQuery('(min-width: 1024px)')`. Trang
   con vẫn có thể còn antd — đó là dạng lai được phép cho tới P4; chỉ **không** trộn
   hai bên trong cùng một component.
-- Trang Sprint 4 port **từng trang một**: `ClassesPage` đã là Astryx thuần
-  (`Table` + `Badge` + `Selector` + `Banner`); `TeachersPage`, `TeacherDetailPage`,
-  `ClassDetailPage` còn antd. Bảng của Astryx **không** dùng class `.ant-table*`, nên
-  E2E chạm trang nào thì sửa khi port trang đó.
+- Trang Sprint 4 port **từng trang một**: `ClassesPage` và `TeachersPage` đã là Astryx
+  thuần (`Table` + `Badge` + `Selector`/`MultiSelector` + `Dialog` + `Banner`);
+  `TeacherDetailPage`, `ClassDetailPage` còn antd. Bảng của Astryx **không** dùng class
+  `.ant-table*`, nên E2E chạm trang nào thì sửa khi port trang đó.
 - E2E không bám class `.ant-*` của layout nữa: dùng `navigation`/`link`/`dialog` +
   `aria-label` của mình.
 - i18n: Astryx `vi-VN`, antd `vi_VN`. Chuỗi của mình vẫn nằm trong code, không phụ
