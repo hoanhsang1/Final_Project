@@ -1,0 +1,52 @@
+# 04-register-default — Đăng ký tổ chức — mặc định
+URL yêu cầu : /dang-ky
+URL thực tế  : http://127.0.0.1:5173/dang-ky
+Viewport     : mobile 375x667
+Tiêu đề tab  : Đăng ký tổ chức — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (1)
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<main> MMEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi g… @0,0 375x1217
+  <h1> Đăng ký tổ chức @32,88 311x32
+  <form> Thông tin tổ chứcTên tổ chứcLoại tổ chứcChọn loại tổ chứcTrường họcTru… @32,280 311x817
+    <h2> Thông tin tổ chức @32,280 311x28
+    <input> (text) "Tên tổ chức" @41,354 293x20
+    <button role="combobox"> Chọn loại tổ chức @45,426 261x20
+    <div role="group"> Module cần sử dụng @32,492 311x208
+      <ul role="list"> Quản lý sinh viênQuản lý sinh viênQuản lý lớp họcQuản lý lớp họcQuản l… @32,492 311x208
+    <h2> Tài khoản quản trị @32,733 311x28
+    <input> (text) "Tên đăng nhập" @41,807 293x20
+    <input> (email) "Email" @41,879 293x20
+    <input> (password) "Mật khẩu" @41,951 293x20
+    <input> (password) "Nhập lại mật khẩu" @41,1023 293x20
+    <button> Gửi đăng ký @32,1065 311x32
+  <a> Đăng nhập @208,1113 73x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[text] "Tên tổ chức" @41,354 293x20
+- button "Chọn loại tổ chức" @45,426 261x20 {expanded=false}
+- input[text] "Tên đăng nhập" @41,807 293x20
+- input[email] "Email" @41,879 293x20
+- input[password] "Mật khẩu" @41,951 293x20
+- input[password] "Nhập lại mật khẩu" @41,1023 293x20
+- button "Gửi đăng ký" @32,1065 311x32
+- a "Đăng nhập" @208,1113 73x20
+
+## Tiêu đề (heading)
+- h1: Đăng ký tổ chức
+- h2: Thông tin tổ chức
+- h2: Tài khoản quản trị
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Đăng ký tổ chức Tạo tài khoản quản trị cho đơn vị của bạn Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được. Thông tin tổ chức Tên tổ chức Loại tổ chức Chọn loại tổ chức Module cần sử dụng Quản lý sinh viên Quản lý sinh viên Quản lý lớp học Quản lý lớp học Quản lý thời khoá biểu Quản lý thời khoá biểu Quản lý cơ sở vật chất Quản lý cơ sở vật chất Phân công giáo viên Phân công giáo viên Tài khoản quản trị Tên đăng nhập Email Mật khẩu Nhập lại mật khẩu Gửi đăng ký Đã có tài khoản? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

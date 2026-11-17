@@ -1,0 +1,14 @@
+﻿{
+  "h1Text": "─É─âng nhß║¡p",
+  "h1ClassName": "astryx-heading x1tgivj0 xcg7oai xfmsba7 x1v68xuy x1lliihq xh015us",
+  "computed": {
+    "fontSize": "24px",
+    "fontWeight": "500",
+    "marginBottom": "12px",
+    "marginTop": "0px"
+  },
+  "antdResetHeadingRulePresent": true,
+  "antdResetHeadingRule": "h1, h2, h3, h4, h5, h6 { margin-top: 0px; margin-bottom: 0.5em; font-weight: 500; }",
+  "antdResetSheetFound": true,
+  "astryxHeadingRuleSample": ".x213oh1 { --container-padding-block-start: max(calc(var(--spacing-10) - var(--spacing-6)),0px); }"
+}

@@ -1,0 +1,44 @@
+# 10-dat-lai-mat-khau-token-het-han — Đặt lại mật khẩu — token hết hạn (400)
+URL yêu cầu : /dat-lai-mat-khau?token=het-han
+URL thực tế  : http://127.0.0.1:5173/dat-lai-mat-khau?token=het-han
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Đặt lại mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- POST /api/v1/auth/reset-password → 400
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x768
+  <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
+<main> MMEMSĐặt mật khẩu mớiMật khẩu cần ít nhất 8 ký tự. Không dùng lại mật … @420,0 946x768
+  <h1> Đặt mật khẩu mới @657,186 472x32
+  <form> Mật khẩu mớiNhập lại mật khẩuLiên kết đặt lại mật khẩu không hợp lệ ho… @657,258 472x292
+    <input> (password) "Mật khẩu mới" @666,288 454x20
+    <input> (password) "Nhập lại mật khẩu" @666,360 454x20
+    <div role="alert"> Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu c… @701,414 412x40
+    <a> Yêu cầu liên kết mới @826,482 133x20
+    <button> Lưu mật khẩu mới @657,518 472x32
+  <a> Về trang đăng nhập @887,566 132x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[password] "Mật khẩu mới" @666,288 454x20
+- input[password] "Nhập lại mật khẩu" @666,360 454x20
+- a "Yêu cầu liên kết mới" @826,482 133x20
+- button "Lưu mật khẩu mới" @657,518 472x32
+- a "Về trang đăng nhập" @887,566 132x20
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Đặt mật khẩu mới
+
+## Thông báo / trạng thái
+- [alert] Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới.
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Đặt mật khẩu mới Mật khẩu cần ít nhất 8 ký tự. Không dùng lại mật khẩu cũ. Mật khẩu mới Nhập lại mật khẩu Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới. Yêu cầu liên kết mới Lưu mật khẩu mới Không muốn đổi? Về trang đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

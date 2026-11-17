@@ -1,0 +1,106 @@
+﻿{
+  "r03": {
+    "before": {
+      "h1Text": null,
+      "h1Class": null,
+      "h1_fontWeight": null,
+      "h1_marginBottom": null,
+      "p_marginBottom": null,
+      "ul_marginBottom": null,
+      "ul_paddingLeft": null,
+      "html_height": "768px",
+      "body_height": "768px",
+      "sheets": [
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)"
+      ]
+    },
+    "disabledSheets": [
+      "(inline)"
+    ],
+    "after": {
+      "h1Text": null,
+      "h1Class": null,
+      "h1_fontWeight": null,
+      "h1_marginBottom": null,
+      "p_marginBottom": null,
+      "ul_marginBottom": null,
+      "ul_paddingLeft": null,
+      "html_height": "523.344px",
+      "body_height": "523.344px",
+      "sheets": [
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)",
+        "(inline)"
+      ]
+    }
+  },
+  "r05": {
+    "accounts_has_scrollx": {
+      "tableLayout": "fixed",
+      "tableWidth": {
+        "x": 16,
+        "w": 1140
+      },
+      "contentOverflowX": "auto",
+      "contentWidth": {
+        "x": 16,
+        "w": 288
+      },
+      "wrapperWidth": {
+        "x": 16,
+        "w": 288
+      },
+      "pageScrollWidth": 320,
+      "pageClientWidth": 320,
+      "overflow": 0
+    },
+    "positions_no_scrollx": {
+      "tableLayout": null,
+      "tableWidth": null,
+      "contentOverflowX": null,
+      "contentWidth": null,
+      "wrapperWidth": null,
+      "pageScrollWidth": 320,
+      "pageClientWidth": 320,
+      "overflow": 0
+    },
+    "departments_no_scrollx": {
+      "tableLayout": null,
+      "tableWidth": null,
+      "contentOverflowX": null,
+      "contentWidth": null,
+      "wrapperWidth": null,
+      "pageScrollWidth": 320,
+      "pageClientWidth": 320,
+      "overflow": 0
+    }
+  }
+}

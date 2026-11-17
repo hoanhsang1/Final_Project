@@ -1,0 +1,45 @@
+# 26-to-chuc-phong-ban — Tổ chức — Phòng ban
+URL yêu cầu : /to-chuc
+URL thực tế  : http://127.0.0.1:5173/to-chuc
+Viewport     : narrow 320x640
+Tiêu đề tab  : Phòng ban — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 42
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (1)
+- GET /departments → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 320x56
+  <button> Mở menu quản lý tổ chức @8,12 32x32
+  <button> Đăng xuất @212,12 92x32
+<main> Phòng banPhòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu … @0,56 320x355
+  <h1> Phòng ban @16,76 288x32
+  <button> Thêm phòng ban @16,162 143x36
+  <table> [table 4 cột, 3 dòng] @16,222 640x169
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @212,12 92x32
+- button "Thêm phòng ban" @16,162 143x36
+- button "Sửa phòng ban Tổ Toán" @479,281 56x36
+- button "Xoá phòng ban Tổ Toán" @542,281 56x36
+- a "Tổ Toán" @24,290 54x17
+- button "Sửa phòng ban Tổ Văn" @479,342 56x36
+- button "Xoá phòng ban Tổ Văn" @542,342 56x36
+- a "Tổ Văn" @24,351 47x17
+
+## Tiêu đề (heading)
+- h1: Phòng ban
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Phòng ban Phòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu của nhân viên. Thêm phòng ban Tên phòng ban Mô tả Ngày tạo Thao tác Tên phòng ban Mô tả Ngày tạo Thao tác Tổ Toán Tổ bộ môn Toán 01/09/2026 Sửa Xoá Tổ Văn — 01/09/2026 Sửa Xoá

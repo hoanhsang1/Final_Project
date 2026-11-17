@@ -1,0 +1,57 @@
+# 16-quan-tri-tat-ca-to-chuc — Quản trị — Tất cả tổ chức
+URL yêu cầu : /quan-tri/to-chuc/tat-ca
+URL thực tế  : http://127.0.0.1:5173/quan-tri/to-chuc/tat-ca
+Viewport     : narrow 320x640
+Tiêu đề tab  : Tất cả tổ chức — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 148
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (1)
+- GET /api/v1/organizations?page=1&size=20&sort=name,asc → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 320x56
+  <button> Mở menu quản trị @8,12 32x32
+  <button> Đăng xuất @212,12 92x32
+<main> Tất cả tổ chứcXem và quản lý mọi tổ chức trên hệ thống.Tất cả trạng th… @0,56 320x681
+  <h1> Tất cả tổ chức @16,76 288x32
+  <input> (search) "Tìm kiếm" @29,153 211x22
+  <button>  @268,146 36x36
+    <span role="img"> search @279,157 14x14
+  <span role="img"> down @163,206 12x12
+  <span role="img"> down @143,254 12x12
+  <table> [table 7 cột, 4 dòng] @16,322 980x331
+  <ul> Tổng 3 tổ chức120 / trang @16,669 288x32
+    <button>  @192,669 32x32
+      <span role="img"> left @202,679 12x12
+    <a> 1 @233,670 30x30
+    <button>  @272,669 32x32
+      <span role="img"> right @282,679 12x12
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản trị" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @212,12 92x32
+- button "" @268,146 36x36
+- input[search] "Tìm kiếm" @29,153 211x22
+- button "Xem chi tiết tổ chức Trường THPT Nguyễn Du" @845,375 60x36
+- button "Vô hiệu hoá tổ chức Trường THPT Nguyễn Du" @845,419 109x36
+- button "Xem chi tiết tổ chức Trung tâm Anh ngữ Sunrise" @845,490 60x36
+- button "Xem chi tiết tổ chức Trường Tiểu học Bình Minh" @845,562 60x36
+- button "Kích hoạt lại tổ chức Trường Tiểu học Bình Minh" @845,606 112x36
+- button "" @192,669 32x32 {disabled}
+- button "" @272,669 32x32 {disabled}
+
+## Tiêu đề (heading)
+- h1: Tất cả tổ chức
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị Đăng xuất Tất cả tổ chức Xem và quản lý mọi tổ chức trên hệ thống. Tất cả trạng thái Tất cả loại Tên tổ chức Loại Người đại diện Email Trạng thái Ngày gửi Hành động Tên tổ chức Loại Người đại diện Email Trạng thái Ngày gửi Hành động Trường THPT Nguyễn Du Trường học nguyendu.owner owner@nguyendu.edu.vn Đã duyệt 01/10/2026 08:30 Xem Vô hiệu hoá Trung tâm Anh ngữ Sunrise Trung tâm sunrise.owner owner@sunrise.vn Chờ duyệt 05/10/2026 14:10 Xem Trường Tiểu học Bình Minh Trường học binhminh.owner owner@binhminh.edu.vn Vô hiệu hoá 20/09/2026 09:00 Xem Kích hoạt lại Tổng 3 tổ chức 1

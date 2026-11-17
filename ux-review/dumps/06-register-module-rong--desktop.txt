@@ -1,0 +1,53 @@
+# 06-register-module-rong — Đăng ký — danh mục module rỗng
+URL yêu cầu : /dang-ky
+URL thực tế  : http://127.0.0.1:5173/dang-ky
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Đăng ký tổ chức — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x1065
+  <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
+<main> MMEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi g… @420,0 946x1065
+  <h1> Đăng ký tổ chức @557,96 672x32
+  <form> Thông tin tổ chứcTên tổ chứcLoại tổ chứcChọn loại tổ chứcTrường họcTru… @557,248 672x689
+    <h2> Thông tin tổ chức @557,248 672x28
+    <input> (text) "Tên tổ chức" @566,322 654x20
+    <button role="combobox"> Chọn loại tổ chức @570,394 622x20
+    <h2> Tài khoản quản trị @557,573 672x28
+    <input> (text) "Tên đăng nhập" @566,647 654x20
+    <input> (email) "Email" @566,719 654x20
+    <input> (password) "Mật khẩu" @566,791 654x20
+    <input> (password) "Nhập lại mật khẩu" @566,863 654x20
+    <button> Gửi đăng ký @557,905 672x32
+  <a> Đăng nhập @914,953 73x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[text] "Tên tổ chức" @566,322 654x20
+- button "Chọn loại tổ chức" @570,394 622x20 {expanded=false}
+- input[text] "Tên đăng nhập" @566,647 654x20
+- input[email] "Email" @566,719 654x20
+- input[password] "Mật khẩu" @566,791 654x20
+- input[password] "Nhập lại mật khẩu" @566,863 654x20
+- button "Gửi đăng ký" @557,905 672x32
+- a "Đăng nhập" @914,953 73x20
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Đăng ký tổ chức
+- h2: Thông tin tổ chức
+- h2: Tài khoản quản trị
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Đăng ký tổ chức Tạo tài khoản quản trị cho đơn vị của bạn Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được. Thông tin tổ chức Tên tổ chức Loại tổ chức Chọn loại tổ chức Chưa có module nào để chọn Quản trị hệ thống cần bật module trước khi tổ chức đăng ký. Module cần sử dụng Tài khoản quản trị Tên đăng nhập Email Mật khẩu Nhập lại mật khẩu Gửi đăng ký Đã có tài khoản? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

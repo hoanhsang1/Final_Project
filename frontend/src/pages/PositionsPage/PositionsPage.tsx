@@ -189,6 +189,7 @@ export default function PositionsPage() {
           loading={list.isPending}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           size="middle"
+          scroll={{ x: 860 }}
         />
       )}
 

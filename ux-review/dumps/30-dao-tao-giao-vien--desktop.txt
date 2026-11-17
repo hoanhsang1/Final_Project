@@ -1,0 +1,63 @@
+# 30-dao-tao-giao-vien — Đào tạo — Giáo viên
+URL yêu cầu : /dao-tao/giao-vien
+URL thực tế  : http://127.0.0.1:5173/dao-tao/giao-vien
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Giáo viên — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (2)
+- GET /api/teachers?page=1&size=20 → 200
+- GET /api/specialties → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSĐào tạogiao.vuĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Đào tạo @0,56 248x712
+  <nav> Menu đào tạo @8,56 231x84
+    <ul> Giáo viênLớp học @8,60 231x76
+      <a> Giáo viên @8,60 231x37
+        <span role="img"> solution @20,60 17x17
+      <a> Lớp học @8,99 231x37
+        <span role="img"> read @20,99 17x17
+<main> Giáo viênQuản lý chuyên mônThêm giáo viênTất cả chuyên mônTất cả chuyê… @248,56 1118x332
+  <h1> Giáo viên @280,88 742x32
+  <button> Quản lý chuyên môn @1034,88 161x36
+  <button> Thêm giáo viên @1207,88 127x36
+  <button role="combobox"> Tất cả chuyên môn @293,142 170x20
+  <button role="combobox"> Tất cả trạng thái dạy @525,142 170x20
+  <input> (search) "Tìm theo mã nhân sự hoặc họ tên" @1010,142 258x20
+  <button> Tìm @1285,132 49x36
+  <div role="group"> Bảng @280,240 1054x116
+    <table> [table 9 cột, 2 dòng] @280,240 1430x116
+<div role="status"> Đang tải @-1,-1 1x1
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Giáo viên" @8,60 231x37
+- button "Quản lý chuyên môn" @1034,88 161x36
+- button "Thêm giáo viên" @1207,88 127x36
+- a "Lớp học" @8,99 231x37
+- button "Tìm" @1285,132 49x36
+- button "Tất cả chuyên môn" @293,142 170x20 {expanded=false}
+- button "Tất cả trạng thái dạy" @525,142 170x20 {expanded=false}
+- input[search] "Tìm theo mã nhân sự hoặc họ tên" @1010,142 258x20
+- a "Nguyễn Thị Mai" @422,288 105x20
+- a "Chỉnh sửa" @1632,288 66x20
+- a "Trần Văn Hùng" @422,327 100x20
+- a "Chỉnh sửa" @1632,327 66x20
+
+## Tiêu đề (heading)
+- h1: Giáo viên
+
+## Thông báo / trạng thái
+- [status] Đang tải
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Đào tạo giao.vu Đăng xuất Giáo viên Lớp học Giáo viên Quản lý chuyên môn Thêm giáo viên Tất cả chuyên môn Tất cả chuyên môn Tất cả trạng thái dạy Tất cả trạng thái dạy Tìm theo mã nhân sự hoặc họ tên Tìm 2 giáo viên Mã nhân sự Họ tên Email Số điện thoại Chuyên môn Loại hợp đồng Trạng thái dạy Lớp đang phụ trách Thao tác GV001 Nguyễn Thị Mai mai.nguyen@nguyendu.edu.vn 0901234567 Toán Cơ hữu Đang dạy 3 lớp Chỉnh sửa GV002 Trần Văn Hùng hung.tran@nguyendu.edu.vn 0907654321 Vật lý Thỉnh giảng Tạm nghỉ Chưa có lớp Chỉnh sửa Đang tải

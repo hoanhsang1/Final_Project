@@ -1,0 +1,75 @@
+# 13-quan-tri-tong-quan — Quản trị — Tổng quan
+URL yêu cầu : /quan-tri
+URL thực tế  : http://127.0.0.1:5173/quan-tri
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Tổng quan — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 48
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (2)
+- GET /api/v1/organizations/pending → 200
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> Tổng quanSố liệu toàn hệ thống quản trị.Tổ chức chờ duyệt2Module trong… @248,56 1118x609
+  <h1> Tổng quan @280,88 1054x32
+  <a> Tổ chức chờ duyệt: 2. Tất cả tổ chức @280,190 249x97
+  <a> Module trong danh mục: 5. Danh mục module @549,190 249x97
+  <a> Module lõi: 3. Danh mục module @817,190 249x97
+  <a> Module mở rộng: 2. Danh mục module @1086,190 249x97
+  <ul> Tổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài khoảnNhật ký… @301,379 1012x232
+    <a> Tổ chức chờ duyệt @301,391 1012x22
+    <a> Tất cả tổ chức @301,438 1012x22
+    <a> Danh mục module @301,485 1012x22
+    <a> Quản lý tài khoản @301,531 1012x22
+    <a> Nhật ký hệ thống @301,578 1012x22
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- a "Danh mục module" @8,177 231x37
+- a "Tổ chức chờ duyệt: 2. Tất cả tổ chức" @280,190 249x97
+- a "Module trong danh mục: 5. Danh mục module" @549,190 249x97
+- a "Module lõi: 3. Danh mục module" @817,190 249x97
+- a "Module mở rộng: 2. Danh mục module" @1086,190 249x97
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+- a "Tổ chức chờ duyệt" @301,391 1012x22
+- a "Tất cả tổ chức" @301,438 1012x22
+- a "Danh mục module" @301,485 1012x22
+- a "Quản lý tài khoản" @301,531 1012x22
+- a "Nhật ký hệ thống" @301,578 1012x22
+
+## Tiêu đề (heading)
+- h1: Tổng quan
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Tổng quan Số liệu toàn hệ thống quản trị. Tổ chức chờ duyệt 2 Module trong danh mục 5 Module lõi 3 Module mở rộng 2 Các mục quản trị Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống

@@ -1,0 +1,56 @@
+# 15-quan-tri-to-chuc-rong — Quản trị — Tổ chức chờ duyệt (rỗng)
+URL yêu cầu : /quan-tri/to-chuc
+URL thực tế  : http://127.0.0.1:5173/quan-tri/to-chuc
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Tổ chức chờ duyệt — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 41
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- GET /api/v1/organizations/pending → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> Tổ chức chờ duyệtDuyệt để tổ chức có thể bắt đầu sử dụng hệ thống.Tên … @248,56 1118x365
+  <h1> Tổ chức chờ duyệt @280,88 1054x32
+  <table> [table 6 cột, 2 dòng] @280,186 1054x203
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- a "Danh mục module" @8,177 231x37
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+
+## Tiêu đề (heading)
+- h1: Tổ chức chờ duyệt
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Tổ chức chờ duyệt Duyệt để tổ chức có thể bắt đầu sử dụng hệ thống. Tên tổ chức Loại Người đại diện Email Trạng thái Hành động Tên tổ chức Loại Người đại diện Email Trạng thái Hành động Không có tổ chức nào đang chờ duyệt

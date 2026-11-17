@@ -1,0 +1,45 @@
+# 20-quan-tri-danh-muc-module — Quản trị — Danh mục module
+URL yêu cầu : /quan-tri/module
+URL thực tế  : http://127.0.0.1:5173/quan-tri/module
+Viewport     : mobile 375x667
+Tiêu đề tab  : Danh mục module — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 91
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (1)
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 375x56
+  <button> Mở menu quản trị @8,12 32x32
+  <button> Đăng xuất @267,12 92x32
+<main> Danh mục moduleCác module hệ thống đang có trong danh mục.Tất cả modul… @0,56 375x501
+  <h1> Danh mục module @16,76 343x32
+  <span role="img"> down @173,158 12x12
+  <input> (search) "Tìm module" @29,201 243x22
+  <button>  @300,194 36x36
+    <span role="img"> search @311,205 14x14
+  <table> [table 4 cột, 6 dòng] @16,274 640x263
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản trị" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @267,12 92x32
+- button "" @300,194 36x36
+- input[search] "Tìm module" @29,201 243x22
+- span "" @550,280 20x30
+- span "" @550,313 20x30
+
+## Tiêu đề (heading)
+- h1: Danh mục module
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị Đăng xuất Danh mục module Các module hệ thống đang có trong danh mục. Tất cả module Mã module Tên module Phân loại Mô tả Mã module Tên module Phân loại Mô tả STUDENT_MANAGEMENT Quản lý sinh viên Lõi — CLASS_MANAGEMENT Quản lý lớp học Lõi — SCHEDULE_MANAGEMENT Quản lý thời khoá biểu Lõi — FACILITY_MANAGEMENT Quản lý cơ sở vật chất Mở rộng — TEACHER_ASSIGNMENT Phân công giáo viên Mở rộng —

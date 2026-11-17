@@ -1,0 +1,40 @@
+# 08-quen-mat-khau-chua-co — Quên mật khẩu — chức năng chưa sẵn sàng (404)
+URL yêu cầu : /quen-mat-khau
+URL thực tế  : http://127.0.0.1:5173/quen-mat-khau
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Quên mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- POST /api/v1/auth/forgot-password → 404
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x768
+  <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
+<main> MMEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt… @420,0 946x768
+  <h1> Quên mật khẩu @657,240 472x32
+  <form> EmailChức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản t… @657,312 472x184
+    <input> (email) "Email" @666,342 454x20
+    <div role="alert"> Chức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản trị vi… @701,396 412x40
+    <button> Gửi liên kết đặt lại @657,464 472x32
+  <a> Đăng nhập @917,512 73x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[email] "Email" @666,342 454x20
+- button "Gửi liên kết đặt lại" @657,464 472x32
+- a "Đăng nhập" @917,512 73x20
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Quên mật khẩu
+
+## Thông báo / trạng thái
+- [alert] Chức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản trị viên hệ thống.
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Quên mật khẩu Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu. Email Chức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản trị viên hệ thống. Gửi liên kết đặt lại Nhớ ra mật khẩu? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

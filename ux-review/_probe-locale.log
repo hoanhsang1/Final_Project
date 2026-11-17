@@ -1,0 +1,14 @@
+﻿{
+  "depDefault": {
+    "label": "dep.default",
+    "typeofValue": "object",
+    "topKeys": [
+      "default"
+    ],
+    "hasPagination": false,
+    "paginationItemsPerPage": null,
+    "looksLikeCjsNamespace": true,
+    "nestedHasPagination": true,
+    "nestedPaginationItemsPerPage": "/ trang"
+  }
+}

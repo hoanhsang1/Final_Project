@@ -1,0 +1,87 @@
+﻿{
+  "intercepted": [
+    "GET /departments"
+  ],
+  "info": {
+    "scrollWidth": 352,
+    "clientWidth": 320,
+    "overflow": 32,
+    "tableCount": 1,
+    "tableBoxes": [
+      {
+        "x": 16,
+        "w": 336,
+        "layout": "auto"
+      }
+    ],
+    "actionsTh": [
+      {
+        "text": "T├¬n ph├▓ng ban",
+        "w": 59
+      },
+      {
+        "text": "M├┤ tß║ú",
+        "w": 49
+      },
+      {
+        "text": "Ng├áy tß║ío",
+        "w": 93
+      },
+      {
+        "text": "Thao t├íc",
+        "w": 136
+      }
+    ],
+    "actionsTdHtml": "<td class=\"ant-table-cell\"><div class=\"ant-space css-dev-only-do-not-override-kxu38y ant-space-horizontal ant-space-align-center\" style=\"gap: 8px;\"><div class=\"ant-space-item\"><button aria-label=\"Sß╗¡a ph├▓ng ban Tß╗ò To├ín\" type=\"button\" class=\"ant-btn css-dev-only-do-not-override-kxu38y ant-btn-link ant",
+    "buttons": [
+      {
+        "text": "Sß╗¡a",
+        "aria": "Sß╗¡a ph├▓ng ban Tß╗ò To├ín",
+        "w": 56
+      },
+      {
+        "text": "Xo├í",
+        "aria": "Xo├í ph├▓ng ban Tß╗ò To├ín",
+        "w": 56
+      },
+      {
+        "text": "Sß╗¡a",
+        "aria": "Sß╗¡a ph├▓ng ban Tß╗ò V─ân",
+        "w": 56
+      },
+      {
+        "text": "Xo├í",
+        "aria": "Xo├í ph├▓ng ban Tß╗ò V─ân",
+        "w": 56
+      }
+    ],
+    "spaces": [
+      {
+        "cls": "ant-space css-dev-only-do-not-override-k",
+        "w": 120,
+        "wrap": "nowrap"
+      },
+      {
+        "cls": "ant-space css-dev-only-do-not-override-k",
+        "w": 120,
+        "wrap": "nowrap"
+      }
+    ],
+    "overflowing": [
+      "table. right=352 w=336",
+      "thead.ant-table-thead right=352 w=336",
+      "tr. right=352 w=336",
+      "th.ant-table-cell right=352 w=136",
+      "tbody.ant-table-tbody right=352 w=336",
+      "tr.ant-table-row right=352 w=336",
+      "td.ant-table-cell right=352 w=136",
+      "div.ant-space right=344 w=120",
+      "div.ant-space-item right=344 w=56",
+      "button.ant-btn right=344 w=56",
+      "span. right=329 w=26",
+      "tr.ant-table-row right=352 w=336",
+      "td.ant-table-cell right=352 w=136"
+    ],
+    "fontFamily": "Inter, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif"
+  }
+}

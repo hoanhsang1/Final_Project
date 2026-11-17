@@ -243,6 +243,7 @@ export default function DepartmentDetailPage() {
           loading={members.isPending}
           pagination={{ pageSize: 20, showSizeChanger: false, hideOnSinglePage: true }}
           size="middle"
+          scroll={{ x: 760 }}
         />
       )}
 

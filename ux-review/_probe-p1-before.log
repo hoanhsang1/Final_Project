@@ -1,0 +1,156 @@
+﻿{
+  "r03": {
+    "before": {
+      "h1Text": null,
+      "h1Class": null,
+      "h1_fontWeight": null,
+      "h1_marginBottom": null,
+      "p_marginBottom": null,
+      "ul_marginBottom": "0px",
+      "ul_paddingLeft": "0px",
+      "html_height": "768px",
+      "body_height": "768px"
+    },
+    "disabledSheets": [
+      "(inline)"
+    ],
+    "after": {
+      "h1Text": null,
+      "h1Class": null,
+      "h1_fontWeight": null,
+      "h1_marginBottom": null,
+      "p_marginBottom": null,
+      "ul_marginBottom": "0px",
+      "ul_paddingLeft": "0px",
+      "html_height": "768px",
+      "body_height": "768px"
+    }
+  },
+  "r05_narrow320": {
+    "accounts_has_scrollx": {
+      "hasTable": false,
+      "tableLayout": null,
+      "tableBox": null,
+      "thWidths": null,
+      "contentOverflowX": null,
+      "contentBox": null,
+      "pageScrollWidth": 320,
+      "pageClientWidth": 320,
+      "overflow": 0
+    },
+    "departments_no_scrollx": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableBox": {
+        "x": 16,
+        "w": 336
+      },
+      "thWidths": [
+        59,
+        49,
+        93,
+        136
+      ],
+      "contentOverflowX": "visible",
+      "contentBox": {
+        "x": 16,
+        "w": 288
+      },
+      "pageScrollWidth": 352,
+      "pageClientWidth": 320,
+      "overflow": 32
+    },
+    "positions_no_scrollx": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableBox": {
+        "x": 16,
+        "w": 588
+      },
+      "thWidths": [
+        60,
+        55,
+        188,
+        93,
+        193
+      ],
+      "contentOverflowX": "visible",
+      "contentBox": {
+        "x": 16,
+        "w": 288
+      },
+      "pageScrollWidth": 604,
+      "pageClientWidth": 320,
+      "overflow": 284
+    },
+    "deptDetail_no_scrollx": {
+      "hasTable": false,
+      "tableLayout": null,
+      "tableBox": null,
+      "thWidths": null,
+      "contentOverflowX": null,
+      "contentBox": null,
+      "pageScrollWidth": 320,
+      "pageClientWidth": 320,
+      "overflow": 0
+    }
+  },
+  "desktop1366_colwidths": {
+    "departments": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableBox": {
+        "x": 280,
+        "w": 1054
+      },
+      "thWidths": [
+        262,
+        278,
+        208,
+        305
+      ],
+      "contentOverflowX": "visible",
+      "contentBox": {
+        "x": 280,
+        "w": 1054
+      },
+      "pageScrollWidth": 1366,
+      "pageClientWidth": 1366,
+      "overflow": 0
+    },
+    "positions": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableBox": {
+        "x": 280,
+        "w": 1054
+      },
+      "thWidths": [
+        131,
+        111,
+        431,
+        123,
+        257
+      ],
+      "contentOverflowX": "visible",
+      "contentBox": {
+        "x": 280,
+        "w": 1054
+      },
+      "pageScrollWidth": 1366,
+      "pageClientWidth": 1366,
+      "overflow": 0
+    },
+    "deptDetail": {
+      "hasTable": false,
+      "tableLayout": null,
+      "tableBox": null,
+      "thWidths": null,
+      "contentOverflowX": null,
+      "contentBox": null,
+      "pageScrollWidth": 1366,
+      "pageClientWidth": 1366,
+      "overflow": 0
+    }
+  }
+}

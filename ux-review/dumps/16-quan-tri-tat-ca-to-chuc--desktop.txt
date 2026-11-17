@@ -1,0 +1,79 @@
+# 16-quan-tri-tat-ca-to-chuc — Quản trị — Tất cả tổ chức
+URL yêu cầu : /quan-tri/to-chuc/tat-ca
+URL thực tế  : http://127.0.0.1:5173/quan-tri/to-chuc/tat-ca
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Tất cả tổ chức — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 148
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- GET /api/v1/organizations?page=1&size=20&sort=name,asc → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> Tất cả tổ chứcXem và quản lý mọi tổ chức trên hệ thống.Tất cả trạng th… @248,56 1118x591
+  <h1> Tất cả tổ chức @280,88 1054x32
+  <input> (search) "Tìm kiếm" @293,165 243x22
+  <button>  @564,158 36x36
+    <span role="img"> search @575,169 14x14
+  <span role="img"> down @759,170 12x12
+  <span role="img"> down @921,170 12x12
+  <table> [table 7 cột, 4 dòng] @280,238 1054x309
+  <ul> Tổng 3 tổ chức120 / trang @280,563 1054x36
+    <button>  @1099,563 32x32
+      <span role="img"> left @1109,574 12x12
+    <a> 1 @1140,564 30x30
+    <button>  @1179,563 32x32
+      <span role="img"> right @1189,574 12x12
+    <input role="combobox"> (search) "kích thước trang" @1239,564 65x34
+    <span role="img"> down @1311,575 12x12
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- button "" @564,158 36x36
+- input[search] "Tìm kiếm" @293,165 243x22
+- a "Danh mục module" @8,177 231x37
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+- button "Xem chi tiết tổ chức Trường THPT Nguyễn Du" @1164,291 60x36
+- button "Vô hiệu hoá tổ chức Trường THPT Nguyễn Du" @1164,335 109x36
+- button "Xem chi tiết tổ chức Trung tâm Anh ngữ Sunrise" @1164,395 60x36
+- button "Xem chi tiết tổ chức Trường Tiểu học Bình Minh" @1164,456 60x36
+- button "Kích hoạt lại tổ chức Trường Tiểu học Bình Minh" @1164,500 112x36
+- button "" @1099,563 32x32 {disabled}
+- button "" @1179,563 32x32 {disabled}
+- input[search] "kích thước trang" @1239,564 65x34 {expanded=false}
+
+## Tiêu đề (heading)
+- h1: Tất cả tổ chức
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Tất cả tổ chức Xem và quản lý mọi tổ chức trên hệ thống. Tất cả trạng thái Tất cả loại Tên tổ chức Loại Người đại diện Email Trạng thái Ngày gửi Hành động Tên tổ chức Loại Người đại diện Email Trạng thái Ngày gửi Hành động Trường THPT Nguyễn Du Trường học nguyendu.owner owner@nguyendu.edu.vn Đã duyệt 01/10/2026 08:30 Xem Vô hiệu hoá Trung tâm Anh ngữ Sunrise Trung tâm sunrise.owner owner@sunrise.vn Chờ duyệt 05/10/2026 14:10 Xem Trường Tiểu học Bình Minh Trường học binhminh.owner owner@binhminh.edu.vn Vô hiệu hoá 20/09/2026 09:00 Xem Kích hoạt lại Tổng 3 tổ chức 1 20 / trang

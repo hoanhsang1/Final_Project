@@ -1,0 +1,30 @@
+# 09-dat-lai-mat-khau-thieu-token — Đặt lại mật khẩu — thiếu token
+URL yêu cầu : /dat-lai-mat-khau
+URL thực tế  : http://127.0.0.1:5173/dat-lai-mat-khau
+Viewport     : narrow 320x640
+Tiêu đề tab  : Đặt lại mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<main> MMEMSĐặt lại mật khẩuCần liên kết trong email để tiếp tục.Thiếu liên k… @0,0 320x640
+  <h1> Đặt lại mật khẩu @32,196 256x32
+  <a> Yêu cầu liên kết mới @32,408 256x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Yêu cầu liên kết mới" @32,408 256x20
+
+## Tiêu đề (heading)
+- h1: Đặt lại mật khẩu
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Đặt lại mật khẩu Cần liên kết trong email để tiếp tục. Thiếu liên kết đặt lại mật khẩu Liên kết trong email có thể đã bị cắt khi sao chép, hoặc bạn mở sai địa chỉ. Yêu cầu liên kết mới Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

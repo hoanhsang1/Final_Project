@@ -1,0 +1,38 @@
+# 07-quen-mat-khau — Quên mật khẩu — mặc định
+URL yêu cầu : /quen-mat-khau
+URL thực tế  : http://127.0.0.1:5173/quen-mat-khau
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Quên mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x768
+  <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
+<main> MMEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt… @420,0 946x768
+  <h1> Quên mật khẩu @657,280 472x32
+  <form> EmailGửi liên kết đặt lại @657,352 472x104
+    <input> (email) "Email" @666,382 454x20
+    <button> Gửi liên kết đặt lại @657,424 472x32
+  <a> Đăng nhập @917,472 73x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[email] "Email" @666,382 454x20
+- button "Gửi liên kết đặt lại" @657,424 472x32
+- a "Đăng nhập" @917,472 73x20
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Quên mật khẩu
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Quên mật khẩu Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu. Email Gửi liên kết đặt lại Nhớ ra mật khẩu? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

@@ -1,0 +1,72 @@
+# 22-quan-tri-chi-tiet-tai-khoan — Quản trị — Chi tiết tài khoản
+URL yêu cầu : /quan-tri/tai-khoan/acc-1
+URL thực tế  : http://127.0.0.1:5173/quan-tri/tai-khoan/acc-1
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Chi tiết tài khoản — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 160
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (2)
+- GET /api/v1/accounts/acc-1 → 200
+- GET /api/v1/audit-logs?accountId=acc-1&page=1&size=20 → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> /Quản lý tài khoản/nguyendu.ownernguyendu.ownerThông tin tài khoản · T… @248,56 1118x642
+  <nav> Đường dẫn @280,88 1054x28
+    <ol> /Quản lý tài khoản/nguyendu.owner @280,88 1054x28
+      <a> Quản lý tài khoản @280,88 115x28
+  <h1> nguyendu.owner @280,124 1054x32
+  <table> [table 0 cột, 3 dòng] @281,265 1052x164
+  <button> Khoá tài khoản nguyendu.owner @280,454 65x36
+  <button> Vô hiệu hoá tài khoản nguyendu.owner @357,454 109x36
+  <button> Đổi vai trò @477,454 98x36
+  <button> Đặt lại mật khẩu @587,454 137x36
+  <h2> Nhật ký của tài khoản @280,514 1054x22
+  <table> [table 4 cột, 3 dòng] @280,548 1054x119
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- a "Quản lý tài khoản" @280,88 115x28
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- a "Danh mục module" @8,177 231x37
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+- button "Khoá tài khoản nguyendu.owner" @280,454 65x36
+- button "Vô hiệu hoá tài khoản nguyendu.owner" @357,454 109x36
+- button "Đổi vai trò" @477,454 98x36
+- button "Đặt lại mật khẩu" @587,454 137x36
+
+## Tiêu đề (heading)
+- h1: nguyendu.owner
+- h2: Nhật ký của tài khoản
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Quản lý tài khoản / nguyendu.owner nguyendu.owner Thông tin tài khoản · Trần Văn A Thông tin tài khoản Tên đăng nhập nguyendu.owner Email owner@nguyendu.edu.vn Họ tên Trần Văn A Tổ chức Trường THPT Nguyễn Du Vai trò Chủ tổ chức Trạng thái Đang hoạt động Ngày tạo 01/10/2026 08:30 Đăng nhập gần nhất 10/11/2026 07:45 Khoá Vô hiệu hoá Đổi vai trò Đặt lại mật khẩu Nhật ký của tài khoản Thời điểm Hành động Người thực hiện Ghi chú Thời điểm Hành động Người thực hiện Ghi chú 21/10/2026 09:15 Duyệt tổ chức admin.he.thong Duyệt tổ chức 21/10/2026 10:02 Đổi trạng thái tài khoản admin.he.thong Vô hiệu hoá tài khoản

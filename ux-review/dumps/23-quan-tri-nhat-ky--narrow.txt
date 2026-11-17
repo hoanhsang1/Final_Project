@@ -1,0 +1,59 @@
+# 23-quan-tri-nhat-ky — Quản trị — Nhật ký hệ thống
+URL yêu cầu : /quan-tri/nhat-ky
+URL thực tế  : http://127.0.0.1:5173/quan-tri/nhat-ky
+Viewport     : narrow 320x640
+Tiêu đề tab  : Nhật ký hệ thống — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 70
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (1)
+- GET /api/v1/audit-logs?page=1&size=20 → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 320x56
+  <button> Mở menu quản trị @8,12 32x32
+  <button> Đăng xuất @212,12 92x32
+<main> Nhật ký hệ thốngCác thao tác quản trị đã được ghi nhận.Tất cả hành độn… @0,56 320x465
+  <h1> Nhật ký hệ thống @16,76 288x32
+  <input> (search) "Tìm trong nhật ký" @29,153 211x22
+  <button>  @268,146 36x36
+    <span role="img"> search @279,157 14x14
+  <span role="img"> down @203,206 12x12
+  <input> (input) "Khoảng thời gian" @28,249 107x22
+  <span role="img"> swap-right @143,252 16x16
+  <input> (input) "Khoảng thời gian" @167,249 107x22
+  <span role="img"> calendar @278,253 14x14
+  <table> [table 5 cột, 3 dòng] @16,322 900x119
+  <ul> Tổng 2 sự kiện1 @16,457 288x28
+    <button>  @220,457 28x28
+      <span role="img"> left @228,465 12x12
+    <a> 1 @249,458 26x26
+    <button>  @276,457 28x28
+      <span role="img"> right @284,465 12x12
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản trị" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @212,12 92x32
+- button "" @268,146 36x36
+- input[search] "Tìm trong nhật ký" @29,153 211x22
+- input[text] "Khoảng thời gian" @28,249 107x22
+- input[text] "Khoảng thời gian" @167,249 107x22
+- a "Xem chi tiết Tổ chức: Trường THPT Nguyễn Du" @351,371 229x17
+- a "Xem chi tiết Tài khoản: nguyendu.owner" @351,411 183x17
+- button "" @220,457 28x28 {disabled}
+- button "" @276,457 28x28 {disabled}
+
+## Tiêu đề (heading)
+- h1: Nhật ký hệ thống
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị Đăng xuất Nhật ký hệ thống Các thao tác quản trị đã được ghi nhận. Tất cả hành động Thời điểm Hành động Đối tượng Người thực hiện Ghi chú Thời điểm Hành động Đối tượng Người thực hiện Ghi chú 21/10/2026 09:15 Duyệt tổ chức Tổ chức: Trường THPT Nguyễn Du admin.he.thong Duyệt tổ chức 21/10/2026 10:02 Đổi trạng thái tài khoản Tài khoản: nguyendu.owner admin.he.thong Vô hiệu hoá tài khoản Tổng 2 sự kiện 1

@@ -1,0 +1,53 @@
+# 18-quan-tri-chi-tiet-to-chuc — Quản trị — Chi tiết tổ chức
+URL yêu cầu : /quan-tri/to-chuc/org-1
+URL thực tế  : http://127.0.0.1:5173/quan-tri/to-chuc/org-1
+Viewport     : narrow 320x640
+Tiêu đề tab  : Chi tiết tổ chức — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 177
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (2)
+- GET /api/v1/organizations/org-1 → 200
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 320x56
+  <button> Mở menu quản trị @8,12 32x32
+  <button> Đăng xuất @212,12 92x32
+<main> /Tổ chức chờ duyệt/Trường THPT Nguyễn DuTrường THPT Nguyễn DuChờ duyệt… @0,56 320x1518
+  <nav> Đường dẫn @16,76 288x60
+    <ol> /Tổ chức chờ duyệt/Trường THPT Nguyễn Du @16,76 288x60
+      <a> Tổ chức chờ duyệt @16,76 124x28
+  <h1> Trường THPT Nguyễn Du @16,144 288x64
+  <button> Duyệt tổ chức @111,220 124x36
+  <button> Từ chối tổ chức @16,268 134x36
+  <button> Xem lịch sử @162,268 108x36
+  <a> Quay lại danh sách @16,316 125x22
+  <table> [table 0 cột, 7 dòng] @38,455 244x400
+  <table> [table 3 cột, 2 dòng] @37,969 520x79
+  <button> Lưu cấu hình module @114,1099 169x36
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản trị" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @212,12 92x32
+- a "Tổ chức chờ duyệt" @16,76 124x28
+- button "Duyệt tổ chức" @111,220 124x36
+- button "Từ chối tổ chức" @16,268 134x36
+- button "Xem lịch sử" @162,268 108x36
+- a "Quay lại danh sách" @16,316 125x22
+- button "Lưu cấu hình module" @114,1099 169x36 {disabled}
+
+## Tiêu đề (heading)
+- h1: Trường THPT Nguyễn Du
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị Đăng xuất Tổ chức chờ duyệt / Trường THPT Nguyễn Du Trường THPT Nguyễn Du Chờ duyệt Duyệt tổ chức Từ chối tổ chức Xem lịch sử Quay lại danh sách Thông tin tổ chức Tên tổ chức Trường THPT Nguyễn Du Loại Trường học Trạng thái Chờ duyệt Ngày gửi đăng ký 01/10/2026 08:30 Email liên hệ lienhe@nguyendu.edu.vn Số điện thoại 028 1234 5678 Lý do từ chối — Người đại diện Tên đăng nhập Email Trạng thái tài khoản Tên đăng nhập Email Trạng thái tài khoản nguyendu.owner owner@nguyendu.edu.vn Chờ duyệt Module đã đăng ký Lưu cấu hình module Quản lý lớp học (CLASS_MANAGEMENT) Chờ duyệt Quản lý cơ sở vật chất (FACILITY_MANAGEMENT) Quản lý thời khoá biểu (SCHEDULE_MANAGEMENT) Quản lý sinh viên (STUDENT_MANAGEMENT) Chờ duyệt Phân công giáo viên (TEACHER_ASSIGNMENT)

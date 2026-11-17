@@ -1,0 +1,28 @@
+# 37-403-quan-tri — Không đủ quyền — /quan-tri (giáo viên)
+URL yêu cầu : /quan-tri
+URL thực tế  : http://127.0.0.1:5173/quan-tri
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Tổng quan — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 6
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<button> Về trang đăng nhập @602,439 162x36
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- button "Về trang đăng nhập" @602,439 162x36
+
+## Tiêu đề (heading)
+(không có)
+
+## Thông báo / trạng thái
+- [ant-result] Unauthorized403Bạn không có quyền truy cập khu vực quản trị.Về trang đăng nhập
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+403 Bạn không có quyền truy cập khu vực quản trị. Về trang đăng nhập

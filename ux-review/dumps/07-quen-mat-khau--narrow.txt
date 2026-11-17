@@ -1,0 +1,35 @@
+# 07-quen-mat-khau — Quên mật khẩu — mặc định
+URL yêu cầu : /quen-mat-khau
+URL thực tế  : http://127.0.0.1:5173/quen-mat-khau
+Viewport     : narrow 320x640
+Tiêu đề tab  : Quên mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<main> MMEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt… @0,0 320x640
+  <h1> Quên mật khẩu @32,196 256x32
+  <form> EmailGửi liên kết đặt lại @32,288 256x104
+    <input> (email) "Email" @41,318 238x20
+    <button> Gửi liên kết đặt lại @32,360 256x32
+  <a> Đăng nhập @184,408 73x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- input[email] "Email" @41,318 238x20
+- button "Gửi liên kết đặt lại" @32,360 256x32
+- a "Đăng nhập" @184,408 73x20
+
+## Tiêu đề (heading)
+- h1: Quên mật khẩu
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quên mật khẩu Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu. Email Gửi liên kết đặt lại Nhớ ra mật khẩu? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

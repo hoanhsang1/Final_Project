@@ -1,0 +1,47 @@
+# 29-to-chuc-chi-tiet-phong-ban — Tổ chức — Chi tiết phòng ban
+URL yêu cầu : /to-chuc/phong-ban/d1
+URL thực tế  : http://127.0.0.1:5173/to-chuc/phong-ban/d1
+Viewport     : mobile 375x667
+Tiêu đề tab  : Chi tiết phòng ban — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 41
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (3)
+- GET /departments → 200
+- GET /positions → 200
+- GET /departments/d1/members → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 375x56
+  <button> Mở menu quản lý tổ chức @8,12 32x32
+  <button> Đăng xuất @267,12 92x32
+<main> /Tổ chức/Tổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò… @0,56 375x351
+  <nav> Đường dẫn @16,76 343x28
+    <ol> /Tổ chức/Tổ Toán @16,76 343x28
+      <a> Tổ chức @16,76 54x28
+  <h1> Tổ Toán @16,112 343x32
+  <button> Thêm nhân viên @16,178 137x36
+  <table> [table 5 cột, 2 dòng] @16,258 760x129
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @267,12 92x32
+- a "Tổ chức" @16,76 54x28
+- button "Thêm nhân viên" @16,178 137x36
+- button "Đổi chức vụ" @487,338 110x36
+- button "Xoá khỏi phòng ban" @605,338 163x36
+
+## Tiêu đề (heading)
+- h1: Tổ Toán
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Tổ chức / Tổ Toán Tổ Toán Tổ bộ môn Toán Thêm nhân viên Mã nhân viên Vai trò trong phòng ban Chức vụ Ngày bổ nhiệm Thao tác Mã nhân viên Vai trò trong phòng ban Chức vụ Ngày bổ nhiệm Thao tác u1 Quản lý phòng ban Giáo viên 02/09/2026 Đổi chức vụ Xoá khỏi phòng ban

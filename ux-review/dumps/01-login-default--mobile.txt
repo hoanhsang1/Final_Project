@@ -1,0 +1,54 @@
+# 01-login-default — Đăng nhập — mặc định
+URL yêu cầu : /dang-nhap
+URL thực tế  : http://127.0.0.1:5173/dang-nhap
+Viewport     : mobile 375x667
+Tiêu đề tab  : Đăng nhập — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<main> Tài khoản/Đăng nhậpMĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng … @0,0 375x1030
+  <h1> Đăng nhập @84,72 126x32
+  <nav> Chuyển giữa đăng nhập và đăng ký @40,150 295x44
+    <a> Đăng nhập @44,154 142x36
+    <a> Đăng ký @190,154 142x36
+  <form> Tên đăng nhậpMật khẩuGhi nhớ tôiQuên mật khẩu?Đăng nhập @40,210 295x228
+    <input> (text) "Tên đăng nhập" @49,242 277x20
+    <input> (password) "Mật khẩu" @49,318 277x20
+    <a> Quên mật khẩu? @227,364 108x20
+    <button> Đăng nhập @40,402 295x36
+  <a> Đăng ký ngay @207,510 92x20
+  <button> Admin hệ thống @16,660 343x58
+  <button> Chủ tổ chức @16,726 343x58
+  <button> Cán bộ quản lý @16,792 343x58
+  <button> Giáo viên @16,858 343x58
+  <button> Sinh viên @16,924 343x58
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Đăng nhập" @44,154 142x36
+- a "Đăng ký" @190,154 142x36
+- input[text] "Tên đăng nhập" @49,242 277x20
+- input[password] "Mật khẩu" @49,318 277x20
+- a "Quên mật khẩu?" @227,364 108x20
+- button "Đăng nhập" @40,402 295x36
+- a "Đăng ký ngay" @207,510 92x20
+- button "Admin hệ thống" @16,660 343x58
+- button "Chủ tổ chức" @16,726 343x58
+- button "Cán bộ quản lý" @16,792 343x58
+- button "Giáo viên" @16,858 343x58
+- button "Sinh viên" @16,924 343x58
+
+## Tiêu đề (heading)
+- h1: Đăng nhập
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tài khoản / Đăng nhập M Đăng nhập Chào mừng bạn quay lại hệ thống MEMS Đăng nhập Đăng ký Tên đăng nhập Mật khẩu Ghi nhớ tôi Quên mật khẩu? Đăng nhập Không chia sẻ mật khẩu với bất kỳ ai. Chưa có tài khoản? Đăng ký ngay Cần hỗ trợ đăng nhập? Liên hệ quản trị viên tổ chức để được trợ giúp. hoặc xem thử theo vai trò Admin hệ thống Quản trị toàn nền tảng Chủ tổ chức Quản lý tài khoản của tổ chức Cán bộ quản lý Giáo vụ của tổ chức Giáo viên Xem lịch dạy, báo sự cố thiết bị Sinh viên Xem thời khóa biểu © MEMS · Hệ thống Quản lý Giáo dục theo Module

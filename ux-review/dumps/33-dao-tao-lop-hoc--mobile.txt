@@ -1,0 +1,47 @@
+# 33-dao-tao-lop-hoc — Đào tạo — Lớp học
+URL yêu cầu : /dao-tao/lop-hoc
+URL thực tế  : http://127.0.0.1:5173/dao-tao/lop-hoc
+Viewport     : mobile 375x667
+Tiêu đề tab  : Lớp học — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (1)
+- GET /api/classes?page=1&size=20 → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSĐào tạogiao.vuĐăng xuất @0,0 375x56
+  <button> Mở menu đào tạo @8,12 32x32
+  <button> Đăng xuất @267,12 92x32
+<main> Lớp họcTất cả trạng tháiTất cả trạng tháiChưa bắt đầuĐang diễn raĐã kế… @0,56 375x427
+  <h1> Lớp học @16,76 343x32
+  <button role="combobox"> Tất cả trạng thái @29,122 170x20
+  <input> (search) "Tìm theo mã lớp hoặc tên lớp" @49,166 258x20
+  <button> Tìm @16,200 49x36
+  <div role="group"> Bảng @16,308 343x155
+    <table> [table 8 cột, 3 dòng] @16,308 1270x155
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu đào tạo" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @267,12 92x32
+- button "Tất cả trạng thái" @29,122 170x20 {expanded=false}
+- input[search] "Tìm theo mã lớp hoặc tên lớp" @49,166 258x20
+- button "Tìm" @16,200 49x36
+- a "LH001" @28,356 46x20
+- a "LH002" @28,395 46x20
+- a "LH003" @28,434 46x20
+
+## Tiêu đề (heading)
+- h1: Lớp học
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Đào tạo Đăng xuất Lớp học Tất cả trạng thái Tất cả trạng thái Tìm theo mã lớp hoặc tên lớp Tìm 3 lớp Mã lớp Tên lớp Năm học Thời gian Trạng thái Đóng lớp Giáo viên Sĩ số LH001 Toán 10A1 2026-2027 05/09/2026 → 30/05/2027 Đang diễn ra Nguyễn Thị Mai 32 LH002 Toán 10A2 2026-2027 05/09/2026 → 30/05/2027 Chưa bắt đầu Chưa phân công 30 LH003 Lý 11B1 2026-2027 05/09/2026 → 30/05/2027 Đang diễn ra Chờ duyệt đóng Trần Văn Hùng 28

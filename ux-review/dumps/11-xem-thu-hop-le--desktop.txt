@@ -1,0 +1,29 @@
+# 11-xem-thu-hop-le — Xem thử vai trò — hợp lệ (giáo viên)
+URL yêu cầu : /xem-thu/teacher
+URL thực tế  : http://127.0.0.1:5173/xem-thu/teacher
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Xem thử vai trò — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 11
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<h1> Giáo viên @629,353 108x31
+<button> Quay lại đăng nhập @604,438 158x36
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- button "Quay lại đăng nhập" @604,438 158x36
+
+## Tiêu đề (heading)
+- h1: Giáo viên
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Chế độ xem thử — chưa đăng nhập Bạn đang là Giáo viên Xem lịch dạy, báo sự cố thiết bị Quay lại đăng nhập

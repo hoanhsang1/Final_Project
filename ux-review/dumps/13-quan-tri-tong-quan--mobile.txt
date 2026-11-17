@@ -1,0 +1,56 @@
+# 13-quan-tri-tong-quan — Quản trị — Tổng quan
+URL yêu cầu : /quan-tri
+URL thực tế  : http://127.0.0.1:5173/quan-tri
+Viewport     : mobile 375x667
+Tiêu đề tab  : Tổng quan — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 48
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (2)
+- GET /api/v1/organizations/pending → 200
+- GET /api/v1/modules → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 375x56
+  <button> Mở menu quản trị @8,12 32x32
+  <button> Đăng xuất @267,12 92x32
+<main> Tổng quanSố liệu toàn hệ thống quản trị.Tổ chức chờ duyệt2Module trong… @0,56 375x724
+  <h1> Tổng quan @16,76 343x32
+  <a> Tổ chức chờ duyệt: 2. Tất cả tổ chức @16,178 162x119
+  <a> Module trong danh mục: 5. Danh mục module @198,178 162x119
+  <a> Module lõi: 3. Danh mục module @16,317 162x97
+  <a> Module mở rộng: 2. Danh mục module @198,317 162x97
+  <ul> Tổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài khoảnNhật ký… @37,506 301x232
+    <a> Tổ chức chờ duyệt @37,518 301x22
+    <a> Tất cả tổ chức @37,565 301x22
+    <a> Danh mục module @37,612 301x22
+    <a> Quản lý tài khoản @37,658 301x22
+    <a> Nhật ký hệ thống @37,705 301x22
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản trị" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @267,12 92x32
+- a "Tổ chức chờ duyệt: 2. Tất cả tổ chức" @16,178 162x119
+- a "Module trong danh mục: 5. Danh mục module" @198,178 162x119
+- a "Module lõi: 3. Danh mục module" @16,317 162x97
+- a "Module mở rộng: 2. Danh mục module" @198,317 162x97
+- a "Tổ chức chờ duyệt" @37,518 301x22
+- a "Tất cả tổ chức" @37,565 301x22
+- a "Danh mục module" @37,612 301x22
+- a "Quản lý tài khoản" @37,658 301x22
+- a "Nhật ký hệ thống" @37,705 301x22
+
+## Tiêu đề (heading)
+- h1: Tổng quan
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị Đăng xuất Tổng quan Số liệu toàn hệ thống quản trị. Tổ chức chờ duyệt 2 Module trong danh mục 5 Module lõi 3 Module mở rộng 2 Các mục quản trị Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống

@@ -1,0 +1,105 @@
+﻿{
+  "r01_pagination": {
+    "paginationText": "Tß╗òng 45 t├ái khoß║ún 1 2 3 20 / trang",
+    "paginationTotalText": "Tß╗òng 45 t├ái khoß║ún",
+    "sizeChangerText": "20 / trang"
+  },
+  "r03_heading": {
+    "h1Text": "Quß║ún l├╜ t├ái khoß║ún",
+    "h1_fontWeight": "600",
+    "h1_marginBottom": "0px",
+    "antdResetStillPresent": false
+  },
+  "r05_narrow320": {
+    "departments": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 640,
+      "thWidths": [
+        159,
+        169,
+        127,
+        185
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 288,
+      "overflow": 0
+    },
+    "positions": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 860,
+      "thWidths": [
+        107,
+        90,
+        352,
+        101,
+        210
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 288,
+      "overflow": 0
+    },
+    "deptDetail": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 760,
+      "thWidths": [
+        98,
+        158,
+        93,
+        114,
+        297
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 288,
+      "overflow": 0
+    }
+  },
+  "r05_desktop1366": {
+    "departments": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 1054,
+      "thWidths": [
+        262,
+        278,
+        208,
+        305
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 1054,
+      "overflow": 0
+    },
+    "positions": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 1054,
+      "thWidths": [
+        131,
+        111,
+        431,
+        123,
+        257
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 1054,
+      "overflow": 0
+    },
+    "deptDetail": {
+      "hasTable": true,
+      "tableLayout": "auto",
+      "tableWidth": 1054,
+      "thWidths": [
+        142,
+        233,
+        124,
+        157,
+        397
+      ],
+      "contentOverflowX": "auto",
+      "contentWidth": 1054,
+      "overflow": 0
+    }
+  }
+}

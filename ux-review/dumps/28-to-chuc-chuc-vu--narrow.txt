@@ -1,0 +1,44 @@
+# 28-to-chuc-chuc-vu — Tổ chức — Chức vụ
+URL yêu cầu : /to-chuc/chuc-vu
+URL thực tế  : http://127.0.0.1:5173/to-chuc/chuc-vu
+Viewport     : narrow 320x640
+Tiêu đề tab  : Chức vụ — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 56
+Tràn ngang   : không (trang vừa khít viewport 320px)
+
+## API đã gọi (2)
+- GET /positions → 200
+- GET /permissions → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 320x56
+  <button> Mở menu quản lý tổ chức @8,12 32x32
+  <button> Đăng xuất @212,12 92x32
+<main> Chức vụChức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viê… @0,56 320x395
+  <h1> Chức vụ @16,76 288x32
+  <button> Thêm chức vụ @16,182 126x36
+  <table> [table 5 cột, 3 dòng] @16,262 860x169
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
+- button "Đăng xuất" @212,12 92x32
+- button "Thêm chức vụ" @16,182 126x36
+- button "Sửa chức vụ" @689,321 113x36
+- button "Xoá" @811,321 56x36
+- button "Sửa chức vụ" @689,382 113x36
+- button "Xoá" @811,382 56x36
+
+## Tiêu đề (heading)
+- h1: Chức vụ
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Chức vụ Chức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viên — phòng ban không có quyền riêng. Thêm chức vụ Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Giáo viên Giảng dạy Xem nhân viên phòng ban 01/09/2026 Sửa chức vụ Xoá Tổ trưởng Quản lý tổ Xem nhân viên phòng ban Quản lý nhân viên phòng ban 01/09/2026 Sửa chức vụ Xoá

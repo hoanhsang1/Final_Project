@@ -1,0 +1,58 @@
+# 02-login-sai-mat-khau — Đăng nhập — sai mật khẩu (401)
+URL yêu cầu : /dang-nhap
+URL thực tế  : http://127.0.0.1:5173/dang-nhap
+Viewport     : mobile 375x667
+Tiêu đề tab  : Đăng nhập — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (1)
+- POST /api/v1/auth/login → 401
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<main> Tài khoản/Đăng nhậpMĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng … @0,0 375x1110
+  <h1> Đăng nhập @84,72 126x32
+  <nav> Chuyển giữa đăng nhập và đăng ký @40,150 295x44
+    <a> Đăng nhập @44,154 142x36
+    <a> Đăng ký @190,154 142x36
+  <div role="alert"> Sai tên đăng nhập hoặc mật khẩu. @84,222 207x40
+  <button> Bỏ qua Sai tên đăng nhập hoặc mật khẩu. @291,228 28x28
+  <form> Tên đăng nhậpMật khẩuGhi nhớ tôiQuên mật khẩu?Đăng nhập @40,290 295x228
+    <input> (text) "Tên đăng nhập" @49,322 277x20
+    <input> (password) "Mật khẩu" @49,398 277x20
+    <a> Quên mật khẩu? @227,444 108x20
+    <button> Đăng nhập @40,482 295x36
+  <a> Đăng ký ngay @207,590 92x20
+  <button> Admin hệ thống @16,740 343x58
+  <button> Chủ tổ chức @16,806 343x58
+  <button> Cán bộ quản lý @16,872 343x58
+  <button> Giáo viên @16,938 343x58
+  <button> Sinh viên @16,1004 343x58
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Đăng nhập" @44,154 142x36
+- a "Đăng ký" @190,154 142x36
+- button "Bỏ qua Sai tên đăng nhập hoặc mật khẩu." @291,228 28x28
+- input[text] "Tên đăng nhập" @49,322 277x20
+- input[password] "Mật khẩu" @49,398 277x20
+- a "Quên mật khẩu?" @227,444 108x20
+- button "Đăng nhập" @40,482 295x36
+- a "Đăng ký ngay" @207,590 92x20
+- button "Admin hệ thống" @16,740 343x58
+- button "Chủ tổ chức" @16,806 343x58
+- button "Cán bộ quản lý" @16,872 343x58
+- button "Giáo viên" @16,938 343x58
+- button "Sinh viên" @16,1004 343x58
+
+## Tiêu đề (heading)
+- h1: Đăng nhập
+
+## Thông báo / trạng thái
+- [alert] Sai tên đăng nhập hoặc mật khẩu.
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tài khoản / Đăng nhập M Đăng nhập Chào mừng bạn quay lại hệ thống MEMS Đăng nhập Đăng ký Sai tên đăng nhập hoặc mật khẩu. Tên đăng nhập Mật khẩu Ghi nhớ tôi Quên mật khẩu? Đăng nhập Không chia sẻ mật khẩu với bất kỳ ai. Chưa có tài khoản? Đăng ký ngay Cần hỗ trợ đăng nhập? Liên hệ quản trị viên tổ chức để được trợ giúp. hoặc xem thử theo vai trò Admin hệ thống Quản trị toàn nền tảng Chủ tổ chức Quản lý tài khoản của tổ chức Cán bộ quản lý Giáo vụ của tổ chức Giáo viên Xem lịch dạy, báo sự cố thiết bị Sinh viên Xem thời khóa biểu © MEMS · Hệ thống Quản lý Giáo dục theo Module

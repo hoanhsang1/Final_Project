@@ -1,0 +1,80 @@
+﻿[
+  {
+    "route": "/quan-tri/tai-khoan",
+    "label": "Quß║ún l├╜ t├ái khoß║ún",
+    "iconOnlyButtons": [
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-input-clear-icon ant-input-clear-icon-hidden",
+        "outerHTML": "<button type=\"button\" tabindex=\"-1\" class=\"ant-input-clear-icon ant-input-clear-icon-hidden\"><span role=\"img\" aria-label=\"close-circle\" class=\"anticon anticon-close-circle\"><svg fill-rule=\"evenodd\" viewBox=\"64 64 896 896"
+      },
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-defaul",
+        "outerHTML": "<button type=\"button\" class=\"ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-btn-icon-only ant-input-search-button\"><span class=\"ant-btn-icon\"><span role=\"im"
+      },
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-pagination-item-link",
+        "outerHTML": "<button class=\"ant-pagination-item-link\" type=\"button\" tabindex=\"-1\" disabled=\"\"><span role=\"img\" aria-label=\"left\" class=\"anticon anticon-left\"><svg viewBox=\"64 64 896 896\" focusable=\"false\" data-icon=\"left\" width=\"1em\""
+      },
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-pagination-item-link",
+        "outerHTML": "<button class=\"ant-pagination-item-link\" type=\"button\" tabindex=\"-1\"><span role=\"img\" aria-label=\"right\" class=\"anticon anticon-right\"><svg viewBox=\"64 64 896 896\" focusable=\"false\" data-icon=\"right\" width=\"1em\" height=\""
+      },
+      {
+        "ariaLabel": "Close",
+        "title": null,
+        "cls": "ant-modal-close",
+        "outerHTML": "<button type=\"button\" aria-label=\"Close\" class=\"ant-modal-close\"><span class=\"ant-modal-close-x\" aria-label=\"─É├│ng\"><span role=\"img\" aria-label=\"close\" class=\"anticon anticon-close ant-modal-close-icon\"><svg fill-rule=\"ev"
+      }
+    ],
+    "paginationAria": "- list:\n  - listitem: Tß╗òng 25 t├ái khoß║ún\n  - listitem \"Trang Tr╞░ß╗¢c\":\n    - button \"left\" [disabled]:\n      - img \"left\"\n  - listitem \"1\"\n  - listitem \"2\"\n  - listitem \"Trang Kß║┐\":\n    - button \"right\":\n      - img \"right\"\n  - listitem:\n    - combobox \"k├¡ch th╞░ß╗¢c trang\"\n    - text: 20 / trang",
+    "searchAria": "- searchbox \"T├¼m kiß║┐m\"\n- button \"search\":\n  - img \"search\""
+  },
+  {
+    "route": "/quan-tri/module",
+    "label": "Danh mß╗Ñc module",
+    "iconOnlyButtons": [
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-input-clear-icon ant-input-clear-icon-hidden",
+        "outerHTML": "<button type=\"button\" tabindex=\"-1\" class=\"ant-input-clear-icon ant-input-clear-icon-hidden\"><span role=\"img\" aria-label=\"close-circle\" class=\"anticon anticon-close-circle\"><svg fill-rule=\"evenodd\" viewBox=\"64 64 896 896"
+      },
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-defaul",
+        "outerHTML": "<button type=\"button\" class=\"ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-btn-icon-only ant-input-search-button\"><span class=\"ant-btn-icon\"><span role=\"im"
+      }
+    ],
+    "paginationAria": "(kh├┤ng c├│ ul.ant-pagination)",
+    "searchAria": "- searchbox \"T├¼m module\"\n- button \"search\":\n  - img \"search\""
+  },
+  {
+    "route": "/quan-tri/nhat-ky",
+    "label": "Nhß║¡t k├╜ hß╗ç thß╗æng",
+    "iconOnlyButtons": [
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-input-clear-icon ant-input-clear-icon-hidden",
+        "outerHTML": "<button type=\"button\" tabindex=\"-1\" class=\"ant-input-clear-icon ant-input-clear-icon-hidden\"><span role=\"img\" aria-label=\"close-circle\" class=\"anticon anticon-close-circle\"><svg fill-rule=\"evenodd\" viewBox=\"64 64 896 896"
+      },
+      {
+        "ariaLabel": null,
+        "title": null,
+        "cls": "ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-defaul",
+        "outerHTML": "<button type=\"button\" class=\"ant-btn css-dev-only-do-not-override-kxu38y ant-btn-default ant-btn-color-default ant-btn-variant-outlined ant-btn-icon-only ant-input-search-button\"><span class=\"ant-btn-icon\"><span role=\"im"
+      }
+    ],
+    "paginationAria": "(kh├┤ng c├│ ul.ant-pagination)",
+    "searchAria": "- searchbox \"T├¼m trong nhß║¡t k├╜\"\n- button \"search\":\n  - img \"search\""
+  }
+]

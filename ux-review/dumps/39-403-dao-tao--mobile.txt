@@ -1,0 +1,28 @@
+# 39-403-dao-tao — Không đủ quyền — /dao-tao (giáo viên)
+URL yêu cầu : /dao-tao
+URL thực tế  : http://127.0.0.1:5173/dao-tao
+Viewport     : mobile 375x667
+Tiêu đề tab  : Đào tạo — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 6
+Tràn ngang   : không (trang vừa khít viewport 375px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<button> Về trang đăng nhập @107,439 162x36
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- button "Về trang đăng nhập" @107,439 162x36
+
+## Tiêu đề (heading)
+(không có)
+
+## Thông báo / trạng thái
+- [ant-result] Unauthorized403Bạn không có quyền truy cập khu vực này.Về trang đăng nhập
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+403 Bạn không có quyền truy cập khu vực này. Về trang đăng nhập

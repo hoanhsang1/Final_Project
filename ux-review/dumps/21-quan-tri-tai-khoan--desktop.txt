@@ -1,0 +1,80 @@
+# 21-quan-tri-tai-khoan — Quản trị — Quản lý tài khoản
+URL yêu cầu : /quan-tri/tai-khoan
+URL thực tế  : http://127.0.0.1:5173/quan-tri/tai-khoan
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Quản lý tài khoản — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 184
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (2)
+- GET /api/v1/accounts?page=1&size=20&sort=username,asc → 200
+- GET /api/v1/organizations/options → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> Quản lý tài khoảnTài khoản trên toàn hệ thống.Tạo tài khoảnTất cả tổ c… @248,56 1118x475
+  <h1> Quản lý tài khoản @280,88 922x32
+  <button> Tạo tài khoản @1214,88 120x36
+  <input> (search) "Tìm kiếm" @293,165 243x22
+  <button>  @564,158 36x36
+    <span role="img"> search @575,169 14x14
+  <span role="img"> down @789,170 12x12
+  <span role="img"> down @981,170 12x12
+  <span role="img"> down @1163,170 12x12
+  <table> [table 9 cột, 3 dòng] @280,238 1140x193
+  <ul> Tổng 2 tài khoản120 / trang @280,447 1054x36
+    <button>  @1099,447 32x32
+      <span role="img"> left @1109,458 12x12
+    <a> 1 @1140,448 30x30
+    <button>  @1179,447 32x32
+      <span role="img"> right @1189,458 12x12
+    <input role="combobox"> (search) "kích thước trang" @1239,448 65x34
+    <span role="img"> down @1311,459 12x12
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- button "Tạo tài khoản" @1214,88 120x36
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- button "" @564,158 36x36
+- input[search] "Tìm kiếm" @293,165 243x22
+- a "Danh mục module" @8,177 231x37
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+- button "Xem chi tiết tài khoản nguyendu.owner" @1223,316 60x36
+- button "Xem chi tiết tài khoản giao.vu" @1223,380 60x36
+- button "" @1099,447 32x32 {disabled}
+- button "" @1179,447 32x32 {disabled}
+- input[search] "kích thước trang" @1239,448 65x34 {expanded=false}
+
+## Tiêu đề (heading)
+- h1: Quản lý tài khoản
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Quản lý tài khoản Tài khoản trên toàn hệ thống. Tạo tài khoản Tất cả tổ chức Tất cả vai trò Tất cả trạng thái Tên đăng nhập Email Họ tên Tổ chức Vai trò Trạng thái Ngày tạo Đăng nhập gần nhất Hành động Tên đăng nhập Email Họ tên Tổ chức Vai trò Trạng thái Ngày tạo Đăng nhập gần nhất Hành động nguyendu.owner owner@nguyendu.edu.vn Trần Văn A Trường THPT Nguyễn Du Chủ tổ chức Đang hoạt động 01/10/2026 08:30 10/11/2026 07:45 Xem giao.vu giaovu@nguyendu.edu.vn Lê Thị B Trường THPT Nguyễn Du Cán bộ quản lý Đang khoá 02/10/2026 09:00 — Xem Tổng 2 tài khoản 1 20 / trang

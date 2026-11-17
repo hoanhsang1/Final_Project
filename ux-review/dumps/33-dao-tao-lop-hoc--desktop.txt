@@ -1,0 +1,54 @@
+# 33-dao-tao-lop-hoc — Đào tạo — Lớp học
+URL yêu cầu : /dao-tao/lop-hoc
+URL thực tế  : http://127.0.0.1:5173/dao-tao/lop-hoc
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Lớp học — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- GET /api/classes?page=1&size=20 → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSĐào tạogiao.vuĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Đào tạo @0,56 248x712
+  <nav> Menu đào tạo @8,56 231x84
+    <ul> Giáo viênLớp học @8,60 231x76
+      <a> Giáo viên @8,60 231x37
+        <span role="img"> solution @20,60 17x17
+      <a> Lớp học @8,99 231x37
+        <span role="img"> read @20,99 17x17
+<main> Lớp họcTất cả trạng tháiTất cả trạng tháiChưa bắt đầuĐang diễn raĐã kế… @248,56 1118x367
+  <h1> Lớp học @280,88 1054x32
+  <button role="combobox"> Tất cả trạng thái @293,138 170x20
+  <input> (search) "Tìm theo mã lớp hoặc tên lớp" @1010,138 258x20
+  <button> Tìm @1285,128 49x36
+  <div role="group"> Bảng @280,236 1054x155
+    <table> [table 8 cột, 3 dòng] @280,236 1270x155
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Giáo viên" @8,60 231x37
+- a "Lớp học" @8,99 231x37
+- button "Tìm" @1285,128 49x36
+- button "Tất cả trạng thái" @293,138 170x20 {expanded=false}
+- input[search] "Tìm theo mã lớp hoặc tên lớp" @1010,138 258x20
+- a "LH001" @292,284 46x20
+- a "LH002" @292,323 46x20
+- a "LH003" @292,362 46x20
+
+## Tiêu đề (heading)
+- h1: Lớp học
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Đào tạo giao.vu Đăng xuất Giáo viên Lớp học Lớp học Tất cả trạng thái Tất cả trạng thái Tìm theo mã lớp hoặc tên lớp Tìm 3 lớp Mã lớp Tên lớp Năm học Thời gian Trạng thái Đóng lớp Giáo viên Sĩ số LH001 Toán 10A1 2026-2027 05/09/2026 → 30/05/2027 Đang diễn ra Nguyễn Thị Mai 32 LH002 Toán 10A2 2026-2027 05/09/2026 → 30/05/2027 Chưa bắt đầu Chưa phân công 30 LH003 Lý 11B1 2026-2027 05/09/2026 → 30/05/2027 Đang diễn ra Chờ duyệt đóng Trần Văn Hùng 28

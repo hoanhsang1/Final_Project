@@ -1,0 +1,61 @@
+# 03-login-vai-tro-chua-co-man — Đăng nhập — vai trò chưa có màn hình
+URL yêu cầu : /dang-nhap
+URL thực tế  : http://127.0.0.1:5173/dang-nhap
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Đăng nhập — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- POST /api/v1/auth/login → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x1142
+  <h2> Quản trị nhà trường trên một hệ thống. @32,519 306x80
+<main> Tài khoản/Đăng nhậpMĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng … @420,0 946x1142
+  <h1> Đăng nhập @701,88 126x32
+  <nav> Chuyển giữa đăng nhập và đăng ký @657,166 472x44
+    <a> Đăng nhập @661,170 230x36
+    <a> Đăng ký @895,170 230x36
+  <div role="status"> Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đo… @657,226 472x64
+    <button> Bỏ qua Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở … @1085,244 28x28
+  <form> Tên đăng nhậpMật khẩuGhi nhớ tôiQuên mật khẩu?Đăng nhập @657,306 472x228
+    <input> (text) "Tên đăng nhập" @666,338 454x20
+    <input> (password) "Mật khẩu" @666,414 454x20
+    <a> Quên mật khẩu? @1021,460 108x20
+    <button> Đăng nhập @657,498 472x36
+  <a> Đăng ký ngay @913,606 92x20
+  <button> Admin hệ thống @633,756 520x58
+  <button> Chủ tổ chức @633,822 520x58
+  <button> Cán bộ quản lý @633,888 520x58
+  <button> Giáo viên @633,954 520x58
+  <button> Sinh viên @633,1020 520x58
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Đăng nhập" @661,170 230x36
+- a "Đăng ký" @895,170 230x36
+- button "Bỏ qua Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn …" @1085,244 28x28
+- input[text] "Tên đăng nhập" @666,338 454x20
+- input[password] "Mật khẩu" @666,414 454x20
+- a "Quên mật khẩu?" @1021,460 108x20
+- button "Đăng nhập" @657,498 472x36
+- a "Đăng ký ngay" @913,606 92x20
+- button "Admin hệ thống" @633,756 520x58
+- button "Chủ tổ chức" @633,822 520x58
+- button "Cán bộ quản lý" @633,888 520x58
+- button "Giáo viên" @633,954 520x58
+- button "Sinh viên" @633,1020 520x58
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Đăng nhập
+
+## Thông báo / trạng thái
+- [status] Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau.Bỏ qua
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+MEMS Hệ thống quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. © 2026 MEMS Tài khoản / Đăng nhập M Đăng nhập Chào mừng bạn quay lại hệ thống MEMS Đăng nhập Đăng ký Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau. Tên đăng nhập Mật khẩu Ghi nhớ tôi Quên mật khẩu? Đăng nhập Không chia sẻ mật khẩu với bất kỳ ai. Chưa có tài khoản? Đăng ký ngay Cần hỗ trợ đăng nhập? Liên hệ quản trị viên tổ chức để được trợ giúp. hoặc xem thử theo vai trò Admin hệ thống Quản trị toàn nền tảng Chủ tổ chức Quản lý tài khoản của tổ chức Cán bộ quản lý Giáo vụ của tổ chức Giáo viên Xem lịch dạy, báo sự cố thiết bị Sinh viên Xem thời khóa biểu © MEMS · Hệ thống Quản lý Giáo dục theo Module

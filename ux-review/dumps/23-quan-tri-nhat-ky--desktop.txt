@@ -1,0 +1,78 @@
+# 23-quan-tri-nhat-ky — Quản trị — Nhật ký hệ thống
+URL yêu cầu : /quan-tri/nhat-ky
+URL thực tế  : http://127.0.0.1:5173/quan-tri/nhat-ky
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Nhật ký hệ thống — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 70
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (1)
+- GET /api/v1/audit-logs?page=1&size=20 → 200
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<a> Tới nội dung chính @12,-51 151x32
+<header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 1366x56
+  <button> Đăng xuất @1250,12 92x32
+<aside> Khu vực quản trị @0,56 248x712
+  <nav> Menu quản trị @8,56 231x240
+    <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
+      <a> Tổng quan @8,60 231x37
+        <span role="img"> dashboard @20,60 17x17
+      <a> Tổ chức chờ duyệt @8,99 231x37
+        <span role="img"> audit @20,99 17x17
+      <a> Tất cả tổ chức @8,138 231x37
+        <span role="img"> bank @20,138 17x17
+      <a> Danh mục module @8,177 231x37
+        <span role="img"> appstore @20,177 17x17
+      <a> Quản lý tài khoản @8,216 231x37
+        <span role="img"> team @20,216 17x17
+      <a> Nhật ký hệ thống @8,255 231x37
+        <span role="img"> file-search @20,255 17x17
+<main> Nhật ký hệ thốngCác thao tác quản trị đã được ghi nhận.Tất cả hành độn… @248,56 1118x393
+  <h1> Nhật ký hệ thống @280,88 1054x32
+  <input> (search) "Tìm trong nhật ký" @293,165 243x22
+  <button>  @564,158 36x36
+    <span role="img"> search @575,169 14x14
+  <span role="img"> down @799,170 12x12
+  <input> (input) "Khoảng thời gian" @846,165 127x22
+  <span role="img"> swap-right @981,168 16x16
+  <input> (input) "Khoảng thời gian" @1005,165 127x22
+  <span role="img"> calendar @1136,169 14x14
+  <table> [table 5 cột, 3 dòng] @280,238 1054x119
+  <ul> Tổng 2 sự kiện1 @280,373 1054x28
+    <button>  @1250,373 28x28
+      <span role="img"> left @1258,381 12x12
+    <a> 1 @1279,374 26x26
+    <button>  @1306,373 28x28
+      <span role="img"> right @1314,381 12x12
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Tới nội dung chính" @12,-51 151x32
+- button "Đăng xuất" @1250,12 92x32
+- a "Tổng quan" @8,60 231x37
+- a "Tổ chức chờ duyệt" @8,99 231x37
+- a "Tất cả tổ chức" @8,138 231x37
+- button "" @564,158 36x36
+- input[search] "Tìm trong nhật ký" @293,165 243x22
+- input[text] "Khoảng thời gian" @846,165 127x22
+- input[text] "Khoảng thời gian" @1005,165 127x22
+- a "Danh mục module" @8,177 231x37
+- a "Quản lý tài khoản" @8,216 231x37
+- a "Nhật ký hệ thống" @8,255 231x37
+- a "Xem chi tiết Tổ chức: Trường THPT Nguyễn Du" @671,287 229x17
+- a "Xem chi tiết Tài khoản: nguyendu.owner" @671,327 183x17
+- button "" @1250,373 28x28 {disabled}
+- button "" @1306,373 28x28 {disabled}
+
+## Tiêu đề (heading)
+- h1: Nhật ký hệ thống
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+Tới nội dung chính MEMS Khu vực quản trị admin.he.thong Đăng xuất Tổng quan Tổ chức chờ duyệt Tất cả tổ chức Danh mục module Quản lý tài khoản Nhật ký hệ thống Nhật ký hệ thống Các thao tác quản trị đã được ghi nhận. Tất cả hành động Thời điểm Hành động Đối tượng Người thực hiện Ghi chú Thời điểm Hành động Đối tượng Người thực hiện Ghi chú 21/10/2026 09:15 Duyệt tổ chức Tổ chức: Trường THPT Nguyễn Du admin.he.thong Duyệt tổ chức 21/10/2026 10:02 Đổi trạng thái tài khoản Tài khoản: nguyendu.owner admin.he.thong Vô hiệu hoá tài khoản Tổng 2 sự kiện 1

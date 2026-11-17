@@ -1,0 +1,29 @@
+﻿
+ RUN  v5.0.4 D:/Final_Project/frontend
+
+node.exe : Not implemented: Window's getComputedStyle() method: with pseudo-elements
+At line:3 char:1
++ & $node "node_modules\vitest\vitest.mjs" run 2>&1 | Out-File "D:\Fina ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Not implemented...pseudo-elements:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ Test Files  24 passed (24)
+      Tests  167 passed (167)
+   Start at  14:52:00
+   Duration  134.99s (setup 49%, import 23%, environment 23%, tests 4%, transform 1%)
+
+    Isolate  24 workers spawned ┬╖ ~12.62s startup each (spawn + environment, per file)
+             at least ~14.91s faster with isolate: false ΓÇö reuses workers across files instead of one per file
+

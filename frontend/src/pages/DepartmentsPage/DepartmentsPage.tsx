@@ -191,6 +191,7 @@ export default function DepartmentsPage() {
           style={{ marginTop: token.margin }}
           pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
           size="middle"
+          scroll={{ x: 640 }}
         />
       )}
 

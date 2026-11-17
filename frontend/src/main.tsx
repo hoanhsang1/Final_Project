@@ -21,11 +21,14 @@ import { InternationalizationProvider, Theme } from '@astryxdesign/core';
 import viVNAstryx from '@astryxdesign/core/locales/vi-VN.generated.js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App, ConfigProvider } from 'antd';
-import viVN from 'antd/locale/vi_VN';
+// `antd/es/locale/vi_VN` (ESM) chứ không phải `antd/locale/vi_VN` (CJS): đi qua Vite,
+// bản CJS bị bọc thành `{ __esModule: true, default: localeValues }` nên `viVN.Pagination`
+// là `undefined` → rc-pagination rơi về en_US ("Page Size", "20 / page"). Bản ESM giữ đủ
+// `Pagination.items_per_page = '/ trang'`.
+import viVN from 'antd/es/locale/vi_VN';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
-import 'antd/dist/reset.css';
 import { memsTheme } from './astryx-theme';
 import './index.css';
 import { router } from './router';

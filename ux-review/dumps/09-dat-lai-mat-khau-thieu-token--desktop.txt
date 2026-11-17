@@ -1,0 +1,33 @@
+# 09-dat-lai-mat-khau-thieu-token — Đặt lại mật khẩu — thiếu token
+URL yêu cầu : /dat-lai-mat-khau
+URL thực tế  : http://127.0.0.1:5173/dat-lai-mat-khau
+Viewport     : desktop 1366x768
+Tiêu đề tab  : Đặt lại mật khẩu — MEMS
+data-theme   : mems
+Số phần tử antd (.ant-*) trên trang: 0
+Tràn ngang   : không (trang vừa khít viewport 1366px)
+
+## API đã gọi (0)
+
+## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
+<aside> Giới thiệu MEMS @0,0 420x768
+  <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
+<main> MMEMSĐặt lại mật khẩuCần liên kết trong email để tiếp tục.Thiếu liên k… @420,0 946x768
+  <h1> Đặt lại mật khẩu @657,290 472x32
+  <a> Yêu cầu liên kết mới @657,462 472x20
+
+## Điều khiển tương tác (trên→dưới, trái→phải)
+- a "Yêu cầu liên kết mới" @657,462 472x20
+
+## Tiêu đề (heading)
+- h2: Quản trị nhà trường trên một hệ thống.
+- h1: Đặt lại mật khẩu
+
+## Thông báo / trạng thái
+(không có)
+
+## Hộp thoại đang mở
+(không có)
+
+## Toàn văn chữ hiển thị (innerText)
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Đặt lại mật khẩu Cần liên kết trong email để tiếp tục. Thiếu liên kết đặt lại mật khẩu Liên kết trong email có thể đã bị cắt khi sao chép, hoặc bạn mở sai địa chỉ. Yêu cầu liên kết mới Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.
