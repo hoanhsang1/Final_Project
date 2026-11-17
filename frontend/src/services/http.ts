@@ -19,6 +19,47 @@ export const DATA_SOURCE: DataSource =
 
 export const isMockMode = DATA_SOURCE === 'mock'
 
+/** Tiền tố do backend phục vụ; phản hồi HTML ở các path này là lỗi triển khai. */
+const API_PATH_PREFIXES = [
+  '/api',
+  '/users',
+  '/departments',
+  '/positions',
+  '/permissions',
+  '/permission-bundles',
+  '/students',
+  '/classes',
+  '/teachers',
+  '/specialties',
+  '/transfer-requests',
+  '/notifications',
+]
+
+export class ApiDeploymentMismatchError extends Error {
+  constructor(path: string, status?: number) {
+    super(
+      `Frontend nhận HTML thay vì JSON từ ${path}${status ? ` (HTTP ${status})` : ''}. ` +
+        'API và bản frontend không cùng triển khai — kiểm tra rewrite Vercel hoặc Vite proxy.',
+    )
+    this.name = 'ApiDeploymentMismatchError'
+  }
+}
+
+function isApiPath(url: string | undefined): boolean {
+  if (!url) return false
+  return API_PATH_PREFIXES.some((prefix) => url === prefix || url.startsWith(`${prefix}/`))
+}
+
+function isHtmlPayload(data: unknown): boolean {
+  return typeof data === 'string' && /^\s*<(?:!doctype|html)/i.test(data)
+}
+
+function rejectIfHtml(path: string | undefined, data: unknown): void {
+  if (isApiPath(path) && isHtmlPayload(data)) {
+    throw new ApiDeploymentMismatchError(path ?? '', 200)
+  }
+}
+
 /**
  * Một axios instance duy nhất: backend dùng nhiều tiền tố đường dẫn
  * (`/api/v1/...`, `/departments...`, `/api/schedules/...`) nên baseURL để trống
@@ -73,11 +114,20 @@ function expireSession() {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    rejectIfHtml(response.config.url, response.data)
+    return response
+  },
   async (error: AxiosError) => {
     const config = error.config
     const status = error.response?.status
     const url = config?.url ?? ''
+
+    // Vercel trả index.html cho path API khi thiếu rewrite: báo lỗi cấu hình,
+    // không để component hiểu nhầm là dữ liệu hợp lệ.
+    if (isApiPath(url) && isHtmlPayload(error.response?.data)) {
+      return Promise.reject(new ApiDeploymentMismatchError(url, status))
+    }
 
     const isAuthEndpoint = url.includes('/api/v1/auth/login') || url.includes('/api/v1/auth/refresh')
 

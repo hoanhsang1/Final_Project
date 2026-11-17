@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
 import { useState } from 'react'
 
 import { ErrorBoundary } from '@/app/error-boundary'
@@ -9,7 +10,14 @@ export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: 1,
+        // 404/403 và các 4xx khác là lỗi cố định: thử lại chỉ nhân đôi request.
+        retry: (failureCount, error) => {
+          if (isAxiosError(error)) {
+            const status = error.response?.status
+            if (status && status >= 400 && status < 500) return false
+          }
+          return failureCount < 1
+        },
         staleTime: 30_000,
         refetchOnWindowFocus: false,
         gcTime: 5 * 60_000,

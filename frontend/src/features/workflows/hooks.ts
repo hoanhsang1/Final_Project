@@ -76,7 +76,8 @@ export function useTransferWorkflow() {
   }
 
   const inbox = useQuery({
-    queryKey: [...queryKeys.transferInbox, 'workflow'],
+    // Cùng endpoint với dashboard/nav badge; dùng chung key để không gọi 2 lần.
+    queryKey: queryKeys.transferInbox,
     queryFn: () => transferWorkflowApi.inbox(),
     staleTime: 15_000,
   })

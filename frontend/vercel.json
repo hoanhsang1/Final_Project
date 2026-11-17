@@ -1,0 +1,56 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/api/:path*"
+    },
+    {
+      "source": "/users/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/users/:path*"
+    },
+    {
+      "source": "/departments/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/departments/:path*"
+    },
+    {
+      "source": "/positions/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/positions/:path*"
+    },
+    {
+      "source": "/permissions/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/permissions/:path*"
+    },
+    {
+      "source": "/permission-bundles/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/permission-bundles/:path*"
+    },
+    {
+      "source": "/students/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/students/:path*"
+    },
+    {
+      "source": "/classes/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/classes/:path*"
+    },
+    {
+      "source": "/teachers/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/teachers/:path*"
+    },
+    {
+      "source": "/specialties/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/specialties/:path*"
+    },
+    {
+      "source": "/transfer-requests/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/transfer-requests/:path*"
+    },
+    {
+      "source": "/notifications/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/notifications/:path*"
+    },
+    {
+      "source": "/((?!api(?:/|$)|users(?:/|$)|departments(?:/|$)|positions(?:/|$)|permissions(?:/|$)|permission-bundles(?:/|$)|students(?:/|$)|classes(?:/|$)|teachers(?:/|$)|specialties(?:/|$)|transfer-requests(?:/|$)|notifications(?:/|$)|assets(?:/|$)).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
