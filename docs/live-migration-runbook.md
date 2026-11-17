@@ -7,6 +7,9 @@
   - Identity crash ngay khi khởi động: `Unknown column 'allowed_scopes'` (bảng `permission`), sau đó là `permission_bundle*`, cột `is_core`, `locked_*`.
   - PeopleService mới query `assignment`, `position_bundle`, `notification`, `transfer_request`, `resignation_request`, `delegation*`, cột `position.department_id`, `member_position.status`.
   - FacilityService mới cần `department_id` trên `classroom`/`equipment`.
+  - ScheduleService đọc/ghi `session.department_id` nhưng `mems_schedule_db` chưa có cột
+    (phát hiện 17/11/2026 khi gọi `GET /api/departments/{id}/schedules` → 500
+    `Unknown column 's.department_id'`).
 - Hiện tại identity đang chạy bản tạm `rollback-60c8997` (login OK, nhưng thiếu tính năng mới). People/gateway/facility/schedule vẫn là ảnh 13/11.
 
 Chạy SQL bên dưới theo đúng thứ tự, sau đó deploy ảnh mới và kiểm thử đầy đủ.
@@ -22,6 +25,8 @@ Chạy SQL bên dưới theo đúng thứ tự, sau đó deploy ảnh mới và 
 | 3 | `32_people_workflow_constraint_alignment.sql` | CHECK/FK/index cho các bảng trên |
 | 4 | `33_people_org_admin_remove_approve_close.sql` | Bỏ grant `class.approve_close` của "Quản trị viên tổ chức" |
 | 5 | `36_people_permission_backfill.sql` | Map mã quyền legacy sang catalog, seed `position_bundle`, backfill `assignment` |
+| 5a | `41_people_head_employee_view_backfill.sql` | Backfill `employee.view` (DEPARTMENT) cho chức vụ "Trưởng phòng ban"; đồng thời mở `employee.view` cho scope DEPARTMENT ở `mems_identity_db` |
+| 5b | `42_people_subject_management.sql` | Cột `subject.code/description/updated_by/updated_at` + index; backfill `subject.view/manage`; đăng ký permission/bundle/role ở `mems_identity_db` |
 
 ### 1.2. `mems_identity_db`
 
@@ -39,6 +44,12 @@ Chạy SQL bên dưới theo đúng thứ tự, sau đó deploy ảnh mới và 
 |---|------|----|----------|
 | 11 | `39_identity_self_permissions_and_department_class_scope.sql` | identity + people | Quyền SELF cho STUDENT/TEACHER, `class.view`/`class.reopen` cho phép DEPARTMENT, chỉnh `position_permission` mặc định |
 | 12 | `37_facility_department_scope_catchup.sql` | facility | `classroom.department_id`, `equipment.department_id` |
+
+### 1.4. `mems_schedule_db`
+
+| # | File | DB | Nội dung |
+|---|------|----|----------|
+| 13 | `40_schedule_department_scope_catchup.sql` | schedule | `session.department_id` + index `(department_id, start_time)` |
 
 ### Lệnh chạy bằng mysql CLI
 
@@ -65,8 +76,18 @@ mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 35_identity_permission_bundle_tables
 mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 30_identity_remove_approve_close_from_academic.sql
 mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 38_identity_permission_allowed_scopes.sql
 mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 39_identity_self_permissions_and_department_class_scope.sql
+mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 41_people_head_employee_view_backfill.sql
+mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 42_people_subject_management.sql
 mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 37_facility_department_scope_catchup.sql
+mysql -h 127.0.0.1 -P 3306 -u %DBUSER% -p < 40_schedule_department_scope_catchup.sql
 ```
+
+Nếu chỉ cần bổ sung migration 40 cho schedule, chạy `scripts\apply-migration-40.bat`
+(không cần build lại service — chỉ thay đổi schema).
+
+**Thứ tự bắt buộc:** migration **42 phải chạy xong trước khi deploy ảnh People mới**.
+`SubjectRepository` mới SELECT `code, description, updated_at`; ảnh mới trên schema cũ
+sẽ lỗi `Unknown column`. Ảnh cũ chạy trên schema mới vẫn an toàn (cột mới NULL-able).
 
 Nếu dùng MySQL Workbench: mở lần lượt từng file theo đúng thứ tự trên và Execute (Workbench hỗ trợ `DELIMITER`).
 
@@ -80,7 +101,12 @@ SHOW TABLES LIKE 'permission_bundle%';
 SHOW COLUMNS FROM module LIKE 'is_core';
 SHOW COLUMNS FROM organization_module LIKE 'locked_reason';
 SELECT code, allowed_scopes FROM permission
- WHERE code IN ('class.view','class.reopen','class.self_view');
+ WHERE code IN ('class.view','class.reopen','class.self_view','employee.view');
+SELECT code, module_code, allowed_scopes FROM permission
+ WHERE code IN ('subject.view','subject.manage');
+SELECT b.code, i.permission_code FROM permission_bundle_item i
+  JOIN permission_bundle b ON b.id = i.bundle_id
+ WHERE b.code = 'ACADEMIC_MANAGEMENT' AND i.permission_code LIKE 'subject.%';
 
 -- mems_people_db
 USE mems_people_db;
@@ -90,11 +116,23 @@ SHOW TABLES LIKE 'transfer_request';
 SHOW TABLES LIKE 'assignment';
 SHOW TABLES LIKE 'notification';
 SELECT COUNT(*) AS assignments FROM assignment;
+SHOW COLUMNS FROM subject LIKE 'code';
+SHOW COLUMNS FROM subject LIKE 'description';
+SHOW INDEX FROM subject WHERE Key_name = 'uq_subject_org_code';
+SELECT p.name, pp.permission_code FROM position_permission pp
+  JOIN `position` p ON p.id = pp.position_id
+ WHERE pp.permission_code IN ('employee.view','subject.view','subject.manage')
+ ORDER BY p.name, pp.permission_code;
 
 -- mems_facility_db
 USE mems_facility_db;
 SHOW COLUMNS FROM classroom LIKE 'department_id';
 SHOW COLUMNS FROM equipment LIKE 'department_id';
+
+-- mems_schedule_db
+USE mems_schedule_db;
+SHOW COLUMNS FROM session LIKE 'department_id';
+SHOW INDEX FROM session WHERE Key_name = 'idx_session_department';
 ```
 
 ## 3. Lỗi có thể gặp
@@ -115,4 +153,4 @@ Gián đoạn dự kiến khi deploy: identity ~60s (login/api lỗi trong lúc 
 ## 5. Rollback
 
 - Ảnh cũ: `mems-backup-people-service:2026-11-13`, `mems-backup-facility-service:2026-11-13`, `mems-backup-schedule-service:2026-11-13`, identity `final_project-identity-org-service:rollback-60c8997`.
-- DB: restore từ `backup_pre_deploy_20261116.sql` (chỉ khi thật cần; các migration đều additive nên thường không phải rollback).
+- DB: mọi migration đều additive. Nếu buộc phải hoàn tác, chỉ drop đúng cột/index đã thêm sau khi xác nhận; không xoá bảng hay dữ liệu.

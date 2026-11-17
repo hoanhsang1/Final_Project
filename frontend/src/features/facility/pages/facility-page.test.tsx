@@ -162,4 +162,55 @@ describe('FacilityPage — phòng và thiết bị', () => {
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
   })
+
+  it('cho phép ghi khi module active và có quyền', async () => {
+    signInAs({
+      permissions: [PERM.facilityView, PERM.facilityRoomCreate, PERM.facilityRoomDelete],
+      moduleStates: { FACILITY_MANAGEMENT: 'active' },
+    })
+
+    renderPage(<FacilityPage />)
+    await screen.findByText('P101')
+    expect(screen.getByRole('button', { name: 'Thêm phòng' })).toBeInTheDocument()
+    expect(screen.queryByText(/chế độ chỉ đọc/)).not.toBeInTheDocument()
+  })
+
+  it('không hiện nút ghi khi module chưa đăng ký', async () => {
+    signInAs({
+      permissions: [PERM.facilityView, PERM.facilityRoomCreate, PERM.facilityRoomDelete],
+      moduleStates: { FACILITY_MANAGEMENT: 'not_registered' },
+    })
+
+    renderPage(<FacilityPage />)
+    await screen.findByText('P101')
+    expect(screen.queryByRole('button', { name: 'Thêm phòng' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
+  })
+
+  it.each(['disabled', 'locked'] as const)(
+    'chỉ cho đọc khi module cơ sở vật chất ở trạng thái %s',
+    async (state) => {
+      signInAs({
+        permissions: [
+          PERM.facilityView,
+          PERM.facilityRoomCreate,
+          PERM.facilityRoomDelete,
+          PERM.facilityManage,
+        ],
+        moduleStates: { FACILITY_MANAGEMENT: state },
+      })
+
+      renderPage(<FacilityPage />)
+
+      expect(await screen.findByText('P101')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Module cơ sở vật chất đang ở chế độ chỉ đọc. Bạn vẫn có thể xem dữ liệu nhưng không thể tạo hoặc cập nhật.',
+        ),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Thêm phòng' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
+    },
+  )
 })

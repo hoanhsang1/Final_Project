@@ -41,6 +41,7 @@ public class DefaultPositionSeeder {
         // Academic (class.approve_close intentionally absent per DEC-02)
         "student.view", "student.create", "student.edit", "student.delete",
         "student.create_account",
+        "subject.view", "subject.manage",
         "class.view", "class.create", "class.edit", "class.delete",
         "class.assign_teacher", "class.teacher.reassign",
         "class.cancel", "class.request_close", "class.reopen",
@@ -64,12 +65,13 @@ public class DefaultPositionSeeder {
         new DefaultPosition("Giáo vụ", "Quản lý lớp học và sinh viên", "GENERAL",
             "ORGANIZATION", Set.of(
                 "class.view", "class.create", "class.edit", "class.assign_teacher", "class.cancel",
-                "class.request_close", "student.view", "student.create", "student.edit", "student.delete"),
+                "class.request_close", "student.view", "student.create", "student.edit", "student.delete",
+                "subject.view", "subject.manage"),
             Set.of("ACADEMIC_MANAGEMENT")),
         new DefaultPosition("Giáo viên", "Giáo viên giảng dạy", "TEACHER",
             "DEPARTMENT", Set.of("class.self_view", "schedule.self_view"), Set.of()),
         new DefaultPosition("Trưởng phòng ban", "Phê duyệt đóng lớp trong phòng ban", "GENERAL",
-            "DEPARTMENT", Set.of("class.view", "class.approve_close", "class.reopen",
+            "DEPARTMENT", Set.of("employee.view", "class.view", "class.approve_close", "class.reopen",
                 "class.self_view", "schedule.view", "schedule.self_view"), Set.of()),
         // Must contain the teacher position's permissions so a MANAGER can assign it (MembershipPolicy).
         new DefaultPosition("Nhân sự phòng ban", "Quản lý nhân sự trong phòng ban", "GENERAL",

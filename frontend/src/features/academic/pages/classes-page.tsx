@@ -70,10 +70,12 @@ function ClassFormDialog({
   open,
   onOpenChange,
   schoolClass,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   schoolClass: SchoolClass | null
+  onCreated?: (created: SchoolClass) => void
 }) {
   const subjects = useSubjects()
   const mutations = useClassMutations()
@@ -113,8 +115,9 @@ function ClassFormDialog({
       return
     }
     const handlers = {
-      onSuccess: () => {
+      onSuccess: (saved: SchoolClass) => {
         toast.success(schoolClass ? 'Đã cập nhật lớp học.' : 'Đã tạo lớp học.')
+        if (!schoolClass) onCreated?.(saved)
         onOpenChange(false)
       },
       onError: (cause: unknown) =>
@@ -785,6 +788,8 @@ function ClassDetailDialog({
 
 export function ClassesPage() {
   const { can } = usePermission()
+  const canView = can(PERM.classView)
+  const canCreate = can(PERM.classCreate)
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search.trim())
   const [status, setStatus] = useState('all')
@@ -795,15 +800,65 @@ export function ClassesPage() {
   const [editing, setEditing] = useState<SchoolClass | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<SchoolClass | null>(null)
+  const [createdClass, setCreatedClass] = useState<SchoolClass | null>(null)
 
-  const classes = useClasses({
-    page,
-    size,
-    q: deferredSearch || undefined,
-    status: status === 'all' ? undefined : status,
-    needsReassignment: needsReassignment ? true : undefined,
-  })
+  const classes = useClasses(
+    {
+      page,
+      size,
+      q: deferredSearch || undefined,
+      status: status === 'all' ? undefined : status,
+      needsReassignment: needsReassignment ? true : undefined,
+    },
+    canView,
+  )
   const mutations = useClassMutations()
+
+  // Có class.create mà không có class.view: chỉ mở luồng tạo, không đọc danh sách/chi tiết.
+  if (!canView) {
+    return (
+      <PageContainer>
+        <PageHeader
+          eyebrow="Đào tạo · Lớp học"
+          title="Lớp học"
+          description="Tạo lớp học mới. Danh sách lớp cần quyền xem lớp học."
+          actions={
+            canCreate ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditing(null)
+                  setCreatedClass(null)
+                  setFormOpen(true)
+                }}
+              >
+                <Plus aria-hidden="true" />
+                Tạo lớp
+              </Button>
+            ) : null
+          }
+        />
+
+        {createdClass ? (
+          <Alert tone="success" className="mt-5" title="Đã tạo lớp học">
+            {createdClass.classCode} · {createdClass.name}
+          </Alert>
+        ) : (
+          <Alert tone="info" className="mt-5" title="Chỉ có quyền tạo lớp">
+            Tài khoản của bạn chưa có quyền xem danh sách lớp học. Bạn vẫn có thể tạo lớp mới; lớp
+            vừa tạo sẽ hiển thị ngay tại đây.
+          </Alert>
+        )}
+
+        <ClassFormDialog
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          schoolClass={null}
+          onCreated={setCreatedClass}
+        />
+      </PageContainer>
+    )
+  }
 
   const rows = classes.data?.items ?? []
   const total = classes.data?.total ?? 0

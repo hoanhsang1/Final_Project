@@ -174,4 +174,25 @@ describe('FacilityIssuesPage — báo cáo và xử lý sự cố', () => {
     expect(screen.queryByRole('button', { name: 'Báo cáo sự cố' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Đánh dấu đã xử lý' })).not.toBeInTheDocument()
   })
+
+  it.each(['disabled', 'locked'] as const)(
+    'chặn báo cáo và xử lý khi module cơ sở vật chất ở trạng thái %s',
+    async (state) => {
+      signInAs({
+        permissions: [PERM.facilityView, PERM.facilityIssueReport, PERM.facilityIssueResolve],
+        moduleStates: { FACILITY_MANAGEMENT: state },
+      })
+
+      renderPage(<FacilityIssuesPage />)
+
+      expect(await screen.findByText('Bóng đèn chiếu bị cháy')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Module cơ sở vật chất đang ở chế độ chỉ đọc. Bạn vẫn có thể xem dữ liệu nhưng không thể tạo hoặc cập nhật.',
+        ),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Báo cáo sự cố' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Đánh dấu đã xử lý' })).not.toBeInTheDocument()
+    },
+  )
 })

@@ -35,8 +35,24 @@ class DefaultPositionSeederTest {
         assertThat(permissions("org-new", "Giáo viên"))
             .containsExactly("class.self_view", "schedule.self_view");
         assertThat(permissions("org-new", "Trưởng phòng ban"))
-            .contains("class.view", "schedule.view");
-        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(47);
+            .contains("employee.view", "class.view", "schedule.view");
+        assertThat(permissions("org-new", "Giáo vụ"))
+            .contains("subject.view", "subject.manage");
+        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(49);
+    }
+
+    @Test
+    @DisplayName("Trưởng phòng ban nhận employee.view ở phạm vi phòng ban, không có quyền ghi nhân sự")
+    void departmentHeadGetsDepartmentEmployeeView() {
+        seeder.ensureForOrg("org-head");
+
+        assertThat(permissions("org-head", "Trưởng phòng ban")).contains("employee.view");
+        assertThat(permissions("org-head", "Trưởng phòng ban"))
+            .doesNotContain("employee.create", "employee.edit", "employee.delete",
+                "employee.assign_position");
+        assertThat(jdbc.queryForObject(
+            "SELECT scope FROM position WHERE org_id=? AND name='Trưởng phòng ban'", String.class, "org-head"))
+            .isEqualTo("DEPARTMENT");
     }
 
     @Test

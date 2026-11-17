@@ -352,7 +352,7 @@ export const WORKSPACES: Workspace[] = [
             label: 'Môn học',
             to: '/dao-tao/mon-hoc',
             icon: Library,
-            permissions: [PERM.subjectView],
+            permissions: [PERM.subjectView, PERM.subjectManage],
             status: 'ready',
           },
           {
@@ -360,7 +360,7 @@ export const WORKSPACES: Workspace[] = [
             label: 'Lớp học',
             to: '/dao-tao/lop-hoc',
             icon: BookOpen,
-            permissions: [PERM.classView],
+            permissions: [PERM.classView, PERM.classCreate],
             modules: ['CLASS_MANAGEMENT'],
             status: 'ready',
           },

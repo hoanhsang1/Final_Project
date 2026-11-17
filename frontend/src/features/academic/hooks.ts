@@ -5,6 +5,7 @@ import type {
   ClassInput,
   ClassUpdateInput,
   StudentInput,
+  SubjectInput,
   TeacherUpdateInput,
 } from '@/features/academic/types'
 
@@ -23,7 +24,7 @@ export const academicKeys = {
   classStudents: (id: string) => ['classes', id, 'students'] as const,
   classLogs: (id: string) => ['classes', id, 'status-logs'] as const,
   classEvents: (id: string) => ['classes', id, 'close-events'] as const,
-  subjects: (q: string) => ['subjects', q] as const,
+  subjects: (params: unknown) => ['subjects', params] as const,
 }
 
 export function useTeachers(params: {
@@ -138,17 +139,21 @@ export function useStudentMutations() {
   }
 }
 
-export function useClasses(params: {
-  page?: number
-  size?: number
-  q?: string
-  status?: string
-  selectable?: boolean
-  needsReassignment?: boolean
-}) {
+export function useClasses(
+  params: {
+    page?: number
+    size?: number
+    q?: string
+    status?: string
+    selectable?: boolean
+    needsReassignment?: boolean
+  },
+  enabled = true,
+) {
   return useQuery({
     queryKey: academicKeys.classes(params),
     queryFn: () => classesApi.list(params),
+    enabled,
     placeholderData: (previous) => previous,
   })
 }
@@ -284,10 +289,35 @@ export function useClassMutations() {
   }
 }
 
-export function useSubjects(q = '') {
+export function useSubjects(params: { q?: string; includeInactive?: boolean } = {}) {
   return useQuery({
-    queryKey: academicKeys.subjects(q),
-    queryFn: () => subjectsApi.list(q || undefined),
+    queryKey: academicKeys.subjects(params),
+    queryFn: () => subjectsApi.list(params),
     staleTime: 5 * 60_000,
   })
+}
+
+export function useSubjectMutations() {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['subjects'] })
+    // Lớp đang hiển thị tên môn — làm mới để đồng bộ khi môn đổi tên/ngừng dùng.
+    await queryClient.invalidateQueries({ queryKey: ['classes'] })
+  }
+  return {
+    create: useMutation({
+      mutationFn: (input: SubjectInput) => subjectsApi.create(input),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: SubjectInput }) =>
+        subjectsApi.update(id, input),
+      onSuccess: invalidate,
+    }),
+    setActive: useMutation({
+      mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+        subjectsApi.setActive(id, active),
+      onSuccess: invalidate,
+    }),
+  }
 }

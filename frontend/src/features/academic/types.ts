@@ -188,7 +188,18 @@ export interface ClassCloseEvent {
 
 export interface Subject {
   id: string
+  code: string | null
   name: string
+  description: string | null
+  active: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface SubjectInput {
+  code?: string
+  name: string
+  description?: string
 }
 
 export const CLASS_STATUS_LABELS: Record<string, string> = {

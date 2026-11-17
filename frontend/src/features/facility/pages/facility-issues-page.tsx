@@ -33,6 +33,7 @@ import { useDepartments } from '@/features/organization/hooks'
 import { useDepartmentScope } from '@/features/organization/use-scope'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime } from '@/lib/format'
+import { moduleState } from '@/lib/nav'
 import { PERM } from '@/lib/permissions'
 
 function ReportIssueDialog({
@@ -141,7 +142,10 @@ function ReportIssueDialog({
 }
 
 export function FacilityIssuesPage() {
-  const { can } = usePermission()
+  const { can, session } = usePermission()
+  const facilityState = moduleState(session, 'FACILITY_MANAGEMENT')
+  const readOnly = facilityState === 'disabled' || facilityState === 'locked'
+  const writable = !readOnly && facilityState !== 'not_registered'
   const scope = useDepartmentScope()
   const departments = useDepartments()
   const [departmentId, setDepartmentId] = useState('')
@@ -159,8 +163,8 @@ export function FacilityIssuesPage() {
   const issues = useIssues(effectiveDepartmentId, status)
   const mutations = useFacilityMutations(effectiveDepartmentId)
 
-  const canReport = can(PERM.facilityIssueReport) || can(PERM.facilityManage)
-  const canResolve = can(PERM.facilityIssueResolve) || can(PERM.facilityManage)
+  const canReport = writable && (can(PERM.facilityIssueReport) || can(PERM.facilityManage))
+  const canResolve = writable && (can(PERM.facilityIssueResolve) || can(PERM.facilityManage))
   const rows = issues.data ?? []
 
   return (
@@ -178,6 +182,15 @@ export function FacilityIssuesPage() {
           ) : null
         }
       />
+
+      {readOnly ? (
+        <div className="mt-5">
+          <Alert tone="warning">
+            Module cơ sở vật chất đang ở chế độ chỉ đọc. Bạn vẫn có thể xem dữ liệu nhưng không thể
+            tạo hoặc cập nhật.
+          </Alert>
+        </div>
+      ) : null}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
         {!scope.isScoped ? (

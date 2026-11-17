@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Alert } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -42,6 +43,7 @@ import { useDepartments } from '@/features/organization/hooks'
 import { useDepartmentScope } from '@/features/organization/use-scope'
 import { ApiError } from '@/lib/api-error'
 import { formatDate } from '@/lib/format'
+import { moduleState } from '@/lib/nav'
 import { PERM } from '@/lib/permissions'
 
 const EMPTY_ROOM: RoomInput = {
@@ -338,7 +340,10 @@ function EquipmentDialog({
 }
 
 export function FacilityPage() {
-  const { can } = usePermission()
+  const { can, session } = usePermission()
+  const facilityState = moduleState(session, 'FACILITY_MANAGEMENT')
+  const readOnly = facilityState === 'disabled' || facilityState === 'locked'
+  const writable = !readOnly && facilityState !== 'not_registered'
   const scope = useDepartmentScope()
   const departments = useDepartments()
   const [departmentId, setDepartmentId] = useState('')
@@ -415,7 +420,7 @@ export function FacilityPage() {
       align: 'right',
       cell: (row) => (
         <div className="flex items-center justify-end gap-1">
-          {can(PERM.facilityRoomUpdate) || can(PERM.facilityManage) ? (
+          {writable && (can(PERM.facilityRoomUpdate) || can(PERM.facilityManage)) ? (
             <Button
               variant="ghost"
               size="sm"
@@ -425,7 +430,7 @@ export function FacilityPage() {
               Sửa
             </Button>
           ) : null}
-          {can(PERM.facilityRoomDelete) || can(PERM.facilityManage) ? (
+          {writable && (can(PERM.facilityRoomDelete) || can(PERM.facilityManage)) ? (
             <Button variant="ghost" size="sm" onClick={() => setDeletingRoom(row)}>
               <Trash2 aria-hidden="true" />
               Xoá
@@ -492,7 +497,7 @@ export function FacilityPage() {
       align: 'right',
       cell: (row) => (
         <div className="flex items-center justify-end gap-1">
-          {can(PERM.facilityEquipmentUpdate) || can(PERM.facilityManage) ? (
+          {writable && (can(PERM.facilityEquipmentUpdate) || can(PERM.facilityManage)) ? (
             <Button
               variant="ghost"
               size="sm"
@@ -502,7 +507,7 @@ export function FacilityPage() {
               Sửa
             </Button>
           ) : null}
-          {can(PERM.facilityEquipmentDelete) || can(PERM.facilityManage) ? (
+          {writable && (can(PERM.facilityEquipmentDelete) || can(PERM.facilityManage)) ? (
             <Button variant="ghost" size="sm" onClick={() => setDeletingEquipment(row)}>
               <Trash2 aria-hidden="true" />
               Xoá
@@ -538,6 +543,15 @@ export function FacilityPage() {
         }
       />
 
+      {readOnly ? (
+        <div className="mt-5">
+          <Alert tone="warning">
+            Module cơ sở vật chất đang ở chế độ chỉ đọc. Bạn vẫn có thể xem dữ liệu nhưng không thể
+            tạo hoặc cập nhật.
+          </Alert>
+        </div>
+      ) : null}
+
       {!scope.isScoped ? (
         <div className="mt-5">
           <Field label="Phòng ban" labelSize="sm">
@@ -567,7 +581,7 @@ export function FacilityPage() {
           </TabsList>
           <TabsContent value="rooms">
             <div className="mb-3 flex justify-end">
-              {can(PERM.facilityRoomCreate) || can(PERM.facilityManage) ? (
+              {writable && (can(PERM.facilityRoomCreate) || can(PERM.facilityManage)) ? (
                 <Button size="sm" onClick={() => setRoomDialog({ open: true, room: null })}>
                   <Plus aria-hidden="true" />
                   Thêm phòng
@@ -594,7 +608,7 @@ export function FacilityPage() {
           </TabsContent>
           <TabsContent value="equipment">
             <div className="mb-3 flex justify-end">
-              {can(PERM.facilityEquipmentCreate) || can(PERM.facilityManage) ? (
+              {writable && (can(PERM.facilityEquipmentCreate) || can(PERM.facilityManage)) ? (
                 <Button size="sm" onClick={() => setEquipmentDialog({ open: true, item: null })}>
                   <Plus aria-hidden="true" />
                   Thêm thiết bị

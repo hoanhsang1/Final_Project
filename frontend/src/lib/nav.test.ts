@@ -57,6 +57,17 @@ describe('điều hướng theo quyền hiệu lực', () => {
     expect(ids).not.toContain('facility')
   })
 
+  it('chỉ có class.create vẫn thấy mục lớp học để mở luồng tạo', () => {
+    const creator = session({ permissions: [PERM.classCreate] })
+    expect(visibleItemIds(creator)).toContain('classes')
+  })
+
+  it('môn học hiện khi có subject.view hoặc subject.manage', () => {
+    expect(visibleItemIds(session({ permissions: [PERM.subjectView] }))).toContain('subjects')
+    expect(visibleItemIds(session({ permissions: [PERM.subjectManage] }))).toContain('subjects')
+    expect(visibleItemIds(session({ permissions: [PERM.classView] }))).not.toContain('subjects')
+  })
+
   it('người chỉ có quyền nhân sự không thấy lớp học hay lịch học', () => {
     const hr = session({
       roles: ['MANAGER'],

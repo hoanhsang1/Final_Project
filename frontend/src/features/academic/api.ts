@@ -11,6 +11,7 @@ import type {
   StudentClass,
   StudentInput,
   Subject,
+  SubjectInput,
   TeacherDetail,
   TeacherItem,
   TeacherUpdateInput,
@@ -222,8 +223,33 @@ export const classesApi = {
 }
 
 export const subjectsApi = {
-  async list(q?: string): Promise<Subject[]> {
-    const { data } = await api.get<Subject[]>('/api/subjects', { params: q ? { q } : undefined })
+  async list(params?: { q?: string; includeInactive?: boolean }): Promise<Subject[]> {
+    const { data } = await api.get<Subject[]>('/api/subjects', {
+      params: {
+        q: params?.q || undefined,
+        includeInactive: params?.includeInactive || undefined,
+      },
+    })
+    return data
+  },
+
+  async byId(id: string): Promise<Subject> {
+    const { data } = await api.get<Subject>(`/api/subjects/${id}`)
+    return data
+  },
+
+  async create(input: SubjectInput): Promise<Subject> {
+    const { data } = await api.post<Subject>('/api/subjects', input)
+    return data
+  },
+
+  async update(id: string, input: SubjectInput): Promise<Subject> {
+    const { data } = await api.put<Subject>(`/api/subjects/${id}`, input)
+    return data
+  },
+
+  async setActive(id: string, active: boolean): Promise<Subject> {
+    const { data } = await api.patch<Subject>(`/api/subjects/${id}/status`, { active })
     return data
   },
 }

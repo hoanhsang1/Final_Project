@@ -176,6 +176,38 @@ class TeacherServiceTest {
             .satisfies(ex -> assertError((AppException) ex, HttpStatus.FORBIDDEN, "FORBIDDEN"));
     }
 
+    @Test
+    @DisplayName("Giáo viên tự xem hồ sơ và chỉ thấy lớp của chính mình")
+    void meAndMyClassesAreSelfScoped() {
+        when(actor.userId()).thenReturn("t001");
+
+        assertThat(service.me().fullName()).isEqualTo("Nguyễn Văn An");
+        assertThat(service.myClasses())
+            .extracting(com.mems.dto.TeacherClassResponse::classCode)
+            .containsExactly("C001");
+    }
+
+    @Test
+    @DisplayName("Giáo viên chưa được phân công lớp: danh sách lớp rỗng")
+    void myClassesEmptyWhenNotAssigned() {
+        when(actor.userId()).thenReturn("t002");
+
+        assertThat(service.myClasses()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Tài khoản không còn hồ sơ giáo viên: 404 TEACHER_NOT_FOUND")
+    void meRejectsUserWithoutTeacherProfile() {
+        when(actor.userId()).thenReturn("staff-without-profile");
+
+        assertThatThrownBy(() -> service.me())
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND"));
+        assertThatThrownBy(() -> service.myClasses())
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND"));
+    }
+
     private TeacherUpdateRequest update(String fullName, String email, String phone, Set<String> specialtyIds,
                                         String contractType, Long version, Boolean confirm) {
         return new TeacherUpdateRequest(fullName, email, phone, specialtyIds, contractType, version, confirm);

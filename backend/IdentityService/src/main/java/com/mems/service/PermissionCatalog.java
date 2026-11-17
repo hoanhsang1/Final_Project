@@ -71,6 +71,9 @@ public final class PermissionCatalog {
         orgOnly("class.request_close", "Request class closure", "STUDENT_MANAGEMENT"),
         orgOnly("class.approve_close", "Approve or reject class closure", "STUDENT_MANAGEMENT"),
         orgAndDept("class.reopen", "Reopen closed classes", "STUDENT_MANAGEMENT"),
+        // Danh mục môn học — tài nguyên cấp tổ chức, dùng khi tạo/sửa lớp.
+        orgOnly("subject.view", "View subjects", "STUDENT_MANAGEMENT"),
+        orgOnly("subject.manage", "Create, update and activate/deactivate subjects", "STUDENT_MANAGEMENT"),
         // Quyền SELF (chỉ dữ liệu của chính người dùng) — không gắn module/phòng ban.
         // Cho phép cả DEPARTMENT vì giáo viên/trưởng phòng giữ chức vụ DEPARTMENT
         // vẫn cần xem lớp/lịch của chính mình.
@@ -113,7 +116,8 @@ public final class PermissionCatalog {
             Set.of("student.view", "student.create", "student.edit", "student.delete",
                 "student.create_account", "class.view", "class.create", "class.edit",
                 "class.delete", "class.assign_teacher", "class.teacher.reassign",
-                "class.cancel", "class.request_close", "class.reopen"),
+                "class.cancel", "class.request_close", "class.reopen",
+                "subject.view", "subject.manage"),
             Set.of(SCOPE_ORGANIZATION)),
         new BundleDefinition("SCHEDULE_MANAGEMENT", "Quản lý lịch học",
             "Quản lý lịch học của phòng ban",

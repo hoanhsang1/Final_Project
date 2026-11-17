@@ -282,7 +282,7 @@ export function App() {
             path="/dao-tao/mon-hoc"
             element={
               <WorkspaceGuard workspaceId="academic">
-                <PermissionGuard permission={PERM.subjectView}>
+                <PermissionGuard anyOf={[PERM.subjectView, PERM.subjectManage]}>
                   <SubjectsPage />
                 </PermissionGuard>
               </WorkspaceGuard>
@@ -292,7 +292,7 @@ export function App() {
             path="/dao-tao/lop-hoc"
             element={
               <WorkspaceGuard workspaceId="academic">
-                <PermissionGuard permission={PERM.classView}>
+                <PermissionGuard anyOf={[PERM.classView, PERM.classCreate]}>
                   <ClassesPage />
                 </PermissionGuard>
               </WorkspaceGuard>

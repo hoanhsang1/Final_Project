@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { EmptyState } from '@/components/ui/feedback'
+import { EmptyState, Alert } from '@/components/ui/feedback'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchInput } from '@/components/ui/search-input'
 import { Spinner } from '@/components/ui/skeleton'
@@ -21,10 +21,11 @@ import { useMyClasses, useMyClassStudents, useMyTeacherProfile } from '@/feature
 import {
   CLASS_STATUS_LABELS,
   CLOSE_STATE_LABELS,
+  CONTRACT_TYPE_LABELS,
   TEACHING_STATUS_LABELS,
   type SchoolClass,
 } from '@/features/academic/types'
-import { errorMessage } from '@/lib/api-error'
+import { errorMessage, isNotFound } from '@/lib/api-error'
 
 /** Giáo viên xem lớp mình phụ trách và sinh viên trong lớp — chỉ dữ liệu của chính mình. */
 export function MyClassesPage() {
@@ -40,17 +41,63 @@ export function MyClassesPage() {
         eyebrow="Đào tạo · Lớp của tôi"
         title="Lớp tôi phụ trách"
         description="Danh sách lớp được phân công cho bạn và sinh viên trong từng lớp."
-        meta={
-          profile.data ? (
-            <span className="text-xs text-ink-500">
-              {profile.data.staffCode ? `Mã GV ${profile.data.staffCode} · ` : ''}
-              {profile.data.teachingStatus
-                ? TEACHING_STATUS_LABELS[profile.data.teachingStatus] ?? profile.data.teachingStatus
-                : 'Giáo viên'}
-            </span>
-          ) : null
-        }
       />
+
+      <section className="mt-5">
+        {profile.isLoading ? <Spinner label="Đang tải hồ sơ giáo viên…" /> : null}
+        {profile.isError ? (
+          isNotFound(profile.error) ? (
+            <Alert tone="info" title="Chưa có hồ sơ giáo viên">
+              Tài khoản của bạn chưa được gắn hồ sơ giáo viên nên chưa có lớp phụ trách.
+            </Alert>
+          ) : (
+            <ErrorState
+              title="Không tải được hồ sơ giáo viên"
+              description={errorMessage(profile.error)}
+              onRetry={() => void profile.refetch()}
+            />
+          )
+        ) : null}
+        {profile.data ? (
+          <Card>
+            <CardContent className="grid gap-3 py-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-xs text-ink-500">Họ tên</p>
+                <p className="text-sm font-medium text-ink-900">{profile.data.fullName}</p>
+                <p className="text-xs text-ink-500">
+                  {profile.data.staffCode ? `Mã GV ${profile.data.staffCode}` : 'Chưa có mã GV'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-500">Liên hệ</p>
+                <p className="text-sm text-ink-900">{profile.data.email ?? '—'}</p>
+                <p className="text-xs text-ink-500">{profile.data.phone ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-500">Chuyên môn</p>
+                <p className="text-sm text-ink-900">
+                  {profile.data.specialties.map((item) => item.name).join(', ') || '—'}
+                </p>
+                <p className="text-xs text-ink-500">
+                  {profile.data.contractType
+                    ? CONTRACT_TYPE_LABELS[profile.data.contractType] ?? profile.data.contractType
+                    : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-500">Trạng thái giảng dạy</p>
+                <p className="text-sm text-ink-900">
+                  {profile.data.teachingStatus
+                    ? TEACHING_STATUS_LABELS[profile.data.teachingStatus] ??
+                      profile.data.teachingStatus
+                    : '—'}
+                </p>
+                <p className="text-xs text-ink-500">{profile.data.classCount} lớp phụ trách</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+      </section>
 
       <div className="mt-4 max-w-sm">
         <SearchInput value={q} onValueChange={setQ} placeholder="Tìm theo mã hoặc tên lớp" />
