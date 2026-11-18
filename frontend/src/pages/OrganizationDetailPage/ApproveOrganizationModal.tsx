@@ -1,8 +1,15 @@
-import { Alert, Checkbox, Modal, Typography, theme } from 'antd';
+import {
+  Banner,
+  Button,
+  CheckboxInput,
+  Dialog,
+  DialogHeader,
+  HStack,
+  Text,
+  VStack,
+} from '@astryxdesign/core';
 import { useEffect, useState } from 'react';
 import { MSG_ORG } from '../../features/admin/adminMessages';
-
-const { Text } = Typography;
 
 interface ApproveOrganizationModalProps {
   open: boolean;
@@ -12,7 +19,7 @@ interface ApproveOrganizationModalProps {
   moduleCount: number;
   /** Đang gửi yêu cầu → nút xác nhận khoá + loading. */
   loading: boolean;
-  /** Lỗi từ BE — hiện bằng `Alert` trong modal thay cho toast dễ bị bỏ lỡ. */
+  /** Lỗi từ BE — hiện bằng `Banner` trong modal thay cho toast dễ bị bỏ lỡ. */
   error?: string | null;
   onCancel: () => void;
   /** `notifyEmail` — `D-27` (C3): BE gửi email cho chủ tổ chức nếu `true`. */
@@ -37,7 +44,6 @@ export default function ApproveOrganizationModal({
   onCancel,
   onConfirm,
 }: ApproveOrganizationModalProps) {
-  const { token } = theme.useToken();
   // Mặc định tick — người dùng phải chủ động BỎ tick thì mới không gửi email.
   const [notifyEmail, setNotifyEmail] = useState(true);
 
@@ -49,41 +55,50 @@ export default function ApproveOrganizationModal({
   }, [open]);
 
   return (
-    <Modal
-      open={open}
-      title={MSG_ORG.APPROVE_TITLE}
-      okText={MSG_ORG.APPROVE}
-      cancelText={MSG_ORG.CANCEL}
-      confirmLoading={loading}
-      // Nút chỉ khoá KHI đang gửi — không tắt trước khi gửi (Đặc tả §3.0).
-      okButtonProps={{ disabled: loading }}
-      onOk={() => onConfirm(notifyEmail)}
-      onCancel={onCancel}
-      destroyOnHidden
+    <Dialog
+      isOpen={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      // `form`: bấm ra ngoài KHÔNG đóng để không mất lựa chọn đang đặt; ESC vẫn đóng.
+      purpose="form"
+      width={520}
     >
-      {open && error && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={error}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
+      <DialogHeader
+        title={MSG_ORG.APPROVE_TITLE}
+        onOpenChange={(next) => {
+          if (!next) onCancel();
+        }}
+      />
 
-      <Text>
-        Bạn sắp duyệt <Text strong>{orgName}</Text>. Toàn bộ <Text strong>{moduleCount}</Text>{' '}
-        module đang chọn sẽ được kích hoạt và tài khoản chủ tổ chức sẽ hoạt động.
-      </Text>
+      <VStack gap={4} style={{ marginTop: 'var(--spacing-4)' }}>
+        {/* Chỉ hiện khi modal đang mở — `Dialog` trả `null` lúc đóng nên guard này
+            giữ cho ý định rõ ràng và an toàn nếu Astryx đổi cách mount. */}
+        {open && error ? (
+          <Banner status="error" title={error} collapsible={false} role="alert" />
+        ) : null}
 
-      <div style={{ marginTop: token.margin }}>
-        <Checkbox
-          checked={notifyEmail}
-          onChange={(event) => setNotifyEmail(event.target.checked)}
-        >
-          {MSG_ORG.NOTIFY_EMAIL}
-        </Checkbox>
-      </div>
-    </Modal>
+        <Text type="body">
+          Bạn sắp duyệt <Text weight="semibold">{orgName}</Text>. Toàn bộ{' '}
+          <Text weight="semibold">{moduleCount}</Text> module đang chọn sẽ được kích hoạt và tài
+          khoản chủ tổ chức sẽ hoạt động.
+        </Text>
+
+        <CheckboxInput label={MSG_ORG.NOTIFY_EMAIL} value={notifyEmail} onChange={setNotifyEmail} />
+
+        <HStack justify="end" gap={2}>
+          <Button variant="secondary" size="lg" label={MSG_ORG.CANCEL} onClick={onCancel} />
+          {/* Nút chỉ khoá KHI đang gửi — không tắt trước khi gửi (Đặc tả §3.0). */}
+          <Button
+            variant="primary"
+            size="lg"
+            label={MSG_ORG.APPROVE}
+            isLoading={loading}
+            isDisabled={loading}
+            onClick={() => onConfirm(notifyEmail)}
+          />
+        </HStack>
+      </VStack>
+    </Dialog>
   );
 }

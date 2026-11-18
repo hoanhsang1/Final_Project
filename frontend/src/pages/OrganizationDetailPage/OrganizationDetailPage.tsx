@@ -1,20 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  App,
+  Badge,
+  Banner,
   Button,
-  Card,
-  Descriptions,
-  Empty,
-  Flex,
+  HStack,
+  MetadataList,
+  MetadataListItem,
+  pixel,
+  proportional,
+  Stack,
   Table,
-  Tag,
-  theme,
-} from 'antd';
-import type { TableProps } from 'antd';
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AppLink } from '../../components/AppLink/AppLink';
+import DetailSection from '../../components/DetailSection/DetailSection';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
@@ -25,7 +28,14 @@ import {
   rejectOrganization,
 } from '../../features/admin/adminApi';
 import { adminKeys } from '../../features/admin/adminKeys';
-import { MSG_ORG, msgApproved, msgBackendPending, msgRejected, msgReactivated, msgSuspended } from '../../features/admin/adminMessages';
+import {
+  MSG_ORG,
+  msgApproved,
+  msgBackendPending,
+  msgReactivated,
+  msgRejected,
+  msgSuspended,
+} from '../../features/admin/adminMessages';
 import { backToListPath } from '../../features/admin/consoleMenu';
 import {
   accountStatusLabel,
@@ -36,6 +46,7 @@ import {
 import { useSuspendOrganization } from '../../features/admin/use-suspend-organization';
 import type { OrganizationAction } from '../../features/admin/use-suspend-organization';
 import type { OrganizationOwner, OrgStatus } from '../../features/admin/types';
+import { useNotify } from '../../hooks/useNotify';
 import ApproveOrganizationModal from './ApproveOrganizationModal';
 import ModuleConfigPanel from './ModuleConfigPanel';
 import RejectOrganizationModal from './RejectOrganizationModal';
@@ -43,6 +54,13 @@ import { useOrganizationDetail } from './use-organization-detail';
 
 /** Giá trị hiển thị khi BE chưa trả dữ liệu — không để trống trơn, không hiện `undefined` (`TC-ORG-25`). */
 const EMPTY_VALUE = '—';
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn
+ * `OrganizationOwner` là interface nên không tự thoả — giao thêm `Record`
+ * để thoả ràng buộc mà **không** nới lỏng DTO (xem `docs/ui-conventions.md` §6.11).
+ */
+type OwnerRow = OrganizationOwner & Record<string, unknown>;
 
 /** Định dạng ngày giờ; trả về "—" khi BE chưa trả (`D-19`). */
 function formatDateTime(value: string | null | undefined): string {
@@ -60,8 +78,7 @@ function formatDateTime(value: string | null | undefined): string {
  * Thanh hành động: Duyệt / Từ chối (chỉ khi còn `pending`) + quay lại danh sách.
  */
 export default function OrganizationDetailPage() {
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const notify = useNotify();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -74,7 +91,7 @@ export default function OrganizationDetailPage() {
    * Lỗi của thao tác cuối (duyệt / từ chối / vô hiệu hoá).
    *
    * `NFR-REL-001`: lỗi hoặc timeout KHÔNG được hiện thành công. Hiển thị bằng
-   * `Alert` thay cho toast — toast tự biến mất và bị modal che nên người dùng
+   * `Banner` thay cho toast — toast tự biến mất và bị modal che nên người dùng
    * không đọc được lý do thất bại.
    */
   const [actionError, setActionError] = useState<string | null>(null);
@@ -113,7 +130,7 @@ export default function OrganizationDetailPage() {
     if (status === 409) {
       // Tổ chức đã được xử lý ở tab/máy khác → đóng modal, tải lại danh sách + chi tiết
       // (nếu không invalidate detail thì nút "Duyệt"/"Từ chối" còn hiện → bấm lại mới 409).
-      message.warning(MSG_ORG.ALREADY_REVIEWED);
+      notify.error(MSG_ORG.ALREADY_REVIEWED);
       setApproveOpen(false);
       setRejectOpen(false);
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
@@ -121,7 +138,7 @@ export default function OrganizationDetailPage() {
       return;
     }
     if (status === 404) {
-      // Modal đóng → lỗi hiện ở trang (Alert phía trên nội dung).
+      // Modal đóng → lỗi hiện ở trang (Banner phía trên nội dung).
       setActionError(MSG_ORG.NOT_FOUND);
       setApproveOpen(false);
       setRejectOpen(false);
@@ -139,7 +156,7 @@ export default function OrganizationDetailPage() {
   const approveMutation = useMutation({
     mutationFn: (notifyEmail: boolean) => approveOrganization(id, notifyEmail),
     onSuccess: () => {
-      message.success(msgApproved(orgName));
+      notify.success(msgApproved(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setApproveOpen(false);
@@ -152,7 +169,7 @@ export default function OrganizationDetailPage() {
     mutationFn: ({ reason, notifyEmail }: { reason: string; notifyEmail: boolean }) =>
       rejectOrganization(id, reason, notifyEmail),
     onSuccess: () => {
-      message.success(msgRejected(orgName));
+      notify.success(msgRejected(orgName));
       void queryClient.invalidateQueries({ queryKey: adminKeys.pending });
       void queryClient.invalidateQueries({ queryKey: adminKeys.detail(id) });
       setRejectOpen(false);
@@ -161,17 +178,27 @@ export default function OrganizationDetailPage() {
     onError: handleMutationError,
   });
 
-  const ownerColumns: TableProps<OrganizationOwner>['columns'] = [
-    { title: 'Tên đăng nhập', dataIndex: 'username', key: 'username' },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
+  const ownerColumns: TableColumn<OwnerRow>[] = [
     {
-      title: 'Trạng thái tài khoản',
-      dataIndex: 'status',
+      key: 'username',
+      header: 'Tên đăng nhập',
+      width: proportional(1, { minWidth: 160 }),
+      renderCell: (row) => row.username,
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      width: proportional(1, { minWidth: 200 }),
+      renderCell: (row) => row.email,
+    },
+    {
       key: 'status',
-      // BR-08: Tag luôn kèm CHỮ.
-      render: (value: string) => {
-        const status = accountStatusLabel(value);
-        return <Tag color={status.color}>{status.label}</Tag>;
+      header: 'Trạng thái tài khoản',
+      width: pixel(160),
+      // BR-08: Badge luôn kèm CHỮ, màu chỉ là tín hiệu phụ.
+      renderCell: (row) => {
+        const status = accountStatusLabel(row.status);
+        return <Badge variant={status.badge} label={status.label} />;
       },
     },
   ];
@@ -193,15 +220,20 @@ export default function OrganizationDetailPage() {
       );
     }
     return (
-      <Alert
-        type="error"
-        showIcon
+      <Banner
+        status="error"
+        title={MSG_ORG.DETAIL_ERROR}
+        description="Kiểm tra kết nối máy chủ rồi thử lại. Thông tin tổ chức chưa được tải."
+        collapsible={false}
         role="alert"
-        message={MSG_ORG.DETAIL_ERROR}
-        action={
-          <Button onClick={() => detailQuery.refetch()} loading={detailQuery.isFetching}>
-            {MSG_ORG.RETRY}
-          </Button>
+        endContent={
+          <Button
+            variant="secondary"
+            size="sm"
+            label={MSG_ORG.RETRY}
+            isLoading={detailQuery.isFetching}
+            onClick={() => void detailQuery.refetch()}
+          />
         }
       />
     );
@@ -225,131 +257,127 @@ export default function OrganizationDetailPage() {
   };
 
   return (
-    <Flex vertical gap={token.marginLG}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         breadcrumb={[{ title: MSG_ORG.LIST_TITLE, href: backPath }, { title: organization.name }]}
         title={organization.name}
         extra={
-          <Flex align="center" gap={token.marginSM} wrap>
-            <Tag color={orgStatus.color}>{orgStatus.label}</Tag>
+          <HStack align="center" gap={3} wrap="wrap">
+            {/* BR-08: Badge trạng thái luôn kèm chữ. */}
+            <Badge variant={orgStatus.badge} label={orgStatus.label} />
             {isPendingOrg ? (
               <>
                 <Button
-                  type="primary"
+                  variant="primary"
+                  size="lg"
+                  label={MSG_ORG.APPROVE_TITLE}
                   onClick={() => {
                     setActionError(null);
                     setApproveOpen(true);
                   }}
-                >
-                  {MSG_ORG.APPROVE_TITLE}
-                </Button>
+                />
                 <Button
-                  danger
+                  variant="destructive"
+                  size="lg"
+                  label={MSG_ORG.REJECT_TITLE}
                   onClick={() => {
                     setActionError(null);
                     setRejectOpen(true);
                   }}
-                >
-                  {MSG_ORG.REJECT_TITLE}
-                </Button>
+                />
               </>
             ) : (
               <>
-                {/* Trạng thái KHÔNG phải pending → nói rõ "đã được xử lý" (e2e cũ assert câu này),
-                    kèm nút đổi trạng thái theo ma trận đặc tả §3.3. */}
-                <Alert type="info" showIcon message={MSG_ORG.ALREADY_REVIEWED} />
                 {/* `C1` — `BR-04`: chữ là "Vô hiệu hoá", không phải "Xoá". */}
-                {nextSuspendAction && (
+                {nextSuspendAction ? (
                   <Button
-                    danger={nextSuspendAction === 'suspend'}
+                    variant={nextSuspendAction === 'suspend' ? 'destructive' : 'secondary'}
+                    size="lg"
+                    label={nextSuspendLabel}
+                    aria-label={`${nextSuspendLabel} tổ chức ${organization.name}`}
                     onClick={() => {
                       setActionError(null);
                       setSuspendAction(nextSuspendAction);
                     }}
-                    aria-label={`${nextSuspendLabel} tổ chức ${organization.name}`}
-                  >
-                    {nextSuspendLabel}
-                  </Button>
-                )}
-                {currentStatus === 'rejected' && (
+                  />
+                ) : null}
+                {currentStatus === 'rejected' ? (
                   // `Q-18`: BE chưa cho duyệt lại tổ chức đã từ chối → nút tạm khoá,
                   // hiện rõ lý do thay vì ẩn đi (người dùng tự hỏi đi đâu mất).
-                  <Button disabled title={MSG_ORG.REAPPROVE_DISABLED}>
-                    {MSG_ORG.APPROVE_TITLE}
-                  </Button>
-                )}
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    label={MSG_ORG.APPROVE_TITLE}
+                    isDisabled
+                    tooltip={MSG_ORG.REAPPROVE_DISABLED}
+                  />
+                ) : null}
               </>
             )}
             <Button
-              type="link"
+              variant="ghost"
+              size="lg"
+              label={MSG_ORG.HISTORY}
               onClick={() => navigate(`/quan-tri/to-chuc/${organization.id}/lich-su?from=to-chuc`)}
-            >
-              {MSG_ORG.HISTORY}
-            </Button>
-            <Link to={backPath}>{MSG_ORG.BACK_TO_LIST}</Link>
-          </Flex>
+            />
+            <AppLink to={backPath}>{MSG_ORG.BACK_TO_LIST}</AppLink>
+          </HStack>
         }
       />
 
+      {/*
+        Tổ chức KHÔNG còn `pending` → nói rõ "đã được xử lý" (e2e cũ assert câu này).
+        Đặt ngay dưới tiêu đề thay vì chen vào hàng nút — hàng nút đã chật, thêm một
+        khối chữ vào giữa các nút sẽ phá thứ tự đọc của trình đọc màn hình.
+      */}
+      {!isPendingOrg ? (
+        <Banner status="info" role="status" title={MSG_ORG.ALREADY_REVIEWED} collapsible={false} />
+      ) : null}
+
       {/* Lỗi thao tác — hiện ở đây CHỈ KHI không có modal nào đang mở (modal đã
           đóng vì 404); lỗi khi modal còn mở nằm trong chính modal đó. */}
-      {actionError && !isAnyModalOpen && (
-        <Alert type="error" showIcon role="alert" message={actionError} />
-      )}
+      {actionError && !isAnyModalOpen ? (
+        <Banner status="error" title={actionError} collapsible={false} role="alert" />
+      ) : null}
 
       {/* Khối 1 — Thông tin tổ chức */}
-      <Card title={MSG_ORG.INFO}>
-        <Descriptions
-          size="small"
-          bordered
-          column={{ xs: 1, sm: 2 }}
-          items={[
-            { key: 'name', label: 'Tên tổ chức', children: organization.name },
-            { key: 'type', label: 'Loại', children: orgTypeLabel(organization.org_type) },
-            {
-              key: 'status',
-              label: 'Trạng thái',
-              children: <Tag color={orgStatus.color}>{orgStatus.label}</Tag>,
-            },
-            {
-              key: 'created_at',
-              label: 'Ngày gửi đăng ký',
-              // `D-19` — BE chưa trả, hiện "—" thay vì bỏ trống.
-              children: formatDateTime(organization.created_at),
-            },
-            {
-              key: 'contact_email',
-              label: 'Email liên hệ',
-              // `D-11` + `D-19` — BE chưa lưu/trả.
-              children: organization.contact_email || EMPTY_VALUE,
-            },
-            {
-              key: 'contact_phone',
-              label: 'Số điện thoại',
-              children: organization.contact_phone || EMPTY_VALUE,
-            },
-            {
-              key: 'rejection_reason',
-              label: 'Lý do từ chối',
-              // Lý do do người khác nhập ⇒ render TEXT THUẦN, không dangerouslySetInnerHTML.
-              children: organization.rejection_reason || EMPTY_VALUE,
-            },
-          ]}
-        />
-      </Card>
+      <DetailSection title={MSG_ORG.INFO}>
+        <MetadataList columns="multi" label={{ position: 'start', width: 170 }}>
+          <MetadataListItem label="Tên tổ chức">{organization.name}</MetadataListItem>
+          <MetadataListItem label="Loại">{orgTypeLabel(organization.org_type)}</MetadataListItem>
+          <MetadataListItem label="Trạng thái">
+            <Badge variant={orgStatus.badge} label={orgStatus.label} />
+          </MetadataListItem>
+          <MetadataListItem label="Ngày gửi đăng ký">
+            {/* `D-19` — BE chưa trả, hiện "—" thay vì bỏ trống. */}
+            {formatDateTime(organization.created_at)}
+          </MetadataListItem>
+          <MetadataListItem label="Email liên hệ">
+            {/* `D-11` + `D-19` — BE chưa lưu/trả. */}
+            {organization.contact_email || EMPTY_VALUE}
+          </MetadataListItem>
+          <MetadataListItem label="Số điện thoại">
+            {organization.contact_phone || EMPTY_VALUE}
+          </MetadataListItem>
+          {/* Lý do do người khác nhập ⇒ render TEXT THUẦN, không dangerouslySetInnerHTML. */}
+          <MetadataListItem label="Lý do từ chối">
+            {organization.rejection_reason || EMPTY_VALUE}
+          </MetadataListItem>
+        </MetadataList>
+      </DetailSection>
 
       {/* Khối 2 — Người đại diện */}
-      <Card title={MSG_ORG.OWNERS}>
-        <Table<OrganizationOwner>
-          rowKey="id"
-          size="small"
+      <DetailSection title={MSG_ORG.OWNERS}>
+        <Table<OwnerRow>
+          data={owners as OwnerRow[]}
           columns={ownerColumns}
-          dataSource={owners}
-          pagination={false}
-          locale={{ emptyText: <Empty description="Chưa có người đại diện" /> }}
-          scroll={{ x: 520 }}
+          idKey="id"
+          density="compact"
+          emptyState={
+            <EmptyState compact headingLevel={3} description="Chưa có người đại diện" />
+          }
         />
-      </Card>
+      </DetailSection>
 
       {/* Khối 3 — Module đã đăng ký + cấu hình module */}
       {/*
@@ -394,7 +422,7 @@ export default function OrganizationDetailPage() {
             { action: suspendAction ?? 'suspend', reason },
             {
               onSuccess: () => {
-                message.success(
+                notify.success(
                   suspendAction === 'suspend' ? msgSuspended(orgName) : msgReactivated(orgName),
                 );
                 setActionError(null);
@@ -405,6 +433,6 @@ export default function OrganizationDetailPage() {
           )
         }
       />
-    </Flex>
+    </Stack>
   );
 }

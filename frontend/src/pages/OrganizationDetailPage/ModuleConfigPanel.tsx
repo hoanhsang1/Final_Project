@@ -1,19 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  App,
+  AlertDialog,
+  Badge,
+  Banner,
   Button,
-  Card,
-  Checkbox,
-  Flex,
-  Tag,
-  Tooltip,
-  Typography,
-  theme,
-} from 'antd';
+  CheckboxInput,
+  HStack,
+  Text,
+  VStack,
+} from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
+import DetailSection from '../../components/DetailSection/DetailSection';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import { AdminApiError, updateOrganizationModules } from '../../features/admin/adminApi';
 import { adminKeys } from '../../features/admin/adminKeys';
@@ -32,8 +31,7 @@ import {
   MODULE_CATALOG_STALE_TIME,
   moduleCatalogKey,
 } from '../../features/modules/moduleApi';
-
-const { Text } = Typography;
+import { useNotify } from '../../hooks/useNotify';
 
 interface ModuleConfigPanelProps {
   orgId: string;
@@ -67,8 +65,7 @@ function sameCodes(a: string[], b: string[]): boolean {
  * Sang làm xong. Lỗi vẫn được xử lý đúng `NFR-REL-001`: KHÔNG báo thành công.
  */
 export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleConfigPanelProps) {
-  const { token } = theme.useToken();
-  const { message, modal } = App.useApp();
+  const notify = useNotify();
   const queryClient = useQueryClient();
 
   const catalogQuery = useQuery({
@@ -103,7 +100,7 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
   const saveMutation = useMutation({
     mutationFn: (codes: string[]) => updateOrganizationModules(orgId, codes),
     onSuccess: () => {
-      message.success(MSG_MOD.SAVED);
+      notify.success(MSG_MOD.SAVED);
       // Đã lên server → nháp không còn giá trị, xoá để không hỏi "áp dụng nháp" nữa.
       clearDraft(orgId);
       setDraft(null);
@@ -114,7 +111,7 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
     onError: (error) => {
       const status = error instanceof AdminApiError ? error.status : null;
       if (status === 409) {
-        message.warning(MSG_ORG.ALREADY_REVIEWED);
+        notify.error(MSG_ORG.ALREADY_REVIEWED);
         void queryClient.invalidateQueries({ queryKey: adminKeys.detail(orgId) });
         return;
       }
@@ -124,7 +121,7 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
       }
       // NFR-REL-001: lỗi/timeout ⇒ KHÔNG báo thành công, giữ nguyên lựa chọn để
       // người dùng thử lại (trạng thái tick KHÔNG bị coi là đã lưu).
-      // Lỗi hiện bằng `Alert` gắn với biểu mẫu thay cho toast dễ bị bỏ lỡ.
+      // Lỗi hiện bằng `Banner` gắn với biểu mẫu thay cho toast dễ bị bỏ lỡ.
       setFormError(MSG_MOD.SAVE_FAILED);
     },
   });
@@ -182,37 +179,6 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
     ({ currentLocation, nextLocation }) =>
       shouldWarnUnsaved && currentLocation.pathname !== nextLocation.pathname,
   );
-  const blockerRef = useRef(blocker);
-  blockerRef.current = blocker;
-  /** Chống mở trùng hộp thoại khi effect chạy lại khi `modal` đổi tham chiếu. */
-  const confirmOpenRef = useRef(false);
-
-  useEffect(() => {
-    if (blocker.state !== 'blocked') {
-      confirmOpenRef.current = false;
-      return;
-    }
-    if (confirmOpenRef.current) {
-      return;
-    }
-    confirmOpenRef.current = true;
-    modal.confirm({
-      title: MSG_MOD.UNSAVED_TITLE,
-      content: MSG_MOD.UNSAVED_CONTENT,
-      okText: MSG_MOD.UNSAVED_LEAVE,
-      okButtonProps: { danger: true },
-      cancelText: MSG_MOD.UNSAVED_STAY,
-      onOk: () => {
-        confirmOpenRef.current = false;
-        // `state === 'blocked'` nên `proceed` luôn có — gọi phòng hờ theo type.
-        blockerRef.current.proceed?.();
-      },
-      onCancel: () => {
-        confirmOpenRef.current = false;
-        blockerRef.current.reset?.();
-      },
-    });
-  }, [blocker.state, modal]);
 
   // Đóng tab / F5 / gõ URL — trình duyệt hỏi trước khi xoá mất lựa chọn.
   useEffect(() => {
@@ -241,7 +207,7 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
     suppressBlockRef.current = false;
     setSelected(draft.codes);
     setFormError(null);
-    message.success(MSG_MOD.DRAFT_APPLIED);
+    notify.success(MSG_MOD.DRAFT_APPLIED);
   };
 
   const handleDiscardDraft = () => {
@@ -264,115 +230,126 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
 
   const saveButton = editable ? (
     <Button
-      type="primary"
+      variant="primary"
+      size="lg"
+      label={MSG_MOD.SAVE}
       onClick={handleSave}
-      loading={saveMutation.isPending}
-      disabled={!hasChanges || catalogNotReady}
-    >
-      {MSG_MOD.SAVE}
-    </Button>
-  ) : null;
+      isLoading={saveMutation.isPending}
+      isDisabled={!hasChanges || catalogNotReady}
+    />
+  ) : undefined;
 
   return (
-    <Card title={MSG_MOD.TITLE} extra={saveButton}>
-      {formError && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={formError}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
+    <>
+      <DetailSection title={MSG_MOD.TITLE} extra={saveButton}>
+        {formError ? (
+          <Banner
+            status="error"
+            title={formError}
+            collapsible={false}
+            role="alert"
+            style={{ marginBottom: 'var(--spacing-4)' }}
+          />
+        ) : null}
 
-      {/* Nháp từ lần chỉnh sửa trước — chỉ mời khi người dùng chưa sửa gì. */}
-      {draftToRestore && (
-        <Alert
-          type="info"
-          showIcon
-          role="status"
-          message={MSG_MOD.DRAFT_FOUND}
-          description={
-            draftToRestore.savedAt
-              ? `Ghi lúc ${dayjs(draftToRestore.savedAt).format('HH:mm DD/MM/YYYY')} — áp dụng để làm tiếp phần đang dở.`
-              : 'Áp dụng để làm tiếp phần đang dở.'
-          }
-          action={
-            <Flex gap={token.paddingXS}>
-              <Button size="small" onClick={handleApplyDraft}>
-                {MSG_MOD.DRAFT_APPLY}
-              </Button>
-              <Button size="small" onClick={handleDiscardDraft}>
-                {MSG_MOD.DRAFT_DISCARD}
-              </Button>
-            </Flex>
-          }
-          style={{ marginBottom: token.margin }}
-        />
-      )}
+        {/* Nháp từ lần chỉnh sửa trước — chỉ mời khi người dùng chưa sửa gì. */}
+        {draftToRestore ? (
+          <Banner
+            status="info"
+            role="status"
+            title={MSG_MOD.DRAFT_FOUND}
+            description={
+              draftToRestore.savedAt
+                ? `Ghi lúc ${dayjs(draftToRestore.savedAt).format('HH:mm DD/MM/YYYY')} — áp dụng để làm tiếp phần đang dở.`
+                : 'Áp dụng để làm tiếp phần đang dở.'
+            }
+            collapsible={false}
+            endContent={
+              <HStack gap={2}>
+                <Button variant="secondary" size="sm" label={MSG_MOD.DRAFT_APPLY} onClick={handleApplyDraft} />
+                <Button variant="ghost" size="sm" label={MSG_MOD.DRAFT_DISCARD} onClick={handleDiscardDraft} />
+              </HStack>
+            }
+            style={{ marginBottom: 'var(--spacing-4)' }}
+          />
+        ) : null}
 
-      {/* Trạng thái loading của danh mục — `PageLoading`, không hiện danh sách rỗng. */}
-      {catalogQuery.isPending ? (
-        <PageLoading />
-      ) : (
-        <>
-          {catalogQuery.isError && (
-            <Alert
-              type="warning"
-              showIcon
-              role="alert"
-              message={MSG_MOD.LOAD_FAILED}
-              description="Danh mục module chưa tải được nên chưa thể lưu cấu hình. Hãy thử lại."
-              action={
-                <Button onClick={() => catalogQuery.refetch()} loading={catalogQuery.isFetching}>
-                  {MSG_ORG.RETRY}
-                </Button>
-              }
-              style={{ marginBottom: token.margin }}
-            />
-          )}
+        {/* Trạng thái loading của danh mục — `PageLoading`, không hiện danh sách rỗng. */}
+        {catalogQuery.isPending ? (
+          <PageLoading />
+        ) : (
+          <>
+            {catalogQuery.isError ? (
+              <Banner
+                status="warning"
+                role="alert"
+                title={MSG_MOD.LOAD_FAILED}
+                description="Danh mục module chưa tải được nên chưa thể lưu cấu hình. Hãy thử lại."
+                collapsible={false}
+                endContent={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={MSG_ORG.RETRY}
+                    isLoading={catalogQuery.isFetching}
+                    onClick={() => void catalogQuery.refetch()}
+                  />
+                }
+                style={{ marginBottom: 'var(--spacing-4)' }}
+              />
+            ) : null}
 
-          <Flex vertical gap={token.marginSM}>
-            {rows.map((row) => {
-              const locked = isLockedCore(row.code);
-              const status = row.orgModule ? moduleStatusLabel(row.orgModule.status) : null;
-              const checkbox = (
-                <Checkbox
-                  checked={selected.includes(row.code)}
-                  disabled={locked || !editable}
-                  onChange={(event) => handleToggle(row.code, event.target.checked)}
-                >
-                  {row.name}
-                </Checkbox>
-              );
+            <VStack gap={3}>
+              {rows.map((row) => {
+                const locked = isLockedCore(row.code);
+                const status = row.orgModule ? moduleStatusLabel(row.orgModule.status) : null;
 
-              return (
-                <Flex
-                  key={row.code}
-                  justify="space-between"
-                  align="center"
-                  gap={token.marginSM}
-                  wrap
-                >
-                  <Flex align="center" gap={token.marginXS} wrap>
-                    {locked ? (
-                      // Tooltip cần bọc trong <span> vì phần tử disabled không bắt sự kiện chuột.
-                      <Tooltip title={msgCoreLocked(row.name)}>
-                        <span>{checkbox}</span>
-                      </Tooltip>
-                    ) : (
-                      checkbox
-                    )}
-                    {/* Mã module hiện mờ — giúp tester đối chiếu với DB. */}
-                    <Text type="secondary">({row.code})</Text>
-                  </Flex>
-                  {status && <Tag color={status.color}>{status.label}</Tag>}
-                </Flex>
-              );
-            })}
-          </Flex>
-        </>
-      )}
-    </Card>
+                return (
+                  <HStack key={row.code} justify="between" align="center" gap={2} wrap="wrap">
+                    <HStack align="center" gap={1} wrap="wrap">
+                      {/*
+                        `BR-06`: module lõi đang bật bị khoá. `disabledMessage` của
+                        Astryx vừa khoá vừa hiện tooltip lý do, và giữ ô trong
+                        tab order (`aria-disabled`) để trình đọc màn hình đọc được
+                        lý do — không cần bọc `Tooltip` quanh `<span>` như antd.
+                      */}
+                      <CheckboxInput
+                        label={row.name}
+                        value={selected.includes(row.code)}
+                        isDisabled={locked || !editable}
+                        disabledMessage={locked ? msgCoreLocked(row.name) : undefined}
+                        onChange={(checked) => handleToggle(row.code, checked)}
+                      />
+                      {/* Mã module hiện mờ — giúp tester đối chiếu với DB. */}
+                      <Text type="supporting">({row.code})</Text>
+                    </HStack>
+                    {/* BR-08: Badge luôn kèm CHỮ, màu chỉ là tín hiệu phụ. */}
+                    {status ? <Badge variant={status.badge} label={status.label} /> : null}
+                  </HStack>
+                );
+              })}
+            </VStack>
+          </>
+        )}
+      </DetailSection>
+
+      {/*
+        Rời trang khi còn thay đổi chưa lưu — `AlertDialog` của Astryx thay cho
+        `modal.confirm` của antd. Điều khiển trực tiếp bằng `blocker.state` nên
+        không cần `useEffect` mở hộp thoại (bớt một nguồn trạng thái trùng).
+      */}
+      <AlertDialog
+        isOpen={blocker.state === 'blocked'}
+        onOpenChange={(next) => {
+          if (!next) blocker.reset?.();
+        }}
+        title={MSG_MOD.UNSAVED_TITLE}
+        description={MSG_MOD.UNSAVED_CONTENT}
+        cancelLabel={MSG_MOD.UNSAVED_STAY}
+        actionLabel={MSG_MOD.UNSAVED_LEAVE}
+        actionVariant="destructive"
+        onAction={() => blocker.proceed?.()}
+      />
+    </>
   );
 }
