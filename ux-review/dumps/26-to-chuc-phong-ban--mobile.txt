@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/to-chuc
 Viewport     : mobile 375x667
 Tiêu đề tab  : Phòng ban — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 42
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 375px)
 
 ## API đã gọi (1)
@@ -15,22 +15,23 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 375x56
   <button> Mở menu quản lý tổ chức @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> Phòng banPhòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu … @0,56 375x355
+<main> Phòng banPhòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu … @0,56 375x330
   <h1> Phòng ban @16,76 343x32
-  <button> Thêm phòng ban @16,162 143x36
-  <table> [table 4 cột, 3 dòng] @16,222 640x169
+  <button> Thêm phòng ban @16,162 137x36
+  <div role="group"> Bảng @16,238 343x128
+    <table> [table 4 cột, 2 dòng] @16,238 710x128
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
 - button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @267,12 92x32
-- button "Thêm phòng ban" @16,162 143x36
-- button "Sửa phòng ban Tổ Toán" @479,281 56x36
-- button "Xoá phòng ban Tổ Toán" @542,281 56x36
-- a "Tổ Toán" @24,290 54x17
-- button "Sửa phòng ban Tổ Văn" @479,342 56x36
-- button "Xoá phòng ban Tổ Văn" @542,342 56x36
-- a "Tổ Văn" @24,351 47x17
+- button "Thêm phòng ban" @16,162 137x36
+- button "Sửa phòng ban Tổ Toán" @588,285 50x28
+- button "Xoá phòng ban Tổ Toán" @646,285 50x28
+- a "Tổ Toán" @28,289 54x20
+- button "Sửa phòng ban Tổ Văn" @588,330 50x28
+- button "Xoá phòng ban Tổ Văn" @646,330 50x28
+- a "Tổ Văn" @28,334 47x20
 
 ## Tiêu đề (heading)
 - h1: Phòng ban
@@ -42,4 +43,4 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Phòng ban Phòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu của nhân viên. Thêm phòng ban Tên phòng ban Mô tả Ngày tạo Thao tác Tên phòng ban Mô tả Ngày tạo Thao tác Tổ Toán Tổ bộ môn Toán 01/09/2026 Sửa Xoá Tổ Văn — 01/09/2026 Sửa Xoá
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Phòng ban Phòng ban là đơn vị tổ chức dùng để giới hạn phạm vi dữ liệu của nhân viên. Thêm phòng ban Tên phòng ban Mô tả Ngày tạo Thao tác Tổ Toán Tổ bộ môn Toán 01/09/2026 Sửa Xoá Tổ Văn — 01/09/2026 Sửa Xoá

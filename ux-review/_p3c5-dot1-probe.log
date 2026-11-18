@@ -1,0 +1,53 @@
+﻿PASS  h1 = "Ph├▓ng ban" ΓÇö Ph├▓ng ban
+PASS  0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  bß║úng hiß╗çn 2 ph├▓ng ban ΓÇö count=2
+PASS  c├│ link t├¬n ph├▓ng ban ΓåÆ chi tiß║┐t
+PASS  link trß╗Å /to-chuc/phong-ban/d1 ΓÇö /to-chuc/phong-ban/d1
+PASS  hiß╗çn m├┤ tß║ú + ng├áy tß║ío + "ΓÇö" cho m├┤ tß║ú null
+PASS  c├│ n├║t "Th├¬m ph├▓ng ban"
+PASS  n├║t sß╗¡a c├│ aria-label ri├¬ng
+PASS  n├║t xo├í c├│ aria-label ri├¬ng
+PASS  kh├┤ng c├│ pageerror (danh s├ích)
+PASS  rß╗ùng: hiß╗çn c├óu h╞░ß╗¢ng dß║½n tß║ío ph├▓ng ban ─æß║ºu ti├¬n
+PASS  rß╗ùng: ti├¬u ─æß╗ü cß╗Öt vß║½n c├▓n (bß║úng vß║½n render)
+PASS  rß╗ùng: n├║t "Th├¬m ph├▓ng ban" vß║½n hiß╗çn
+PASS  c├│ thanh ph├ón trang (nh├ún tiß║┐ng Viß╗çt)
+PASS  trang 1 hiß╗çn 10 d├▓ng ΓÇö count=10
+PASS  trang 2 c├▓n 2 d├▓ng ΓÇö count=2
+PASS  trang 2 KH├öNG gß╗ìi lß║íi API (ph├ón trang client)
+PASS  mß╗ƒ dialog tß║ío ph├▓ng ban
+PASS  validate: hiß╗çn "Vui l├▓ng nhß║¡p t├¬n ph├▓ng ban"
+PASS  validate: KH├öNG gß╗¡i POST
+PASS  POST /departments gß╗¡i name ΓÇö {"name":"Khoa Mß╗¢i"}
+PASS  tß║ío xong ΓåÆ toast "─É├ú tß║ío ph├▓ng ban."
+PASS  tß║ío xong ΓåÆ ─æ├│ng dialog
+PASS  dialog sß╗¡a ─æiß╗ün sß║╡n t├¬n c┼⌐
+PASS  PUT /departments/d1 gß╗¡i name mß╗¢i ΓÇö {"name":"Tß╗ò To├ín - Tin","description":"Tß╗ò bß╗Ö m├┤n To├ín"}
+PASS  sß╗¡a xong ΓåÆ toast "─É├ú cß║¡p nhß║¡t ph├▓ng ban."
+PASS  mß╗ƒ AlertDialog xo├í
+PASS  AlertDialog n├¬u t├¬n ph├▓ng ban ΓÇö Xo├í ph├▓ng ban? Ph├▓ng ban "Tß╗ò To├ín" sß║╜ bß╗ï xo├í. Thao t├íc n├áy kh├┤ng ho├án t├íc ─æ╞░ß╗úc. Huß╗╖ Xo├í
+PASS  DELETE /departments/d1 ─æ├ú gß╗ìi
+PASS  xo├í xong ΓåÆ toast "─É├ú xo├í ph├▓ng ban."
+PASS  xo├í xong ΓåÆ ─æ├│ng AlertDialog
+PASS  409: hiß╗çn c├óu giß║úi th├¡ch phß║úi gß╗í nh├ón vi├¬n tr╞░ß╗¢c
+PASS  409: KH├öNG b├ío th├ánh c├┤ng
+PASS  409: c├│ banner lß╗ùi role=alert
+PASS  lß╗ùi tß║úi: c├óu lß╗ùi tiß║┐ng Viß╗çt
+PASS  lß╗ùi tß║úi: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  h1 = "Chß╗⌐c vß╗Ñ" ΓÇö Chß╗⌐c vß╗Ñ
+PASS  chß╗⌐c vß╗Ñ: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  chß╗⌐c vß╗Ñ: hiß╗çn nh├ún quyß╗ün bß║▒ng CHß╗«
+PASS  chß╗⌐c vß╗Ñ: c├│ n├║t "Th├¬m chß╗⌐c vß╗Ñ"
+PASS  kh├┤ng c├│ pageerror (chß╗⌐c vß╗Ñ)
+PASS  mß╗ƒ dialog tß║ío chß╗⌐c vß╗Ñ
+PASS  validate: hiß╗çn lß╗ùi t├¬n chß╗⌐c vß╗Ñ
+PASS  validate: hiß╗çn lß╗ùi cß║ºn ├¡t nhß║Ñt 1 quyß╗ün
+PASS  validate: KH├öNG gß╗¡i POST
+PASS  POST /positions gß╗¡i name + permissions ΓÇö {"name":"Trß╗ú giß║úng","permissions":["PEOPLE_VIEW"]}
+PASS  tß║ío chß╗⌐c vß╗Ñ xong ΓåÆ toast "─É├ú tß║ío chß╗⌐c vß╗Ñ."
+PASS  lß╗ùi quyß╗ün: c├óu lß╗ùi ri├¬ng
+PASS  lß╗ùi quyß╗ün: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  403: hiß╗çn c├óu kh├┤ng c├│ quyß╗ün
+PASS  403: KH├öNG gß╗ìi API ph├▓ng ban
+
+== Tß╗öNG: 51/51 PASS ==

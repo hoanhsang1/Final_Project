@@ -1,0 +1,79 @@
+﻿[36mvite v8.3.4 [32mbuilding client environment for production...[36m[39m
+transforming...
+Γ£ô 4391 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                     2.53 kB Γöé gzip:   0.88 kB
+dist/assets/login-illustration-DNbthDWe.png       349.65 kB
+dist/assets/index-CPf_EOAf.css                    289.80 kB Γöé gzip:  45.24 kB
+dist/assets/coreModules-ChWcrG6H.js                 0.14 kB Γöé gzip:   0.13 kB
+dist/assets/use-organization-detail-Dk6uGngI.js     0.20 kB Γöé gzip:   0.17 kB
+dist/assets/axios-CTlg8jEJ.js                       0.27 kB Γöé gzip:   0.22 kB
+dist/assets/disabledInteraction-u9yjM5Jo.js         0.29 kB Γöé gzip:   0.22 kB
+dist/assets/roleLabels-8bMfze88.js                  0.50 kB Γöé gzip:   0.37 kB
+dist/assets/MenuBottomSheet-CEHlIgrs.js             0.66 kB Γöé gzip:   0.41 kB
+dist/assets/statusLabels-DtOYMIDJ.js                1.12 kB Γöé gzip:   0.37 kB
+dist/assets/useMediaQuery-BAY_IqOQ.js               1.23 kB Γöé gzip:   0.61 kB
+dist/assets/presentation-xofUtAcV.js                1.48 kB Γöé gzip:   0.80 kB
+dist/assets/OrganizationAuditPage-CVOPT1rz.js       1.73 kB Γöé gzip:   1.00 kB
+dist/assets/PendingOrganizationsPage-3R1L7JuB.js    1.94 kB Γöé gzip:   1.10 kB
+dist/assets/useTablePagination-DuQZza3y.js          1.99 kB Γöé gzip:   0.91 kB
+dist/assets/useAttachment-BWED9aH7.js               2.08 kB Γöé gzip:   0.91 kB
+dist/assets/use-suspend-organization-CNZLZfzw.js    2.29 kB Γöé gzip:   1.25 kB
+dist/assets/Badge-CfLq0s5V.js                       2.37 kB Γöé gzip:   1.16 kB
+dist/assets/adminKeys-Bof0YvnB.js                   2.72 kB Γöé gzip:   0.89 kB
+dist/assets/ownerKeys-ZdAGtEZZ.js                   2.76 kB Γöé gzip:   1.19 kB
+dist/assets/ModuleCatalogPage-AIYj6Iuw.js           2.83 kB Γöé gzip:   1.45 kB
+dist/assets/AuditLogTable-BNUU2Mdl.js               2.89 kB Γöé gzip:   1.46 kB
+dist/assets/row-8C78SHc0.js                         3.64 kB Γöé gzip:   1.57 kB
+dist/assets/ClassesPage-Jk_Oy3jk.js                 3.75 kB Γöé gzip:   1.82 kB
+dist/assets/theme-BdfCxb6U.js                       4.05 kB Γöé gzip:   1.55 kB
+dist/assets/DepartmentsPage-DOHTDthO.js             5.16 kB Γöé gzip:   2.34 kB
+dist/assets/AntdIconLight-tlawPIZa.js               5.26 kB Γöé gzip:   2.37 kB
+dist/assets/AllOrganizationsPage-BLn0HTZ5.js        5.65 kB Γöé gzip:   2.61 kB
+dist/assets/TextArea-Bfv5aCRa.js                    5.71 kB Γöé gzip:   2.63 kB
+dist/assets/PositionsPage-CZPUrOe_.js               6.42 kB Γöé gzip:   2.68 kB
+dist/assets/sprint4Api-DitMiFqP.js                  6.63 kB Γöé gzip:   2.86 kB
+dist/assets/dayjs.min-DN3IxNoE.js                   7.18 kB Γöé gzip:   3.09 kB
+dist/assets/AccountsPage-DSQM-1_i.js                7.44 kB Γöé gzip:   3.23 kB
+dist/assets/adminMessages-BqJI1HBw.js               7.78 kB Γöé gzip:   2.63 kB
+dist/assets/AccountDetailPage-B-fg2Hnr.js           8.94 kB Γöé gzip:   3.46 kB
+dist/assets/descriptions-BsL6E62n.js                9.63 kB Γöé gzip:   2.97 kB
+dist/assets/ItemSwipeLayer-CciH35Rd.js              9.75 kB Γöé gzip:   3.77 kB
+dist/assets/TextArea-BkzoXdE7.js                   10.96 kB Γöé gzip:   4.45 kB
+dist/assets/TeacherDetailPage-CNo0N6qp.js          11.04 kB Γöé gzip:   4.09 kB
+dist/assets/input-CvFk9u0H.js                      11.10 kB Γöé gzip:   4.51 kB
+dist/assets/useDevWarning-BVAEaozy.js              11.50 kB Γöé gzip:   4.39 kB
+dist/assets/useScrollableArea-xfjhdtdB.js          11.60 kB Γöé gzip:   4.29 kB
+dist/assets/style-D0WBP978.js                      11.86 kB Γöé gzip:   3.68 kB
+dist/assets/container.stylex-BtDeQaTH.js           12.06 kB Γöé gzip:   2.22 kB
+dist/assets/OrganizationDetailPage-se1rBazQ.js     12.15 kB Γöé gzip:   4.76 kB
+dist/assets/TeachersPage-BTrAQcJA.js               12.84 kB Γöé gzip:   4.25 kB
+dist/assets/useFocusTrap-DKx_9dy7.js               13.12 kB Γöé gzip:   3.28 kB
+dist/assets/OverviewPage-B1Kkw8Zi.js               17.58 kB Γöé gzip:   6.28 kB
+dist/assets/AlertDialog-D61Q9gDS.js                19.47 kB Γöé gzip:   7.19 kB
+dist/assets/DepartmentDetailPage-DrSRGczT.js       20.05 kB Γöé gzip:   7.08 kB
+dist/assets/DetailSection-B80UqtzK.js              20.92 kB Γöé gzip:   8.19 kB
+dist/assets/MultiSelector-DIjBhjcM.js              24.82 kB Γöé gzip:   9.15 kB
+dist/assets/modal-PsxtvxBs.js                      25.60 kB Γöé gzip:   9.04 kB
+dist/assets/Pagination-DbZjjvDh.js                 26.06 kB Γöé gzip:   9.74 kB
+dist/assets/coarsePointer-wBO_tEUD.js              29.66 kB Γöé gzip:   8.45 kB
+dist/assets/PageLoading-CmKIwX6W.js                33.65 kB Γöé gzip:  11.68 kB
+dist/assets/tag-cs8Q1a_T.js                        35.67 kB Γöé gzip:  11.52 kB
+dist/assets/ClassDetailPage-BJfJSQvP.js            38.97 kB Γöé gzip:  13.28 kB
+dist/assets/useLayerDismissal-DjwUnl81.js          48.36 kB Γöé gzip:  17.23 kB
+dist/assets/EmptyState-DdOqzMxJ.js                 51.41 kB Γöé gzip:  18.94 kB
+dist/assets/TextInput-BPuR0Ezt.js                  54.10 kB Γöé gzip:  18.60 kB
+dist/assets/ListItem-D5q5qsXB.js                   55.10 kB Γöé gzip:  20.11 kB
+dist/assets/useTooltip-Bjh9rXdY.js                 68.68 kB Γöé gzip:  22.53 kB
+dist/assets/useNotify-hBI5v0v0.js                 105.28 kB Γöé gzip:  31.41 kB
+dist/assets/AuditLogPage-MUB4AzoR.js              106.55 kB Γöé gzip:  34.09 kB
+dist/assets/BottomSheet-CmQ1nTRi.js               114.05 kB Γöé gzip:  38.46 kB
+dist/assets/pagination-ChmigvCb.js                115.68 kB Γöé gzip:  36.76 kB
+dist/assets/useBusyAnnouncement-T7am7MhF.js       174.11 kB Γöé gzip:  57.99 kB
+dist/assets/sprint4Messages-hGC1xnnH.js           192.97 kB Γöé gzip:  67.10 kB
+dist/assets/table-BtNEQadF.js                     204.62 kB Γöé gzip:  62.44 kB
+dist/assets/theme-VLWQ7o3e.js                     281.76 kB Γöé gzip:  93.11 kB
+dist/assets/index-xzoSYkP9.js                     472.67 kB Γöé gzip: 145.31 kB
+
+[32mΓ£ô built in 1.33s[39m

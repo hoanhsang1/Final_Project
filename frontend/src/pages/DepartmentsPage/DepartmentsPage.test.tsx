@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OwnerApiError } from '../../features/owner/ownerApi';
@@ -46,11 +45,9 @@ function renderPage() {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <App>
-        <MemoryRouter>
-          <DepartmentsPage />
-        </MemoryRouter>
-      </App>
+      <MemoryRouter>
+        <DepartmentsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -107,7 +104,11 @@ describe('DepartmentsPage — tạo phòng ban', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Thêm phòng ban' }));
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
 
-    expect(await screen.findByText('Vui lòng nhập tên phòng ban')).toBeInTheDocument();
+    // Astryx render thông báo lỗi ở 2 nơi: bản hiện trong dialog và bản trong
+    // live region `role="alert"` portal ra `<body>`. Scope vào dialog để chỉ bắt
+    // bản hiển thị (tránh "Found multiple elements" khi chạy cả suite).
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('Vui lòng nhập tên phòng ban')).toBeInTheDocument();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 

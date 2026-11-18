@@ -1,12 +1,28 @@
-import { Alert, Form, Input, Modal, theme } from 'antd';
+import {
+  Banner,
+  Button,
+  Dialog,
+  DialogHeader,
+  HStack,
+  TextArea,
+  TextInput,
+  VStack,
+} from '@astryxdesign/core';
+import type { FormEvent } from 'react';
 import { useEffect } from 'react';
 import { MSG_DEPT, MSG_OWNER } from '../../features/owner/ownerMessages';
 import type { Department, DepartmentPayload } from '../../features/owner/types';
+import { useFormState } from '../../hooks/useFormState';
 
-interface DepartmentFormValues {
+/**
+ * Là `type` chứ không phải `interface`: `useFormState<T>` buộc
+ * `T extends Record<string, unknown>`, và chỉ type alias của object literal mới
+ * có index signature ngầm.
+ */
+type DepartmentFormValues = {
   name: string;
-  description?: string;
-}
+  description: string;
+};
 
 interface DepartmentFormModalProps {
   open: boolean;
@@ -34,73 +50,103 @@ export default function DepartmentFormModal({
   onCancel,
   onSubmit,
 }: DepartmentFormModalProps) {
-  const { token } = theme.useToken();
-  const [form] = Form.useForm<DepartmentFormValues>();
   const isEditing = department !== null;
 
+  const form = useFormState<DepartmentFormValues>(
+    { name: '', description: '' },
+    {
+      name: (value) => {
+        if (!value.trim()) return MSG_DEPT.NAME_REQUIRED;
+        return value.trim().length <= 200 ? undefined : MSG_DEPT.NAME_TOO_LONG;
+      },
+      description: (value) =>
+        value.trim().length <= 1000 ? undefined : MSG_DEPT.DESCRIPTION_TOO_LONG,
+    },
+  );
+  // `reset` có identity ổn định (useCallback deps rỗng) — tách ra để effect bên
+  // dưới không phải phụ thuộc cả object `form` (đổi mỗi render → effect lặp vô hạn).
+  const resetForm = form.reset;
+
+  // Đổ dữ liệu vào form mỗi khi mở (thay `Form.setFieldsValue` + `destroyOnClose`).
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
     if (department) {
-      form.setFieldsValue({ name: department.name, description: department.description ?? '' });
+      resetForm({ name: department.name, description: department.description ?? '' });
     } else {
-      form.resetFields();
+      resetForm();
     }
-  }, [open, department, form]);
+  }, [open, department, resetForm]);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.validate()) return;
+    onSubmit({
+      name: form.values.name.trim(),
+      description: form.values.description.trim() || undefined,
+    });
+  };
 
   return (
-    <Modal
-      open={open}
-      title={isEditing ? MSG_DEPT.EDIT : MSG_DEPT.CREATE}
-      okText={MSG_OWNER.SAVE}
-      cancelText={MSG_OWNER.CANCEL}
-      confirmLoading={submitting}
-      okButtonProps={{ disabled: submitting }}
-      onOk={() => form.submit()}
-      onCancel={onCancel}
-      destroyOnClose
+    <Dialog
+      isOpen={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      purpose="form"
+      width={520}
     >
-      {open && error && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={error}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
+      <DialogHeader
+        title={isEditing ? MSG_DEPT.EDIT : MSG_DEPT.CREATE}
+        onOpenChange={(next) => {
+          if (!next) onCancel();
+        }}
+      />
 
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={false}
-        onFinish={(values) =>
-          onSubmit({
-            name: values.name.trim(),
-            description: values.description?.trim() || undefined,
-          })
-        }
-      >
-        <Form.Item
-          label={MSG_DEPT.NAME}
-          name="name"
-          rules={[
-            { required: true, whitespace: true, message: MSG_DEPT.NAME_REQUIRED },
-            { max: 200, message: MSG_DEPT.NAME_TOO_LONG },
-          ]}
-        >
-          <Input autoComplete="off" placeholder="Ví dụ: Khoa Công nghệ thông tin" />
-        </Form.Item>
+      <form noValidate onSubmit={handleSubmit} style={{ marginTop: 'var(--spacing-4)' }}>
+        <VStack gap={4}>
+          {error ? (
+            <Banner status="error" title={error} collapsible={false} role="alert" />
+          ) : null}
 
-        <Form.Item
-          label={MSG_DEPT.DESCRIPTION}
-          name="description"
-          rules={[{ max: 1000, message: MSG_DEPT.DESCRIPTION_TOO_LONG }]}
-        >
-          <Input.TextArea rows={3} maxLength={1000} showCount />
-        </Form.Item>
-      </Form>
-    </Modal>
+          <TextInput
+            label={MSG_DEPT.NAME}
+            value={form.values.name}
+            onChange={(value) => form.setValue('name', value)}
+            placeholder="Ví dụ: Khoa Công nghệ thông tin"
+            autoComplete="off"
+            isDisabled={submitting}
+            aria-required="true"
+            status={
+              form.errorOf('name') ? { type: 'error', message: form.errorOf('name') } : undefined
+            }
+          />
+
+          <TextArea
+            label={MSG_DEPT.DESCRIPTION}
+            value={form.values.description}
+            onChange={(value) => form.setValue('description', value)}
+            rows={3}
+            maxLength={1000}
+            isDisabled={submitting}
+            status={
+              form.errorOf('description')
+                ? { type: 'error', message: form.errorOf('description') }
+                : undefined
+            }
+          />
+
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_OWNER.CANCEL} onClick={onCancel} />
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              label={MSG_OWNER.SAVE}
+              isLoading={submitting}
+            />
+          </HStack>
+        </VStack>
+      </form>
+    </Dialog>
   );
 }

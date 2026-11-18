@@ -1,18 +1,42 @@
-import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
-import type { TableProps } from 'antd';
+import {
+  AlertDialog,
+  Badge,
+  Banner,
+  Button,
+  HStack,
+  paginateData,
+  pixel,
+  proportional,
+  Stack,
+  Table,
+  Text,
+  useTablePagination,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useState } from 'react';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import PositionFormModal from '../../components/PositionFormModal/PositionFormModal';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
 import { MSG_OWNER, MSG_POS } from '../../features/owner/ownerMessages';
 import { permissionLabel } from '../../features/owner/permissionLabels';
 import type { Position, PositionPayload } from '../../features/owner/types';
+import { useNotify } from '../../hooks/useNotify';
 import { usePositionsPage } from './use-positions';
 
-const { Text } = Typography;
-
 const EMPTY_VALUE = '—';
+
+/** Số dòng mỗi trang. BE trả cả mảng nên phân trang ở client bằng `paginateData`. */
+const PAGE_SIZE = 10;
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `Position` là
+ * interface nên không có index signature — giao thêm `Record<string, unknown>`
+ * để thoả ràng buộc mà **không** nới lỏng DTO (`docs/ui-conventions.md` §6.9).
+ */
+type PositionRow = Position & Record<string, unknown>;
 
 function formatDate(value: string): string {
   const parsed = dayjs(value);
@@ -20,14 +44,16 @@ function formatDate(value: string): string {
 }
 
 export default function PositionsPage() {
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const notify = useNotify();
   const { list, permissions, create, update, remove } = usePositionsPage();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Chức vụ đang chờ xác nhận xoá; `null` = không mở hộp thoại. */
+  const [pendingDelete, setPendingDelete] = useState<Position | null>(null);
+  const [page, setPage] = useState(1);
 
   const openCreate = () => {
     setEditing(null);
@@ -52,10 +78,10 @@ export default function PositionsPage() {
     try {
       if (editing) {
         await update.mutateAsync({ id: editing.id, payload });
-        message.success(MSG_POS.UPDATED);
+        notify.success(MSG_POS.UPDATED);
       } else {
         await create.mutateAsync(payload);
-        message.success(MSG_POS.CREATED);
+        notify.success(MSG_POS.CREATED);
       }
       closeForm();
     } catch (error) {
@@ -67,137 +93,148 @@ export default function PositionsPage() {
     setActionError(null);
     try {
       await remove.mutateAsync(position.id);
-      message.success(MSG_POS.DELETED);
+      notify.success(MSG_POS.DELETED);
     } catch (error) {
       setActionError(ownerErrorMessage(error));
+    } finally {
+      setPendingDelete(null);
     }
   };
 
-  const columns: TableProps<Position>['columns'] = [
+  const rows = (list.data ?? []) as PositionRow[];
+  // antd cũ dùng `hideOnSinglePage`: chỉ một trang thì không hiện thanh phân trang.
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  const pagination = useTablePagination<PositionRow>({
+    page: currentPage,
+    onPageChange: setPage,
+    totalItems: rows.length,
+    pageSize: PAGE_SIZE,
+    variant: totalPages > 1 ? 'pages' : 'none',
+    label: MSG_POS.PAGINATION_LABEL,
+  });
+
+  const columns: TableColumn<PositionRow>[] = [
     {
-      title: MSG_POS.NAME,
-      dataIndex: 'name',
       key: 'name',
+      header: MSG_POS.NAME,
+      width: proportional(1, { minWidth: 160 }),
+      renderCell: (position) => position.name,
     },
     {
-      title: MSG_POS.DESCRIPTION,
-      dataIndex: 'description',
       key: 'description',
-      render: (value: string | null) => value || EMPTY_VALUE,
+      header: MSG_POS.DESCRIPTION,
+      width: proportional(1, { minWidth: 180 }),
+      renderCell: (position) => position.description || EMPTY_VALUE,
     },
     {
-      title: MSG_POS.PERMISSIONS,
-      dataIndex: 'permissions',
       key: 'permissions',
-      render: (perms: string[]) => {
-        if (!perms || perms.length === 0) {
-          return <Text type="secondary">{MSG_POS.NO_PERMISSIONS}</Text>;
+      header: MSG_POS.PERMISSIONS,
+      width: proportional(1, { minWidth: 220 }),
+      renderCell: (position) => {
+        const codes = position.permissions;
+        if (!codes || codes.length === 0) {
+          return <Text type="supporting">{MSG_POS.NO_PERMISSIONS}</Text>;
         }
+        // BR-08: `Badge` luôn kèm NHÃN CHỮ, màu chỉ là tín hiệu phụ.
         return (
-          <Space wrap size={[token.marginXS, token.marginXS]}>
-            {perms.map((code) => (
-              <Tag key={code}>{permissionLabel(code)}</Tag>
+          <HStack gap={2} wrap="wrap">
+            {codes.map((code) => (
+              <Badge key={code} label={permissionLabel(code)} />
             ))}
-          </Space>
+          </HStack>
         );
       },
     },
     {
-      title: MSG_POS.CREATED_AT,
-      dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (value: string) => formatDate(value),
+      header: MSG_POS.CREATED_AT,
+      width: pixel(120),
+      renderCell: (position) => formatDate(position.createdAt),
     },
     {
-      title: MSG_POS.ACTIONS,
       key: 'actions',
-      render: (_, position) => (
-        <Space size={token.marginXS}>
+      header: MSG_POS.ACTIONS,
+      width: pixel(150),
+      renderCell: (position) => (
+        <HStack gap={2}>
           <Button
-            type="link"
+            variant="ghost"
+            size="sm"
+            label={MSG_POS.EDIT_SHORT}
             aria-label={`${MSG_POS.EDIT} ${position.name}`}
             onClick={() => openEdit(position)}
-          >
-            {MSG_POS.EDIT_SHORT}
-          </Button>
-          <Popconfirm
-            title={MSG_POS.DELETE_CONFIRM_TITLE}
-            description={`Chức vụ "${position.name}" sẽ bị xoá. ${MSG_POS.DELETE_CONFIRM}`}
-            okText={MSG_POS.DELETE}
-            cancelText={MSG_OWNER.CANCEL}
-            okButtonProps={{ danger: true }}
-            onConfirm={() => void handleDelete(position)}
-          >
-            <Button
-              type="link"
-              danger
-              aria-label={`${MSG_POS.DELETE} chức vụ ${position.name}`}
-            >
-              {MSG_POS.DELETE}
-            </Button>
-          </Popconfirm>
-        </Space>
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            label={MSG_POS.DELETE}
+            aria-label={`${MSG_POS.DELETE} chức vụ ${position.name}`}
+            onClick={() => setPendingDelete(position)}
+          />
+        </HStack>
       ),
     },
   ];
 
-  const isEmpty = list.isSuccess && (list.data?.length ?? 0) === 0;
-
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         title={MSG_POS.TITLE}
         subtitle={MSG_POS.SUBTITLE}
-        extra={
-          !isEmpty ? (
-            <Button type="primary" onClick={openCreate}>
-              {MSG_POS.CREATE}
-            </Button>
-          ) : undefined
-        }
+        extra={<Button variant="primary" size="lg" label={MSG_POS.CREATE} onClick={openCreate} />}
       />
 
-      {actionError && (
-        <Alert type="error" showIcon role="alert" message={actionError} />
-      )}
+      {actionError ? (
+        <Banner status="error" title={actionError} collapsible={false} role="alert" />
+      ) : null}
 
-      {permissions.isError && (
-        <Alert
-          type="error"
-          showIcon
+      {permissions.isError ? (
+        <Banner
+          status="error"
+          title={MSG_POS.PERMISSIONS_LOAD_ERROR}
+          collapsible={false}
           role="alert"
-          message={MSG_POS.PERMISSIONS_LOAD_ERROR}
-          action={<Button onClick={() => void permissions.refetch()}>{MSG_OWNER.RETRY}</Button>}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_OWNER.RETRY}
+              onClick={() => void permissions.refetch()}
+            />
+          }
         />
-      )}
+      ) : null}
 
-      {list.isError && (
-        <Alert
-          type="error"
-          showIcon
+      {list.isError ? (
+        <Banner
+          status="error"
+          title={MSG_POS.LOAD_ERROR}
+          collapsible={false}
           role="alert"
-          message={MSG_POS.LOAD_ERROR}
-          action={<Button onClick={() => void list.refetch()}>{MSG_OWNER.RETRY}</Button>}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_OWNER.RETRY}
+              onClick={() => void list.refetch()}
+            />
+          }
         />
-      )}
-
-      {isEmpty && (
-        <Empty description={<Text type="secondary">{MSG_POS.EMPTY}</Text>} style={{ marginTop: token.marginLG }}>
-          <Button type="primary" onClick={openCreate}>
-            {MSG_POS.CREATE}
-          </Button>
-        </Empty>
-      )}
-
-      {!isEmpty && !list.isError && (
-        <Table<Position>
-          rowKey="id"
+      ) : list.isPending ? (
+        <PageLoading />
+      ) : (
+        <Table<PositionRow>
+          data={paginateData(rows, currentPage, PAGE_SIZE)}
           columns={columns}
-          dataSource={list.data ?? []}
-          loading={list.isPending}
-          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
-          size="middle"
-          scroll={{ x: 860 }}
+          idKey="id"
+          hasHover
+          textOverflow="truncate"
+          rowIndexStart={(currentPage - 1) * PAGE_SIZE + 1}
+          rowCount={rows.length}
+          emptyState={<EmptyState description={MSG_POS.EMPTY} compact />}
+          plugins={{ pagination }}
         />
       )}
 
@@ -210,6 +247,28 @@ export default function PositionsPage() {
         onCancel={closeForm}
         onSubmit={(payload) => void handleSubmit(payload)}
       />
-    </Flex>
+
+      {/* Xác nhận xoá: Astryx không có `Popconfirm` nên dùng `AlertDialog` —
+          hộp thoại giữa màn hình thay vì bong bóng neo nút. */}
+      <AlertDialog
+        isOpen={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={MSG_POS.DELETE_CONFIRM_TITLE}
+        description={
+          pendingDelete
+            ? `Chức vụ "${pendingDelete.name}" sẽ bị xoá. ${MSG_POS.DELETE_CONFIRM}`
+            : ''
+        }
+        cancelLabel={MSG_OWNER.CANCEL}
+        actionLabel={MSG_POS.DELETE}
+        actionVariant="destructive"
+        isActionLoading={remove.isPending}
+        onAction={() => {
+          if (pendingDelete) void handleDelete(pendingDelete);
+        }}
+      />
+    </Stack>
   );
 }

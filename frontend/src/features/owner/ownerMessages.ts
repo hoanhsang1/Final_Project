@@ -53,6 +53,8 @@ export const MSG_DEPT = {
   DESCRIPTION: 'Mô tả',
   CREATED_AT: 'Ngày tạo',
   ACTIONS: 'Thao tác',
+  /** `aria-label` cho `nav` phân trang của bảng (Astryx mặc định tiếng Anh). */
+  PAGINATION_LABEL: 'Phân trang danh sách phòng ban',
   NAME_REQUIRED: 'Vui lòng nhập tên phòng ban',
   NAME_TOO_LONG: 'Tên phòng ban tối đa 200 ký tự',
   DESCRIPTION_TOO_LONG: 'Mô tả tối đa 1000 ký tự',
@@ -127,6 +129,8 @@ export const MSG_POS = {
   PERMISSIONS: 'Quyền',
   CREATED_AT: 'Ngày tạo',
   ACTIONS: 'Thao tác',
+  /** `aria-label` cho `nav` phân trang của bảng (Astryx mặc định tiếng Anh). */
+  PAGINATION_LABEL: 'Phân trang danh sách chức vụ',
   NAME_REQUIRED: 'Vui lòng nhập tên chức vụ',
   NAME_TOO_LONG: 'Tên chức vụ tối đa 200 ký tự',
   DESCRIPTION_TOO_LONG: 'Mô tả tối đa 1000 ký tự',

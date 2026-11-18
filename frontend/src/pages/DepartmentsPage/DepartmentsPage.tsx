@@ -1,17 +1,41 @@
-import { Alert, App, Button, Empty, Popconfirm, Space, Table, Typography, theme } from 'antd';
-import type { TableProps } from 'antd';
+import {
+  AlertDialog,
+  Banner,
+  Button,
+  HStack,
+  paginateData,
+  pixel,
+  proportional,
+  Stack,
+  Table,
+  useTablePagination,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { AppLink } from '../../components/AppLink/AppLink';
 import DepartmentFormModal from '../../components/DepartmentFormModal/DepartmentFormModal';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
 import { MSG_DEPT, MSG_OWNER } from '../../features/owner/ownerMessages';
 import type { Department, DepartmentPayload } from '../../features/owner/types';
+import { useNotify } from '../../hooks/useNotify';
 import { useDepartmentsPage } from './use-departments';
 
 /** Giá trị hiển thị khi BE trả `null` — không để ô trống, không hiện `null`. */
 const EMPTY_VALUE = '—';
+
+/** Số dòng mỗi trang. BE trả cả mảng nên phân trang ở client bằng `paginateData`. */
+const PAGE_SIZE = 10;
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `Department`
+ * là interface nên không có index signature. Giao thêm `Record<string, unknown>`
+ * để thoả ràng buộc mà **không** nới lỏng DTO — xem `docs/ui-conventions.md` §6.9.
+ */
+type DepartmentRow = Department & Record<string, unknown>;
 
 function formatDate(value: string): string {
   const parsed = dayjs(value);
@@ -26,14 +50,16 @@ function formatDate(value: string): string {
  * thì phải gọi N lần `GET /departments/{id}/members`, không đáng.
  */
 export default function DepartmentsPage() {
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const notify = useNotify();
   const { list, create, update, remove } = useDepartmentsPage();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Phòng ban đang chờ xác nhận xoá; `null` = không mở hộp thoại. */
+  const [pendingDelete, setPendingDelete] = useState<Department | null>(null);
+  const [page, setPage] = useState(1);
 
   const openCreate = () => {
     setEditing(null);
@@ -58,10 +84,10 @@ export default function DepartmentsPage() {
     try {
       if (editing) {
         await update.mutateAsync({ id: editing.id, payload });
-        message.success(MSG_DEPT.UPDATED);
+        notify.success(MSG_DEPT.UPDATED);
       } else {
         await create.mutateAsync(payload);
-        message.success(MSG_DEPT.CREATED);
+        notify.success(MSG_DEPT.CREATED);
       }
       closeForm();
     } catch (error) {
@@ -74,124 +100,120 @@ export default function DepartmentsPage() {
     setActionError(null);
     try {
       await remove.mutateAsync(department.id);
-      message.success(MSG_DEPT.DELETED);
+      notify.success(MSG_DEPT.DELETED);
     } catch (error) {
       setActionError(ownerErrorMessage(error));
+    } finally {
+      // `AlertDialog` KHÔNG tự đóng (khác `Popconfirm` của antd): đóng sau khi
+      // yêu cầu kết thúc, dù thành công hay lỗi — lỗi đã hiện ở `Banner` trên bảng.
+      setPendingDelete(null);
     }
   };
 
-  const columns: TableProps<Department>['columns'] = [
+  const rows = (list.data ?? []) as DepartmentRow[];
+  // antd cũ dùng `hideOnSinglePage`: chỉ một trang thì không hiện thanh phân trang.
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  const pagination = useTablePagination<DepartmentRow>({
+    page: currentPage,
+    onPageChange: setPage,
+    totalItems: rows.length,
+    pageSize: PAGE_SIZE,
+    variant: totalPages > 1 ? 'pages' : 'none',
+    label: MSG_DEPT.PAGINATION_LABEL,
+  });
+
+  const columns: TableColumn<DepartmentRow>[] = [
     {
-      title: MSG_DEPT.NAME,
-      dataIndex: 'name',
       key: 'name',
-      render: (_, department) => (
-        <Link to={`/to-chuc/phong-ban/${department.id}`}>{department.name}</Link>
+      header: MSG_DEPT.NAME,
+      width: proportional(1, { minWidth: 180 }),
+      renderCell: (department) => (
+        <AppLink to={`/to-chuc/phong-ban/${department.id}`}>{department.name}</AppLink>
       ),
     },
     {
-      title: MSG_DEPT.DESCRIPTION,
-      dataIndex: 'description',
       key: 'description',
-      render: (value: string | null) => value || EMPTY_VALUE,
+      header: MSG_DEPT.DESCRIPTION,
+      width: proportional(1, { minWidth: 220 }),
+      renderCell: (department) => department.description || EMPTY_VALUE,
     },
     {
-      title: MSG_DEPT.CREATED_AT,
-      dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (value: string) => formatDate(value),
+      header: MSG_DEPT.CREATED_AT,
+      width: pixel(120),
+      renderCell: (department) => formatDate(department.createdAt),
     },
     {
-      title: MSG_DEPT.ACTIONS,
       key: 'actions',
-      render: (_, department) => (
-        <Space size={token.marginXS}>
+      header: MSG_DEPT.ACTIONS,
+      width: pixel(150),
+      renderCell: (department) => (
+        <HStack gap={2}>
           <Button
-            type="link"
+            variant="ghost"
+            size="sm"
+            label={MSG_DEPT.EDIT_SHORT}
             aria-label={`${MSG_DEPT.EDIT} ${department.name}`}
             onClick={() => openEdit(department)}
-          >
-            {MSG_DEPT.EDIT_SHORT}
-          </Button>
-          <Popconfirm
-            title={MSG_DEPT.DELETE_CONFIRM_TITLE}
-            description={`Phòng ban "${department.name}" sẽ bị xoá. ${MSG_DEPT.DELETE_CONFIRM}`}
-            okText={MSG_DEPT.DELETE}
-            cancelText={MSG_OWNER.CANCEL}
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(department)}
-          >
-            <Button
-              type="link"
-              danger
-              aria-label={`${MSG_DEPT.DELETE} phòng ban ${department.name}`}
-            >
-              {MSG_DEPT.DELETE}
-            </Button>
-          </Popconfirm>
-        </Space>
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            label={MSG_DEPT.DELETE}
+            aria-label={`${MSG_DEPT.DELETE} phòng ban ${department.name}`}
+            onClick={() => setPendingDelete(department)}
+          />
+        </HStack>
       ),
     },
   ];
 
-  const isEmpty = list.isSuccess && list.data.length === 0;
-
   return (
-    <div>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         title={MSG_DEPT.TITLE}
         subtitle={MSG_DEPT.SUBTITLE}
         extra={
-          !isEmpty ? (
-            <Button type="primary" onClick={openCreate}>
-              {MSG_DEPT.CREATE}
-            </Button>
-          ) : undefined
+          <Button variant="primary" size="lg" label={MSG_DEPT.CREATE} onClick={openCreate} />
         }
       />
 
-      {actionError && (
-        <Alert
-          type="error"
-          showIcon
+      {actionError ? (
+        <Banner status="error" title={actionError} collapsible={false} role="alert" />
+      ) : null}
+
+      {list.isError ? (
+        <Banner
+          status="error"
+          title={MSG_DEPT.LOAD_ERROR}
+          collapsible={false}
           role="alert"
-          message={actionError}
-          style={{ marginTop: token.margin }}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_OWNER.RETRY}
+              onClick={() => void list.refetch()}
+            />
+          }
         />
-      )}
-
-      {list.isError && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={MSG_DEPT.LOAD_ERROR}
-          style={{ marginTop: token.margin }}
-          action={<Button onClick={() => void list.refetch()}>{MSG_OWNER.RETRY}</Button>}
-        />
-      )}
-
-      {isEmpty && (
-        <Empty
-          description={<Typography.Text type="secondary">{MSG_DEPT.EMPTY}</Typography.Text>}
-          style={{ marginTop: token.marginXXL }}
-        >
-          <Button type="primary" size="large" onClick={openCreate}>
-            {MSG_DEPT.CREATE}
-          </Button>
-        </Empty>
-      )}
-
-      {!isEmpty && !list.isError && (
-        <Table<Department>
-          rowKey="id"
+      ) : list.isPending ? (
+        <PageLoading />
+      ) : (
+        <Table<DepartmentRow>
+          data={paginateData(rows, currentPage, PAGE_SIZE)}
           columns={columns}
-          dataSource={list.data ?? []}
-          loading={list.isPending}
-          style={{ marginTop: token.margin }}
-          pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }}
-          size="middle"
-          scroll={{ x: 640 }}
+          idKey="id"
+          hasHover
+          textOverflow="truncate"
+          // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự
+          // trong mảng một trang.
+          rowIndexStart={(currentPage - 1) * PAGE_SIZE + 1}
+          rowCount={rows.length}
+          emptyState={<EmptyState description={MSG_DEPT.EMPTY} compact />}
+          plugins={{ pagination }}
         />
       )}
 
@@ -203,6 +225,28 @@ export default function DepartmentsPage() {
         onCancel={closeForm}
         onSubmit={(payload) => void handleSubmit(payload)}
       />
-    </div>
+
+      {/* Xác nhận xoá: Astryx không có `Popconfirm` nên dùng `AlertDialog` —
+          hộp thoại giữa màn hình thay vì bong bóng neo nút. */}
+      <AlertDialog
+        isOpen={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={MSG_DEPT.DELETE_CONFIRM_TITLE}
+        description={
+          pendingDelete
+            ? `Phòng ban "${pendingDelete.name}" sẽ bị xoá. ${MSG_DEPT.DELETE_CONFIRM}`
+            : ''
+        }
+        cancelLabel={MSG_OWNER.CANCEL}
+        actionLabel={MSG_DEPT.DELETE}
+        actionVariant="destructive"
+        isActionLoading={remove.isPending}
+        onAction={() => {
+          if (pendingDelete) void handleDelete(pendingDelete);
+        }}
+      />
+    </Stack>
   );
 }

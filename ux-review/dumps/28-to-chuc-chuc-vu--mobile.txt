@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/to-chuc/chuc-vu
 Viewport     : mobile 375x667
 Tiêu đề tab  : Chức vụ — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 56
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 375px)
 
 ## API đã gọi (2)
@@ -16,20 +16,21 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 375x56
   <button> Mở menu quản lý tổ chức @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> Chức vụChức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viê… @0,56 375x395
+<main> Chức vụChức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viê… @0,56 375x370
   <h1> Chức vụ @16,76 343x32
-  <button> Thêm chức vụ @16,182 126x36
-  <table> [table 5 cột, 3 dòng] @16,262 860x169
+  <button> Thêm chức vụ @16,182 120x36
+  <div role="group"> Bảng @16,258 343x148
+    <table> [table 5 cột, 2 dòng] @16,258 930x148
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
 - button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @267,12 92x32
-- button "Thêm chức vụ" @16,182 126x36
-- button "Sửa chức vụ Giáo viên" @737,321 56x36
-- button "Xoá chức vụ Giáo viên" @801,321 56x36
-- button "Sửa chức vụ Tổ trưởng" @737,382 56x36
-- button "Xoá chức vụ Tổ trưởng" @801,382 56x36
+- button "Thêm chức vụ" @16,182 120x36
+- button "Sửa chức vụ Giáo viên" @808,305 50x28
+- button "Xoá chức vụ Giáo viên" @866,305 50x28
+- button "Sửa chức vụ Tổ trưởng" @808,360 50x28
+- button "Xoá chức vụ Tổ trưởng" @866,360 50x28
 
 ## Tiêu đề (heading)
 - h1: Chức vụ
@@ -41,4 +42,4 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Chức vụ Chức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viên — phòng ban không có quyền riêng. Thêm chức vụ Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Giáo viên Giảng dạy Xem nhân viên phòng ban 01/09/2026 Sửa Xoá Tổ trưởng Quản lý tổ Xem nhân viên phòng ban Quản lý nhân viên phòng ban 01/09/2026 Sửa Xoá
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Chức vụ Chức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viên — phòng ban không có quyền riêng. Thêm chức vụ Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Giáo viên Giảng dạy Xem nhân viên phòng ban 01/09/2026 Sửa Xoá Tổ trưởng Quản lý tổ Xem nhân viên phòng ban Quản lý nhân viên phòng ban 01/09/2026 Sửa Xoá
