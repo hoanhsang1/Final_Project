@@ -49,6 +49,19 @@ if (!container) {
 // — chữ hơi khác kiểu và không ai biết vì sao. Đo bằng `getComputedStyle` mới thấy.
 document.body.style.fontFamily = fontFamily;
 
+// Bù các khoá mà gói Astryx CHƯA dịch sang `vi-VN`.
+//
+// Cách kiểm: đối chiếu `dist/i18n/generated-english/<Component>/<Component>.generated.js`
+// với `dist/i18n/generated-locales/vi-VN.generated.js`. Khoá thiếu ở vi-VN sẽ rơi
+// về tiếng Anh (`resolve.js` bước 5) — hiện ra màn hình chứ không báo lỗi.
+//
+// Đã xác minh: `MultiSelector` thiếu `selectedCount` → trigger hiện "1 selected"
+// sau khi chọn (mọi `MultiSelector` dùng `triggerDisplay="count"` mặc định).
+// Bù tại ĐÂY, KHÔNG sửa `node_modules` (file generated, mất khi cập nhật gói).
+const astryxViOverrides = {
+  '@astryx.multiSelector.selectedCount': 'Đã chọn {count}',
+};
+
 // Client dùng chung cho TanStack Query (server state). Không retry khi lỗi 4xx
 // (đăng nhập sai mật khẩu là 401 — retry vô nghĩa, chỉ làm người dùng đợi lâu).
 const queryClient = new QueryClient({
@@ -66,7 +79,10 @@ createRoot(container).render(
       `mode="light"` cố định chế độ sáng — app không có dark mode, và nếu để
       `system` thì `light-dark()` trong CSS sẽ đổi màu theo cài đặt của máy.
     */}
-    <InternationalizationProvider locale="vi-VN" messages={{ 'vi-VN': viVNAstryx }}>
+    <InternationalizationProvider
+      locale="vi-VN"
+      messages={{ 'vi-VN': { ...viVNAstryx, ...astryxViOverrides } }}
+    >
       <Theme theme={memsTheme} mode="light">
         <QueryClientProvider client={queryClient}>
           {/* `App` của antd: để `message`/`notification` đi qua ConfigProvider (đúng token/theme). */}
