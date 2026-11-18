@@ -1,14 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  App,
+  Badge,
+  Banner,
   Button,
-  Descriptions,
-  Flex,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+  HStack,
+  MetadataList,
+  MetadataListItem,
+  Stack,
+} from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -20,6 +19,7 @@ import type { PasswordResetMode } from '../../components/AccountResetPasswordMod
 import AccountStatusModal from '../../components/AccountStatusModal/AccountStatusModal';
 import type { TargetAccountStatus } from '../../components/AccountStatusModal/AccountStatusModal';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
+import DetailSection from '../../components/DetailSection/DetailSection';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import {
   AdminApiError,
@@ -27,15 +27,19 @@ import {
   updateAccountRole,
   updateAccountStatus,
 } from '../../features/admin/adminApi';
-import { MSG_ACC, MSG_ORG, msgAccountStatusUpdated, msgBackendPending } from '../../features/admin/adminMessages';
+import {
+  MSG_ACC,
+  MSG_ORG,
+  msgAccountStatusUpdated,
+  msgBackendPending,
+} from '../../features/admin/adminMessages';
 import { backToListPath } from '../../features/admin/consoleMenu';
 import { roleLabel } from '../../features/admin/roleLabels';
 import { accountStatusLabel } from '../../features/admin/statusLabels';
 import type { AccountStatus } from '../../features/admin/types';
+import { useNotify } from '../../hooks/useNotify';
 import { useAccountAudit } from './use-account-audit';
 import { useAccountDetailQuery } from './use-account-detail';
-
-const { Text, Title } = Typography;
 
 /** Số dòng / trang của khối nhật ký tài khoản. */
 const ACCOUNT_AUDIT_PAGE_SIZE = 20;
@@ -90,15 +94,14 @@ function formatDateTime(value: string | null | undefined): string {
  * `POST /accounts/{id}/reset-password` (`D-31`) + nhật ký
  * `GET /api/v1/audit-logs?accountId=<id>` (`D-22`).
  *
- * ⚠️ Cả 5 endpoint đều CHƯA có ở BE → tới khi Sang làm, màn hiện Result 404
- * (item) hoặc Alert "chờ backend" (nhật ký).
+ * ⚠️ Cả 5 endpoint đều CHƯA có ở BE → tới khi Sang làm, màn hiện `StatusScreen`
+ * 404 (item) hoặc Banner "chờ backend" (nhật ký).
  *
  * Trạng thái: **loading** · **error** · **success** · **no-permission**
  * (guard). **empty** áp dụng cho khối nhật ký.
  */
 export default function AccountDetailPage() {
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const notify = useNotify();
   const { id: accountId = '' } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,8 +109,8 @@ export default function AccountDetailPage() {
 
   const [pendingTarget, setPendingTarget] = useState<TargetAccountStatus | null>(null);
   /**
-   * Lỗi của thao tác đổi trạng thái gần nhất — hiện bằng `Alert` thay cho
-   * `message.error` (toast tự biến mất và bị modal che — NFR-REL-001).
+   * Lỗi của thao tác đổi trạng thái gần nhất — hiện bằng `Banner` thay cho
+   * toast (toast tự biến mất và bị modal che — NFR-REL-001).
    */
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -133,7 +136,7 @@ export default function AccountDetailPage() {
   const roleMutation = useMutation({
     mutationFn: (role: string) => updateAccountRole(accountId, role),
     onSuccess: () => {
-      message.success(MSG_ACC.ROLE_UPDATED);
+      notify.success(MSG_ACC.ROLE_UPDATED);
       setRoleOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
@@ -157,9 +160,7 @@ export default function AccountDetailPage() {
     mutationFn: ({ newPassword }: { mode: PasswordResetMode; newPassword?: string }) =>
       resetAccountPassword(accountId, newPassword),
     onSuccess: (_data, variables) => {
-      message.success(
-        variables.mode === 'manual' ? MSG_ACC.PASSWORD_UPDATED : MSG_ACC.RESET_SENT,
-      );
+      notify.success(variables.mode === 'manual' ? MSG_ACC.PASSWORD_UPDATED : MSG_ACC.RESET_SENT);
       setResetOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
@@ -180,8 +181,8 @@ export default function AccountDetailPage() {
 
   const account = detailQuery.data;
 
-  // 404 từ ITEM endpoint = không tìm thấy đối tượng → Result 404 (khác với
-  // collection — xem đặc tả §4.5).
+  // 404 từ ITEM endpoint = không tìm thấy đối tượng → `StatusScreen` 404 (khác
+  // với collection — xem đặc tả §4.5).
   const isNotFound =
     detailQuery.isError &&
     detailQuery.error instanceof AdminApiError &&
@@ -203,16 +204,21 @@ export default function AccountDetailPage() {
 
   if (detailQuery.isError || !account) {
     return (
-      <Alert
-        type="error"
-        showIcon
+      <Banner
+        status="error"
         role="alert"
-        message={MSG_ACC.DETAIL_ERROR}
+        collapsible={false}
+        title={MSG_ACC.DETAIL_ERROR}
         description="Kiểm tra kết nối máy chủ rồi thử lại."
-        action={
-          <Button onClick={() => void detailQuery.refetch()} loading={detailQuery.isFetching}>
-            {MSG_ORG.RETRY}
-          </Button>
+        endContent={
+          <Button
+            variant="secondary"
+            size="sm"
+            label={MSG_ORG.RETRY}
+            onClick={() => void detailQuery.refetch()}
+            isLoading={detailQuery.isFetching}
+            isDisabled={detailQuery.isFetching}
+          />
         }
       />
     );
@@ -222,97 +228,78 @@ export default function AccountDetailPage() {
   const targets = ALLOWED_TARGETS[account.status] ?? [];
 
   return (
-    <Flex vertical gap={token.marginLG}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         breadcrumb={[{ title: MSG_ACC.LIST_TITLE, href: backPath }, { title: account.username }]}
         title={account.username}
-        subtitle={
-          <Text type="secondary">
-            {MSG_ACC.DETAIL_TITLE}
-            {account.full_name ? ` · ${account.full_name}` : ''}
-          </Text>
-        }
+        subtitle={`${MSG_ACC.DETAIL_TITLE}${account.full_name ? ` · ${account.full_name}` : ''}`}
       />
 
       {/* Lỗi đổi trạng thái — hiện khi modal đã đóng, không nằm sau lớp phủ. */}
-      {actionError && pendingTarget === null && (
-        <Alert type="error" showIcon role="alert" message={actionError} />
-      )}
+      {actionError && pendingTarget === null ? (
+        <Banner status="error" role="alert" title={actionError} collapsible={false} />
+      ) : null}
 
-      <Descriptions
-        title={MSG_ACC.DETAIL_TITLE}
-        bordered
-        column={{ xs: 1, sm: 2, lg: 3 }}
-        items={[
-          { key: 'username', label: 'Tên đăng nhập', children: account.username },
-          { key: 'email', label: 'Email', children: account.email || EMPTY_VALUE },
-          {
-            key: 'full_name',
-            label: MSG_ACC.FULL_NAME,
-            children: account.full_name || EMPTY_VALUE,
-          },
-          {
-            key: 'organization',
-            label: MSG_ACC.ORGANIZATION,
-            children: account.organization_name || EMPTY_VALUE,
-          },
-          { key: 'role', label: MSG_ACC.ROLE, children: roleLabel(account.role) },
-          {
-            key: 'status',
-            label: 'Trạng thái',
-            // BR-08: Tag LUÔN kèm chữ, không chỉ màu.
-            children: <Tag color={statusLabel.color}>{statusLabel.label}</Tag>,
-          },
-          {
-            key: 'created_at',
-            label: MSG_ACC.CREATED_AT,
-            children: formatDateTime(account.created_at),
-          },
-          {
-            key: 'last_login_at',
-            label: MSG_ACC.LAST_LOGIN,
-            children: formatDateTime(account.last_login_at),
-          },
-        ]}
-      />
+      <DetailSection title={MSG_ACC.DETAIL_TITLE}>
+        <MetadataList columns="multi" label={{ position: 'start', width: 170 }}>
+          <MetadataListItem label="Tên đăng nhập">{account.username}</MetadataListItem>
+          <MetadataListItem label="Email">{account.email || EMPTY_VALUE}</MetadataListItem>
+          <MetadataListItem label={MSG_ACC.FULL_NAME}>
+            {account.full_name || EMPTY_VALUE}
+          </MetadataListItem>
+          <MetadataListItem label={MSG_ACC.ORGANIZATION}>
+            {account.organization_name || EMPTY_VALUE}
+          </MetadataListItem>
+          <MetadataListItem label={MSG_ACC.ROLE}>{roleLabel(account.role)}</MetadataListItem>
+          <MetadataListItem label="Trạng thái">
+            {/* BR-08: Badge LUÔN kèm chữ, không chỉ màu. */}
+            <Badge variant={statusLabel.badge} label={statusLabel.label} />
+          </MetadataListItem>
+          <MetadataListItem label={MSG_ACC.CREATED_AT}>
+            {formatDateTime(account.created_at)}
+          </MetadataListItem>
+          <MetadataListItem label={MSG_ACC.LAST_LOGIN}>
+            {formatDateTime(account.last_login_at)}
+          </MetadataListItem>
+        </MetadataList>
+      </DetailSection>
 
-      <Flex gap={token.marginSM} wrap>
+      <HStack gap={3} wrap="wrap">
         {targets.map((target) => (
           <Button
             key={target}
-            danger={target !== 'active'}
+            variant={target === 'active' ? 'secondary' : 'destructive'}
+            size="lg"
+            label={targetLabel(account.status, target)}
+            aria-label={`${targetLabel(account.status, target)} tài khoản ${account.username}`}
             onClick={() => {
               setActionError(null);
               setPendingTarget(target);
             }}
-            aria-label={`${targetLabel(account.status, target)} tài khoản ${account.username}`}
-          >
-            {targetLabel(account.status, target)}
-          </Button>
+          />
         ))}
         {/* UC-19 (mở rộng): đổi vai trò + đặt lại mật khẩu — luôn hiển thị. */}
         <Button
+          variant="secondary"
+          size="lg"
+          label={MSG_ACC.CHANGE_ROLE_TITLE}
           onClick={() => {
             setRoleError(null);
             setRoleOpen(true);
           }}
-        >
-          {MSG_ACC.CHANGE_ROLE_TITLE}
-        </Button>
+        />
         <Button
+          variant="secondary"
+          size="lg"
+          label={MSG_ACC.RESET_TITLE}
           onClick={() => {
             setResetError(null);
             setResetOpen(true);
           }}
-        >
-          {MSG_ACC.RESET_TITLE}
-        </Button>
-      </Flex>
+        />
+      </HStack>
 
-      <div>
-        <Title level={2} style={{ margin: 0, marginBlockEnd: token.marginSM }}>
-          {MSG_ACC.AUDIT_TITLE}
-        </Title>
+      <DetailSection title={MSG_ACC.AUDIT_TITLE}>
         <AuditLogTable
           query={auditQuery}
           page={1}
@@ -321,7 +308,7 @@ export default function AccountDetailPage() {
           emptyText="Chưa có sự kiện nào"
           errorText="Không tải được nhật ký của tài khoản."
         />
-      </div>
+      </DetailSection>
 
       <AccountStatusModal
         open={pendingTarget !== null}
@@ -336,7 +323,7 @@ export default function AccountDetailPage() {
             { status: pendingTarget ?? 'active', reason },
             {
               onSuccess: () => {
-                message.success(msgAccountStatusUpdated(account.username));
+                notify.success(msgAccountStatusUpdated(account.username));
                 setActionError(null);
                 setPendingTarget(null);
               },
@@ -374,6 +361,6 @@ export default function AccountDetailPage() {
         onCancel={() => setResetOpen(false)}
         onConfirm={(mode, newPassword) => resetMutation.mutate({ mode, newPassword })}
       />
-    </Flex>
+    </Stack>
   );
 }

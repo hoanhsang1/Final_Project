@@ -1,0 +1,58 @@
+﻿PASS  chi tiß║┐t: h1 = "lequydon" ΓÇö lequydon
+PASS  chi tiß║┐t: c├│ heading "Th├┤ng tin t├ái khoß║ún"
+PASS  chi tiß║┐t: c├│ heading "Nhß║¡t k├╜ cß╗ºa t├ái khoß║ún"
+PASS  chi tiß║┐t: ─æß╗º 8 nh├ún metadata
+PASS  chi tiß║┐t: gi├í trß╗ï vai tr├▓ tiß║┐ng Viß╗çt "Chß╗º tß╗ò chß╗⌐c"
+PASS  chi tiß║┐t: Badge trß║íng th├íi k├¿m chß╗» "─Éang hoß║ít ─æß╗Öng"
+PASS  chi tiß║┐t: ng├áy ─æß╗ïnh dß║íng DD/MM/YYYY
+PASS  chi tiß║┐t: kh├┤ng c├│ pageerror
+PASS  chi tiß║┐t 404: c├óu "Kh├┤ng t├¼m thß║Ñy t├ái khoß║ún."
+PASS  chi tiß║┐t 404: n├║t vß╗ü danh s├ích l├á role=button (StatusScreen)
+PASS  chi tiß║┐t 404: bß║Ñm n├║t vß╗ü /quan-tri/tai-khoan ΓÇö http://127.0.0.1:5173/quan-tri/tai-khoan
+PASS  chi tiß║┐t lß╗ùi: c├óu "Kh├┤ng tß║úi ─æ╞░ß╗úc th├┤ng tin t├ái khoß║ún."
+PASS  chi tiß║┐t lß╗ùi: c├│ banner role=alert
+PASS  chi tiß║┐t lß╗ùi: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  ma trß║¡n pending: C├ô n├║t "K├¡ch hoß║ít t├ái khoß║ún lequydon"
+PASS  ma trß║¡n pending: KH├öNG c├│ n├║t "Kho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n pending: KH├öNG c├│ n├║t "V├┤ hiß╗çu ho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n active: C├ô n├║t "Kho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n active: C├ô n├║t "V├┤ hiß╗çu ho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n active: KH├öNG c├│ n├║t "K├¡ch hoß║ít t├ái khoß║ún lequydon"
+PASS  ma trß║¡n locked: C├ô n├║t "Mß╗ƒ kho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n locked: C├ô n├║t "V├┤ hiß╗çu ho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n locked: KH├öNG c├│ n├║t "K├¡ch hoß║ít t├ái khoß║ún lequydon"
+PASS  ma trß║¡n disabled: C├ô n├║t "K├¡ch hoß║ít lß║íi t├ái khoß║ún lequydon"
+PASS  ma trß║¡n disabled: KH├öNG c├│ n├║t "V├┤ hiß╗çu ho├í t├ái khoß║ún lequydon"
+PASS  ma trß║¡n disabled: KH├öNG c├│ n├║t "Kho├í t├ái khoß║ún lequydon"
+PASS  ─æß╗òi trß║íng th├íi: PATCH status=disabled ΓÇö {"status":"disabled"}
+PASS  ─æß╗òi trß║íng th├íi: bß╗Å trß╗æng l├╜ do ΓåÆ KH├öNG gß╗¡i reason ΓÇö {"status":"disabled"}
+PASS  ─æß╗òi trß║íng th├íi: toast "─É├ú cß║¡p nhß║¡t trß║íng th├íi t├ái khoß║ún \"lequydon\"."
+PASS  ─æß╗òi trß║íng th├íi: refetch ΓåÆ n├║t "K├¡ch hoß║ít lß║íi t├ái khoß║ún lequydon"
+PASS  ─æß╗òi trß║íng th├íi: dialog ─æ├ú ─æ├│ng
+PASS  ─æß╗òi trß║íng th├íi: gß╗¡i status=locked ΓÇö {"status":"locked","reason":"vi phß║ím nß╗Öi quy"}
+PASS  ─æß╗òi trß║íng th├íi: reason ─æ├ú trim ΓÇö {"status":"locked","reason":"vi phß║ím nß╗Öi quy"}
+PASS  ─æß╗òi trß║íng th├íi lß╗ùi: c├óu lß╗ùi TRONG modal
+PASS  ─æß╗òi trß║íng th├íi lß╗ùi: KH├öNG c├│ toast th├ánh c├┤ng
+PASS  ─æß╗òi trß║íng th├íi lß╗ùi: dialog vß║½n mß╗ƒ
+PASS  modal trß║íng th├íi: textarea c├│ maxlength=500 ΓÇö 500
+PASS  ─æß╗òi vai tr├▓: modal hiß╗çn "Vai tr├▓ hiß╗çn tß║íi" + "Chß╗º tß╗ò chß╗⌐c"
+PASS  ─æß╗òi vai tr├▓ tr├╣ng: hiß╗çn "Vai tr├▓ mß╗¢i phß║úi kh├íc vai tr├▓ hiß╗çn tß║íi."
+PASS  ─æß╗òi vai tr├▓ tr├╣ng: KH├öNG gß╗¡i PATCH
+PASS  ─æß╗òi vai tr├▓: PATCH role=ORG_ADMIN ΓÇö {"role":"ORG_ADMIN"}
+PASS  ─æß╗òi vai tr├▓: toast "─É├ú ─æß╗òi vai tr├▓ t├ái khoß║ún."
+PASS  ─æß╗òi vai tr├▓: refetch ΓåÆ chi tiß║┐t hiß╗çn "Quß║ún trß╗ï tß╗ò chß╗⌐c"
+PASS  ─æß║╖t lß║íi email: hiß╗çn c├óu "Mß║¡t khß║⌐u tß║ím sß║╜ ─æ╞░ß╗úc gß╗¡i tß╗¢i email cß╗ºa t├ái khoß║ún n├áy."
+PASS  ─æß║╖t lß║íi email: KH├öNG hiß╗çn ├┤ "Mß║¡t khß║⌐u mß╗¢i"
+PASS  ─æß║╖t lß║íi email: radio "Gß╗¡i mß║¡t khß║⌐u tß║ím qua email" mß║╖c ─æß╗ïnh chß╗ìn
+PASS  ─æß║╖t lß║íi email: POST KH├öNG k├¿m new_password ΓÇö {}
+PASS  ─æß║╖t lß║íi email: toast "─É├ú gß╗¡i mß║¡t khß║⌐u tß║ím tß╗¢i email cß╗ºa t├ái khoß║ún."
+PASS  ─æß║╖t lß║íi thß╗º c├┤ng: hiß╗çn ├┤ "Mß║¡t khß║⌐u mß╗¢i"
+PASS  ─æß║╖t lß║íi thß╗º c├┤ng: hiß╗çn "Mß║¡t khß║⌐u tß╗æi thiß╗âu 8 k├╜ tß╗▒"
+PASS  ─æß║╖t lß║íi thß╗º c├┤ng <8: KH├öNG c├│ toast th├ánh c├┤ng
+PASS  ─æß║╖t lß║íi thß╗º c├┤ng: POST k├¿m new_password ΓÇö {"new_password":"matkhau123"}
+PASS  ─æß║╖t lß║íi thß╗º c├┤ng: toast "─É├ú ─æß║╖t lß║íi mß║¡t khß║⌐u t├ái khoß║ún."
+PASS  nhß║¡t k├╜ lß╗ùi: chi tiß║┐t vß║½n ─æß╗ìc ─æ╞░ß╗úc (heading + username)
+PASS  nhß║¡t k├╜ lß╗ùi: chß╗ë khß╗æi nhß║¡t k├╜ b├ío lß╗ùi
+PASS  nhß║¡t k├╜ lß╗ùi: kh├┤ng c├│ pageerror
+
+== Tß╗öNG: 56/56 PASS ==
