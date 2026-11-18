@@ -1,0 +1,84 @@
+﻿PASS  h1 = "Tß╗ò To├ín" ΓÇö Tß╗ò To├ín
+PASS  0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  hiß╗çn m├┤ tß║ú ph├▓ng ban
+PASS  c├│ link breadcrumb "Tß╗ò chß╗⌐c" ΓåÆ /to-chuc
+PASS  breadcrumb trß╗Å /to-chuc ΓÇö /to-chuc
+PASS  bß║úng hiß╗çn 1 nh├ón vi├¬n ΓÇö count=1
+PASS  cß╗Öt M├ú nh├ón vi├¬n d├╣ng Code (chß╗» u1)
+PASS  role MANAGER ΓåÆ "Quß║ún l├╜ ph├▓ng ban"
+PASS  chß╗⌐c vß╗Ñ p1 ΓåÆ Badge "Gi├ío vi├¬n"
+PASS  ng├áy bß╗ò nhiß╗çm ─æß╗ïnh dß║íng DD/MM/YYYY
+PASS  c├│ n├║t "Th├¬m nh├ón vi├¬n"
+PASS  n├║t ─æß╗òi chß╗⌐c vß╗Ñ c├│ aria-label ri├¬ng
+PASS  n├║t xo├í c├│ aria-label ri├¬ng
+PASS  kh├┤ng c├│ pageerror (chi tiß║┐t)
+PASS  rß╗ùng: c├óu h╞░ß╗¢ng dß║½n
+PASS  rß╗ùng: ti├¬u ─æß╗ü cß╗Öt vß║½n c├▓n (bß║úng vß║½n render)
+PASS  rß╗ùng: n├║t "Th├¬m nh├ón vi├¬n" ß╗ƒ cß║ú header lß║½n empty state ΓÇö count=2
+PASS  ch╞░a g├ín chß╗⌐c vß╗Ñ: hiß╗çn "Ch╞░a g├ín chß╗⌐c vß╗Ñ"
+PASS  c├│ thanh ph├ón trang (nh├ún tiß║┐ng Viß╗çt)
+PASS  trang 1 hiß╗çn 20 d├▓ng ΓÇö count=20
+PASS  trang 2 c├▓n 5 d├▓ng ΓÇö count=5
+PASS  trang 2 KH├öNG gß╗ìi lß║íi API (ph├ón trang client)
+PASS  mß╗ƒ dialog th├¬m nh├ón vi├¬n
+PASS  validate: lß╗ùi t├¬n ─æ─âng nhß║¡p
+PASS  validate: lß╗ùi email
+PASS  validate: lß╗ùi cß║ºn ├¡t nhß║Ñt 1 chß╗⌐c vß╗Ñ
+PASS  validate: KH├öNG gß╗¡i POST
+PASS  validate: email sai ΓåÆ "Email kh├┤ng hß╗úp lß╗ç"
+PASS  MultiSelector hiß╗çn sß╗æ ─æ├ú chß╗ìn bß║▒ng tiß║┐ng Viß╗çt ΓÇö ─É├ú chß╗ìn 1
+PASS  POST gß╗¡i username/email/role/positionIds ΓÇö {"username":"nhanvien.moi","email":"nhanvien.moi@truong.edu.vn","role":"MANAGER","positionIds":["p1"]}
+PASS  tß║ío xong ΓåÆ toast "─É├ú tß║ío nh├ón vi├¬n."
+PASS  mß╗ƒ hß╗Öp thoß║íi mß║¡t khß║⌐u tß║ím
+PASS  hiß╗çn mß║¡t khß║⌐u tß║ím ΓÇö Mß║¡t khß║⌐u tß║ím cß╗ºa nh├ón vi├¬n Hß╗ç thß╗æng tß╗▒ sinh mß║¡t khß║⌐u tß║ím; nh├ón vi├¬n phß║úi ─æß╗òi khi ─æ─âng nhß║¡p lß║ºn ─æß║ºu. T├¬n ─æ─âng nhß║¡p: u9 Mß║¡
+PASS  n├¬u cß║únh b├ío "chß╗ë hiß╗çn mß╗Öt lß║ºn"
+PASS  KH├öNG c├│ n├║t ─æ├│ng (X)
+PASS  c├│ n├║t "Sao ch├⌐p"
+PASS  sao ch├⌐p ΓåÆ toast "─É├ú sao ch├⌐p."
+PASS  bß║Ñm "T├┤i ─æ├ú l╞░u mß║¡t khß║⌐u" ΓåÆ ─æ├│ng hß╗Öp thoß║íi
+PASS  409: hiß╗çn c├óu "T├¬n ─æ─âng nhß║¡p hoß║╖c email ─æ├ú tß╗ôn tß║íi."
+PASS  409: modal KH├öNG ─æ├│ng
+PASS  409: KH├öNG b├ío th├ánh c├┤ng
+PASS  409: c├│ banner lß╗ùi role=alert
+PASS  thiß║┐u chß╗⌐c vß╗Ñ: hiß╗çn cß║únh b├ío tß║ío chß╗⌐c vß╗Ñ tr╞░ß╗¢c
+PASS  thiß║┐u chß╗⌐c vß╗Ñ: c├│ link "Tß╗¢i trang Chß╗⌐c vß╗Ñ"
+PASS  thiß║┐u chß╗⌐c vß╗Ñ: n├║t L╞░u bß╗ï kho├í (aria-disabled)
+PASS  mß╗ƒ dialog ─æß╗òi chß╗⌐c vß╗Ñ
+PASS  ─æiß╗ün sß║╡n chß╗⌐c vß╗Ñ hiß╗çn tß║íi (trigger hiß╗çn sß╗æ ─æ├ú chß╗ìn)
+PASS  PUT positions gß╗¡i positionIds (gß╗ôm p2) ΓÇö {"positionIds":["p1","p2"]}
+PASS  ─æß╗òi xong ΓåÆ toast "─É├ú cß║¡p nhß║¡t chß╗⌐c vß╗Ñ cho nh├ón vi├¬n."
+PASS  ─æß╗òi xong ΓåÆ ─æ├│ng dialog
+PASS  mß╗ƒ AlertDialog xo├í nh├ón vi├¬n
+PASS  AlertDialog n├¬u m├ú nh├ón vi├¬n ΓÇö Xo├í nh├ón vi├¬n khß╗Åi ph├▓ng ban? Nh├ón vi├¬n "u1" sß║╜ bß╗ï xo├í khß╗Åi ph├▓ng ban. Nh├ón vi├¬n sß║╜ mß║Ñt quyß╗ün truy cß║¡p dß╗» liß╗çu cß╗ºa ph├▓ng ban n├áy. Huß╗╖ Xo├í kh
+PASS  AlertDialog n├¬u hß║¡u quß║ú
+PASS  DELETE /departments/d1/members/u1 ─æ├ú gß╗ìi
+PASS  xo├í xong ΓåÆ toast "─É├ú xo├í nh├ón vi├¬n khß╗Åi ph├▓ng ban."
+PASS  xo├í xong ΓåÆ ─æ├│ng AlertDialog
+PASS  403 xo├í: hiß╗çn c├óu kh├┤ng c├│ quyß╗ün
+PASS  403 xo├í: KH├öNG b├ío th├ánh c├┤ng
+PASS  403 xo├í: c├│ banner lß╗ùi role=alert
+PASS  403 xo├í: ─æ├│ng AlertDialog sau khi lß╗ùi
+PASS  lß╗ùi tß║úi nh├ón vi├¬n: c├óu lß╗ùi ri├¬ng
+PASS  lß╗ùi tß║úi nh├ón vi├¬n: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  lß╗ùi tß║úi ph├▓ng ban: c├óu lß╗ùi
+PASS  lß╗ùi tß║úi ph├▓ng ban: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  lß╗ùi tß║úi ph├▓ng ban: c├│ n├║t quay lß║íi
+PASS  404: hiß╗çn "Kh├┤ng t├¼m thß║Ñy ph├▓ng ban n├áy."
+PASS  404: c├│ n├║t quay lß║íi
+PASS  403: hiß╗çn c├óu kh├┤ng c├│ quyß╗ün
+PASS  403: KH├öNG gß╗ìi API ph├▓ng ban
+PASS  xem thß╗¡: hiß╗çn "Bß║ín ─æang l├á"
+PASS  xem thß╗¡: heading = "Gi├ío vi├¬n"
+PASS  xem thß╗¡: badge "Chß║┐ ─æß╗Ö xem thß╗¡ ΓÇö ch╞░a ─æ─âng nhß║¡p"
+PASS  xem thß╗¡: KH├öNG c├│ n├║t ─É─âng xuß║Ñt
+PASS  xem thß╗¡: c├│ n├║t "Quay lß║íi ─æ─âng nhß║¡p"
+PASS  xem thß╗¡: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  xem thß╗¡: kh├┤ng c├│ pageerror
+PASS  ─æ├ú ─æ─âng nhß║¡p: badge "─É├ú ─æ─âng nhß║¡p"
+PASS  ─æ├ú ─æ─âng nhß║¡p: heading = username
+PASS  ─æ├ú ─æ─âng nhß║¡p: KH├öNG hiß╗çn "chß║┐ ─æß╗Ö xem thß╗¡"
+PASS  ─æ├ú ─æ─âng nhß║¡p: c├│ n├║t ─É─âng xuß║Ñt
+PASS  slug sai: hiß╗çn "Kh├┤ng c├│ vai tr├▓ n├áy"
+PASS  slug sai: c├│ n├║t "Quay lß║íi ─æ─âng nhß║¡p"
+
+== Tß╗öNG: 82/82 PASS ==

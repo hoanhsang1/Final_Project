@@ -1,12 +1,10 @@
-import { Button, Card, Flex, Space, Tag, theme, Typography } from 'antd';
+import { Badge, Button, Card, Heading, HStack, Stack, Text, VStack } from '@astryxdesign/core';
 import { useNavigate, useParams } from 'react-router-dom';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import { logout } from '../../features/auth/authApi';
 import { findRole } from '../../features/auth/roles';
 import { useAuthStore } from '../../stores/authStore';
-import { cardStyle, layoutBackground } from '../../theme';
-
-const { Text, Title } = Typography;
+import { layoutBackground } from '../../theme';
 
 /**
  * Trang "Bạn đang là …" — hiện có HAI chế độ, phân biệt bằng phiên đăng nhập thật:
@@ -20,7 +18,6 @@ const { Text, Title } = Typography;
  * Đọc thẳng slug trên URL (`/xem-thu/:vaiTro`) nên dán link hoặc F5 vẫn dựng đúng.
  */
 export default function RolePreviewPage() {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { vaiTro } = useParams();
 
@@ -44,40 +41,55 @@ export default function RolePreviewPage() {
   };
 
   const backButton = (
-    <Button type="primary" onClick={() => navigate('/dang-nhap')}>
-      Quay lại đăng nhập
-    </Button>
+    <Button
+      variant="primary"
+      size="lg"
+      label="Quay lại đăng nhập"
+      onClick={() => navigate('/dang-nhap')}
+    />
   );
 
   return (
-    <Flex
+    <Stack
+      direction="vertical"
       align="center"
       justify="center"
-      style={{ minHeight: '100vh', background: layoutBackground, padding: token.paddingLG }}
+      minHeight="100vh"
+      padding={6}
+      style={{ background: layoutBackground }}
     >
-      <Card style={cardStyle} styles={{ body: { padding: token.paddingLG } }}>
+      <Card width="100%" maxWidth={420} padding={6}>
         {role ? (
-          <Flex vertical align="center" gap={token.marginXS}>
+          <VStack align="center" gap={2}>
             {/* BR-08: trạng thái phải kèm CHỮ, không chỉ dựa vào màu. */}
             {isAuthenticated ? (
-              <Tag color="success">Đã đăng nhập</Tag>
+              <Badge variant="success" label="Đã đăng nhập" />
             ) : (
-              <Tag color="processing">Chế độ xem thử — chưa đăng nhập</Tag>
+              <Badge variant="info" label="Chế độ xem thử — chưa đăng nhập" />
             )}
 
-            <Text type="secondary">{isAuthenticated ? 'Xin chào' : 'Bạn đang là'}</Text>
-            <Title level={1} style={{ margin: 0 }}>
+            <Text type="body" color="secondary">
+              {isAuthenticated ? 'Xin chào' : 'Bạn đang là'}
+            </Text>
+            <Heading level={1}>
               {isAuthenticated ? (username ?? role.label) : role.label}
-            </Title>
-            <Text type="secondary" style={{ textAlign: 'center' }}>
+            </Heading>
+            <Text type="body" color="secondary" justify="center">
               {isAuthenticated ? `Vai trò: ${role.label} — ${role.description}` : role.description}
             </Text>
 
-            <Space style={{ marginTop: token.margin }}>
-              {isAuthenticated && <Button onClick={handleLogout}>Đăng xuất</Button>}
+            <HStack gap={2} style={{ marginTop: 'var(--spacing-4)' }}>
+              {isAuthenticated && (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  label="Đăng xuất"
+                  onClick={() => void handleLogout()}
+                />
+              )}
               {backButton}
-            </Space>
-          </Flex>
+            </HStack>
+          </VStack>
         ) : (
           <StatusScreen
             code="404"
@@ -87,6 +99,6 @@ export default function RolePreviewPage() {
           />
         )}
       </Card>
-    </Flex>
+    </Stack>
   );
 }

@@ -1,38 +1,69 @@
-import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
-import type { TableProps } from 'antd';
+import {
+  AlertDialog,
+  Badge,
+  Banner,
+  Button,
+  Code,
+  HStack,
+  paginateData,
+  pixel,
+  proportional,
+  Stack,
+  Table,
+  Text,
+  useTablePagination,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import EmptyState from '../../components/EmptyState/EmptyState';
+import MemberFormModal from '../../components/MemberFormModal/MemberFormModal';
+import MemberPositionsModal from '../../components/MemberPositionsModal/MemberPositionsModal';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
-import MemberFormModal from '../../components/MemberFormModal/MemberFormModal';
-import MemberPositionsModal from '../../components/MemberPositionsModal/MemberPositionsModal';
 import TempPasswordModal from '../../components/TempPasswordModal/TempPasswordModal';
+import { roleLabel } from '../../features/admin/roleLabels';
 import { ownerErrorMessage } from '../../features/owner/ownerApi';
 import { MSG_DEPT, MSG_MEM, MSG_OWNER } from '../../features/owner/ownerMessages';
-import { roleLabel } from '../../features/admin/roleLabels';
 import type { CreatedMember, Member, MemberPayload } from '../../features/owner/types';
+import { useNotify } from '../../hooks/useNotify';
 import { useDepartmentDetail } from './use-department-detail';
 
-const { Text } = Typography;
-
 const EMPTY_VALUE = '—';
+
+/** Số dòng mỗi trang. BE trả cả mảng nên phân trang ở client bằng `paginateData`. */
+const PAGE_SIZE = 20;
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `Member` là
+ * interface nên không có index signature — giao thêm `Record<string, unknown>`
+ * để thoả ràng buộc mà **không** nới lỏng DTO (`docs/ui-conventions.md` §6.9).
+ */
+type MemberRow = Member & Record<string, unknown>;
 
 function formatDate(value: string): string {
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format('DD/MM/YYYY') : EMPTY_VALUE;
 }
 
+/** BE không trả tên/username của nhân viên → định danh bằng `userId` rút gọn. */
 function shortId(value: string): string {
   return value.length > 8 ? `${value.slice(0, 8)}...` : value;
 }
 
+/**
+ * Màn chi tiết phòng ban (`/to-chuc/phong-ban/:id`) — danh sách nhân viên.
+ *
+ * Ba thao tác ghi: thêm nhân viên (BE sinh mật khẩu tạm, hiện một lần), đổi chức
+ * vụ, và xoá khỏi phòng ban. Mọi lỗi hiện trong `Banner`/modal — KHÔNG báo thành
+ * công khi lỗi (NFR-REL-001).
+ */
 export default function DepartmentDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
+  const notify = useNotify();
 
   const {
     department,
@@ -56,6 +87,9 @@ export default function DepartmentDetailPage() {
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Nhân viên đang chờ xác nhận xoá; `null` = không mở hộp thoại. */
+  const [pendingRemove, setPendingRemove] = useState<Member | null>(null);
+  const [page, setPage] = useState(1);
 
   const positionMap = new Map((positions.data ?? []).map((p) => [p.id, p.name]));
 
@@ -66,8 +100,9 @@ export default function DepartmentDetailPage() {
       setAddOpen(false);
       setTempData(created);
       setTempOpen(true);
-      message.success(MSG_MEM.CREATED);
+      notify.success(MSG_MEM.CREATED);
     } catch (error) {
+      // Lỗi hiện trong modal, modal KHÔNG đóng, không báo thành công.
       setAddError(ownerErrorMessage(error));
     }
   };
@@ -77,14 +112,18 @@ export default function DepartmentDetailPage() {
     setPosOpen(true);
   };
 
+  const closeChangePositions = () => {
+    setPosOpen(false);
+    setEditingMember(null);
+  };
+
   const handleChangePositions = async (positionIds: string[]) => {
     if (!editingMember) return;
     setActionError(null);
     try {
       await updatePositions.mutateAsync({ userId: editingMember.userId, positionIds });
-      setPosOpen(false);
-      setEditingMember(null);
-      message.success(MSG_MEM.POSITIONS_UPDATED);
+      closeChangePositions();
+      notify.success(MSG_MEM.POSITIONS_UPDATED);
     } catch (error) {
       setActionError(ownerErrorMessage(error));
     }
@@ -94,72 +133,30 @@ export default function DepartmentDetailPage() {
     setActionError(null);
     try {
       await remove.mutateAsync(member.userId);
-      message.success(MSG_MEM.REMOVED);
+      notify.success(MSG_MEM.REMOVED);
     } catch (error) {
       setActionError(ownerErrorMessage(error));
+    } finally {
+      // `AlertDialog` KHÔNG tự đóng: đóng sau khi yêu cầu kết thúc, dù thành công
+      // hay lỗi — lỗi đã hiện ở `Banner` trên bảng.
+      setPendingRemove(null);
     }
   };
 
-  const columns: TableProps<Member>['columns'] = [
-    {
-      title: MSG_MEM.USER_ID,
-      dataIndex: 'userId',
-      key: 'userId',
-      render: (value: string) => <Typography.Text code>{shortId(value)}</Typography.Text>,
-    },
-    {
-      title: MSG_MEM.ROLE,
-      dataIndex: 'role',
-      key: 'role',
-      render: (value: string) => roleLabel(value),
-    },
-    {
-      title: MSG_MEM.POSITIONS,
-      dataIndex: 'positionIds',
-      key: 'positions',
-      render: (ids: string[]) => {
-        if (!ids || ids.length === 0) {
-          return <Text type="secondary">{MSG_MEM.NO_POSITIONS}</Text>;
-        }
-        return (
-          <Space wrap size={[token.marginXS, token.marginXS]}>
-            {ids.map((pid) => (
-              <Tag key={pid}>{positionMap.get(pid) ?? pid}</Tag>
-            ))}
-          </Space>
-        );
-      },
-    },
-    {
-      title: MSG_MEM.APPOINTED_AT,
-      dataIndex: 'appointedAt',
-      key: 'appointedAt',
-      render: (value: string) => formatDate(value),
-    },
-    {
-      title: MSG_MEM.ACTIONS,
-      key: 'actions',
-      render: (_, member) => (
-        <Space size={token.marginXS}>
-          <Button type="link" onClick={() => openChangePositions(member)}>
-            {MSG_MEM.CHANGE_POSITIONS}
-          </Button>
-          <Popconfirm
-            title={MSG_MEM.REMOVE_CONFIRM_TITLE}
-            description={MSG_MEM.REMOVE_CONFIRM}
-            okText={MSG_MEM.REMOVE}
-            cancelText={MSG_OWNER.CANCEL}
-            okButtonProps={{ danger: true }}
-            onConfirm={() => void handleRemove(member)}
-          >
-            <Button type="link" danger>
-              {MSG_MEM.REMOVE}
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  // Tính phân trang TRƯỚC các `return` sớm: `useTablePagination` là hook nên
+  // phải gọi vô điều kiện, cùng thứ tự ở mọi lần render.
+  const rows = (members.data ?? []) as MemberRow[];
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  const pagination = useTablePagination<MemberRow>({
+    page: currentPage,
+    onPageChange: setPage,
+    totalItems: rows.length,
+    pageSize: PAGE_SIZE,
+    variant: totalPages > 1 ? 'pages' : 'none',
+    label: MSG_MEM.PAGINATION_LABEL,
+  });
 
   if (isLoading) {
     return <PageLoading />;
@@ -167,18 +164,26 @@ export default function DepartmentDetailPage() {
 
   if (departmentsError) {
     return (
-      <Alert
-        type="error"
-        showIcon
+      <Banner
+        status="error"
+        title={MSG_DEPT.LOAD_ERROR}
+        collapsible={false}
         role="alert"
-        message={MSG_DEPT.LOAD_ERROR}
-        action={
-          <Space>
-            <Button onClick={() => void refetchDepartments()}>{MSG_OWNER.RETRY}</Button>
-            <Button type="primary" onClick={() => navigate('/to-chuc')}>
-              {MSG_MEM.BACK}
-            </Button>
-          </Space>
+        endContent={
+          <HStack gap={2}>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_OWNER.RETRY}
+              onClick={() => void refetchDepartments()}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              label={MSG_MEM.BACK}
+              onClick={() => navigate('/to-chuc')}
+            />
+          </HStack>
         }
       />
     );
@@ -195,53 +200,118 @@ export default function DepartmentDetailPage() {
     );
   }
 
-  const data = members.data ?? [];
-  const isEmpty = members.isSuccess && data.length === 0;
+  const columns: TableColumn<MemberRow>[] = [
+    {
+      key: 'userId',
+      header: MSG_MEM.USER_ID,
+      width: proportional(1, { minWidth: 140 }),
+      renderCell: (member) => <Code>{shortId(member.userId)}</Code>,
+    },
+    {
+      key: 'role',
+      header: MSG_MEM.ROLE,
+      width: proportional(1, { minWidth: 140 }),
+      renderCell: (member) => roleLabel(member.role),
+    },
+    {
+      key: 'positions',
+      header: MSG_MEM.POSITIONS,
+      width: proportional(1, { minWidth: 180 }),
+      renderCell: (member) => {
+        const ids = member.positionIds;
+        if (!ids || ids.length === 0) {
+          return <Text type="supporting">{MSG_MEM.NO_POSITIONS}</Text>;
+        }
+        // BR-08: `Badge` luôn kèm NHÃN CHỮ, màu chỉ là tín hiệu phụ.
+        return (
+          <HStack gap={2} wrap="wrap">
+            {ids.map((pid) => (
+              <Badge key={pid} label={positionMap.get(pid) ?? pid} />
+            ))}
+          </HStack>
+        );
+      },
+    },
+    {
+      key: 'appointedAt',
+      header: MSG_MEM.APPOINTED_AT,
+      width: pixel(120),
+      renderCell: (member) => formatDate(member.appointedAt),
+    },
+    {
+      key: 'actions',
+      header: MSG_MEM.ACTIONS,
+      width: pixel(240),
+      renderCell: (member) => (
+        <HStack gap={2}>
+          <Button
+            variant="ghost"
+            size="sm"
+            label={MSG_MEM.CHANGE_POSITIONS}
+            aria-label={`${MSG_MEM.CHANGE_POSITIONS} ${shortId(member.userId)}`}
+            onClick={() => openChangePositions(member)}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            label={MSG_MEM.REMOVE}
+            aria-label={`${MSG_MEM.REMOVE} ${shortId(member.userId)}`}
+            onClick={() => setPendingRemove(member)}
+          />
+        </HStack>
+      ),
+    },
+  ];
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         breadcrumb={[{ title: 'Tổ chức', href: '/to-chuc' }, { title: department.name }]}
         title={department.name}
         subtitle={department.description || EMPTY_VALUE}
         extra={
-          <Button type="primary" onClick={() => setAddOpen(true)}>
-            {MSG_MEM.ADD}
-          </Button>
+          <Button variant="primary" size="lg" label={MSG_MEM.ADD} onClick={() => setAddOpen(true)} />
         }
       />
 
-      {actionError && (
-        <Alert type="error" showIcon role="alert" message={actionError} />
-      )}
+      {actionError ? (
+        <Banner status="error" title={actionError} collapsible={false} role="alert" />
+      ) : null}
 
-      {members.isError && (
-        <Alert
-          type="error"
-          showIcon
+      {members.isError ? (
+        <Banner
+          status="error"
+          title={MSG_MEM.LOAD_ERROR}
+          collapsible={false}
           role="alert"
-          message={MSG_MEM.LOAD_ERROR}
-          action={<Button onClick={() => void members.refetch()}>{MSG_OWNER.RETRY}</Button>}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_OWNER.RETRY}
+              onClick={() => void members.refetch()}
+            />
+          }
         />
-      )}
-
-      {isEmpty && !members.isError && (
-        <Empty description={<Text type="secondary">{MSG_MEM.EMPTY}</Text>} style={{ marginTop: token.marginLG }}>
-          <Button type="primary" onClick={() => setAddOpen(true)}>
-            {MSG_MEM.ADD}
-          </Button>
-        </Empty>
-      )}
-
-      {!isEmpty && !members.isError && (
-        <Table<Member>
-          rowKey="userId"
+      ) : members.isPending ? (
+        <PageLoading />
+      ) : (
+        <Table<MemberRow>
+          data={paginateData(rows, currentPage, PAGE_SIZE)}
           columns={columns}
-          dataSource={data}
-          loading={members.isPending}
-          pagination={{ pageSize: 20, showSizeChanger: false, hideOnSinglePage: true }}
-          size="middle"
-          scroll={{ x: 760 }}
+          idKey="userId"
+          hasHover
+          textOverflow="truncate"
+          rowIndexStart={(currentPage - 1) * PAGE_SIZE + 1}
+          rowCount={rows.length}
+          emptyState={
+            <EmptyState
+              description={MSG_MEM.EMPTY}
+              compact
+              action={{ label: MSG_MEM.ADD, onClick: () => setAddOpen(true) }}
+            />
+          }
+          plugins={{ pagination }}
         />
       )}
 
@@ -262,10 +332,7 @@ export default function DepartmentDetailPage() {
         member={editingMember}
         positions={positions.data ?? []}
         submitting={updatePositions.isPending}
-        onCancel={() => {
-          setPosOpen(false);
-          setEditingMember(null);
-        }}
+        onCancel={closeChangePositions}
         onSubmit={(ids) => void handleChangePositions(ids)}
       />
 
@@ -278,6 +345,27 @@ export default function DepartmentDetailPage() {
           setTempData(null);
         }}
       />
-    </Flex>
+
+      {/* Xác nhận xoá: Astryx không có `Popconfirm` nên dùng `AlertDialog`. */}
+      <AlertDialog
+        isOpen={pendingRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemove(null);
+        }}
+        title={MSG_MEM.REMOVE_CONFIRM_TITLE}
+        description={
+          pendingRemove
+            ? `Nhân viên "${shortId(pendingRemove.userId)}" sẽ bị xoá khỏi phòng ban. ${MSG_MEM.REMOVE_CONFIRM}`
+            : ''
+        }
+        cancelLabel={MSG_OWNER.CANCEL}
+        actionLabel={MSG_MEM.REMOVE}
+        actionVariant="destructive"
+        isActionLoading={remove.isPending}
+        onAction={() => {
+          if (pendingRemove) void handleRemove(pendingRemove);
+        }}
+      />
+    </Stack>
   );
 }

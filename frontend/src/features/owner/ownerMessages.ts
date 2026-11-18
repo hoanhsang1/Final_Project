@@ -110,6 +110,8 @@ export const MSG_MEM = {
   REMOVE_CONFIRM: 'Nhân viên sẽ mất quyền truy cập dữ liệu của phòng ban này.',
   REMOVED: 'Đã xoá nhân viên khỏi phòng ban.',
   ACTIONS: 'Thao tác',
+  /** `aria-label` cho `nav` phân trang của bảng (Astryx mặc định tiếng Anh). */
+  PAGINATION_LABEL: 'Phân trang danh sách nhân viên',
 } as const;
 
 /** Màn Chức vụ `/to-chuc/chuc-vu`. */

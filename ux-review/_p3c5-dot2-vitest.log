@@ -1,0 +1,12 @@
+﻿
+ RUN  v5.0.4 D:/Final_Project/frontend
+
+
+ Test Files  25 passed (25)
+      Tests  169 passed (169)
+   Start at  13:10:08
+   Duration  63.62s (setup 41%, import 36%, tests 12%, environment 10%, transform 1%)
+
+    Isolate  25 workers spawned ┬╖ ~3.03s startup each (spawn + environment, per file)
+             at least ~3.86s faster with isolate: false ΓÇö reuses workers across files instead of one per file
+

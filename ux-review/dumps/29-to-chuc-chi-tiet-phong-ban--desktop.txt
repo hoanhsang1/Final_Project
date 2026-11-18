@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/to-chuc/phong-ban/d1
 Viewport     : desktop 1366x768
 Tiêu đề tab  : Chi tiết phòng ban — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 41
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 1366px)
 
 ## API đã gọi (3)
@@ -23,13 +23,14 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
         <span role="img"> apartment @20,60 17x17 {aria-hidden}
       <a> Chức vụ @8,99 231x37
         <span role="img"> idcard @20,99 17x17 {aria-hidden}
-<main> Tổ chứcTổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò t… @248,56 1118x306
+<main> Tổ chứcTổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò t… @248,56 1118x277
   <nav> Đường dẫn @280,88 1054x28
     <ol> Tổ chứcTổ Toán @280,88 1054x28
       <a> Tổ chức @280,88 54x28
-  <h1> Tổ Toán @280,124 905x32
-  <button> Thêm nhân viên @1197,124 137x36
-  <table> [table 5 cột, 2 dòng] @280,222 1054x108
+  <h1> Tổ Toán @280,124 911x32
+  <button> Thêm nhân viên @1203,124 131x36
+  <div role="group"> Bảng @280,218 1054x83
+    <table> [table 5 cột, 1 dòng] @280,218 1054x83
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
@@ -37,9 +38,9 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 - a "Phòng ban" @8,60 231x37
 - a "Tổ chức" @280,88 54x28
 - a "Chức vụ" @8,99 231x37
-- button "Thêm nhân viên" @1197,124 137x36
-- button "Đổi chức vụ" @945,281 110x36
-- button "Xoá khỏi phòng ban" @1063,281 163x36
+- button "Thêm nhân viên" @1203,124 131x36
+- button "Đổi chức vụ u1" @1106,265 84x28
+- button "Xoá khỏi phòng ban u1" @1198,265 124x28
 
 ## Tiêu đề (heading)
 - h1: Tổ Toán
@@ -51,4 +52,4 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Tới nội dung chính MEMS Khu vực tổ chức chu.to.chuc Đăng xuất Phòng ban Chức vụ Tổ chức / Tổ Toán Tổ Toán Tổ bộ môn Toán Thêm nhân viên Mã nhân viên Vai trò trong phòng ban Chức vụ Ngày bổ nhiệm Thao tác Mã nhân viên Vai trò trong phòng ban Chức vụ Ngày bổ nhiệm Thao tác u1 Quản lý phòng ban Giáo viên 02/09/2026 Đổi chức vụ Xoá khỏi phòng ban
+Tới nội dung chính MEMS Khu vực tổ chức chu.to.chuc Đăng xuất Phòng ban Chức vụ Tổ chức / Tổ Toán Tổ Toán Tổ bộ môn Toán Thêm nhân viên Mã nhân viên Vai trò trong phòng ban Chức vụ Ngày bổ nhiệm Thao tác u1 Quản lý phòng ban Giáo viên 02/09/2026 Đổi chức vụ Xoá khỏi phòng ban

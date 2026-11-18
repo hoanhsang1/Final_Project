@@ -98,8 +98,14 @@ it('nhập đúng rồi bấm Đăng nhập thì gọi API và vào trang theo v
   await userEvent.type(screen.getByLabelText('Mật khẩu'), '123456');
   await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
-  // Đợi mutation chạy xong và điều hướng.
-  expect(await screen.findByText(/xem thử theo vai trò/i)).toBeInTheDocument();
+  // Đợi mutation chạy xong và điều hướng sang màn xem thử vai trò.
+  //
+  // Trước đây câu này chờ chữ "hoặc xem thử theo vai trò" của **chính trang Đăng nhập** —
+  // chữ đó đã có sẵn TRƯỚC khi bấm nên `findByText` trả về ngay, rồi trong lúc `await`
+  // React kịp điều hướng và tháo trang Đăng nhập → phần tử vừa lấy bị tách khỏi DOM.
+  // Test chỉ "xanh" nhờ thứ tự thời gian tình cờ (trang xem thử bản antd nặng hơn nên
+  // commit chậm hơn). Chờ đúng chữ của trang ĐÍCH vừa hết đua, vừa kiểm tra đúng ý định.
+  expect(await screen.findByText('Đã đăng nhập')).toBeInTheDocument();
   // TanStack Query truyền thêm context (QueryClient, meta) làm argument thứ 2 → chỉ so field đầu.
   expect(mockLogin).toHaveBeenCalledWith({ username: 'gv', password: '123456' }, expect.anything());
   expect(router.state.location.pathname).toBe('/xem-thu/teacher');

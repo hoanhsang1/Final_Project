@@ -4,17 +4,17 @@ URL thực tế  : http://127.0.0.1:5173/xem-thu/teacher
 Viewport     : narrow 320x640
 Tiêu đề tab  : Xem thử vai trò — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 11
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 320px)
 
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<h1> Giáo viên @106,289 108x31
-<button> Quay lại đăng nhập @81,374 158x36
+<h1> Giáo viên @106,288 108x32
+<button> Quay lại đăng nhập @84,372 152x36
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
-- button "Quay lại đăng nhập" @81,374 158x36
+- button "Quay lại đăng nhập" @84,372 152x36
 
 ## Tiêu đề (heading)
 - h1: Giáo viên
