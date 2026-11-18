@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/dao-tao/giao-vien/t1
 Viewport     : mobile 375x667
 Tiêu đề tab  : Chi tiết giáo viên — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 82
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 375px)
 
 ## API đã gọi (4)
@@ -18,30 +18,30 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSĐào tạogiao.vuĐăng xuất @0,0 375x56
   <button> Mở menu đào tạo @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> /Giáo viên/Nguyễn Thị MaiNguyễn Thị MaiChỉnh sửaThông tinLớp phụ trách… @0,56 375x799
+<main> Giáo viênNguyễn Thị MaiNguyễn Thị MaiChỉnh sửaThông tinLớp phụ trách (… @0,56 375x804
   <nav> Đường dẫn @16,76 343x28
-    <ol> /Giáo viên/Nguyễn Thị Mai @16,76 343x28
+    <ol> Giáo viênNguyễn Thị Mai @16,76 343x28
       <a> Giáo viên @16,76 62x28
   <h1> Nguyễn Thị Mai @16,112 343x32
-  <button> Chỉnh sửa @16,156 97x36
-  <div role="tablist"> Thông tinLớp phụ trách (2)Lịch sử thay đổi @16,236 343x42
-    <div role="tab"> Thông tin @16,246 63x22
-    <div role="tab"> Lớp phụ trách (2) @103,246 115x22
-    <div role="tab"> Lịch sử thay đổi @241,246 104x22
-  <div role="tabpanel"> Thông tin @16,294 343x509
-    <section> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @16,294 343x509
-      <h2> Hồ sơ giáo viên @16,294 324x28
-      <table> [table 0 cột, 11 dòng] @16,361 343x442
+  <button> Chỉnh sửa @16,156 91x36
+  <div role="tablist"> Mục thông tin giáo viên @16,232 343x37
+    <button role="tab"> Thông tin @16,232 88x32
+    <button role="tab"> Lớp phụ trách (2) @106,232 140x32
+    <button role="tab"> Lịch sử thay đổi @248,232 130x32
+  <button>  @327,232 32x32 {aria-hidden}
+  <div role="tabpanel"> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @16,285 343x555
+    <section> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @16,301 343x507
+      <h2> Hồ sơ giáo viên @16,301 324x28
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
 - button "Mở menu đào tạo" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @267,12 92x32
 - a "Giáo viên" @16,76 62x28
-- button "Chỉnh sửa" @16,156 97x36
-- div "Thông tin" @16,246 63x22
-- div "Lớp phụ trách (2)" @103,246 115x22
-- div "Lịch sử thay đổi" @241,246 104x22
+- button "Chỉnh sửa" @16,156 91x36
+- button "Thông tin" @16,232 88x32
+- button "Lớp phụ trách (2)" @106,232 140x32
+- button "Lịch sử thay đổi" @248,232 130x32
 
 ## Tiêu đề (heading)
 - h1: Nguyễn Thị Mai

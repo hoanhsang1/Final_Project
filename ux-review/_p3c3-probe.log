@@ -1,0 +1,27 @@
+﻿PASS  h1 = Nguyß╗àn Thß╗ï Mai
+PASS  0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  3 tab ─æ├║ng t├¬n ΓÇö ["Th├┤ng tin","Lß╗¢p phß╗Ñ tr├ích (2)","Lß╗ïch sß╗¡ thay ─æß╗òi"]
+PASS  nh├ún tab kh├┤ng bß╗ï nh├ón ─æ├┤i ΓÇö ["Th├┤ng tin","Lß╗¢p phß╗Ñ tr├ích (2)","Lß╗ïch sß╗¡ thay ─æß╗òi"]
+PASS  tab Lß╗¢p phß╗Ñ tr├ích: c├│ LH001 + LH002
+PASS  m├ú lß╗¢p l├á li├¬n kß║┐t thß║¡t tß╗¢i /dao-tao/lop-hoc/c1
+PASS  tab Lß╗¢p phß╗Ñ tr├ích: badge trß║íng th├íi c├│ chß╗» (BR-08)
+PASS  tab Lß╗ïch sß╗¡: c├│ h├ánh ─æß╗Öng + ng╞░ß╗¥i + thay ─æß╗òi ΓÇö Tß╗¢i nß╗Öi dung ch├¡nh MEMS ─É├áo tß║ío giao.vu ─É─âng xuß║Ñt Gi├ío vi├¬n Lß╗¢p hß╗ìc Gi├ío vi├¬n / Nguyß╗àn Thß╗ï Mai Nguyß╗àn Thß╗ï Mai Th├┤ng tin Lß╗¢p phß╗Ñ tr├ích (2) Lß╗ïch sß╗¡ thay ─æß╗òi Cß║¡p nhß║¡t hß╗ô s╞í L├¬ Thß╗ï B ┬╖ 10:00 08/11/2026 Ch
+PASS  kh├┤ng c├│ pageerror
+PASS  form sß╗¡a hiß╗çn ra
+PASS  M├ú nh├ón sß╗▒ chß╗ë ─æß╗ìc
+PASS  validate: hiß╗çn "Vui l├▓ng nhß║¡p hß╗ì t├¬n"
+PASS  validate: KH├öNG gß╗¡i PUT ΓÇö PUT tr╞░ß╗¢c=0 sau=0
+PASS  kh├┤ng c├│ pageerror (form)
+PASS  409 mß╗ƒ dialog x├íc nhß║¡n
+PASS  dialog n├¬u ti├¬u ─æß╗ü + lß╗¢p lß╗çch m├┤n ΓÇö Chuy├¬n m├┤n kh├┤ng c├▓n ph├╣ hß╗úp Chuy├¬n m├┤n mß╗¢i kh├┤ng c├▓n khß╗¢p vß╗¢i m├┤n cß╗ºa c├íc lß╗¢p sau: L├╜ 12C3 Hß╗ºy Vß║½n l╞░u
+PASS  bß║Ñm "Vß║½n l╞░u" ΓåÆ PUT lß║ºn 2 (confirm) ΓÇö putCount=2
+PASS  th├ánh c├┤ng ΓåÆ toast "─É├ú cß║¡p nhß║¡t gi├ío vi├¬n."
+PASS  th├ánh c├┤ng ΓåÆ tho├ít form
+PASS  kh├┤ng c├│ pageerror (mismatch)
+PASS  loading: c├│ role=status "─Éang tß║úiΓÇª" ΓÇö ["","─Éang tß║úiΓÇª"]
+PASS  error 500: role=alert + ti├¬u ─æß╗ü lß╗ùi ΓÇö Kh├┤ng tß║úi ─æ╞░ß╗úc th├┤ng tin gi├ío vi├¬n. C├│ lß╗ùi xß║úy ra, vui l├▓ng thß╗¡ lß║íi.
+PASS  error 500: c├│ n├║t "Thß╗¡ lß║íi" + "Quay lß║íi"
+PASS  404: banner "Kh├┤ng t├¼m thß║Ñy dß╗» liß╗çu n├áy."
+PASS  404: c├│ n├║t "Quay lß║íi"
+
+== Tß╗öNG: 25/25 PASS ==

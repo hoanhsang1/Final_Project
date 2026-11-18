@@ -1,0 +1,29 @@
+﻿
+ RUN  v5.0.4 D:/Final_Project/frontend
+
+node.exe : Not implemented: Window's getComputedStyle() method: with pseudo-elements
+At line:1 char:1
++ & "D:\AI skill\SEO\.venv\Lib\site-packages\playwright\driver\node.exe ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Not implemented...pseudo-elements:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+Not implemented: Window's getComputedStyle() method: with pseudo-elements
+
+ Test Files  25 passed (25)
+      Tests  169 passed (169)
+   Start at  09:53:53
+   Duration  61.92s (setup 41%, import 35%, tests 13%, environment 10%, transform 1%)
+
+    Isolate  25 workers spawned ┬╖ ~2.89s startup each (spawn + environment, per file)
+             at least ~3.68s faster with isolate: false ΓÇö reuses workers across files instead of one per file
+

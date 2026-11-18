@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/dao-tao/giao-vien/t1
 Viewport     : desktop 1366x768
 Tiêu đề tab  : Chi tiết giáo viên — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 75
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 1366px)
 
 ## API đã gọi (4)
@@ -21,23 +21,22 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu đào tạo @8,56 231x84
     <ul> Giáo viênLớp học @8,60 231x76
       <a> Giáo viên @8,60 231x37
-        <span role="img"> solution @20,60 17x17
+        <span role="img"> solution @20,60 17x17 {aria-hidden}
       <a> Lớp học @8,99 231x37
-        <span role="img"> read @20,99 17x17
-<main> /Giáo viên/Nguyễn Thị MaiNguyễn Thị MaiChỉnh sửaThông tinLớp phụ trách… @248,56 1118x508
+        <span role="img"> read @20,99 17x17 {aria-hidden}
+<main> Giáo viênNguyễn Thị MaiNguyễn Thị MaiChỉnh sửaThông tinLớp phụ trách (… @248,56 1118x768
   <nav> Đường dẫn @280,88 1054x28
-    <ol> /Giáo viên/Nguyễn Thị Mai @280,88 1054x28
+    <ol> Giáo viênNguyễn Thị Mai @280,88 1054x28
       <a> Giáo viên @280,88 62x28
-  <h1> Nguyễn Thị Mai @280,124 945x32
-  <button> Chỉnh sửa @1237,124 97x36
-  <div role="tablist"> Thông tinLớp phụ trách (2)Lịch sử thay đổi @280,204 1054x42
-    <div role="tab"> Thông tin @280,214 63x22
-    <div role="tab"> Lớp phụ trách (2) @367,214 115x22
-    <div role="tab"> Lịch sử thay đổi @505,214 104x22
-  <div role="tabpanel"> Thông tin @280,262 1054x238
-    <section> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @280,262 1054x238
-      <h2> Hồ sơ giáo viên @280,262 324x28
-      <table> [table 0 cột, 4 dòng] @280,329 1054x171
+  <h1> Nguyễn Thị Mai @280,124 951x32
+  <button> Chỉnh sửa @1243,124 91x36
+  <div role="tablist"> Mục thông tin giáo viên @280,200 1054x37
+    <button role="tab"> Thông tin @280,200 88x32
+    <button role="tab"> Lớp phụ trách (2) @370,200 140x32
+    <button role="tab"> Lịch sử thay đổi @512,200 130x32
+  <div role="tabpanel"> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @280,253 1054x539
+    <section> Hồ sơ giáo viênThông tin nhân sự và chuyên môn đang áp dụng.Mã nhân sự… @280,269 1054x491
+      <h2> Hồ sơ giáo viên @280,269 324x28
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
@@ -45,10 +44,10 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 - a "Giáo viên" @8,60 231x37
 - a "Giáo viên" @280,88 62x28
 - a "Lớp học" @8,99 231x37
-- button "Chỉnh sửa" @1237,124 97x36
-- div "Thông tin" @280,214 63x22
-- div "Lớp phụ trách (2)" @367,214 115x22
-- div "Lịch sử thay đổi" @505,214 104x22
+- button "Chỉnh sửa" @1243,124 91x36
+- button "Thông tin" @280,200 88x32
+- button "Lớp phụ trách (2)" @370,200 140x32
+- button "Lịch sử thay đổi" @512,200 130x32
 
 ## Tiêu đề (heading)
 - h1: Nguyễn Thị Mai

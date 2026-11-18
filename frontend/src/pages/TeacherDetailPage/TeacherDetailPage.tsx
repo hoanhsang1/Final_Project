@@ -1,42 +1,46 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
+  Badge,
+  Banner,
   Button,
-  Descriptions,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
+  Dialog,
+  DialogHeader,
+  HStack,
+  MetadataList,
+  MetadataListItem,
+  MultiSelector,
+  pixel,
+  proportional,
+  Selector,
+  Stack,
+  Tab,
+  TabList,
   Table,
-  Tabs,
-  Tag,
-  Timeline,
-  Typography,
-  theme,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import type { DescriptionsProps } from 'antd';
+  Text,
+  TextInput,
+  VStack,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { AppLink } from '../../components/AppLink/AppLink';
 import DetailSection from '../../components/DetailSection/DetailSection';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
-import { useNotify } from '../../hooks/useNotify';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import { canEditTeachers, canViewTeachers, isOwnerRole } from '../../features/auth/permissions';
 import {
+  CLASS_STATUS_BADGE,
   CLASS_STATUS_LABEL,
-  CLASS_STATUS_TAG,
+  CLOSE_STATE_BADGE,
   CLOSE_STATE_LABEL,
-  CLOSE_STATE_TAG,
   CONTRACT_TYPE_LABEL,
   FIELD_LABEL,
   TEACHER_HISTORY_ACTION_LABEL,
+  TEACHING_STATUS_BADGE,
   TEACHING_STATUS_LABEL,
-  TEACHING_STATUS_TAG,
   formatChangeValue,
   formatDate,
   formatDateTime,
@@ -61,30 +65,49 @@ import type {
   TeacherClass,
   TeacherUpdatePayload,
 } from '../../features/sprint4/types';
+import { useFormState } from '../../hooks/useFormState';
+import { useNotify } from '../../hooks/useNotify';
 import { useAuthStore } from '../../stores/authStore';
-
-const { Text } = Typography;
 
 const CONTRACT_TYPE_OPTIONS = [
   { value: 'CO_HUU', label: CONTRACT_TYPE_LABEL.CO_HUU },
   { value: 'THINH_GIANG', label: CONTRACT_TYPE_LABEL.THINH_GIANG },
 ];
 
-/** Giá trị form sửa hồ sơ (§5). `staffCode` chỉ đọc nên không nằm trong payload. */
-interface TeacherEditFormValues {
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `TeacherClass`
+ * là interface nên không có index signature. Giao thêm `Record<string, unknown>`
+ * để thoả ràng buộc mà **không** nới lỏng DTO — xem `docs/ui-conventions.md` 6.9.
+ */
+type TeacherRow = TeacherClass & Record<string, unknown>;
+
+/**
+ * Giá trị form sửa hồ sơ (§5). `staffCode` chỉ đọc nên không nằm trong payload.
+ *
+ * Là `type` chứ không phải `interface`: `useFormState<T>` buộc
+ * `T extends Record<string, unknown>`, và chỉ type alias của object literal mới
+ * có index signature ngầm.
+ */
+type TeacherEditFormValues = {
   staffCode: string;
   fullName: string;
   email: string;
   phone: string;
   specialtyIds: string[];
-  contractType?: ContractType;
-}
+  contractType: ContractType | null;
+};
+
+/** Ô nửa hàng của form: đủ rộng thì hai cột, hẹp thì tự xuống một cột. */
+const HALF_FIELD: CSSProperties = { flex: '1 1 240px', minWidth: 0 };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^(\+84|0)\d{9,10}$/;
 
 /**
  * Màn 3 — chi tiết & sửa giáo viên (§5).
  *
  * - 3 tab: Thông tin / Lớp phụ trách / Lịch sử thay đổi.
- * - Sửa tại chỗ với `version` đang đọc; 409 `SPECIALTY_MISMATCH` mở modal xác
+ * - Sửa tại chỗ với `version` đang đọc; 409 `SPECIALTY_MISMATCH` mở dialog xác
  *   nhận rồi gửi lại **cùng payload** với `confirm: true`.
  * - 409 `DATA_CHANGED`: báo lỗi + tải lại, không gửi lại version cũ (§8.1).
  * - 5 state: loading / empty / error / success / không có quyền.
@@ -93,7 +116,6 @@ export default function TeacherDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { token } = theme.useToken();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const backendRoles = useAuthStore((s) => s.backendRoles);
@@ -110,7 +132,34 @@ export default function TeacherDetailPage() {
     payload: TeacherUpdatePayload;
   } | null>(null);
 
-  const [form] = Form.useForm<TeacherEditFormValues>();
+  const form = useFormState<TeacherEditFormValues>(
+    {
+      staffCode: '',
+      fullName: '',
+      email: '',
+      phone: '',
+      specialtyIds: [],
+      contractType: null,
+    },
+    {
+      fullName: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập họ tên';
+        return value.trim().length <= 200 ? undefined : 'Họ tên tối đa 200 ký tự';
+      },
+      phone: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập số điện thoại';
+        return PHONE_PATTERN.test(value.trim()) ? undefined : 'Số điện thoại không hợp lệ';
+      },
+      email: (value) => {
+        if (!value.trim()) return 'Vui lòng nhập email';
+        return EMAIL_PATTERN.test(value.trim()) ? undefined : 'Email không hợp lệ';
+      },
+      specialtyIds: (value) => (value.length > 0 ? undefined : MSG_TEACHER.SPECIALTY_REQUIRED),
+    },
+  );
+  // `reset` có identity ổn định (useCallback deps rỗng) — tách ra để effect bên
+  // dưới không phải phụ thuộc vào cả object `form` (đổi mỗi render).
+  const resetForm = form.reset;
 
   // `?edit=1` chỉ dùng một lần để mở form; xoá khỏi URL để reload không mở lại.
   useEffect(() => {
@@ -164,15 +213,15 @@ export default function TeacherDetailPage() {
   // Đổ dữ liệu vào form mỗi khi mở form (kể cả khi mở bằng `?edit=1`).
   useEffect(() => {
     if (!teacher || !editing) return;
-    form.setFieldsValue({
+    resetForm({
       staffCode: teacher.staffCode ?? '',
       fullName: teacher.fullName ?? '',
       email: teacher.email ?? '',
       phone: teacher.phone ?? '',
       specialtyIds: (teacher.specialties ?? []).map((s) => s.id),
-      contractType: teacher.contractType ?? undefined,
+      contractType: teacher.contractType ?? null,
     });
-  }, [teacher, editing, form]);
+  }, [teacher, editing, resetForm]);
 
   const refreshAfterSave = () => {
     if (id) {
@@ -193,7 +242,7 @@ export default function TeacherDetailPage() {
       refreshAfterSave();
     },
     onError: (error, payload) => {
-      // §5.1 — lệch môn: mở modal xác nhận, KHÔNG báo thành công.
+      // §5.1 — lệch môn: mở dialog xác nhận, KHÔNG báo thành công.
       if (isMismatchError(error)) {
         setSaveError(null);
         setMismatch({ classes: error.mismatchClasses, payload });
@@ -238,94 +287,95 @@ export default function TeacherDetailPage() {
   const cancelEdit = () => {
     setSaveError(null);
     setEditing(false);
-    form.resetFields();
+    resetForm();
   };
 
-  const submitEdit = async () => {
+  const submitEdit = () => {
     if (!teacher) return;
-    try {
-      const values = await form.validateFields();
-      saveMut.mutate({
-        fullName: values.fullName.trim(),
-        email: values.email.trim(),
-        phone: values.phone.trim(),
-        specialtyIds: values.specialtyIds,
-        contractType: values.contractType ?? null,
-        version: teacher.version,
-        confirm: false,
-      });
-    } catch {
-      // Lỗi hiển thị ngay dưới từng trường — không gửi request.
-    }
+    if (!form.validate()) return;
+    saveMut.mutate({
+      fullName: form.values.fullName.trim(),
+      email: form.values.email.trim(),
+      phone: form.values.phone.trim(),
+      specialtyIds: form.values.specialtyIds,
+      contractType: form.values.contractType ?? null,
+      version: teacher.version,
+      confirm: false,
+    });
   };
 
-  const classColumns = useMemo<ColumnsType<TeacherClass>>(
+  const classColumns: TableColumn<TeacherRow>[] = useMemo(
     () => [
       {
-        title: 'Mã lớp',
-        dataIndex: 'classCode',
-        width: 140,
-        render: (value: string | null | undefined, record) => (
-          <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/dao-tao/lop-hoc/${record.id}`)}>
-            {value || record.id}
-          </Button>
+        key: 'classCode',
+        header: 'Mã lớp',
+        width: pixel(140),
+        renderCell: (row) => (
+          <AppLink to={`/dao-tao/lop-hoc/${row.id}`} weight="medium">
+            {row.classCode || row.id}
+          </AppLink>
         ),
       },
       {
-        title: 'Tên lớp',
-        dataIndex: 'name',
-        render: (value: string | null | undefined) => value || '—',
+        key: 'name',
+        header: 'Tên lớp',
+        width: proportional(1, { minWidth: 180 }),
+        renderCell: (row) => row.name || '—',
       },
       {
-        title: 'Trạng thái',
-        dataIndex: 'status',
-        width: 160,
-        render: (value: string | null | undefined) =>
-          value ? <Tag color={CLASS_STATUS_TAG[value]}>{labelOf(CLASS_STATUS_LABEL, value)}</Tag> : '—',
-      },
-      {
-        title: 'Trạng thái đóng',
-        dataIndex: 'closeState',
-        width: 170,
-        render: (value: string | null | undefined) =>
-          value && value !== 'NONE' ? (
-            <Tag color={CLOSE_STATE_TAG[value]}>{labelOf(CLOSE_STATE_LABEL, value)}</Tag>
+        key: 'status',
+        header: 'Trạng thái',
+        width: pixel(160),
+        renderCell: (row) =>
+          row.status ? (
+            <Badge
+              variant={CLASS_STATUS_BADGE[row.status] ?? 'neutral'}
+              label={labelOf(CLASS_STATUS_LABEL, row.status)}
+            />
           ) : (
-            <Text type="secondary">—</Text>
+            '—'
+          ),
+      },
+      {
+        key: 'closeState',
+        header: 'Trạng thái đóng',
+        width: pixel(170),
+        renderCell: (row) =>
+          row.closeState && row.closeState !== 'NONE' ? (
+            <Badge
+              variant={CLOSE_STATE_BADGE[row.closeState] ?? 'neutral'}
+              label={labelOf(CLOSE_STATE_LABEL, row.closeState)}
+            />
+          ) : (
+            <Text type="supporting">—</Text>
           ),
       },
     ],
-    [navigate],
+    [],
   );
 
-  const historyItems = useMemo(() => {
-    const rows = teacher?.history ?? [];
-    return rows.map((item, index) => {
-      const changes = Object.entries(item.details ?? {});
-      return {
+  /**
+   * Lịch sử thay đổi — bản Astryx của `Timeline`. Astryx không có component
+   * timeline, nên dựng bằng `VStack` + hairline giữa các mục: mỗi mục là một
+   * khối "nhật ký" (hành động → ai/lúc nào → các thay đổi), đọc rõ hơn cả dấu
+   * chấm nối tiếp của antd.
+   */
+  const historyRows = useMemo(
+    () =>
+      (teacher?.history ?? []).map((item, index) => ({
         key: `${item.action}-${index}`,
-        color: 'blue' as const,
-        children: (
-          <Flex vertical gap={token.marginXXS}>
-            <Text strong>{labelOf(TEACHER_HISTORY_ACTION_LABEL, item.action)}</Text>
-            <Text type="secondary">
-              {item.actorName || item.actorUserId || '—'} · {formatDateTime(item.createdAt)}
-            </Text>
-            {changes.length > 0 && (
-              <ul style={{ margin: 0, paddingInlineStart: token.paddingMD }}>
-                {changes.map(([field, diff]) => (
-                  <li key={field}>
-                    {labelOf(FIELD_LABEL, field)}: {formatChangeValue(diff?.before, specialtyName)} →{' '}
-                    {formatChangeValue(diff?.after, specialtyName)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Flex>
-        ),
-      };
-    });
-  }, [teacher?.history, token.marginXXS, token.paddingMD, specialtyName]);
+        action: labelOf(TEACHER_HISTORY_ACTION_LABEL, item.action),
+        actor: item.actorName || item.actorUserId || '—',
+        at: formatDateTime(item.createdAt),
+        changes: Object.entries(item.details ?? {}).map(([field, diff]) => ({
+          field,
+          label: labelOf(FIELD_LABEL, field),
+          before: formatChangeValue(diff?.before, specialtyName),
+          after: formatChangeValue(diff?.after, specialtyName),
+        })),
+      })),
+    [teacher?.history, specialtyName],
+  );
 
   if (!canView) return <ForbiddenNotice />;
   if (detailQuery.isLoading) return <PageLoading />;
@@ -334,69 +384,68 @@ export default function TeacherDetailPage() {
     if (isForbiddenError(detailQuery.error)) return <ForbiddenNotice />;
     if (isNotFoundError(detailQuery.error)) {
       return (
-        <Alert
-          type="warning"
-          showIcon
-          role="alert"
-          message={MSG_S4.NOT_FOUND}
-          action={<Button onClick={() => navigate('/dao-tao/giao-vien')}>{MSG_S4.BACK}</Button>}
+        <Banner
+          status="warning"
+          title={MSG_S4.NOT_FOUND}
+          collapsible={false}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.BACK}
+              onClick={() => navigate('/dao-tao/giao-vien')}
+            />
+          }
         />
       );
     }
     return (
-      <Alert
-        type="error"
-        showIcon
-        role="alert"
-        message={MSG_TEACHER.DETAIL_LOAD_ERROR}
+      <Banner
+        status="error"
+        title={MSG_TEACHER.DETAIL_LOAD_ERROR}
         description={sprint4ErrorMessage(detailQuery.error)}
-        action={
-          <Space>
-            <Button onClick={() => detailQuery.refetch()}>{MSG_S4.RETRY}</Button>
-            <Button onClick={() => navigate('/dao-tao/giao-vien')}>{MSG_S4.BACK}</Button>
-          </Space>
+        collapsible={false}
+        role="alert"
+        endContent={
+          <HStack gap={2}>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.RETRY}
+              onClick={() => void detailQuery.refetch()}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.BACK}
+              onClick={() => navigate('/dao-tao/giao-vien')}
+            />
+          </HStack>
         }
       />
     );
   }
 
-  if (!teacher) return <Alert type="warning" showIcon message={MSG_S4.NOT_FOUND} />;
+  if (!teacher) {
+    return <Banner status="warning" title={MSG_S4.NOT_FOUND} collapsible={false} />;
+  }
 
-  const specialtyTags =
+  const specialtyBadges =
     (teacher.specialties ?? []).length > 0 ? (
-      <Space wrap>
+      <HStack gap={2} wrap="wrap">
         {(teacher.specialties ?? []).map((specialty) => (
-          <Tag key={specialty.id}>{specialty.name}</Tag>
+          <Badge key={specialty.id} variant="neutral" label={specialty.name} />
         ))}
-      </Space>
+      </HStack>
     ) : (
       '—'
     );
 
-  const positionTags = positionNames(teacher.positionIds);
+  const positionNamesList = positionNames(teacher.positionIds);
   const showEditForm = canEdit && editing;
 
-  /**
-   * `Descriptions` không viền: nhãn xám, cột nhãn cố định. Bản `bordered` biến
-   * khối thông tin thành bảng kẻ ô, đọc như dump DB và làm mọi field nặng như
-   * nhau (xem `docs/ui-conventions.md` mục 4).
-   */
-  const descProps: DescriptionsProps = {
-    column: { xs: 1, sm: 1, md: 2 },
-    colon: false,
-    size: 'small',
-    labelStyle: {
-      color: token.colorTextSecondary,
-      width: 170,
-      paddingBottom: token.paddingXS,
-      fontWeight: 400,
-      verticalAlign: 'top',
-    },
-    contentStyle: { paddingBottom: token.paddingXS },
-  };
-
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         breadcrumb={[
           { title: MSG_TEACHER.TITLE, href: '/dao-tao/giao-vien' },
@@ -406,207 +455,295 @@ export default function TeacherDetailPage() {
         extra={
           canEdit && activeTab === 'info' ? (
             showEditForm ? (
-              <Space wrap>
-                <Button onClick={cancelEdit}>{MSG_S4.CANCEL}</Button>
-                <Button type="primary" loading={saveMut.isPending} onClick={submitEdit}>
-                  {MSG_S4.SAVE}
-                </Button>
-              </Space>
+              <HStack gap={2} wrap="wrap">
+                <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={cancelEdit} />
+                <Button
+                  variant="primary"
+                  size="lg"
+                  label={MSG_S4.SAVE}
+                  isLoading={saveMut.isPending}
+                  onClick={submitEdit}
+                />
+              </HStack>
             ) : (
-              <Button type="primary" onClick={startEdit}>
-                {MSG_TEACHER.EDIT}
-              </Button>
+              <Button variant="primary" size="lg" label={MSG_TEACHER.EDIT} onClick={startEdit} />
             )
           ) : undefined
         }
       />
 
-      <Tabs
-        activeKey={activeTab}
+      <TabList
+        value={activeTab}
         onChange={setActiveTab}
-        items={[
-          {
-            key: 'info',
-            label: MSG_TEACHER.TAB_INFO,
-            children: showEditForm ? (
-              <Flex vertical gap={token.marginSM} style={{ maxWidth: 760 }}>
-                {saveError && <Alert type="error" showIcon role="alert" message={saveError} />}
-                <Form<TeacherEditFormValues> form={form} layout="vertical" requiredMark>
-                  <Form.Item
-                    name="staffCode"
-                    label="Mã nhân sự"
-                    extra={MSG_TEACHER.STAFF_CODE_LOCKED}
-                  >
-                    <Input readOnly />
-                  </Form.Item>
-
-                  <Flex gap={token.marginSM} wrap="wrap">
-                    <Form.Item
-                      name="fullName"
-                      label="Họ tên"
-                      style={{ flex: 1, minWidth: 240 }}
-                      rules={[
-                        { required: true, message: 'Vui lòng nhập họ tên' },
-                        { max: 200, message: 'Họ tên tối đa 200 ký tự' },
-                      ]}
-                    >
-                      <Input autoComplete="off" />
-                    </Form.Item>
-                    <Form.Item
-                      name="phone"
-                      label="Số điện thoại"
-                      style={{ flex: 1, minWidth: 240 }}
-                      rules={[
-                        { required: true, message: 'Vui lòng nhập số điện thoại' },
-                        { pattern: /^(\+84|0)\d{9,10}$/, message: 'Số điện thoại không hợp lệ' },
-                      ]}
-                    >
-                      <Input autoComplete="off" />
-                    </Form.Item>
-                  </Flex>
-
-                  <Form.Item
-                    name="email"
-                    label="Email"
-                    rules={[
-                      { required: true, message: 'Vui lòng nhập email' },
-                      { type: 'email', message: 'Email không hợp lệ' },
-                    ]}
-                  >
-                    <Input autoComplete="off" />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="specialtyIds"
-                    label="Chuyên môn"
-                    rules={[
-                      {
-                        required: true,
-                        type: 'array',
-                        min: 1,
-                        message: MSG_TEACHER.SPECIALTY_REQUIRED,
-                      },
-                    ]}
-                    extra="Đổi chuyên môn có thể làm lệch môn của lớp đang phụ trách — hệ thống sẽ hỏi lại."
-                  >
-                    <Select
-                      mode="multiple"
-                      options={specialtyOptions}
-                      loading={specialtiesQuery.isLoading}
-                      placeholder="Chọn chuyên môn"
-                    />
-                  </Form.Item>
-
-                  <Form.Item name="contractType" label="Loại hợp đồng">
-                    <Select allowClear options={CONTRACT_TYPE_OPTIONS} placeholder="Không bắt buộc" />
-                  </Form.Item>
-
-                  {specialtiesQuery.isError && (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message={MSG_TEACHER.SPECIALTY_LOAD_ERROR}
-                      style={{ marginBottom: token.marginSM }}
-                    />
-                  )}
-                </Form>
-              </Flex>
-            ) : (
-              <DetailSection
-                title="Hồ sơ giáo viên"
-                description="Thông tin nhân sự và chuyên môn đang áp dụng."
-              >
-                <Descriptions {...descProps}>
-                  <Descriptions.Item label="Mã nhân sự">{teacher.staffCode || '—'}</Descriptions.Item>
-                  <Descriptions.Item label="Họ tên">{teacher.fullName || '—'}</Descriptions.Item>
-                  <Descriptions.Item label="Email">{teacher.email || '—'}</Descriptions.Item>
-                  <Descriptions.Item label="Số điện thoại">{teacher.phone || '—'}</Descriptions.Item>
-                  <Descriptions.Item label="Bộ phận">{departmentName(teacher.departmentId)}</Descriptions.Item>
-                  <Descriptions.Item label="Chức vụ">
-                    {positionTags.length > 0 ? (
-                      <Space wrap>
-                        {positionTags.map((name, index) => (
-                          <Tag key={`${name}-${index}`}>{name}</Tag>
-                        ))}
-                      </Space>
-                    ) : (
-                      '—'
-                    )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Chuyên môn" span={2}>
-                    {specialtyTags}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Loại hợp đồng">
-                    {labelOf(CONTRACT_TYPE_LABEL, teacher.contractType)}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Trạng thái dạy">
-                    {teacher.teachingStatus ? (
-                      <Tag color={TEACHING_STATUS_TAG[teacher.teachingStatus]}>
-                        {labelOf(TEACHING_STATUS_LABEL, teacher.teachingStatus)}
-                      </Tag>
-                    ) : (
-                      '—'
-                    )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Ngày tạo">{formatDate(teacher.createdAt)}</Descriptions.Item>
-                  <Descriptions.Item label="Cập nhật gần nhất">
-                    {formatDateTime(teacher.updatedAt)}
-                  </Descriptions.Item>
-                </Descriptions>
-              </DetailSection>
-            ),
-          },
-          {
-            key: 'classes',
-            label: `${MSG_TEACHER.TAB_CLASSES} (${(teacher.classes ?? []).length})`,
-            children: (
-              <Table<TeacherClass>
-                rowKey="id"
-                size="small"
-                columns={classColumns}
-                dataSource={teacher.classes ?? []}
-                locale={{ emptyText: <EmptyState compact description={MSG_TEACHER.CLASSES_EMPTY} /> }}
-                pagination={false}
-                scroll={{ x: 620 }}
-              />
-            ),
-          },
-          {
-            key: 'history',
-            label: MSG_TEACHER.TAB_HISTORY,
-            children:
-              historyItems.length === 0 ? (
-                <EmptyState description={MSG_TEACHER.HISTORY_EMPTY} />
-              ) : (
-                <Timeline items={historyItems} />
-              ),
-          },
-        ]}
-      />
-
-      {/* §5.1 — xác nhận khi đổi chuyên môn làm lệch môn lớp đang phụ trách. */}
-      <Modal
-        title={MSG_TEACHER.MISMATCH_TITLE}
-        open={!!mismatch}
-        onCancel={() => setMismatch(null)}
-        onOk={() => {
-          if (mismatch) confirmMismatchMut.mutate(mismatch.payload);
-        }}
-        okText={MSG_TEACHER.CONFIRM_UPDATE}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={confirmMismatchMut.isPending}
-        maskClosable={false}
+        role="tablist"
+        hasDivider
+        aria-label="Mục thông tin giáo viên"
       >
-        <Flex vertical gap={token.marginSM}>
-          {saveError && <Alert type="error" showIcon role="alert" message={saveError} />}
+        <Tab value="info" label={MSG_TEACHER.TAB_INFO} panelId="teacher-panel-info" />
+        <Tab
+          value="classes"
+          label={`${MSG_TEACHER.TAB_CLASSES} (${(teacher.classes ?? []).length})`}
+          panelId="teacher-panel-classes"
+        />
+        <Tab value="history" label={MSG_TEACHER.TAB_HISTORY} panelId="teacher-panel-history" />
+      </TabList>
+
+      <div
+        id={`teacher-panel-${activeTab}`}
+        role="tabpanel"
+        tabIndex={-1}
+        style={{ paddingTop: 'var(--spacing-4)' }}
+      >
+        {activeTab === 'info' ? (
+          showEditForm ? (
+            <VStack gap={3} style={{ maxWidth: 760 }}>
+              {saveError ? (
+                <Banner status="error" title={saveError} collapsible={false} role="alert" />
+              ) : null}
+
+              <form
+                noValidate
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  submitEdit();
+                }}
+              >
+                <VStack gap={4}>
+                  <TextInput
+                    label="Mã nhân sự"
+                    value={form.values.staffCode}
+                    onChange={(value) => form.setValue('staffCode', value)}
+                    isReadOnly
+                    description={MSG_TEACHER.STAFF_CODE_LOCKED}
+                  />
+
+                  <HStack gap={3} wrap="wrap">
+                    <TextInput
+                      label="Họ tên"
+                      value={form.values.fullName}
+                      onChange={(value) => form.setValue('fullName', value)}
+                      autoComplete="off"
+                      isDisabled={saveMut.isPending}
+                      aria-required="true"
+                      containerStyle={HALF_FIELD}
+                      status={
+                        form.errorOf('fullName')
+                          ? { type: 'error', message: form.errorOf('fullName') }
+                          : undefined
+                      }
+                    />
+                    <TextInput
+                      label="Số điện thoại"
+                      type="tel"
+                      value={form.values.phone}
+                      onChange={(value) => form.setValue('phone', value)}
+                      autoComplete="off"
+                      isDisabled={saveMut.isPending}
+                      aria-required="true"
+                      containerStyle={HALF_FIELD}
+                      status={
+                        form.errorOf('phone')
+                          ? { type: 'error', message: form.errorOf('phone') }
+                          : undefined
+                      }
+                    />
+                  </HStack>
+
+                  <TextInput
+                    label="Email"
+                    type="email"
+                    value={form.values.email}
+                    onChange={(value) => form.setValue('email', value)}
+                    autoComplete="off"
+                    isDisabled={saveMut.isPending}
+                    aria-required="true"
+                    status={
+                      form.errorOf('email')
+                        ? { type: 'error', message: form.errorOf('email') }
+                        : undefined
+                    }
+                  />
+
+                  <MultiSelector
+                    label="Chuyên môn"
+                    placeholder="Chọn chuyên môn"
+                    options={specialtyOptions}
+                    isLoading={specialtiesQuery.isLoading}
+                    value={form.values.specialtyIds}
+                    onChange={(value) => form.setValue('specialtyIds', value)}
+                    isDisabled={saveMut.isPending}
+                    aria-required="true"
+                    description="Đổi chuyên môn có thể làm lệch môn của lớp đang phụ trách — hệ thống sẽ hỏi lại."
+                    status={
+                      form.errorOf('specialtyIds')
+                        ? { type: 'error', message: form.errorOf('specialtyIds') }
+                        : undefined
+                    }
+                  />
+
+                  <Selector
+                    label="Loại hợp đồng"
+                    placeholder="Không bắt buộc"
+                    hasClear
+                    options={CONTRACT_TYPE_OPTIONS}
+                    value={form.values.contractType}
+                    onChange={(value) => form.setValue('contractType', value as ContractType | null)}
+                    isDisabled={saveMut.isPending}
+                  />
+
+                  {specialtiesQuery.isError ? (
+                    <Banner
+                      status="warning"
+                      title={MSG_TEACHER.SPECIALTY_LOAD_ERROR}
+                      collapsible={false}
+                    />
+                  ) : null}
+                </VStack>
+              </form>
+            </VStack>
+          ) : (
+            <DetailSection
+              title="Hồ sơ giáo viên"
+              description="Thông tin nhân sự và chuyên môn đang áp dụng."
+            >
+              <MetadataList columns="multi" label={{ position: 'start', width: 170 }}>
+                <MetadataListItem label="Mã nhân sự">{teacher.staffCode || '—'}</MetadataListItem>
+                <MetadataListItem label="Họ tên">{teacher.fullName || '—'}</MetadataListItem>
+                <MetadataListItem label="Email">{teacher.email || '—'}</MetadataListItem>
+                <MetadataListItem label="Số điện thoại">
+                  {teacher.phone || '—'}
+                </MetadataListItem>
+                <MetadataListItem label="Bộ phận">
+                  {departmentName(teacher.departmentId)}
+                </MetadataListItem>
+                <MetadataListItem label="Chức vụ">
+                  {positionNamesList.length > 0 ? (
+                    <HStack gap={2} wrap="wrap">
+                      {positionNamesList.map((name, index) => (
+                        <Badge key={`${name}-${index}`} variant="neutral" label={name} />
+                      ))}
+                    </HStack>
+                  ) : (
+                    '—'
+                  )}
+                </MetadataListItem>
+                <MetadataListItem label="Chuyên môn">{specialtyBadges}</MetadataListItem>
+                <MetadataListItem label="Loại hợp đồng">
+                  {labelOf(CONTRACT_TYPE_LABEL, teacher.contractType)}
+                </MetadataListItem>
+                <MetadataListItem label="Trạng thái dạy">
+                  {teacher.teachingStatus ? (
+                    <Badge
+                      variant={TEACHING_STATUS_BADGE[teacher.teachingStatus] ?? 'neutral'}
+                      label={labelOf(TEACHING_STATUS_LABEL, teacher.teachingStatus)}
+                    />
+                  ) : (
+                    '—'
+                  )}
+                </MetadataListItem>
+                <MetadataListItem label="Ngày tạo">
+                  {formatDate(teacher.createdAt)}
+                </MetadataListItem>
+                <MetadataListItem label="Cập nhật gần nhất">
+                  {formatDateTime(teacher.updatedAt)}
+                </MetadataListItem>
+              </MetadataList>
+            </DetailSection>
+          )
+        ) : null}
+
+        {activeTab === 'classes' ? (
+          <Table<TeacherRow>
+            data={(teacher.classes ?? []) as TeacherRow[]}
+            columns={classColumns}
+            idKey="id"
+            hasHover
+            textOverflow="truncate"
+            emptyState={<EmptyState compact description={MSG_TEACHER.CLASSES_EMPTY} />}
+          />
+        ) : null}
+
+        {activeTab === 'history' ? (
+          historyRows.length === 0 ? (
+            <EmptyState description={MSG_TEACHER.HISTORY_EMPTY} />
+          ) : (
+            <VStack gap={0}>
+              {historyRows.map((item, index) => (
+                <VStack
+                  key={item.key}
+                  gap={1}
+                  style={{
+                    paddingBlock: 'var(--spacing-3)',
+                    borderTop: index === 0 ? undefined : '1px solid var(--color-border)',
+                  }}
+                >
+                  <Text weight="medium">{item.action}</Text>
+                  <Text type="supporting">
+                    {item.actor} · {item.at}
+                  </Text>
+                  {item.changes.length > 0 ? (
+                    <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                      {item.changes.map((change) => (
+                        <li key={change.field}>
+                          {change.label}: {change.before} → {change.after}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </VStack>
+              ))}
+            </VStack>
+          )
+        ) : null}
+      </div>
+
+      {/* §5.1 — xác nhận khi đổi chuyên môn làm lệch môn lớp đang phụ trách.
+          `purpose="form"`: bấm ra ngoài KHÔNG đóng (không mất ngữ cảnh), ESC vẫn
+          đóng như bản antd `maskClosable={false}`. */}
+      <Dialog
+        isOpen={!!mismatch}
+        onOpenChange={(open) => {
+          if (!open) setMismatch(null);
+        }}
+        purpose="form"
+        width={560}
+      >
+        <DialogHeader
+          title={MSG_TEACHER.MISMATCH_TITLE}
+          onOpenChange={(open) => {
+            if (!open) setMismatch(null);
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {saveError ? (
+            <Banner status="error" title={saveError} collapsible={false} role="alert" />
+          ) : null}
           <Text>{MSG_TEACHER.MISMATCH_DESC}</Text>
-          <ul style={{ margin: 0, paddingInlineStart: token.paddingLG }}>
+          <ul style={{ margin: 0, paddingInlineStart: 20 }}>
             {(mismatch?.classes ?? []).map((item, index) => (
               <li key={item.id ?? index}>{item.name || item.id || '—'}</li>
             ))}
           </ul>
-        </Flex>
-      </Modal>
-    </Flex>
+          <HStack justify="end" gap={2}>
+            <Button
+              variant="secondary"
+              size="lg"
+              label={MSG_S4.CANCEL}
+              onClick={() => setMismatch(null)}
+            />
+            <Button
+              variant="primary"
+              size="lg"
+              label={MSG_TEACHER.CONFIRM_UPDATE}
+              isLoading={confirmMismatchMut.isPending}
+              onClick={() => {
+                if (mismatch) confirmMismatchMut.mutate(mismatch.payload);
+              }}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
+    </Stack>
   );
 }
