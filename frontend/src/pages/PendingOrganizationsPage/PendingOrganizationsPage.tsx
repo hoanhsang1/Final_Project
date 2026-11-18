@@ -1,8 +1,9 @@
-import { Alert, Button, Empty, Flex, Skeleton, Table, Tag, theme } from 'antd';
+import { Alert, Button, Empty, Flex, Table, Tag, theme } from 'antd';
 import type { TableProps } from 'antd';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import { MSG_ORG } from '../../features/admin/adminMessages';
 import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/statusLabels';
 import type { PendingOrganization } from '../../features/admin/types';
@@ -94,10 +95,10 @@ export default function PendingOrganizationsPage() {
     <Flex vertical gap={token.marginMD}>
       <PageHeader title={MSG_ORG.LIST_TITLE} subtitle={MSG_ORG.LIST_SUBTITLE} />
 
-      {/* Trạng thái loading — `Skeleton` (NFR-PER-001, `TC-ORG-14`).
+      {/* Trạng thái loading — `PageLoading` (NFR-PER-001, `TC-ORG-14`).
           KHÔNG render bảng rỗng lúc đang tải để tránh nhấp nháy "không có dữ liệu". */}
       {query.isPending ? (
-        <Skeleton active paragraph={{ rows: 8 }} />
+        <PageLoading />
       ) : (
         <Table<PendingOrganization>
           rowKey="id"

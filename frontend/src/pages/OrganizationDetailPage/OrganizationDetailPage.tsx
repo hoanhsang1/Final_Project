@@ -7,7 +7,6 @@ import {
   Descriptions,
   Empty,
   Flex,
-  Skeleton,
   Table,
   Tag,
   theme,
@@ -17,6 +16,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import {
@@ -177,7 +177,7 @@ export default function OrganizationDetailPage() {
   ];
 
   if (detailQuery.isPending) {
-    return <Skeleton active paragraph={{ rows: 10 }} />;
+    return <PageLoading />;
   }
 
   if (detailQuery.isError) {

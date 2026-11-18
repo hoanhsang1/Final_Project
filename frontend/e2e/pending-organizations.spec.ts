@@ -51,19 +51,19 @@ test.describe('Danh sách tổ chức chờ duyệt', () => {
     await expect(page.getByText('Không có tổ chức nào đang chờ duyệt')).toBeHidden();
   });
 
-  test('TC-ORG-14 — lúc đang tải thì có Skeleton, không nhấp nháy Empty', async ({ page }) => {
+  test('TC-ORG-14 — lúc đang tải thì có khung chờ, không nhấp nháy Empty', async ({ page }) => {
     await loginAs(page);
     await mockAdminApi(page, { pendingDelayMs: 2500 });
 
     await page.goto('/quan-tri/to-chuc');
 
-    // Đang tải: có Skeleton, KHÔNG hiện Empty.
-    await expect(page.locator('.ant-skeleton').first()).toBeVisible();
+    // Đang tải: có khung chờ `PageLoading` (Astryx, `role="status"`), KHÔNG hiện Empty.
+    await expect(page.getByRole('status')).toBeVisible();
     await expect(page.getByText('Không có tổ chức nào đang chờ duyệt')).toBeHidden();
 
-    // Tải xong: dữ liệu hiện, Skeleton biến mất.
+    // Tải xong: dữ liệu hiện, khung chờ biến mất.
     await expect(page.getByText(ORG_A.name)).toBeVisible();
-    await expect(page.locator('.ant-skeleton')).toHaveCount(0);
+    await expect(page.getByRole('status')).toHaveCount(0);
   });
 
   test('TC-ORG-15 — mọi dòng có Tag trạng thái kèm chữ "Chờ duyệt" (BR-08)', async ({ page }) => {

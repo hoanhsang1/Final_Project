@@ -7,7 +7,6 @@ import {
   Flex,
   Input,
   Select,
-  Skeleton,
   Table,
   Tag,
   theme,
@@ -17,6 +16,7 @@ import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import AccountCreateModal from '../../components/AccountCreateModal/AccountCreateModal';
 import {
   AdminApiError,
@@ -313,7 +313,7 @@ export default function AccountsPage() {
       </PageHeader>
 
       {result.isPending ? (
-        <Skeleton active paragraph={{ rows: 8 }} />
+        <PageLoading />
       ) : (
         <Table<AccountItem>
           rowKey="id"

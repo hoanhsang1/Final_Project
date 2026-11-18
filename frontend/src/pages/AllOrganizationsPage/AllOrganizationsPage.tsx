@@ -1,9 +1,10 @@
-import { Alert, App, Button, Empty, Flex, Input, Select, Skeleton, Table, Tag, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Input, Select, Table, Tag, theme } from 'antd';
 import type { SelectProps, TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import { AdminApiError } from '../../features/admin/adminApi';
 import { MSG_ORG, msgBackendPending, msgReactivated, msgSuspended } from '../../features/admin/adminMessages';
@@ -58,7 +59,7 @@ function formatDateTime(value: string | null | undefined): string {
  * làm xong, màn này hiện "Tính năng đang chờ backend" (xem §4.5 của đặc tả),
  * KHÔNG hiện Empty rỗng để tránh hiểu nhầm là không có tổ chức nào.
  *
- * Trạng thái: **loading** (Skeleton) · **empty** (Empty) · **error** (Alert +
+ * Trạng thái: **loading** (PageLoading) · **empty** (Empty) · **error** (Alert +
  * Thử lại) · **success**. No-permission do `AdminGuard` chặn trước.
  */
 export default function AllOrganizationsPage() {
@@ -274,7 +275,7 @@ export default function AllOrganizationsPage() {
       )}
 
       {result.isPending ? (
-        <Skeleton active paragraph={{ rows: 8 }} />
+        <PageLoading />
       ) : (
         <Table<OrganizationListItem>
           rowKey="id"

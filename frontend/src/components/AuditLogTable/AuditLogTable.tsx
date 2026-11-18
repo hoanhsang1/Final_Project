@@ -1,8 +1,9 @@
-import { Alert, Button, Empty, Skeleton, Table, Tag, Typography } from 'antd';
+import { Alert, Button, Empty, Table, Tag, Typography } from 'antd';
 import type { TableProps } from 'antd';
 import type { UseQueryResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
+import PageLoading from '../PageLoading/PageLoading';
 import {
   auditActionLabel,
   auditTargetPath,
@@ -114,7 +115,7 @@ export default function AuditLogTable({
   ] satisfies TableProps<AuditLogItem>['columns'];
 
   if (query.isPending) {
-    return <Skeleton active paragraph={{ rows: 6 }} />;
+    return <PageLoading />;
   }
 
   if (query.isError) {

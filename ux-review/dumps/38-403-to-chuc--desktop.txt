@@ -11,10 +11,10 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
 <h1> Bạn không có quyền truy cập khu vực quản lý tổ chức. @473,344 420x64
-<button> Về trang đăng nhập @605,420 156x36
+<button> Về trang đăng nhập @608,420 151x36
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
-- button "Về trang đăng nhập" @605,420 156x36
+- button "Về trang đăng nhập" @608,420 151x36
 
 ## Tiêu đề (heading)
 - h1: Bạn không có quyền truy cập khu vực quản lý tổ chức.

@@ -1,7 +1,8 @@
-import { Alert, Button, Card, Col, Flex, List, Row, Skeleton, Statistic, theme } from 'antd';
+import { Alert, Button, Card, Col, Flex, List, Row, Statistic, theme } from 'antd';
 import { Link } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
-import { MSG_ADM, MSG_OVW } from '../../features/admin/adminMessages';
+import PageLoading from '../../components/PageLoading/PageLoading';
+import { MSG_ADM, MSG_ORG, MSG_OVW } from '../../features/admin/adminMessages';
 import { CONSOLE_MENU } from '../../features/admin/consoleMenu';
 import { CORE_MODULES } from '../../features/admin/coreModules';
 import { useOverview } from './use-overview';
@@ -21,7 +22,7 @@ interface StatCard {
  * Trước đây `/quan-tri` chỉ là `Navigate` redirect sang màn danh sách; giờ là
  * màn thật, cho Admin thấy bức tranh tổng thể trước khi lao vào chi tiết.
  *
- * Trạng thái: **loading** (Skeleton) · **error** (Alert + Thử lại) · **success**.
+ * Trạng thái: **loading** (PageLoading) · **error** (Alert + Thử lại) · **success**.
  * Không có **empty** — màn tổng quan không có khái niệm dữ liệu rỗng.
  * No-permission do `AdminGuard` chặn trước, không tới được màn này.
  */
@@ -42,7 +43,10 @@ export default function OverviewPage() {
       title: MSG_OVW.PENDING_CARD,
       value: pendingQuery.data?.length ?? 0,
       path: '/quan-tri/to-chuc',
-      ariaLabel: `${MSG_OVW.PENDING_CARD}: ${pendingQuery.data?.length ?? 0}. ${MSG_ADM.MENU_ORG_ALL}`,
+      // Đích đến là màn "Tổ chức chờ duyệt" (`/quan-tri/to-chuc`) → nhãn phải
+      // nêu đúng tên màn đó (`MSG-ORG-18`), KHÔNG dùng `MENU_ORG_ALL`
+      // ("Tất cả tổ chức" — màn khác, `/quan-tri/to-chuc/tat-ca`).
+      ariaLabel: `${MSG_OVW.PENDING_CARD}: ${pendingQuery.data?.length ?? 0}. ${MSG_ORG.LIST_TITLE}`,
     },
     {
       key: 'modules-total',
@@ -94,7 +98,7 @@ export default function OverviewPage() {
   }
 
   if (isPending) {
-    return <Skeleton active paragraph={{ rows: 6 }} />;
+    return <PageLoading />;
   }
 
   return (

@@ -6,7 +6,6 @@ import {
   Card,
   Checkbox,
   Flex,
-  Skeleton,
   Tag,
   Tooltip,
   Typography,
@@ -15,6 +14,7 @@ import {
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import { AdminApiError, updateOrganizationModules } from '../../features/admin/adminApi';
 import { adminKeys } from '../../features/admin/adminKeys';
 import { MSG_MOD, MSG_ORG, msgCoreLocked } from '../../features/admin/adminMessages';
@@ -311,9 +311,9 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
         />
       )}
 
-      {/* Trạng thái loading của danh mục — `Skeleton`, không hiện danh sách rỗng. */}
+      {/* Trạng thái loading của danh mục — `PageLoading`, không hiện danh sách rỗng. */}
       {catalogQuery.isPending ? (
-        <Skeleton active paragraph={{ rows: 4 }} />
+        <PageLoading />
       ) : (
         <>
           {catalogQuery.isError && (

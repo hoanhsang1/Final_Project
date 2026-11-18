@@ -5,7 +5,6 @@ import {
   Flex,
   Input,
   Select,
-  Skeleton,
   Table,
   Tag,
   theme,
@@ -13,6 +12,7 @@ import {
 import type { TableProps } from 'antd';
 import { useMemo } from 'react';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import { MSG_MDL } from '../../features/admin/adminMessages';
 import { CORE_MODULES } from '../../features/admin/coreModules';
 import type { ModuleCatalogItem } from '../../features/modules/moduleApi';
@@ -40,7 +40,7 @@ const CATEGORY_OPTIONS = [
  *
  * Bộ lọc lưu trong URL (`?loi=core&q=...`) để deep-link được.
  *
- * Trạng thái: **loading** (Skeleton) · **empty** (Empty) · **error** (Alert +
+ * Trạng thái: **loading** (PageLoading) · **empty** (Empty) · **error** (Alert +
  * Thử lại) · **success**. No-permission do `AdminGuard` chặn trước.
  */
 export default function ModuleCatalogPage() {
@@ -155,7 +155,7 @@ export default function ModuleCatalogPage() {
       </PageHeader>
 
       {query.isPending ? (
-        <Skeleton active paragraph={{ rows: 8 }} />
+        <PageLoading />
       ) : (
         <Table<ModuleCatalogItem>
           rowKey="code"

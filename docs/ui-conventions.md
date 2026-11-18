@@ -374,8 +374,12 @@ Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
 4. `Selector` render **listbox ẩn chứa đúng nhãn option**. Test `getByText('Đang diễn ra')`
    sẽ khớp 2 lần (badge trong bảng + option của bộ lọc). Phải scope:
    `within(screen.getByRole('table')).getByText(...)`.
-5. `PageLoading` có **hai** `role="status"`: `<div aria-busy>` của mình và `<span>`
-   của `VisuallyHidden`. Truy vấn theo chữ "Đang tải…", không theo role.
+5. `PageLoading` có **đúng một** `role="status"`: `<div role="status" aria-busy>`
+   bao ngoài. `<span>` của `VisuallyHidden` **không** mang role — Astryx
+   `VisuallyHidden` chỉ render `<span>` trần và chỉ nhận `role` khi người gọi
+   truyền vào (xem `Button` truyền `role="status"` cho nhãn loading của nút).
+   Vì vậy `getByRole('status')` khớp **một** phần tử và dùng được trong test
+   (`PageLoading.test.tsx`, `e2e/pending-organizations.spec.ts` TC-ORG-14).
 6. `TextInput`/`Selector` **không** nhận `className`/`style` ở gốc (field là một cụm
    label + control + status); muốn đặt bề rộng dùng prop `width`, muốn style cả cụm
    dùng `containerStyle`. `Input.Search` → `TextInput type="search"` (role `searchbox`,

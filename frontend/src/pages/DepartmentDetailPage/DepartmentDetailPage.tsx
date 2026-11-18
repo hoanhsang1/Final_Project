@@ -1,9 +1,10 @@
-import { Alert, App, Button, Empty, Flex, Popconfirm, Skeleton, Space, Table, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Popconfirm, Space, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import MemberFormModal from '../../components/MemberFormModal/MemberFormModal';
 import MemberPositionsModal from '../../components/MemberPositionsModal/MemberPositionsModal';
@@ -161,7 +162,7 @@ export default function DepartmentDetailPage() {
   ];
 
   if (isLoading) {
-    return <Skeleton active paragraph={{ rows: 6 }} />;
+    return <PageLoading />;
   }
 
   if (departmentsError) {

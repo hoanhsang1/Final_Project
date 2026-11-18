@@ -5,7 +5,6 @@ import {
   Button,
   Descriptions,
   Flex,
-  Skeleton,
   Tag,
   Typography,
   theme,
@@ -14,6 +13,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import PageLoading from '../../components/PageLoading/PageLoading';
 import AccountRoleModal from '../../components/AccountRoleModal/AccountRoleModal';
 import AccountResetPasswordModal from '../../components/AccountResetPasswordModal/AccountResetPasswordModal';
 import type { PasswordResetMode } from '../../components/AccountResetPasswordModal/AccountResetPasswordModal';
@@ -188,7 +188,7 @@ export default function AccountDetailPage() {
     detailQuery.error.status === 404;
 
   if (detailQuery.isPending) {
-    return <Skeleton active paragraph={{ rows: 8 }} />;
+    return <PageLoading />;
   }
 
   if (isNotFound) {

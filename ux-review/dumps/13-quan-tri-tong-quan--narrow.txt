@@ -18,7 +18,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
   <button> Đăng xuất @212,12 92x32
 <main> Tổng quanSố liệu toàn hệ thống quản trị.Tổ chức chờ duyệt2Module trong… @0,56 320x767
   <h1> Tổng quan @16,76 288x32
-  <a> Tổ chức chờ duyệt: 2. Tất cả tổ chức @16,178 134x119
+  <a> Tổ chức chờ duyệt: 2. Tổ chức chờ duyệt @16,178 134x119
   <a> Module trong danh mục: 5. Danh mục module @170,178 134x141
   <a> Module lõi: 3. Danh mục module @16,339 134x97
   <a> Module mở rộng: 2. Danh mục module @170,339 134x119
@@ -33,7 +33,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 - a "Tới nội dung chính" @12,-51 151x32
 - button "Mở menu quản trị" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @212,12 92x32
-- a "Tổ chức chờ duyệt: 2. Tất cả tổ chức" @16,178 134x119
+- a "Tổ chức chờ duyệt: 2. Tổ chức chờ duyệt" @16,178 134x119
 - a "Module trong danh mục: 5. Danh mục module" @170,178 134x141
 - a "Module lõi: 3. Danh mục module" @16,339 134x97
 - a "Module mở rộng: 2. Danh mục module" @170,339 134x119
