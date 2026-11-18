@@ -20,7 +20,8 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
     <h2> Thông tin tổ chức @557,248 672x28
     <input> (text) "Tên tổ chức" @566,322 654x20
     <button role="combobox"> Chọn loại tổ chức @570,394 622x20
-    <div role="alert"> Không tải được danh sách module. Danh mục module không tải được. Vui l… @601,448 612x40
+    <div role="alert"> Không tải được danh sách module. Danh mục module không tải được. Vui l… @601,448 535x40
+    <button> Thử lại @1144,444 69x28
     <h2> Tài khoản quản trị @557,573 672x28
     <input> (text) "Tên đăng nhập" @566,647 654x20
     <input> (email) "Email" @566,719 654x20
@@ -32,6 +33,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - input[text] "Tên tổ chức" @566,322 654x20
 - button "Chọn loại tổ chức" @570,394 622x20 {expanded=false}
+- button "Thử lại" @1144,444 69x28
 - input[text] "Tên đăng nhập" @566,647 654x20
 - input[email] "Email" @566,719 654x20
 - input[password] "Mật khẩu" @566,791 654x20
@@ -46,10 +48,10 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 - h2: Tài khoản quản trị
 
 ## Thông báo / trạng thái
-- [alert] Không tải được danh sách module. Danh mục module không tải được. Vui lòng tải lại trang rồi đăng ký.
+- [alert] Không tải được danh sách module. Danh mục module không tải được. Vui lòng thử lại.
 
 ## Hộp thoại đang mở
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Đăng ký tổ chức Tạo tài khoản quản trị cho đơn vị của bạn Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được. Thông tin tổ chức Tên tổ chức Loại tổ chức Chọn loại tổ chức Không tải được danh sách module. Danh mục module không tải được. Vui lòng tải lại trang rồi đăng ký. Module cần sử dụng Tài khoản quản trị Tên đăng nhập Email Mật khẩu Nhập lại mật khẩu Gửi đăng ký Đã có tài khoản? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.
+M MEMS Quản lý giáo dục theo module Quản trị nhà trường trên một hệ thống. Đăng nhập bằng tài khoản do quản trị viên tổ chức cấp. Quản trị hệ thống Tài khoản, vai trò, quyền theo module Tổ chức Đơn vị, phòng ban, chức vụ Đào tạo Giáo viên, lớp học, trạng thái lớp © 2026 MEMS · Hệ thống Quản lý Giáo dục theo Module M MEMS Đăng ký tổ chức Tạo tài khoản quản trị cho đơn vị của bạn Sau khi gửi, tổ chức sẽ ở trạng thái Chờ duyệt. Admin hệ thống phê duyệt xong bạn mới đăng nhập được. Thông tin tổ chức Tên tổ chức Loại tổ chức Chọn loại tổ chức Không tải được danh sách module. Danh mục module không tải được. Vui lòng thử lại. Thử lại Module cần sử dụng Tài khoản quản trị Tên đăng nhập Email Mật khẩu Nhập lại mật khẩu Gửi đăng ký Đã có tài khoản? Đăng nhập Cần hỗ trợ đăng nhập? Liên hệ quản trị viên hệ thống.

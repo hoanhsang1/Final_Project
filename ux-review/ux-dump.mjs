@@ -801,6 +801,10 @@ async function run() {
         await page.goto(BASE + sc.route, { waitUntil: 'domcontentloaded', timeout: 30000 });
         if (sc.action) await sc.action(page);
         await page.waitForTimeout(sc.settle ?? 900);
+        // Chờ webfont (Inter) tải xong TRƯỚC khi đo: bề rộng nút phụ thuộc font, nếu
+        // đo lúc font chưa sẵn sàng thì vài px lệch giữa các lần chạy (dump không ổn
+        // định — ví dụ nút ở màn 403 nhảy 151↔156px).
+        await page.evaluate(() => document.fonts.ready);
         const snap = await snapshot(page);
         body = [
           `# ${sc.id} — ${sc.name}`,

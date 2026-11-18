@@ -171,6 +171,8 @@ export const MSG_MOD = {
   DRAFT_DISCARD: 'Bỏ nháp',
   /** `MSG-MOD-15` — đã khôi phục nháp vào biểu mẫu. */
   DRAFT_APPLIED: 'Đã khôi phục bản nháp chưa lưu.',
+  /** `MSG-MOD-16` — nút thử lại khi không tải được danh mục module (màn Đăng ký). */
+  RETRY: 'Thử lại',
 } as const;
 
 /** `MSG-MOD-03` có thêm tên module cụ thể. */

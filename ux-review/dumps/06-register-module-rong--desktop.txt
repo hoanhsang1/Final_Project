@@ -34,7 +34,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 - input[email] "Email" @566,719 654x20
 - input[password] "Mật khẩu" @566,791 654x20
 - input[password] "Nhập lại mật khẩu" @566,863 654x20
-- button "Gửi đăng ký" @557,905 672x32
+- button "Gửi đăng ký" @557,905 672x32 {disabled}
 - a "Đăng nhập" @914,953 73x20
 
 ## Tiêu đề (heading)

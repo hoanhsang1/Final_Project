@@ -10,6 +10,8 @@
 > **Cập nhật (giai đoạn sửa lỗi P2):** sửa tiếp **R-04** (5 màn 403/404 dựng lại bằng Astryx — hết chữ tiếng Anh cho trình đọc màn hình, có `h1`) và **R-07** (nút Sửa/Xoá ở màn Chức vụ nêu tên từng dòng, hộp xác nhận xoá nêu tên chức vụ). Xác minh bằng `probe-p2-verify.mjs` → `_probe-p2-after.log` + chạy lại toàn bộ 87 dump. Chi tiết ở mục "✅ Đã sửa (P2)" trong R-04/R-07.
 >
 > **Cập nhật (giai đoạn sửa lỗi P3):** sửa **R-06** (thay antd `Skeleton` — vốn để lại `<h3>`/`<ul>` rỗng trong cây trợ năng — bằng component Astryx `PageLoading` ở **10 file**) và **R-08** (thẻ "Tổ chức chờ duyệt" ở màn Tổng quan nêu **đúng** đích đến). **R-02** (nhãn icon antd tiếng Anh "search"/"left"/"right"/"Close") **không sửa được sạch khi còn antd** (xem mục R-02) → **chờ port** và xác minh ở P5. Chi tiết ở mục "✅ Đã sửa (P3)" trong R-06/R-08.
+>
+> **Cập nhật (giai đoạn sửa lỗi P4 — N-01/N-02):** người dùng chọn **sửa cả hai** mục "Không hợp lý nếu là bản hoàn chỉnh" ở màn Đăng ký tổ chức. **N-01** — banner lỗi danh mục module có thêm nút "Thử lại" (`endContent`, gọi `modulesQuery.refetch()`), câu chữ bỏ "tải lại trang". **N-02** — nút "Gửi đăng ký" **tắt** khi danh mục tải xong nhưng rỗng. Không đổi API/hợp đồng/nghiệp vụ/phân quyền; không cài thêm thư viện. Xác minh bằng đo lại (dump `05`/`06`) + `tsc`/`eslint`/`vitest`/`build`. Chi tiết ở mục "✅ Đã sửa (P4)" trong N-01/N-02.
 
 ---
 
@@ -46,6 +48,8 @@ Kết luận chính:
 
 **Đã sửa (2 lỗi P3):** R-06 (thay antd `Skeleton` bằng Astryx `PageLoading` ở **10 file** — hết `<h3>`/`<ul>` rỗng trong cây trợ năng; dump `25` giờ chỉ còn `h1` + `[status] Đang tải…`), R-08 (thẻ "Tổ chức chờ duyệt" ở màn Tổng quan nêu đúng đích đến — dump `13` giờ `"Tổ chức chờ duyệt: 2. Tổ chức chờ duyệt"`). **R-02 chờ port** (nhãn icon antd nằm trong `rc-dialog`/`rc-pagination`/`antd/es/input/Search` — không có prop sửa sạch).
 
+**Đã sửa (2 mục P4 — N-01/N-02):** N-01 (màn Đăng ký: banner lỗi danh mục module có nút "Thử lại" gọi `refetch` — dump `05` giờ có `button "Thử lại"`), N-02 (màn Đăng ký: nút "Gửi đăng ký" **tắt** khi danh mục tải xong nhưng rỗng — dump `06` giờ `{disabled}`). Không đổi API/nghiệp vụ; thêm 2 test `RegisterPage.modules.test.tsx`.
+
 ---
 
 ## 2. Bảng ưu tiên
@@ -62,8 +66,8 @@ Kết luận chính:
 | 6 | R-02 | Nút chỉ-icon của antd có **tên truy cập tiếng Anh** ("search", "left", "right", "Close") | Lỗi thật — ⏸ **CHỜ PORT** (P5) | WCAG 2.1 AA; mọi trang antd | probe `_probe-a11y.log` (`searchAria`, `paginationAria`); `rc-dialog/es/Dialog/Content/Panel.js:111` |
 | 7 | R-06 | Skeleton antd để lại `<h3>` rỗng + `<ul>` rỗng trong cây trợ năng | Lỗi thật — ✅ **ĐÃ SỬA** | Nhẹ; trình đọc màn hình | dump `25` |
 | 8 | R-08 | Thẻ số liệu "Tổ chức chờ duyệt" nêu **sai đích đến** trong tên truy cập | Lỗi thật — ✅ **ĐÃ SỬA** | Nhẹ; trình đọc màn hình | dump `13`; `OverviewPage.tsx:45`; `adminMessages.ts:22` |
-| 9 | N-01 | Đăng ký: danh mục module lỗi → banner bảo "tải lại trang", **không có nút "Thử lại"** | Không hợp lý nếu là bản hoàn chỉnh | Người đăng ký tổ chức | dump `05`; `RegisterPage.tsx:222-231` |
-| 10 | N-02 | Đăng ký: danh mục module **rỗng** nhưng nút "Gửi đăng ký" vẫn bật | Không hợp lý nếu là bản hoàn chỉnh | Người đăng ký tổ chức | dump `06`; `RegisterPage.tsx:114,232-237` |
+| 9 | N-01 | Đăng ký: danh mục module lỗi → banner bảo "tải lại trang", **không có nút "Thử lại"** | Không hợp lý nếu là bản hoàn chỉnh — ✅ **ĐÃ SỬA** | Người đăng ký tổ chức | dump `05`; `RegisterPage.tsx:222-231` |
+| 10 | N-02 | Đăng ký: danh mục module **rỗng** nhưng nút "Gửi đăng ký" vẫn bật | Không hợp lý nếu là bản hoàn chỉnh — ✅ **ĐÃ SỬA** | Người đăng ký tổ chức | dump `06`; `RegisterPage.tsx:114,232-237` |
 
 ---
 
@@ -222,21 +226,23 @@ Kết luận chính:
 
 ### N-01 — Đăng ký: danh mục module lỗi, không có nút "Thử lại"
 
-- **Tình trạng:** `Không hợp lý nếu là bản hoàn chỉnh`
+- **Tình trạng:** `Không hợp lý nếu là bản hoàn chỉnh` — ✅ **ĐÃ SỬA (P4)**
 - **Mô tả:** Khi `GET /api/v1/modules` lỗi 500, banner lỗi hiện ra nhưng **không có nút thử lại**; câu chữ yêu cầu người dùng **tải lại cả trang**. Mọi màn lỗi khác trong app đều có nút "Thử lại".
-- **Bằng chứng:** dump `05-register-module-loi--desktop.txt:23,50` → `role="alert"` "Không tải được danh sách module. Danh mục module không tải được. **Vui lòng tải lại trang rồi đăng ký.**" — **không** có nút "Thử lại" trong danh sách điều khiển (dòng 33-41). So sánh: dump `24-quan-tri-tong-quan-loi--desktop.txt:37,44` có `button "Thử lại"`. Nguồn: `RegisterPage.tsx:222-231`.
+- **Bằng chứng (trước):** dump `05-register-module-loi--desktop.txt:23,50` → `role="alert"` "Không tải được danh sách module. Danh mục module không tải được. **Vui lòng tải lại trang rồi đăng ký.**" — **không** có nút "Thử lại" trong danh sách điều khiển (dòng 33-41). So sánh: dump `24-quan-tri-tong-quan-loi--desktop.txt:37,44` có `button "Thử lại"`. Nguồn: `RegisterPage.tsx:222-231`.
 - **Góc nhìn (A):** không nên — bắt người dùng F5 để thử lại là bước lùi so với phần còn lại của app.
 - **Góc nhìn (B):** có thể là lựa chọn tối giản có chủ đích cho trang công khai.
-- **Đề xuất (KHÔNG thực hiện):** thêm nút "Thử lại" gọi `modulesQuery.refetch()`, giống các trang khác.
+- **Đề xuất:** thêm nút "Thử lại" gọi `modulesQuery.refetch()`, giống các trang khác.
+- **✅ Đã sửa (P4):** thêm nút "Thử lại" (`variant="secondary" size="sm"`) vào `endContent` của `Banner`, gọi `void modulesQuery.refetch()`; đổi câu chữ mô tả thành "Danh mục module không tải được. **Vui lòng thử lại.**" (bỏ "tải lại trang"). Hằng `MSG_MOD.RETRY` thêm ở `adminMessages.ts`. Bám đúng mẫu `ClassesPage`/`TeachersPage`. **Bằng chứng sau:** dump `05` → `button "Thử lại" @1144,444 69x28`; test `RegisterPage.modules.test.tsx` (N-01) kiểm `getByRole('alert')` + bấm "Thử lại" gọi lại `fetchModuleCatalog`.
 
 ### N-02 — Đăng ký: danh mục module rỗng nhưng vẫn bật nút "Gửi đăng ký"
 
-- **Tình trạng:** `Không hợp lý nếu là bản hoàn chỉnh`
+- **Tình trạng:** `Không hợp lý nếu là bản hoàn chỉnh` — ✅ **ĐÃ SỬA (P4)**
 - **Mô tả:** Khi danh mục module **rỗng** ("Chưa có module nào để chọn"), nút "Gửi đăng ký" **vẫn bật**. Bấm vào sẽ báo lỗi "Vui lòng chọn ít nhất 1 module" — nhưng **không có module nào để chọn** → ngõ cụt. Trong khi đó module là **bắt buộc** (`modules: value.length > 0 ? undefined : 'Vui lòng chọn ít nhất 1 module'`).
-- **Bằng chứng:** dump `06-register-module-rong--desktop.txt:22,28,33,38` → `Module cần sử dụng`, `button "Gửi đăng ký"` (**không** `{disabled}`), banner "Chưa có module nào để chọn … Quản trị hệ thống cần bật module trước khi tổ chức đăng ký." Nguồn: `RegisterPage.tsx:114` (bắt buộc) và `:232-237` (banner rỗng).
+- **Bằng chứng (trước):** dump `06-register-module-rong--desktop.txt:22,28,33,38` → `Module cần sử dụng`, `button "Gửi đăng ký"` (**không** `{disabled}`), banner "Chưa có module nào để chọn … Quản trị hệ thống cần bật module trước khi tổ chức đăng ký." Nguồn: `RegisterPage.tsx:114` (bắt buộc) và `:232-237` (banner rỗng).
 - **Góc nhìn (A):** nên **tắt** nút "Gửi đăng ký" khi danh mục rỗng (hoặc ẩn cả form) để người dùng không đi vào ngõ cụt.
 - **Góc nhìn (B):** banner đã giải thích lý do → có thể coi là tạm chấp nhận; nhưng nút vẫn bật là điểm trừ.
-- **Đề xuất (KHÔNG thực hiện):** `disabled` nút gửi khi `moduleOptions.length === 0`.
+- **Đề xuất:** `disabled` nút gửi khi `moduleOptions.length === 0`.
+- **✅ Đã sửa (P4):** `isDisabled={hasNoModuleToSelect}` với `hasNoModuleToSelect = modulesQuery.isSuccess && moduleOptions.length === 0` — chỉ tắt khi danh mục **đã tải xong và rỗng** (đang tải/lỗi thì không tắt). **Bằng chứng sau:** dump `06` → `button "Gửi đăng ký" … {disabled}`; test `RegisterPage.modules.test.tsx` (N-02) mock danh mục rỗng → kiểm nút có `aria-disabled="true"`.
 
 ---
 
@@ -273,7 +279,7 @@ Kết luận chính:
 6. Vai trò `ORG_ADMIN`/`FACILITY_STAFF` thuộc sprint nào? (Q-02)
 7. Người đã đăng nhập nhưng sai quyền: nên đi đâu? (Q-03)
 8. `PROJECT_CONTEXT.md` §2.3 (ghi "Ant Design 5" + "React Hook Form + Zod") có cập nhật sang Astryx + `useFormState` không? Hiện gây hiểu nhầm cho người mới.
-9. Đăng ký tổ chức khi danh mục module rỗng: có mong muốn **chặn** đăng ký (tắt nút gửi) không? (N-02)
+9. Đăng ký tổ chức khi danh mục module rỗng: có mong muốn **chặn** đăng ký (tắt nút gửi) không? (N-02) → **đã quyết ở P4:** **tắt** nút "Gửi đăng ký" khi danh mục tải xong nhưng rỗng (xem N-02).
 
 ---
 
@@ -372,13 +378,15 @@ Nguồn: `dumps/_index.md` (87 file).
 
 **Nhật ký kiểm tra chất lượng (sau khi sửa P3):** `tsc -b` EXIT 0 · `_p3-eslint.log` (`eslint . --max-warnings=0` EXIT 0) · `_p3-vitest.log` (24 file / 167 test pass) · `_p3-build.log` (`vite build` EXIT 0) · `_p3-dump.log` (dump lại 87 file, EXIT 0). E2E `pending-organizations.spec.ts` cập nhật selector (chưa chạy được vì BE không chạy).
 
-**File nguồn đối chiếu:** `frontend/src/main.tsx` (:12-19 comment, :24-28 locale import — **đã sửa**; dòng `import 'antd/dist/reset.css'` đã xoá) · `frontend/src/pages/DepartmentsPage/DepartmentsPage.tsx` (:194 `scroll` — **đã thêm**) · `frontend/src/pages/PositionsPage/PositionsPage.tsx` (:192 `scroll` — **đã thêm**; cột thao tác `aria-label`/`Popconfirm.description` — **đã sửa R-07**) · `frontend/src/features/owner/ownerMessages.ts` (`MSG_POS.EDIT_SHORT` — **đã thêm**) · `frontend/src/components/StatusScreen/StatusScreen.tsx` (**mới** — màn 403/404 dùng chung) · `frontend/src/components/{AdminGuard,OwnerGuard,AcademicGuard}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/{NotFoundPage,RolePreviewPage,AccountDetailPage,DepartmentDetailPage,OrganizationDetailPage}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/DepartmentDetailPage/DepartmentDetailPage.tsx` (:246 `scroll` — **đã thêm**) · `frontend/src/pages/OverviewPage/OverviewPage.tsx` (:41-46 — **đã sửa R-08**: dùng `MSG_ORG.LIST_TITLE`; :97 `PageLoading` — **đã sửa R-06**) · `frontend/src/features/admin/adminMessages.ts` (:22 `MENU_ORG_ALL`, :86 `ALL_LIST_TITLE`) · `frontend/src/components/PageLoading/PageLoading.tsx` (khung chờ dùng chung — **đã dùng cho R-06**) · **10 file thay `Skeleton`→`PageLoading` (R-06):** `frontend/src/pages/{AccountsPage,OverviewPage,ModuleCatalogPage,AllOrganizationsPage,PendingOrganizationsPage,AccountDetailPage,DepartmentDetailPage,OrganizationDetailPage}/`, `frontend/src/pages/OrganizationDetailPage/ModuleConfigPanel.tsx`, `frontend/src/components/AuditLogTable/AuditLogTable.tsx` · `frontend/e2e/pending-organizations.spec.ts` (`TC-ORG-14` selector — **đã sửa kèm R-06**) · `frontend/src/pages/RegisterPage/RegisterPage.tsx` (:114, :222-237) · `node_modules/antd/es/result/{unauthorized,noFound,serverError}.js` · `node_modules/rc-table/es/Table.js` (:446-463 logic `table-layout`) · `node_modules/rc-dialog/es/Dialog/Content/Panel.js` (:111 `aria-label="Close"`) · `node_modules/rc-pagination/es/Pagination.js` (:399-425 nút prev/next) · `node_modules/antd/es/input/Search.js` (:84, :112 nút tìm).
+**Nhật ký kiểm tra chất lượng (sau khi sửa P4 — N-01/N-02):** `_n-tsc.log` (`tsc -b` EXIT 0) · `_n-eslint.log` (`eslint . --max-warnings=0` EXIT 0) · `_n-vitest.log` (**25 file / 169 test** pass — thêm `RegisterPage.modules.test.tsx`) · `_n-build.log` (`vite build` EXIT 0) · `_n-dump.log` (dump lại 87 file, EXIT 0; 0 dòng "Tràn ngang: CÓ"; chỉ `05`/`06`/`38` đổi).
+
+**File nguồn đối chiếu:** `frontend/src/main.tsx` (:12-19 comment, :24-28 locale import — **đã sửa**; dòng `import 'antd/dist/reset.css'` đã xoá) · `frontend/src/pages/DepartmentsPage/DepartmentsPage.tsx` (:194 `scroll` — **đã thêm**) · `frontend/src/pages/PositionsPage/PositionsPage.tsx` (:192 `scroll` — **đã thêm**; cột thao tác `aria-label`/`Popconfirm.description` — **đã sửa R-07**) · `frontend/src/features/owner/ownerMessages.ts` (`MSG_POS.EDIT_SHORT` — **đã thêm**) · `frontend/src/components/StatusScreen/StatusScreen.tsx` (**mới** — màn 403/404 dùng chung) · `frontend/src/components/{AdminGuard,OwnerGuard,AcademicGuard}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/{NotFoundPage,RolePreviewPage,AccountDetailPage,DepartmentDetailPage,OrganizationDetailPage}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/DepartmentDetailPage/DepartmentDetailPage.tsx` (:246 `scroll` — **đã thêm**) · `frontend/src/pages/OverviewPage/OverviewPage.tsx` (:41-46 — **đã sửa R-08**: dùng `MSG_ORG.LIST_TITLE`; :97 `PageLoading` — **đã sửa R-06**) · `frontend/src/features/admin/adminMessages.ts` (:22 `MENU_ORG_ALL`, :86 `ALL_LIST_TITLE`; :174 `MSG_MOD.RETRY` — **đã thêm (P4)**) · `frontend/src/components/PageLoading/PageLoading.tsx` (khung chờ dùng chung — **đã dùng cho R-06**) · **10 file thay `Skeleton`→`PageLoading` (R-06):** `frontend/src/pages/{AccountsPage,OverviewPage,ModuleCatalogPage,AllOrganizationsPage,PendingOrganizationsPage,AccountDetailPage,DepartmentDetailPage,OrganizationDetailPage}/`, `frontend/src/pages/OrganizationDetailPage/ModuleConfigPanel.tsx`, `frontend/src/components/AuditLogTable/AuditLogTable.tsx` · `frontend/e2e/pending-organizations.spec.ts` (`TC-ORG-14` selector — **đã sửa kèm R-06**) · `frontend/src/pages/RegisterPage/RegisterPage.tsx` (:114, :222-237 — **đã sửa N-01/N-02 (P4)**: nút "Thử lại" ở `endContent`; `hasNoModuleToSelect` → `isDisabled`) · `frontend/src/pages/RegisterPage/RegisterPage.modules.test.tsx` (**mới (P4)** — test N-01/N-02) · `node_modules/antd/es/result/{unauthorized,noFound,serverError}.js` · `node_modules/rc-table/es/Table.js` (:446-463 logic `table-layout`) · `node_modules/rc-dialog/es/Dialog/Content/Panel.js` (:111 `aria-label="Close"`) · `node_modules/rc-pagination/es/Pagination.js` (:399-425 nút prev/next) · `node_modules/antd/es/input/Search.js` (:84, :112 nút tìm).
 
 ---
 
 ## Phụ lục C — Nhật ký thử & giới hạn
 
-**Đã thử:** dev server Vite chạy nền (HTTP 200 trên `http://127.0.0.1:5173`); chạy dump full 87 lượt (EXIT=0, 0 lỗi script); 3 probe chẩn đoán (EXIT=0); **sửa 3 lỗi P1 rồi đo lại** (probe trước/sau, dump lại full, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0); **sửa 2 lỗi P2 rồi đo lại** (`probe-p2-verify.mjs`, dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0); **sửa 2 lỗi P3 rồi đo lại** (dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0; kiểm mã nguồn antd/rc-* để kết luận R-02 chờ port).
+**Đã thử:** dev server Vite chạy nền (HTTP 200 trên `http://127.0.0.1:5173`); chạy dump full 87 lượt (EXIT=0, 0 lỗi script); 3 probe chẩn đoán (EXIT=0); **sửa 3 lỗi P1 rồi đo lại** (probe trước/sau, dump lại full, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0); **sửa 2 lỗi P2 rồi đo lại** (`probe-p2-verify.mjs`, dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0); **sửa 2 lỗi P3 rồi đo lại** (dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0; kiểm mã nguồn antd/rc-* để kết luận R-02 chờ port); **sửa 2 mục N-01/N-02 (P4) rồi đo lại** (dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0; thêm 2 test mới ở `RegisterPage.modules.test.tsx`).
 **Kẹt gặp phải:** không. Không có bước nào vượt quá 3 lần thử.
   - Một lần **sai kết luận tạm thời** đã tự bắt và sửa: probe đầu tiên chặn API bằng glob `**/api/**` không khớp `/departments` (không có tiền tố `/api`) nên trang ở trạng thái đang tải → tưởng Phòng ban *không* tràn. Viết `probe-dept-narrow.mjs` dùng đúng regex như `ux-dump.mjs` để tái hiện → xác nhận R-05 là **thật**. Các probe P1 sau đó dùng regex không neo đầu chuỗi (Playwright khớp trên URL đầy đủ).
 
@@ -387,4 +395,4 @@ Nguồn: `dumps/_index.md` (87 file).
 2. **Không đọc được hình ảnh** → đánh giá dựa trên cây cấu trúc + toạ độ + `innerText` + mã nguồn CSS, **không** đánh giá được màu sắc tương phản thực tế (cần công cụ đo contrast riêng để kết luận WCAG 1.4.3/1.4.11).
 3. **Nhiều khoảng trống trạng thái** (Phụ lục A) → các kết luận về error/loading/empty chỉ đúng với những màn đã dump.
 4. **Hai câu hỏi đang chờ Sang (BE) trả lời:** (a) có thêm `actorName` không; (b) mã module là `STUDENT_MANAGEMENT` hay `CLASS_MANAGEMENT`. Không ảnh hưởng kết luận UX ở trên.
-5. **Đã thực hiện:** 7 lỗi (P1: R-01, R-03, R-05; P2: R-04, R-07; P3: R-06, R-08) — xem mục "✅ Đã sửa". **Chờ port (P5):** R-02 (nhãn icon antd — không sửa sạch được khi còn antd; xem mục R-02). **Chưa thực hiện:** N-01, N-02 — vẫn theo ràng buộc "chỉ ghi trong `ux-review/`" cho tới khi được yêu cầu.
+5. **Đã thực hiện:** 7 lỗi + 2 mục không-hợp-lý (P1: R-01, R-03, R-05; P2: R-04, R-07; P3: R-06, R-08; **P4: N-01, N-02**) — xem mục "✅ Đã sửa". **Chờ port (P5):** R-02 (nhãn icon antd — không sửa sạch được khi còn antd; xem mục R-02).

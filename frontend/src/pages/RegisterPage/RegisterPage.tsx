@@ -58,9 +58,10 @@ type RegisterFormValues = {
  *
  * Trạng thái:
  * - **loading** — `Skeleton` trong khi tải danh mục module.
- * - **empty** — danh mục rỗng: `Banner` báo chưa có module, không có gì để chọn.
- * - **error** — không tải được danh mục hoặc BE từ chối đăng ký: `Banner` đỏ,
- *   `NFR-REL-001` không hiện thành công.
+ * - **empty** — danh mục rỗng: `Banner` báo chưa có module, **nút "Gửi đăng ký"
+ *   bị tắt** (`N-02`) vì không có gì để chọn.
+ * - **error** — không tải được danh mục hoặc BE từ chối đăng ký: `Banner` đỏ kèm
+ *   nút "Thử lại" (`N-01`, gọi `refetch`), `NFR-REL-001` không hiện thành công.
  * - **success** — `Banner status="success"` + lối về đăng nhập.
  * - **no-permission** — không áp dụng: màn công khai.
  */
@@ -159,6 +160,9 @@ export default function RegisterPage() {
   }
 
   const isSubmitting = registerMutation.isPending;
+  // `N-02`: danh mục module tải xong nhưng **rỗng** → không có gì để chọn, nên chặn
+  // gửi để tránh ngõ cụt ("chọn ít nhất 1 module" mà chẳng có module nào).
+  const hasNoModuleToSelect = modulesQuery.isSuccess && moduleOptions.length === 0;
 
   return (
     <AuthCard
@@ -223,9 +227,17 @@ export default function RegisterPage() {
               <Banner
                 status="error"
                 title={MSG_MOD.LOAD_FAILED}
-                description="Danh mục module không tải được. Vui lòng tải lại trang rồi đăng ký."
+                description="Danh mục module không tải được. Vui lòng thử lại."
                 collapsible={false}
                 role="alert"
+                endContent={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={MSG_MOD.RETRY}
+                    onClick={() => void modulesQuery.refetch()}
+                  />
+                }
               />
             )}
 
@@ -339,6 +351,7 @@ export default function RegisterPage() {
               label="Gửi đăng ký"
               width="100%"
               isLoading={isSubmitting}
+              isDisabled={hasNoModuleToSelect}
             />
           </VStack>
         </form>

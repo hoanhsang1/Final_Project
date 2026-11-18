@@ -413,6 +413,16 @@ Ghi lại vì cả 4 màn đều đụng, và P3–P4 sẽ đụng lại.
    `containerStyle={{ flex: '1 1 240px', minWidth: 0 }}` trên từng field; ở 320px hai
    ô tự xuống một cột mà không cần JS.
 
+### 6.11 Cạm bẫy phát hiện khi sửa lỗi UX N-01/N-02 (màn Đăng ký)
+
+1. `Button` khoá bằng `isDisabled` **không** đặt attribute `disabled` native: Astryx đánh
+   dấu `aria-disabled="true"` rồi tự `preventDefault` cú bấm (giữ được focus). Hệ quả khi
+   test: **không** dùng `toBeDisabled()` — kiểm `toHaveAttribute('aria-disabled', 'true')`.
+   Nút `isLoading` thì khác: đánh `aria-busy`, vẫn bấm được nhưng chống bấm trùng.
+2. Trạng thái **error** của `Banner` (không tải được dữ liệu) đặt nút "Thử lại" ở
+   `endContent` — đúng quy ước ở §5 bảng trạng thái và ở `ClassesPage`/`TeachersPage`.
+   Trạng thái **empty** thì **tắt** nút hành động chính để tránh ngõ cụt (`N-02`).
+
 ## 7. Sáu khối dùng chung (v2)
 
 | Khối | Spec v2 |
