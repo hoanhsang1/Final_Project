@@ -18,9 +18,9 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu đào tạo @8,56 231x84
     <ul> Giáo viênLớp học @8,60 231x76
       <a> Giáo viên @8,60 231x37
-        <span role="img"> solution @20,60 17x17
+        <span role="img"> solution @20,60 17x17 {aria-hidden}
       <a> Lớp học @8,99 231x37
-        <span role="img"> read @20,99 17x17
+        <span role="img"> read @20,99 17x17 {aria-hidden}
 <main> Lớp họcTất cả trạng tháiTất cả trạng tháiChưa bắt đầuĐang diễn raĐã kế… @248,56 1118x324
   <h1> Lớp học @280,88 1054x32
   <button role="combobox"> Tất cả trạng thái @293,138 170x20

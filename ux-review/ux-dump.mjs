@@ -429,6 +429,24 @@ async function snapshot(page) {
       const r = el.getBoundingClientRect();
       return `@${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`;
     };
+    // `true` khi chính `el` hoặc một tổ tiên có `aria-hidden="true"`. Những phần
+    // tử này **không** nằm trong cây trợ năng, nên báo cáo phải nói rõ thay vì
+    // liệt kê chúng ngang hàng với nội dung thật.
+    const ariaHidden = (el) => {
+      for (let n = el; n; n = n.parentElement) {
+        if (n.getAttribute && n.getAttribute('aria-hidden') === 'true') return true;
+      }
+      return false;
+    };
+    // `textContent` gồm cả phần `aria-hidden` (vd `Tab` in nhãn hai lần: bản
+    // hiện + bản in đậm ẩn để giữ bề rộng). Tên trợ năng phải bỏ phần ẩn, nếu
+    // không dump sẽ báo "Thông tinThông tin" cho một tab tên đúng là "Thông tin".
+    const textWithoutHidden = (el) => {
+      if (!el.querySelector('[aria-hidden="true"]')) return norm(el.textContent);
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+      return norm(clone.textContent);
+    };
     const accName = (el) => {
       const aria = el.getAttribute('aria-label');
       if (aria) return norm(aria);
@@ -436,7 +454,10 @@ async function snapshot(page) {
       if (lb) {
         const t = lb
           .split(/\s+/)
-          .map((id) => document.getElementById(id)?.textContent || '')
+          .map((id) => {
+            const target = document.getElementById(id);
+            return target ? textWithoutHidden(target) : '';
+          })
           .join(' ');
         if (norm(t)) return norm(t);
       }
@@ -451,7 +472,7 @@ async function snapshot(page) {
         if (el.getAttribute('placeholder')) return norm(el.getAttribute('placeholder'));
         return '';
       }
-      return norm(el.textContent) || norm(el.getAttribute('title'));
+      return textWithoutHidden(el) || norm(el.getAttribute('title'));
     };
 
     // A. Cấu trúc (cây thụt lề)
@@ -473,7 +494,8 @@ async function snapshot(page) {
         else label = trunc(accName(el), 70);
         // Bỏ nút "chỉ có role" mà rỗng nhãn (vd <span role="status"></span> trong Button).
         if (interestingTag || label) {
-          struct.push(`${'  '.repeat(d)}<${tag}${role ? ` role="${role}"` : ''}> ${label} ${box(el)}`);
+          const hidden = ariaHidden(el) ? ' {aria-hidden}' : '';
+          struct.push(`${'  '.repeat(d)}<${tag}${role ? ` role="${role}"` : ''}> ${label} ${box(el)}${hidden}`);
           if (tag === 'table') return;
           d += 1;
         }
@@ -487,7 +509,7 @@ async function snapshot(page) {
       document.querySelectorAll(
         'button,a[href],input,select,textarea,[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="combobox"],[role="tab"],[role="switch"]',
       ),
-    ).filter(visible);
+    ).filter((el) => visible(el) && !ariaHidden(el));
     interactive.sort((a, b) => {
       const ra = a.getBoundingClientRect();
       const rb = b.getBoundingClientRect();
@@ -509,7 +531,7 @@ async function snapshot(page) {
     // C. Tiêu đề
     const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
       .filter(visible)
-      .map((h) => `- ${h.tagName.toLowerCase()}: ${trunc(norm(h.textContent), 100)}`);
+      .map((h) => `- ${h.tagName.toLowerCase()}: ${trunc(textWithoutHidden(h), 100)}`);
 
     // D. Thông báo / trạng thái
     const notices = Array.from(
@@ -518,13 +540,13 @@ async function snapshot(page) {
       ),
     )
       .filter(visible)
-      .filter((el) => norm(el.textContent).length > 0)
-      .map((el) => `- [${el.getAttribute('role') || el.className.split(' ')[0]}] ${trunc(norm(el.textContent), 160)}`);
+      .filter((el) => textWithoutHidden(el).length > 0)
+      .map((el) => `- [${el.getAttribute('role') || el.className.split(' ')[0]}] ${trunc(textWithoutHidden(el), 160)}`);
 
     // E. Hộp thoại đang mở
     const dialogs = Array.from(document.querySelectorAll('dialog,[role="dialog"],.ant-modal'))
       .filter(visible)
-      .map((el) => `- ${trunc(norm(el.textContent), 300)}`);
+      .map((el) => `- ${trunc(textWithoutHidden(el), 300)}`);
 
     // F. Tràn ngang — bằng chứng cho yêu cầu "không tràn ngang" (320/768/1024/1440).
     //    `scrollWidth > clientWidth` ở <html> nghĩa là CẢ TRANG phải cuộn ngang.

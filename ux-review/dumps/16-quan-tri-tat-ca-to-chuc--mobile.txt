@@ -20,8 +20,8 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
   <input> (search) "Tìm kiếm" @29,153 243x22
   <button>  @300,146 36x36
     <span role="img"> search @311,157 14x14
-  <span role="img"> down @163,206 12x12
-  <span role="img"> down @325,206 12x12
+  <span role="img"> down @163,206 12x12 {aria-hidden}
+  <span role="img"> down @325,206 12x12 {aria-hidden}
   <table> [table 7 cột, 4 dòng] @16,274 980x331
   <ul> Tổng 3 tổ chức120 / trang @16,621 343x32
     <button>  @247,621 32x32

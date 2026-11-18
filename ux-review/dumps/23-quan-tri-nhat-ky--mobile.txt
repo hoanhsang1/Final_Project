@@ -20,7 +20,7 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
   <input> (search) "Tìm trong nhật ký" @29,153 243x22
   <button>  @300,146 36x36
     <span role="img"> search @311,157 14x14
-  <span role="img"> down @203,206 12x12
+  <span role="img"> down @203,206 12x12 {aria-hidden}
   <input> (input) "Khoảng thời gian" @28,249 127x22
   <span role="img"> swap-right @163,252 16x16
   <input> (input) "Khoảng thời gian" @187,249 127x22

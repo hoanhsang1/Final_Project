@@ -22,9 +22,9 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
   <input> (search) "Tìm kiếm" @29,201 243x22
   <button>  @300,194 36x36
     <span role="img"> search @311,205 14x14
-  <span role="img"> down @193,254 12x12
-  <span role="img"> down @173,302 12x12
-  <span role="img"> down @163,350 12x12
+  <span role="img"> down @193,254 12x12 {aria-hidden}
+  <span role="img"> down @173,302 12x12 {aria-hidden}
+  <span role="img"> down @163,350 12x12 {aria-hidden}
   <table> [table 9 cột, 3 dòng] @16,418 1140x193
   <ul> Tổng 2 tài khoản120 / trang @16,627 343x32
     <button>  @247,627 32x32

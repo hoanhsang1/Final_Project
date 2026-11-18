@@ -18,24 +18,24 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản trị @8,56 231x240
     <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
       <a> Tổng quan @8,60 231x37
-        <span role="img"> dashboard @20,60 17x17
+        <span role="img"> dashboard @20,60 17x17 {aria-hidden}
       <a> Tổ chức chờ duyệt @8,99 231x37
-        <span role="img"> audit @20,99 17x17
+        <span role="img"> audit @20,99 17x17 {aria-hidden}
       <a> Tất cả tổ chức @8,138 231x37
-        <span role="img"> bank @20,138 17x17
+        <span role="img"> bank @20,138 17x17 {aria-hidden}
       <a> Danh mục module @8,177 231x37
-        <span role="img"> appstore @20,177 17x17
+        <span role="img"> appstore @20,177 17x17 {aria-hidden}
       <a> Quản lý tài khoản @8,216 231x37
-        <span role="img"> team @20,216 17x17
+        <span role="img"> team @20,216 17x17 {aria-hidden}
       <a> Nhật ký hệ thống @8,255 231x37
-        <span role="img"> file-search @20,255 17x17
+        <span role="img"> file-search @20,255 17x17 {aria-hidden}
 <main> Tất cả tổ chứcXem và quản lý mọi tổ chức trên hệ thống.Tất cả trạng th… @248,56 1118x591
   <h1> Tất cả tổ chức @280,88 1054x32
   <input> (search) "Tìm kiếm" @293,165 243x22
   <button>  @564,158 36x36
     <span role="img"> search @575,169 14x14
-  <span role="img"> down @759,170 12x12
-  <span role="img"> down @921,170 12x12
+  <span role="img"> down @759,170 12x12 {aria-hidden}
+  <span role="img"> down @921,170 12x12 {aria-hidden}
   <table> [table 7 cột, 4 dòng] @280,238 1054x309
   <ul> Tổng 3 tổ chức120 / trang @280,563 1054x36
     <button>  @1099,563 32x32
@@ -44,7 +44,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
     <button>  @1179,563 32x32
       <span role="img"> right @1189,574 12x12
     <input role="combobox"> (search) "kích thước trang" @1239,564 65x34
-    <span role="img"> down @1311,575 12x12
+    <span role="img"> down @1311,575 12x12 {aria-hidden}
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32

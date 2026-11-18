@@ -19,26 +19,26 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản trị @8,56 231x240
     <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
       <a> Tổng quan @8,60 231x37
-        <span role="img"> dashboard @20,60 17x17
+        <span role="img"> dashboard @20,60 17x17 {aria-hidden}
       <a> Tổ chức chờ duyệt @8,99 231x37
-        <span role="img"> audit @20,99 17x17
+        <span role="img"> audit @20,99 17x17 {aria-hidden}
       <a> Tất cả tổ chức @8,138 231x37
-        <span role="img"> bank @20,138 17x17
+        <span role="img"> bank @20,138 17x17 {aria-hidden}
       <a> Danh mục module @8,177 231x37
-        <span role="img"> appstore @20,177 17x17
+        <span role="img"> appstore @20,177 17x17 {aria-hidden}
       <a> Quản lý tài khoản @8,216 231x37
-        <span role="img"> team @20,216 17x17
+        <span role="img"> team @20,216 17x17 {aria-hidden}
       <a> Nhật ký hệ thống @8,255 231x37
-        <span role="img"> file-search @20,255 17x17
+        <span role="img"> file-search @20,255 17x17 {aria-hidden}
 <main> Quản lý tài khoảnTài khoản trên toàn hệ thống.Tạo tài khoảnTất cả tổ c… @248,56 1118x475
   <h1> Quản lý tài khoản @280,88 922x32
   <button> Tạo tài khoản @1214,88 120x36
   <input> (search) "Tìm kiếm" @293,165 243x22
   <button>  @564,158 36x36
     <span role="img"> search @575,169 14x14
-  <span role="img"> down @789,170 12x12
-  <span role="img"> down @981,170 12x12
-  <span role="img"> down @1163,170 12x12
+  <span role="img"> down @789,170 12x12 {aria-hidden}
+  <span role="img"> down @981,170 12x12 {aria-hidden}
+  <span role="img"> down @1163,170 12x12 {aria-hidden}
   <table> [table 9 cột, 3 dòng] @280,238 1140x193
   <ul> Tổng 2 tài khoản120 / trang @280,447 1054x36
     <button>  @1099,447 32x32
@@ -47,7 +47,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
     <button>  @1179,447 32x32
       <span role="img"> right @1189,458 12x12
     <input role="combobox"> (search) "kích thước trang" @1239,448 65x34
-    <span role="img"> down @1311,459 12x12
+    <span role="img"> down @1311,459 12x12 {aria-hidden}
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32

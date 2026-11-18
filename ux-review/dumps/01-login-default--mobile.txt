@@ -10,7 +10,7 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<main> Tài khoản/Đăng nhậpMĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng … @0,0 375x1030
+<main> Tài khoản/Đăng nhậpĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng n… @0,0 375x1030
   <h1> Đăng nhập @84,72 126x32
   <nav> Chuyển giữa đăng nhập và đăng ký @40,150 295x44
     <a> Đăng nhập @44,154 142x36

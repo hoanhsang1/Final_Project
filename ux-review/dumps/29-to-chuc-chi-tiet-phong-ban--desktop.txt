@@ -20,12 +20,12 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản lý tổ chức @8,56 231x84
     <ul> Phòng banChức vụ @8,60 231x76
       <a> Phòng ban @8,60 231x37
-        <span role="img"> apartment @20,60 17x17
+        <span role="img"> apartment @20,60 17x17 {aria-hidden}
       <a> Chức vụ @8,99 231x37
-        <span role="img"> idcard @20,99 17x17
-<main> /Tổ chức/Tổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò… @248,56 1118x306
+        <span role="img"> idcard @20,99 17x17 {aria-hidden}
+<main> Tổ chứcTổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò t… @248,56 1118x306
   <nav> Đường dẫn @280,88 1054x28
-    <ol> /Tổ chức/Tổ Toán @280,88 1054x28
+    <ol> Tổ chứcTổ Toán @280,88 1054x28
       <a> Tổ chức @280,88 54x28
   <h1> Tổ Toán @280,124 905x32
   <button> Thêm nhân viên @1197,124 137x36

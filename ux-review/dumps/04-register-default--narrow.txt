@@ -11,7 +11,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 - GET /api/v1/modules → 200
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<main> MMEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi g… @0,0 320x1257
+<main> MEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi gử… @0,0 320x1257
   <h1> Đăng ký tổ chức @32,88 256x32
   <form> Thông tin tổ chứcTên tổ chứcLoại tổ chứcChọn loại tổ chứcTrường họcTru… @32,300 256x817
     <h2> Thông tin tổ chức @32,300 256x28

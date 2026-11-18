@@ -16,9 +16,9 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSKhu vực quản trịadmin.he.thongĐăng xuất @0,0 375x56
   <button> Mở menu quản trị @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> /Tổ chức chờ duyệt/Trường THPT Nguyễn DuTrường THPT Nguyễn DuChờ duyệt… @0,56 375x1390
+<main> Tổ chức chờ duyệtTrường THPT Nguyễn DuTrường THPT Nguyễn DuChờ duyệtDu… @0,56 375x1390
   <nav> Đường dẫn @16,76 343x28
-    <ol> /Tổ chức chờ duyệt/Trường THPT Nguyễn Du @16,76 343x28
+    <ol> Tổ chức chờ duyệtTrường THPT Nguyễn Du @16,76 343x28
       <a> Tổ chức chờ duyệt @16,76 124x28
   <h1> Trường THPT Nguyễn Du @16,112 343x32
   <button> Duyệt tổ chức @111,156 124x36

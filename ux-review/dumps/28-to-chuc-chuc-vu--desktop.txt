@@ -19,9 +19,9 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản lý tổ chức @8,56 231x84
     <ul> Phòng banChức vụ @8,60 231x76
       <a> Phòng ban @8,60 231x37
-        <span role="img"> apartment @20,60 17x17
+        <span role="img"> apartment @20,60 17x17 {aria-hidden}
       <a> Chức vụ @8,99 231x37
-        <span role="img"> idcard @20,99 17x17
+        <span role="img"> idcard @20,99 17x17 {aria-hidden}
 <main> Chức vụChức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viê… @248,56 1118x351
   <h1> Chức vụ @280,88 916x32
   <button> Thêm chức vụ @1208,88 126x36

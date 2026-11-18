@@ -17,9 +17,9 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSKhu vực tổ chứcchu.to.chucĐăng xuất @0,0 375x56
   <button> Mở menu quản lý tổ chức @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> /Tổ chức/Tổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò… @0,56 375x351
+<main> Tổ chứcTổ ToánTổ ToánTổ bộ môn ToánThêm nhân viênMã nhân viênVai trò t… @0,56 375x351
   <nav> Đường dẫn @16,76 343x28
-    <ol> /Tổ chức/Tổ Toán @16,76 343x28
+    <ol> Tổ chứcTổ Toán @16,76 343x28
       <a> Tổ chức @16,76 54x28
   <h1> Tổ Toán @16,112 343x32
   <button> Thêm nhân viên @16,178 137x36

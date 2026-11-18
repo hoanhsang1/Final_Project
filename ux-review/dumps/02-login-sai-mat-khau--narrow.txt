@@ -11,7 +11,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 - POST /api/v1/auth/login → 401
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<main> Tài khoản/Đăng nhậpMĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng … @0,0 320x1154
+<main> Tài khoản/Đăng nhậpĐăng nhậpChào mừng bạn quay lại hệ thống MEMSĐăng n… @0,0 320x1154
   <h1> Đăng nhập @84,72 126x32
   <nav> Chuyển giữa đăng nhập và đăng ký @40,171 240x44
     <a> Đăng nhập @44,175 114x36

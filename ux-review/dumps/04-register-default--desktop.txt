@@ -13,7 +13,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
 <aside> Giới thiệu MEMS @0,0 420x1193
   <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
-<main> MMEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi g… @420,0 946x1193
+<main> MEMSĐăng ký tổ chứcTạo tài khoản quản trị cho đơn vị của bạnSau khi gử… @420,0 946x1193
   <h1> Đăng ký tổ chức @557,96 672x32
   <form> Thông tin tổ chứcTên tổ chứcLoại tổ chứcChọn loại tổ chứcTrường họcTru… @557,248 672x817
     <h2> Thông tin tổ chức @557,248 672x28

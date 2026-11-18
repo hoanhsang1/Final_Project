@@ -13,7 +13,7 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
 <aside> Giới thiệu MEMS @0,0 420x768
   <h2> Quản trị nhà trường trên một hệ thống. @32,100 344x80
-<main> MMEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt… @420,0 946x768
+<main> MEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt … @420,0 946x768
   <h1> Quên mật khẩu @657,240 472x32
   <form> EmailChức năng đặt lại mật khẩu chưa sẵn sàng. Vui lòng liên hệ quản t… @657,312 472x184
     <input> (email) "Email" @666,342 454x20

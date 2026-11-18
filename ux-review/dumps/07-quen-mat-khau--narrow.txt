@@ -10,7 +10,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<main> MMEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt… @0,0 320x640
+<main> MEMSQuên mật khẩuNhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt … @0,0 320x640
   <h1> Quên mật khẩu @32,196 256x32
   <form> EmailGửi liên kết đặt lại @32,288 256x104
     <input> (email) "Email" @41,318 238x20

@@ -19,20 +19,20 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản trị @8,56 231x240
     <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
       <a> Tổng quan @8,60 231x37
-        <span role="img"> dashboard @20,60 17x17
+        <span role="img"> dashboard @20,60 17x17 {aria-hidden}
       <a> Tổ chức chờ duyệt @8,99 231x37
-        <span role="img"> audit @20,99 17x17
+        <span role="img"> audit @20,99 17x17 {aria-hidden}
       <a> Tất cả tổ chức @8,138 231x37
-        <span role="img"> bank @20,138 17x17
+        <span role="img"> bank @20,138 17x17 {aria-hidden}
       <a> Danh mục module @8,177 231x37
-        <span role="img"> appstore @20,177 17x17
+        <span role="img"> appstore @20,177 17x17 {aria-hidden}
       <a> Quản lý tài khoản @8,216 231x37
-        <span role="img"> team @20,216 17x17
+        <span role="img"> team @20,216 17x17 {aria-hidden}
       <a> Nhật ký hệ thống @8,255 231x37
-        <span role="img"> file-search @20,255 17x17
-<main> /Quản lý tài khoản/nguyendu.ownernguyendu.ownerThông tin tài khoản · T… @248,56 1118x642
+        <span role="img"> file-search @20,255 17x17 {aria-hidden}
+<main> Quản lý tài khoảnnguyendu.ownernguyendu.ownerThông tin tài khoản · Trầ… @248,56 1118x642
   <nav> Đường dẫn @280,88 1054x28
-    <ol> /Quản lý tài khoản/nguyendu.owner @280,88 1054x28
+    <ol> Quản lý tài khoảnnguyendu.owner @280,88 1054x28
       <a> Quản lý tài khoản @280,88 115x28
   <h1> nguyendu.owner @280,124 1054x32
   <table> [table 0 cột, 3 dòng] @281,265 1052x164

@@ -18,17 +18,17 @@ Tràn ngang   : không (trang vừa khít viewport 1366px)
   <nav> Menu quản trị @8,56 231x240
     <ul> Tổng quanTổ chức chờ duyệtTất cả tổ chứcDanh mục moduleQuản lý tài kho… @8,60 231x232
       <a> Tổng quan @8,60 231x37
-        <span role="img"> dashboard @20,60 17x17
+        <span role="img"> dashboard @20,60 17x17 {aria-hidden}
       <a> Tổ chức chờ duyệt @8,99 231x37
-        <span role="img"> audit @20,99 17x17
+        <span role="img"> audit @20,99 17x17 {aria-hidden}
       <a> Tất cả tổ chức @8,138 231x37
-        <span role="img"> bank @20,138 17x17
+        <span role="img"> bank @20,138 17x17 {aria-hidden}
       <a> Danh mục module @8,177 231x37
-        <span role="img"> appstore @20,177 17x17
+        <span role="img"> appstore @20,177 17x17 {aria-hidden}
       <a> Quản lý tài khoản @8,216 231x37
-        <span role="img"> team @20,216 17x17
+        <span role="img"> team @20,216 17x17 {aria-hidden}
       <a> Nhật ký hệ thống @8,255 231x37
-        <span role="img"> file-search @20,255 17x17
+        <span role="img"> file-search @20,255 17x17 {aria-hidden}
 <main> Tổ chức chờ duyệtDuyệt để tổ chức có thể bắt đầu sử dụng hệ thống.Tên … @248,56 1118x365
   <h1> Tổ chức chờ duyệt @280,88 1054x32
   <table> [table 6 cột, 2 dòng] @280,186 1054x203

@@ -10,7 +10,7 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<main> MMEMSĐặt lại mật khẩuCần liên kết trong email để tiếp tục.Thiếu liên k… @0,0 375x667
+<main> MEMSĐặt lại mật khẩuCần liên kết trong email để tiếp tục.Thiếu liên kế… @0,0 375x667
   <h1> Đặt lại mật khẩu @32,240 311x32
   <a> Yêu cầu liên kết mới @32,411 311x20
 

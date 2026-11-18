@@ -17,7 +17,7 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
   <button> Đăng xuất @212,12 92x32
 <main> Danh mục moduleCác module hệ thống đang có trong danh mục.Tất cả modul… @0,56 320x521
   <h1> Danh mục module @16,76 288x32
-  <span role="img"> down @173,178 12x12
+  <span role="img"> down @173,178 12x12 {aria-hidden}
   <input> (search) "Tìm module" @29,221 211x22
   <button>  @268,214 36x36
     <span role="img"> search @279,225 14x14
@@ -30,7 +30,6 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 - button "" @268,214 36x36
 - input[search] "Tìm module" @29,221 211x22
 - span "" @550,300 20x30
-- span "" @550,333 20x30
 
 ## Tiêu đề (heading)
 - h1: Danh mục module
