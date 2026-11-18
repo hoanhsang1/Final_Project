@@ -125,7 +125,11 @@ export const MSG_CLASS = {
 
   ASSIGN_SEARCH_LABEL: 'Tìm giáo viên theo mã hoặc họ tên',
   ASSIGN_EMPTY: 'Không có giáo viên phù hợp để gán.',
-  ASSIGN_PICK: 'Chọn giáo viên ở bảng bên dưới.',
+  ASSIGN_PICK: 'Chọn giáo viên ở danh sách bên dưới.',
+  /** Nhãn cho nhóm chọn giáo viên (radio) trong dialog gán. */
+  ASSIGN_LIST_LABEL: 'Danh sách giáo viên có thể gán',
+  /** Tên cho `nav` phân trang trong dialog gán — khác `PAGINATION_LABEL` để không trùng landmark. */
+  ASSIGN_PAGINATION_LABEL: 'Phân trang danh sách giáo viên để gán',
 
   LOGS_EMPTY: 'Chưa có lịch sử trạng thái.',
   EVENTS_EMPTY: 'Chưa có sự kiện đóng lớp.',
@@ -137,6 +141,7 @@ export const MSG_CLASS = {
   REJECT_REASON_LABEL: 'Lý do từ chối',
   REOPEN_REASON_LABEL: 'Lý do mở lại',
   REASON_REQUIRED: 'Vui lòng nhập lý do.',
+  REASON_MAX: 'Lý do tối đa 500 ký tự',
 
   APPROVE_CONFIRM: 'Duyệt yêu cầu đóng lớp này?',
   REOPEN_CONFIRM: 'Mở lại lớp này?',

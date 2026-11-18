@@ -4,7 +4,7 @@ URL thực tế  : http://127.0.0.1:5173/dao-tao/lop-hoc/c1
 Viewport     : mobile 375x667
 Tiêu đề tab  : Chi tiết lớp học — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 216
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 375px)
 
 ## API đã gọi (3)
@@ -17,28 +17,28 @@ Tràn ngang   : không (trang vừa khít viewport 375px)
 <header> MEMSĐào tạogiao.vuĐăng xuất @0,0 375x56
   <button> Mở menu đào tạo @8,12 32x32
   <button> Đăng xuất @267,12 92x32
-<main> /Lớp học/LH001LH001Đang diễn raThông tinLịch sử trạng tháiSự kiện đóng… @0,56 375x588
+<main> Lớp họcLH001LH001Đang diễn raThông tinLịch sử trạng tháiSự kiện đóngTh… @0,56 375x614
   <nav> Đường dẫn @16,76 343x28
-    <ol> /Lớp học/LH001 @16,76 343x28
+    <ol> Lớp họcLH001 @16,76 343x28
       <a> Lớp học @16,76 53x28
   <h1> LH001Đang diễn ra @16,112 343x32
-  <div role="tablist"> Thông tinLịch sử trạng tháiSự kiện đóng @16,188 343x42
-    <div role="tab"> Thông tin @16,198 63x22
-    <div role="tab"> Lịch sử trạng thái @103,198 114x22
-    <div role="tab"> Sự kiện đóng @241,198 87x22
-  <div role="tabpanel"> Thông tin @16,246 343x347
-    <section> Thông tin lớpMã lớpLH001Tên lớpToán 10A1Năm học2026-2027Sĩ số32Thời gi… @16,246 343x347
-      <h2> Thông tin lớp @16,246 127x28
-      <table> [table 0 cột, 8 dòng] @16,291 343x302
+  <div role="tablist"> Mục thông tin lớp học @16,184 343x37
+    <button role="tab"> Thông tin @16,184 88x32
+    <button role="tab"> Lịch sử trạng thái @106,184 141x32
+    <button role="tab"> Sự kiện đóng @249,184 112x32
+  <button>  @327,184 32x32 {aria-hidden}
+  <div role="tabpanel"> Thông tin lớpMã lớpLH001Tên lớpToán 10A1Năm học2026-2027Sĩ số32Thời gi… @16,237 343x413
+    <section> Thông tin lớpMã lớpLH001Tên lớpToán 10A1Năm học2026-2027Sĩ số32Thời gi… @16,253 343x365
+      <h2> Thông tin lớp @16,253 127x28
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
 - a "Tới nội dung chính" @12,-51 151x32
 - button "Mở menu đào tạo" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @267,12 92x32
 - a "Lớp học" @16,76 53x28
-- div "Thông tin" @16,198 63x22
-- div "Lịch sử trạng thái" @103,198 114x22
-- div "Sự kiện đóng" @241,198 87x22
+- button "Thông tin" @16,184 88x32
+- button "Lịch sử trạng thái" @106,184 141x32
+- button "Sự kiện đóng" @249,184 112x32
 
 ## Tiêu đề (heading)
 - h1: LH001Đang diễn ra

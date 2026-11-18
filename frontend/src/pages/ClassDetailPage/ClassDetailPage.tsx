@@ -1,40 +1,45 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
+  Badge,
+  Banner,
   Button,
-  Descriptions,
-  Dropdown,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Space,
+  Dialog,
+  DialogHeader,
+  DropdownMenu,
+  HStack,
+  MetadataList,
+  MetadataListItem,
+  Pagination,
+  RadioList,
+  RadioListItem,
+  Stack,
+  Tab,
+  TabList,
   Table,
-  Tabs,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import type { DescriptionsProps, MenuProps } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
+  Text,
+  TextArea,
+  TextInput,
+  VStack,
+  pixel,
+  proportional,
+} from '@astryxdesign/core';
+import type { DropdownMenuOption, TableColumn } from '@astryxdesign/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import DetailSection from '../../components/DetailSection/DetailSection';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
-import { useNotify } from '../../hooks/useNotify';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import { canViewClasses, hasPermission, isOwnerRole } from '../../features/auth/permissions';
 import {
+  CLASS_STATUS_BADGE,
   CLASS_STATUS_LABEL,
-  CLASS_STATUS_TAG,
   CLOSE_ACTION_LABEL,
+  CLOSE_STATE_BADGE,
   CLOSE_STATE_LABEL,
-  CLOSE_STATE_TAG,
+  TEACHING_STATUS_BADGE,
   TEACHING_STATUS_LABEL,
-  TEACHING_STATUS_TAG,
   formatDate,
   formatDateTime,
   formatPeriod,
@@ -63,19 +68,44 @@ import type {
   CloseEventItem,
   StatusLogItem,
 } from '../../features/sprint4/types';
+import { useFormState } from '../../hooks/useFormState';
+import { useNotify } from '../../hooks/useNotify';
 import { useAuthStore } from '../../stores/authStore';
-import { numericStyle } from '../../theme';
-
-const { Text } = Typography;
-const { TextArea } = Input;
 
 type ModalKind = 'assign' | 'cancel' | 'requestClose' | 'approve' | 'reject' | 'reopen' | null;
 
 /** §6.4 — chỉ hủy được lớp chưa bắt đầu / đang diễn ra và chưa xin đóng. */
 const CANCELLABLE_STATUSES = ['CHUA_BAT_DAU', 'DANG_DIEN_RA'];
 
-/** Kích thước trang mặc định cho bảng chọn giáo viên trong modal. */
+/** Kích thước trang mặc định cho danh sách chọn giáo viên trong dialog. */
 const ASSIGN_PAGE_SIZE = 10;
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn DTO là interface
+ * nên không có index signature. Giao thêm `Record<string, unknown>` để thoả ràng
+ * buộc mà **không** nới lỏng DTO — xem `docs/ui-conventions.md` mục 6.9.
+ *
+ * `rowKey` là field tổng hợp `${at}-${index}`: `idKey` của Astryx không nhận
+ * index (antd `rowKey(record, index)` thì có), mà 2 tab lịch sử không có id ổn
+ * định trong dữ liệu.
+ */
+type StatusLogRow = StatusLogItem & Record<string, unknown> & { rowKey: string };
+type CloseEventRow = CloseEventItem & Record<string, unknown> & { rowKey: string };
+
+/** Giá trị form của 3 dialog nhập lý do (hủy / từ chối / mở lại). */
+type ReasonFormValues = { reason: string };
+
+/** Giá trị form "Yêu cầu đóng" — ghi chú là tùy chọn. */
+type RequestNoteFormValues = { note: string };
+
+/** Ràng buộc chung cho lý do: bắt buộc (không chỉ khoảng trắng) + tối đa 500 ký tự. */
+const REASON_VALIDATORS = {
+  reason: (value: string) => {
+    if (!value.trim()) return MSG_CLASS.REASON_REQUIRED;
+    if (value.length > 500) return MSG_CLASS.REASON_MAX;
+    return undefined;
+  },
+};
 
 /**
  * Màn 6 — chi tiết lớp học (§6.2–§6.5).
@@ -86,11 +116,12 @@ const ASSIGN_PAGE_SIZE = 10;
  *   lỗi, không gửi lại version cũ.
  * - Lớp `CLOSED`: chỉ xem (không gán giáo viên).
  * - 5 state cho trang và cho 2 tab lịch sử.
+ * - Một primary duy nhất (duyệt → hoặc yêu cầu đóng); hành động phá huỷ gom vào
+ *   "Thao tác khác" và tô đỏ.
  */
 export default function ClassDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = theme.useToken();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const backendRoles = useAuthStore((s) => s.backendRoles);
@@ -105,6 +136,7 @@ export default function ClassDetailPage() {
   const canApproveClose = isOwner || hasPermission(permissions, 'CLASS_CLOSE_APPROVE');
   const canReopen = isOwner || hasPermission(permissions, 'CLASS_REOPEN');
 
+  const [activeTab, setActiveTab] = useState('info');
   const [modal, setModal] = useState<ModalKind>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -114,10 +146,10 @@ export default function ClassDetailPage() {
   const [assignKeywordInput, setAssignKeywordInput] = useState('');
   const [assignKeyword, setAssignKeyword] = useState('');
 
-  const [cancelForm] = Form.useForm<{ reason: string }>();
-  const [requestForm] = Form.useForm<{ note?: string }>();
-  const [rejectForm] = Form.useForm<{ reason: string }>();
-  const [reopenForm] = Form.useForm<{ reason: string }>();
+  const cancelForm = useFormState<ReasonFormValues>({ reason: '' }, REASON_VALIDATORS);
+  const requestForm = useFormState<RequestNoteFormValues>({ note: '' });
+  const rejectForm = useFormState<ReasonFormValues>({ reason: '' }, REASON_VALIDATORS);
+  const reopenForm = useFormState<ReasonFormValues>({ reason: '' }, REASON_VALIDATORS);
 
   const detailQuery = useQuery({
     queryKey: ['class', id],
@@ -184,10 +216,10 @@ export default function ClassDetailPage() {
   const closeModal = () => {
     setModal(null);
     setModalError(null);
-    cancelForm.resetFields();
-    requestForm.resetFields();
-    rejectForm.resetFields();
-    reopenForm.resetFields();
+    cancelForm.reset();
+    requestForm.reset();
+    rejectForm.reset();
+    reopenForm.reset();
     setSelectedTeacherId(null);
     setAssignKeyword('');
     setAssignKeywordInput('');
@@ -284,95 +316,83 @@ export default function ClassDetailPage() {
     onError: handleMutationError,
   });
 
-  const logColumns = useMemo<ColumnsType<StatusLogItem>>(
+  const logColumns: TableColumn<StatusLogRow>[] = useMemo(
     () => [
       {
-        title: 'Thời gian',
-        dataIndex: 'at',
-        width: 170,
-        render: (value: string | null | undefined) => formatDateTime(value),
+        key: 'at',
+        header: 'Thời gian',
+        width: pixel(170),
+        renderCell: (row) => formatDateTime(row.at),
       },
       {
-        title: 'Người thực hiện',
         key: 'actor',
-        width: 200,
-        render: (_, record) => record.actorName || record.actorId || '—',
+        header: 'Người thực hiện',
+        width: pixel(200),
+        renderCell: (row) => row.actorName || row.actorId || '—',
       },
       {
-        title: 'Từ trạng thái',
-        dataIndex: 'fromStatus',
-        width: 150,
-        render: (value: string | null | undefined) =>
-          value ? <Tag color={CLASS_STATUS_TAG[value]}>{labelOf(CLASS_STATUS_LABEL, value)}</Tag> : '—',
-      },
-      {
-        title: 'Sang trạng thái',
-        dataIndex: 'toStatus',
-        width: 150,
-        render: (value: string | null | undefined) =>
-          value ? <Tag color={CLASS_STATUS_TAG[value]}>{labelOf(CLASS_STATUS_LABEL, value)}</Tag> : '—',
-      },
-      {
-        title: 'Lý do/Ghi chú',
-        dataIndex: 'reason',
-        render: (value: string | null | undefined) => value || '—',
-      },
-    ],
-    [],
-  );
-
-  const eventColumns = useMemo<ColumnsType<CloseEventItem>>(
-    () => [
-      {
-        title: 'Thời gian',
-        dataIndex: 'at',
-        width: 170,
-        render: (value: string | null | undefined) => formatDateTime(value),
-      },
-      {
-        title: 'Người thực hiện',
-        key: 'actor',
-        width: 200,
-        render: (_, record) => record.actorName || record.actorId || '—',
-      },
-      {
-        title: 'Hành động',
-        dataIndex: 'action',
-        width: 180,
-        render: (value: string | null | undefined) => labelOf(CLOSE_ACTION_LABEL, value),
-      },
-      {
-        title: 'Lý do/Ghi chú',
-        key: 'note',
-        render: (_, record) => record.note || record.reason || '—',
-      },
-    ],
-    [],
-  );
-
-  const assignColumns = useMemo<ColumnsType<AssignableTeacher>>(
-    () => [
-      {
-        title: 'Mã nhân sự',
-        dataIndex: 'staffCode',
-        width: 130,
-        render: (value: string | null | undefined) => value || '—',
-      },
-      {
-        title: 'Họ tên',
-        dataIndex: 'fullName',
-        render: (value: string | null | undefined, record) => value || record.userId,
-      },
-      {
-        title: 'Trạng thái dạy',
-        dataIndex: 'teachingStatus',
-        width: 140,
-        render: (value: string | null | undefined) =>
-          value ? (
-            <Tag color={TEACHING_STATUS_TAG[value]}>{labelOf(TEACHING_STATUS_LABEL, value)}</Tag>
+        key: 'fromStatus',
+        header: 'Từ trạng thái',
+        width: pixel(150),
+        renderCell: (row) =>
+          row.fromStatus ? (
+            <Badge
+              variant={CLASS_STATUS_BADGE[row.fromStatus] ?? 'neutral'}
+              label={labelOf(CLASS_STATUS_LABEL, row.fromStatus)}
+            />
           ) : (
             '—'
           ),
+      },
+      {
+        key: 'toStatus',
+        header: 'Sang trạng thái',
+        width: pixel(150),
+        renderCell: (row) =>
+          row.toStatus ? (
+            <Badge
+              variant={CLASS_STATUS_BADGE[row.toStatus] ?? 'neutral'}
+              label={labelOf(CLASS_STATUS_LABEL, row.toStatus)}
+            />
+          ) : (
+            '—'
+          ),
+      },
+      {
+        key: 'reason',
+        header: 'Lý do/Ghi chú',
+        width: proportional(1, { minWidth: 180 }),
+        renderCell: (row) => row.reason || '—',
+      },
+    ],
+    [],
+  );
+
+  const eventColumns: TableColumn<CloseEventRow>[] = useMemo(
+    () => [
+      {
+        key: 'at',
+        header: 'Thời gian',
+        width: pixel(170),
+        renderCell: (row) => formatDateTime(row.at),
+      },
+      {
+        key: 'actor',
+        header: 'Người thực hiện',
+        width: pixel(200),
+        renderCell: (row) => row.actorName || row.actorId || '—',
+      },
+      {
+        key: 'action',
+        header: 'Hành động',
+        width: pixel(180),
+        renderCell: (row) => labelOf(CLOSE_ACTION_LABEL, row.action),
+      },
+      {
+        key: 'note',
+        header: 'Lý do/Ghi chú',
+        width: proportional(1, { minWidth: 180 }),
+        renderCell: (row) => row.note || row.reason || '—',
       },
     ],
     [],
@@ -385,33 +405,51 @@ export default function ClassDetailPage() {
     if (isForbiddenError(detailQuery.error)) return <ForbiddenNotice />;
     if (isNotFoundError(detailQuery.error)) {
       return (
-        <Alert
-          type="warning"
-          showIcon
-          role="alert"
-          message={MSG_S4.NOT_FOUND}
-          action={<Button onClick={() => navigate('/dao-tao/lop-hoc')}>{MSG_S4.BACK}</Button>}
+        <Banner
+          status="warning"
+          title={MSG_S4.NOT_FOUND}
+          collapsible={false}
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.BACK}
+              onClick={() => navigate('/dao-tao/lop-hoc')}
+            />
+          }
         />
       );
     }
     return (
-      <Alert
-        type="error"
-        showIcon
-        role="alert"
-        message={MSG_CLASS.DETAIL_LOAD_ERROR}
+      <Banner
+        status="error"
+        title={MSG_CLASS.DETAIL_LOAD_ERROR}
         description={sprint4ErrorMessage(detailQuery.error)}
-        action={
-          <Space>
-            <Button onClick={() => detailQuery.refetch()}>{MSG_S4.RETRY}</Button>
-            <Button onClick={() => navigate('/dao-tao/lop-hoc')}>{MSG_S4.BACK}</Button>
-          </Space>
+        collapsible={false}
+        role="alert"
+        endContent={
+          <HStack gap={2}>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.RETRY}
+              onClick={() => void detailQuery.refetch()}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_S4.BACK}
+              onClick={() => navigate('/dao-tao/lop-hoc')}
+            />
+          </HStack>
         }
       />
     );
   }
 
-  if (!detail) return <Alert type="warning" showIcon message={MSG_S4.NOT_FOUND} />;
+  if (!detail) {
+    return <Banner status="warning" title={MSG_S4.NOT_FOUND} collapsible={false} />;
+  }
 
   const classStatus = detail.status ?? null;
   const closeState = detail.closeState ?? 'NONE';
@@ -433,67 +471,45 @@ export default function ClassDetailPage() {
     assignMut.mutate(selectedTeacherId);
   };
 
-  const submitCancel = async () => {
-    try {
-      const values = await cancelForm.validateFields();
-      setModalError(null);
-      cancelMut.mutate(values.reason.trim());
-    } catch {
-      // Lỗi hiển thị ngay dưới trường — không gửi request.
-    }
+  const submitCancel = () => {
+    if (!cancelForm.validate()) return;
+    setModalError(null);
+    cancelMut.mutate(cancelForm.values.reason.trim());
   };
 
-  const submitRequest = async () => {
-    try {
-      const values = await requestForm.validateFields();
-      setModalError(null);
-      requestCloseMut.mutate(values.note?.trim() ? values.note.trim() : null);
-    } catch {
-      // Ghi chú là tùy chọn — không có lỗi validate cần xử lý.
-    }
+  const submitRequest = () => {
+    if (!requestForm.validate()) return;
+    setModalError(null);
+    const note = requestForm.values.note.trim();
+    requestCloseMut.mutate(note ? note : null);
   };
 
-  const submitReject = async () => {
-    try {
-      const values = await rejectForm.validateFields();
-      setModalError(null);
-      rejectMut.mutate(values.reason.trim());
-    } catch {
-      // Lỗi hiển thị ngay dưới trường — không gửi request.
-    }
+  const submitReject = () => {
+    if (!rejectForm.validate()) return;
+    setModalError(null);
+    rejectMut.mutate(rejectForm.values.reason.trim());
   };
 
-  const submitReopen = async () => {
-    try {
-      const values = await reopenForm.validateFields();
-      setModalError(null);
-      reopenMut.mutate(values.reason.trim());
-    } catch {
-      // Lỗi hiển thị ngay dưới trường — không gửi request.
-    }
+  const submitReopen = () => {
+    if (!reopenForm.validate()) return;
+    setModalError(null);
+    reopenMut.mutate(reopenForm.values.reason.trim());
   };
 
-  const assignable = assignableQuery.data?.items ?? [];
+  const assignable: AssignableTeacher[] = assignableQuery.data?.items ?? [];
+  const assignCurrentPage = assignableQuery.data?.page ?? assignPage;
+  const assignPageSize = assignableQuery.data?.size ?? ASSIGN_PAGE_SIZE;
+  const assignTotal = assignableQuery.data?.total ?? 0;
 
-  /**
-   * Cấu hình chung cho `Descriptions` trong trang: **không** `bordered`.
-   * Bản `bordered` biến phần thông tin thành một bảng kẻ ô — đọc như dump DB,
-   * và mọi field trông quan trọng như nhau. Bản thường + nhãn xám, cột nhãn cố
-   * định thì mắt quét theo nhãn, nhanh hơn.
-   */
-  const descProps: DescriptionsProps = {
-    column: { xs: 1, sm: 1, md: 2 },
-    colon: false,
-    size: 'small',
-    labelStyle: {
-      color: token.colorTextSecondary,
-      width: 150,
-      paddingBottom: token.paddingXS,
-      fontWeight: 400,
-      verticalAlign: 'top',
-    },
-    contentStyle: { paddingBottom: token.paddingXS },
-  };
+  const logRows: StatusLogRow[] = (logsQuery.data ?? []).map((item, index) => ({
+    ...item,
+    rowKey: `${item.at ?? ''}-${index}`,
+  }));
+
+  const eventRows: CloseEventRow[] = (eventsQuery.data ?? []).map((item, index) => ({
+    ...item,
+    rowKey: `${item.at ?? ''}-${index}`,
+  }));
 
   /**
    * Một màn chỉ nên có **một** primary. Trước đây trang bày ra tới 6 nút cùng
@@ -510,413 +526,585 @@ export default function ClassDetailPage() {
       ? { label: MSG_CLASS.REQUEST_CLOSE, onClick: () => openModal('requestClose') }
       : null;
 
-  const moreItems = [
-    canApproveOrReject && {
-      key: 'reject',
+  const moreItems: DropdownMenuOption[] = [];
+  if (canApproveOrReject) {
+    moreItems.push({
+      id: 'reject',
       label: MSG_CLASS.REJECT_CLOSE,
-      danger: true,
+      variant: 'destructive',
       onClick: () => openModal('reject'),
-    },
-    canRequest &&
-      primaryAction?.label !== MSG_CLASS.REQUEST_CLOSE && {
-        key: 'requestClose',
-        label: MSG_CLASS.REQUEST_CLOSE,
-        onClick: () => openModal('requestClose'),
-      },
-    canReopenClass && {
-      key: 'reopen',
+    });
+  }
+  if (canRequest && primaryAction?.label !== MSG_CLASS.REQUEST_CLOSE) {
+    moreItems.push({
+      id: 'requestClose',
+      label: MSG_CLASS.REQUEST_CLOSE,
+      onClick: () => openModal('requestClose'),
+    });
+  }
+  if (canReopenClass) {
+    moreItems.push({
+      id: 'reopen',
       label: MSG_CLASS.REOPEN,
       onClick: () => openModal('reopen'),
-    },
-    canCancelClass && {
-      key: 'cancel',
+    });
+  }
+  if (canCancelClass) {
+    moreItems.push({
+      id: 'cancel',
       label: MSG_CLASS.CANCEL,
-      danger: true,
+      variant: 'destructive',
       onClick: () => openModal('cancel'),
-    },
-  ].filter(Boolean) as NonNullable<MenuProps['items']>;
+    });
+  }
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         breadcrumb={[
           { title: MSG_CLASS.TITLE, href: '/dao-tao/lop-hoc' },
           { title: detail.classCode || detail.name || 'Lớp học' },
         ]}
         title={
-          <Space size={token.marginXS} wrap>
+          <span
+            style={{
+              display: 'inline-flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 'var(--spacing-2)',
+            }}
+          >
             <span>{detail.classCode || detail.name || 'Lớp học'}</span>
-            {classStatus && (
-              <Tag color={CLASS_STATUS_TAG[classStatus]}>{labelOf(CLASS_STATUS_LABEL, classStatus)}</Tag>
-            )}
-            {closeState !== 'NONE' && (
-              <Tag color={CLOSE_STATE_TAG[closeState]}>{labelOf(CLOSE_STATE_LABEL, closeState)}</Tag>
-            )}
-          </Space>
+            {classStatus ? (
+              <Badge
+                variant={CLASS_STATUS_BADGE[classStatus] ?? 'neutral'}
+                label={labelOf(CLASS_STATUS_LABEL, classStatus)}
+              />
+            ) : null}
+            {closeState !== 'NONE' ? (
+              <Badge
+                variant={CLOSE_STATE_BADGE[closeState] ?? 'neutral'}
+                label={labelOf(CLOSE_STATE_LABEL, closeState)}
+              />
+            ) : null}
+          </span>
         }
         extra={
           canChangeTeacher || primaryAction || moreItems.length > 0 ? (
-            <Space wrap>
-              {canChangeTeacher && (
-                <Button onClick={() => openModal('assign')}>{MSG_CLASS.ASSIGN}</Button>
-              )}
-              {primaryAction && (
-                <Button type="primary" onClick={primaryAction.onClick}>
-                  {primaryAction.label}
-                </Button>
-              )}
-              {moreItems.length > 0 && (
-                <Dropdown menu={{ items: moreItems }} trigger={['click']} placement="bottomRight">
-                  <Button icon={<MoreOutlined />} aria-label="Thao tác khác">
-                    Thao tác khác
-                  </Button>
-                </Dropdown>
-              )}
-            </Space>
+            <>
+              {canChangeTeacher ? (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  label={MSG_CLASS.ASSIGN}
+                  onClick={() => openModal('assign')}
+                />
+              ) : null}
+              {primaryAction ? (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  label={primaryAction.label}
+                  onClick={primaryAction.onClick}
+                />
+              ) : null}
+              {moreItems.length > 0 ? (
+                <DropdownMenu
+                  items={moreItems}
+                  button={{ label: 'Thao tác khác', variant: 'secondary', size: 'lg' }}
+                  placement="below"
+                  alignment="end"
+                />
+              ) : null}
+            </>
           ) : undefined
         }
       />
 
-      {isClosed && (
-        <Alert
-          type="info"
-          showIcon
-          message="Lớp đã đóng"
+      {isClosed ? (
+        <Banner
+          status="info"
+          title="Lớp đã đóng"
           description="Lớp đã đóng nên chỉ xem được thông tin. Hãy mở lại lớp nếu cần thay đổi."
+          collapsible={false}
         />
-      )}
+      ) : null}
 
-      {pageError && (
-        <Alert
-          type="error"
-          showIcon
+      {pageError ? (
+        <Banner
+          status="error"
+          title={pageError}
+          collapsible={false}
           role="alert"
-          closable
-          message={pageError}
-          onClose={() => setPageError(null)}
+          isDismissable
+          onDismiss={() => setPageError(null)}
         />
-      )}
+      ) : null}
 
-      <Tabs
-        items={[
-          {
-            key: 'info',
-            label: MSG_CLASS.TAB_INFO,
-            children: (
-              <>
-                <DetailSection title="Thông tin lớp">
-                  <Descriptions {...descProps}>
-                    <Descriptions.Item label="Mã lớp">{detail.classCode || '—'}</Descriptions.Item>
-                    <Descriptions.Item label="Tên lớp">{detail.name || '—'}</Descriptions.Item>
-                    <Descriptions.Item label="Năm học">{detail.academicYear || '—'}</Descriptions.Item>
-                    <Descriptions.Item label="Sĩ số">
-                      <span style={numericStyle}>
-                        {detail.studentCount == null ? '—' : detail.studentCount}
-                      </span>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Thời gian" span={2}>
-                      {formatPeriod(detail.startDate, detail.endDate)}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={MSG_CLASS.TEACHER_SECTION} span={2}>
-                      {detail.teacher?.fullName ? (
-                        <Space size={token.marginXS} wrap>
-                          <Text strong>{detail.teacher.fullName}</Text>
-                          {detail.teacher.code ? (
-                            <Text type="secondary">({detail.teacher.code})</Text>
-                          ) : null}
-                        </Space>
-                      ) : (
-                        <Text type="secondary">{MSG_CLASS.TEACHER_UNASSIGNED}</Text>
-                      )}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Ngày tạo">{formatDate(detail.createdAt)}</Descriptions.Item>
-                    <Descriptions.Item label="Cập nhật gần nhất">
-                      {formatDateTime(detail.updatedAt)}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </DetailSection>
+      <TabList
+        value={activeTab}
+        onChange={setActiveTab}
+        role="tablist"
+        hasDivider
+        aria-label="Mục thông tin lớp học"
+      >
+        <Tab value="info" label={MSG_CLASS.TAB_INFO} panelId="class-panel-info" />
+        <Tab value="status-logs" label={MSG_CLASS.TAB_STATUS_LOGS} panelId="class-panel-status-logs" />
+        <Tab value="close-events" label={MSG_CLASS.TAB_CLOSE_EVENTS} panelId="class-panel-close-events" />
+      </TabList>
 
-                {(detail.cancelReason || detail.closeRequestNote || detail.closeRejectReason) && (
-                  <DetailSection
-                    title="Ghi nhận đóng / huỷ lớp"
-                    description="Lấy từ lịch sử trạng thái và sự kiện đóng của lớp."
-                  >
-                    <Descriptions {...descProps} column={1}>
-                      {detail.cancelReason && (
-                        <Descriptions.Item label={MSG_CLASS.CANCEL_REASON_LABEL}>
-                          {detail.cancelReason}
-                        </Descriptions.Item>
-                      )}
-                      {detail.closeRequestNote && (
-                        <Descriptions.Item label="Ghi chú yêu cầu đóng">
-                          {detail.closeRequestNote}
-                        </Descriptions.Item>
-                      )}
-                      {detail.closeRejectReason && (
-                        <Descriptions.Item label={MSG_CLASS.REJECT_REASON_LABEL}>
-                          {detail.closeRejectReason}
-                        </Descriptions.Item>
-                      )}
-                    </Descriptions>
-                  </DetailSection>
-                )}
-              </>
-            ),
-          },
-          {
-            key: 'status-logs',
-            label: MSG_CLASS.TAB_STATUS_LOGS,
-            children: logsQuery.isError ? (
-              <Alert
-                type="error"
-                showIcon
-                role="alert"
-                message={MSG_CLASS.LOGS_LOAD_ERROR}
-                description={sprint4ErrorMessage(logsQuery.error)}
-                action={
-                  <Button size="small" onClick={() => logsQuery.refetch()}>
-                    {MSG_S4.RETRY}
-                  </Button>
-                }
-              />
-            ) : (
-              <Table<StatusLogItem>
-                rowKey={(record, index) => `${record.at ?? ''}-${index}`}
-                size="small"
-                loading={logsQuery.isLoading}
-                columns={logColumns}
-                dataSource={logsQuery.data ?? []}
-                locale={{ emptyText: <EmptyState compact description={MSG_CLASS.LOGS_EMPTY} /> }}
-                pagination={false}
-                scroll={{ x: 820 }}
-              />
-            ),
-          },
-          {
-            key: 'close-events',
-            label: MSG_CLASS.TAB_CLOSE_EVENTS,
-            children: eventsQuery.isError ? (
-              <Alert
-                type="error"
-                showIcon
-                role="alert"
-                message={MSG_CLASS.EVENTS_LOAD_ERROR}
-                description={sprint4ErrorMessage(eventsQuery.error)}
-                action={
-                  <Button size="small" onClick={() => eventsQuery.refetch()}>
-                    {MSG_S4.RETRY}
-                  </Button>
-                }
-              />
-            ) : (
-              <Table<CloseEventItem>
-                rowKey={(record, index) => `${record.at ?? ''}-${index}`}
-                size="small"
-                loading={eventsQuery.isLoading}
-                columns={eventColumns}
-                dataSource={eventsQuery.data ?? []}
-                locale={{ emptyText: <EmptyState compact description={MSG_CLASS.EVENTS_EMPTY} /> }}
-                pagination={false}
-                scroll={{ x: 760 }}
-              />
-            ),
-          },
-        ]}
-      />
+      <div
+        id={`class-panel-${activeTab}`}
+        role="tabpanel"
+        tabIndex={-1}
+        style={{ paddingTop: 'var(--spacing-4)' }}
+      >
+        {activeTab === 'info' ? (
+          <>
+            <DetailSection title="Thông tin lớp">
+              <MetadataList columns="multi" label={{ position: 'start', width: 170 }}>
+                <MetadataListItem label="Mã lớp">{detail.classCode || '—'}</MetadataListItem>
+                <MetadataListItem label="Tên lớp">{detail.name || '—'}</MetadataListItem>
+                <MetadataListItem label="Năm học">{detail.academicYear || '—'}</MetadataListItem>
+                <MetadataListItem label="Sĩ số">
+                  <Text hasTabularNumbers>
+                    {detail.studentCount == null ? '—' : detail.studentCount}
+                  </Text>
+                </MetadataListItem>
+                <MetadataListItem label="Thời gian">
+                  {formatPeriod(detail.startDate, detail.endDate)}
+                </MetadataListItem>
+                <MetadataListItem label={MSG_CLASS.TEACHER_SECTION}>
+                  {detail.teacher?.fullName ? (
+                    <HStack gap={1} wrap="wrap" align="center">
+                      <Text weight="medium">{detail.teacher.fullName}</Text>
+                      {detail.teacher.code ? (
+                        <Text type="supporting">({detail.teacher.code})</Text>
+                      ) : null}
+                    </HStack>
+                  ) : (
+                    <Text type="supporting">{MSG_CLASS.TEACHER_UNASSIGNED}</Text>
+                  )}
+                </MetadataListItem>
+                <MetadataListItem label="Ngày tạo">{formatDate(detail.createdAt)}</MetadataListItem>
+                <MetadataListItem label="Cập nhật gần nhất">
+                  {formatDateTime(detail.updatedAt)}
+                </MetadataListItem>
+              </MetadataList>
+            </DetailSection>
 
-      {/* §6.3 — gán/đổi giáo viên: chỉ giáo viên DANG_DAY, có tìm kiếm + phân trang. */}
-      <Modal
-        title={MSG_CLASS.ASSIGN_TITLE}
-        open={modal === 'assign'}
-        onCancel={closeModal}
-        onOk={submitAssign}
-        okText={MSG_S4.CONFIRM}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={assignMut.isPending}
-        okButtonProps={{ disabled: !selectedTeacherId }}
-        forceRender
+            {detail.cancelReason || detail.closeRequestNote || detail.closeRejectReason ? (
+              <DetailSection
+                title="Ghi nhận đóng / huỷ lớp"
+                description="Lấy từ lịch sử trạng thái và sự kiện đóng của lớp."
+              >
+                <MetadataList columns="single" label={{ position: 'start', width: 170 }}>
+                  {detail.cancelReason ? (
+                    <MetadataListItem label={MSG_CLASS.CANCEL_REASON_LABEL}>
+                      {detail.cancelReason}
+                    </MetadataListItem>
+                  ) : null}
+                  {detail.closeRequestNote ? (
+                    <MetadataListItem label="Ghi chú yêu cầu đóng">
+                      {detail.closeRequestNote}
+                    </MetadataListItem>
+                  ) : null}
+                  {detail.closeRejectReason ? (
+                    <MetadataListItem label={MSG_CLASS.REJECT_REASON_LABEL}>
+                      {detail.closeRejectReason}
+                    </MetadataListItem>
+                  ) : null}
+                </MetadataList>
+              </DetailSection>
+            ) : null}
+          </>
+        ) : null}
+
+        {activeTab === 'status-logs' ? (
+          logsQuery.isError ? (
+            <Banner
+              status="error"
+              title={MSG_CLASS.LOGS_LOAD_ERROR}
+              description={sprint4ErrorMessage(logsQuery.error)}
+              collapsible={false}
+              role="alert"
+              endContent={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={MSG_S4.RETRY}
+                  onClick={() => void logsQuery.refetch()}
+                />
+              }
+            />
+          ) : logsQuery.isLoading ? (
+            <PageLoading />
+          ) : (
+            <Table<StatusLogRow>
+              data={logRows}
+              columns={logColumns}
+              idKey="rowKey"
+              density="compact"
+              hasHover
+              textOverflow="truncate"
+              emptyState={<EmptyState compact description={MSG_CLASS.LOGS_EMPTY} />}
+            />
+          )
+        ) : null}
+
+        {activeTab === 'close-events' ? (
+          eventsQuery.isError ? (
+            <Banner
+              status="error"
+              title={MSG_CLASS.EVENTS_LOAD_ERROR}
+              description={sprint4ErrorMessage(eventsQuery.error)}
+              collapsible={false}
+              role="alert"
+              endContent={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={MSG_S4.RETRY}
+                  onClick={() => void eventsQuery.refetch()}
+                />
+              }
+            />
+          ) : eventsQuery.isLoading ? (
+            <PageLoading />
+          ) : (
+            <Table<CloseEventRow>
+              data={eventRows}
+              columns={eventColumns}
+              idKey="rowKey"
+              density="compact"
+              hasHover
+              textOverflow="truncate"
+              emptyState={<EmptyState compact description={MSG_CLASS.EVENTS_EMPTY} />}
+            />
+          )
+        ) : null}
+      </div>
+
+      {/* §6.3 — gán/đổi giáo viên: chỉ giáo viên DANG_DAY, có tìm kiếm + phân trang.
+          Astryx `Table` không có chọn-hàng-đơn, nên danh sách dùng `RadioList`
+          (chọn đúng 1) + `Pagination` riêng. `purpose="form"`: bấm ra ngoài KHÔNG
+          đóng để không mất lựa chọn; ESC vẫn đóng như bản antd. */}
+      <Dialog
+        isOpen={modal === 'assign'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        purpose="form"
         width={720}
       >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
-          <Input.Search
-            allowClear
-            aria-label={MSG_CLASS.ASSIGN_SEARCH_LABEL}
-            placeholder={MSG_CLASS.ASSIGN_SEARCH_LABEL}
-            value={assignKeywordInput}
-            onChange={(event) => {
-              const next = event.target.value;
-              setAssignKeywordInput(next);
-              if (next === '') {
-                setAssignKeyword('');
+        <DialogHeader
+          title={MSG_CLASS.ASSIGN_TITLE}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
+
+          <HStack gap={2} align="end" wrap="wrap">
+            <TextInput
+              type="search"
+              label={MSG_CLASS.ASSIGN_SEARCH_LABEL}
+              isLabelHidden
+              startIcon="search"
+              enterKeyHint="search"
+              hasClear
+              placeholder={MSG_CLASS.ASSIGN_SEARCH_LABEL}
+              value={assignKeywordInput}
+              containerStyle={{ flex: '1 1 240px', minWidth: 0 }}
+              onChange={(value) => {
+                setAssignKeywordInput(value);
+                if (value === '') {
+                  setAssignKeyword('');
+                  setAssignPage(1);
+                }
+              }}
+              onEnter={() => {
+                setAssignKeyword(assignKeywordInput);
                 setAssignPage(1);
-              }
-            }}
-            onSearch={(value) => {
-              setAssignKeyword(value);
-              setAssignPage(1);
-            }}
-          />
-          <Table<AssignableTeacher>
-            rowKey="userId"
-            size="small"
-            loading={assignableQuery.isLoading}
-            columns={assignColumns}
-            dataSource={assignable}
-            locale={{
-              emptyText: (
-                <EmptyState
-                  compact
-                  description={
-                    assignableQuery.isLoading ? MSG_S4.LOADING : MSG_CLASS.ASSIGN_EMPTY
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="lg"
+              label={MSG_S4.SEARCH}
+              onClick={() => {
+                setAssignKeyword(assignKeywordInput);
+                setAssignPage(1);
+              }}
+            />
+          </HStack>
+
+          {assignableQuery.isLoading ? (
+            <Text type="supporting">{MSG_S4.LOADING}</Text>
+          ) : assignable.length === 0 ? (
+            <EmptyState compact description={MSG_CLASS.ASSIGN_EMPTY} />
+          ) : (
+            <RadioList
+              label={MSG_CLASS.ASSIGN_LIST_LABEL}
+              isLabelHidden
+              value={selectedTeacherId ?? ''}
+              onChange={setSelectedTeacherId}
+              isDisabled={assignMut.isPending}
+            >
+              {assignable.map((teacher) => (
+                <RadioListItem
+                  key={teacher.userId}
+                  value={teacher.userId}
+                  label={teacher.fullName || teacher.userId}
+                  description={teacher.staffCode || undefined}
+                  endContent={
+                    teacher.teachingStatus ? (
+                      <Badge
+                        variant={TEACHING_STATUS_BADGE[teacher.teachingStatus] ?? 'neutral'}
+                        label={labelOf(TEACHING_STATUS_LABEL, teacher.teachingStatus)}
+                      />
+                    ) : undefined
                   }
                 />
-              ),
-            }}
-            rowSelection={{
-              type: 'radio',
-              selectedRowKeys: selectedTeacherId ? [selectedTeacherId] : [],
-              onChange: (keys) => setSelectedTeacherId(keys.length > 0 ? String(keys[0]) : null),
-            }}
-            onRow={(record) => ({
-              onClick: () => setSelectedTeacherId(record.userId),
-            })}
-            pagination={{
-              current: assignableQuery.data?.page ?? assignPage,
-              pageSize: assignableQuery.data?.size ?? ASSIGN_PAGE_SIZE,
-              total: assignableQuery.data?.total ?? 0,
-              showSizeChanger: false,
-              onChange: (nextPage) => setAssignPage(nextPage),
-            }}
-            scroll={{ x: 560 }}
-          />
-        </Flex>
-      </Modal>
+              ))}
+            </RadioList>
+          )}
+
+          {assignTotal > 0 ? (
+            <Pagination
+              page={assignCurrentPage}
+              onChange={setAssignPage}
+              totalItems={assignTotal}
+              pageSize={assignPageSize}
+              label={MSG_CLASS.ASSIGN_PAGINATION_LABEL}
+            />
+          ) : null}
+
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="primary"
+              size="lg"
+              label={MSG_S4.CONFIRM}
+              isDisabled={!selectedTeacherId}
+              isLoading={assignMut.isPending}
+              onClick={submitAssign}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
 
       {/* §6.4 — hủy lớp. */}
-      <Modal
-        title={MSG_CLASS.CANCEL}
-        open={modal === 'cancel'}
-        onCancel={closeModal}
-        onOk={submitCancel}
-        okText={MSG_CLASS.CANCEL}
-        cancelText={MSG_S4.CANCEL}
-        okButtonProps={{ danger: true }}
-        confirmLoading={cancelMut.isPending}
-        forceRender
+      <Dialog
+        isOpen={modal === 'cancel'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        purpose="form"
       >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
-          <Form form={cancelForm} layout="vertical">
-            <Form.Item
-              name="reason"
-              label={MSG_CLASS.CANCEL_REASON_LABEL}
-              rules={[
-                { required: true, whitespace: true, message: MSG_CLASS.REASON_REQUIRED },
-                { max: 500, message: 'Lý do tối đa 500 ký tự' },
-              ]}
-            >
-              <TextArea rows={3} />
-            </Form.Item>
-          </Form>
-        </Flex>
-      </Modal>
+        <DialogHeader
+          title={MSG_CLASS.CANCEL}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
+          <TextArea
+            label={MSG_CLASS.CANCEL_REASON_LABEL}
+            value={cancelForm.values.reason}
+            onChange={(value) => cancelForm.setValue('reason', value)}
+            rows={3}
+            isDisabled={cancelMut.isPending}
+            aria-required="true"
+            status={
+              cancelForm.errorOf('reason')
+                ? { type: 'error', message: cancelForm.errorOf('reason') }
+                : undefined
+            }
+          />
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="destructive"
+              size="lg"
+              label={MSG_CLASS.CANCEL}
+              isLoading={cancelMut.isPending}
+              onClick={submitCancel}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
 
       {/* §6.5 — yêu cầu đóng lớp (note tùy chọn). */}
-      <Modal
-        title={MSG_CLASS.REQUEST_CLOSE}
-        open={modal === 'requestClose'}
-        onCancel={closeModal}
-        onOk={submitRequest}
-        okText={MSG_S4.CONFIRM}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={requestCloseMut.isPending}
-        forceRender
-      >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
-          <Form form={requestForm} layout="vertical">
-            <Form.Item name="note" label={MSG_CLASS.REQUEST_NOTE_LABEL}>
-              <TextArea rows={3} />
-            </Form.Item>
-          </Form>
-        </Flex>
-      </Modal>
-
-      <Modal
-        title={MSG_CLASS.APPROVE_CLOSE}
-        open={modal === 'approve'}
-        onCancel={closeModal}
-        onOk={() => {
-          setModalError(null);
-          approveMut.mutate();
+      <Dialog
+        isOpen={modal === 'requestClose'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
         }}
-        okText={MSG_CLASS.APPROVE_CLOSE}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={approveMut.isPending}
-        forceRender
+        purpose="form"
       >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
+        <DialogHeader
+          title={MSG_CLASS.REQUEST_CLOSE}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
+          <TextArea
+            label={MSG_CLASS.REQUEST_NOTE_LABEL}
+            value={requestForm.values.note}
+            onChange={(value) => requestForm.setValue('note', value)}
+            rows={3}
+            isDisabled={requestCloseMut.isPending}
+          />
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="primary"
+              size="lg"
+              label={MSG_S4.CONFIRM}
+              isLoading={requestCloseMut.isPending}
+              onClick={submitRequest}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
+
+      <Dialog
+        isOpen={modal === 'approve'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        purpose="info"
+      >
+        <DialogHeader
+          title={MSG_CLASS.APPROVE_CLOSE}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
           <Text>{MSG_CLASS.APPROVE_CONFIRM}</Text>
-        </Flex>
-      </Modal>
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="primary"
+              size="lg"
+              label={MSG_CLASS.APPROVE_CLOSE}
+              isLoading={approveMut.isPending}
+              onClick={() => {
+                setModalError(null);
+                approveMut.mutate();
+              }}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
 
-      <Modal
-        title={MSG_CLASS.REJECT_CLOSE}
-        open={modal === 'reject'}
-        onCancel={closeModal}
-        onOk={submitReject}
-        okText={MSG_CLASS.REJECT_CLOSE}
-        cancelText={MSG_S4.CANCEL}
-        okButtonProps={{ danger: true }}
-        confirmLoading={rejectMut.isPending}
-        forceRender
+      <Dialog
+        isOpen={modal === 'reject'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        purpose="form"
       >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
-          <Form form={rejectForm} layout="vertical">
-            <Form.Item
-              name="reason"
-              label={MSG_CLASS.REJECT_REASON_LABEL}
-              rules={[
-                { required: true, whitespace: true, message: MSG_CLASS.REASON_REQUIRED },
-                { max: 500, message: 'Lý do tối đa 500 ký tự' },
-              ]}
-            >
-              <TextArea rows={3} />
-            </Form.Item>
-          </Form>
-        </Flex>
-      </Modal>
+        <DialogHeader
+          title={MSG_CLASS.REJECT_CLOSE}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
 
-      <Modal
-        title={MSG_CLASS.REOPEN}
-        open={modal === 'reopen'}
-        onCancel={closeModal}
-        onOk={submitReopen}
-        okText={MSG_CLASS.REOPEN}
-        cancelText={MSG_S4.CANCEL}
-        confirmLoading={reopenMut.isPending}
-        forceRender
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
+          <TextArea
+            label={MSG_CLASS.REJECT_REASON_LABEL}
+            value={rejectForm.values.reason}
+            onChange={(value) => rejectForm.setValue('reason', value)}
+            rows={3}
+            isDisabled={rejectMut.isPending}
+            aria-required="true"
+            status={
+              rejectForm.errorOf('reason')
+                ? { type: 'error', message: rejectForm.errorOf('reason') }
+                : undefined
+            }
+          />
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="destructive"
+              size="lg"
+              label={MSG_CLASS.REJECT_CLOSE}
+              isLoading={rejectMut.isPending}
+              onClick={submitReject}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
+
+      <Dialog
+        isOpen={modal === 'reopen'}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        purpose="form"
       >
-        <Flex vertical gap={token.marginSM}>
-          {modalError && <Alert type="error" showIcon role="alert" message={modalError} />}
+        <DialogHeader
+          title={MSG_CLASS.REOPEN}
+          onOpenChange={(open) => {
+            if (!open) closeModal();
+          }}
+        />
+
+        <VStack gap={3} style={{ marginTop: 'var(--spacing-4)' }}>
+          {modalError ? (
+            <Banner status="error" title={modalError} collapsible={false} role="alert" />
+          ) : null}
           <Text>{MSG_CLASS.REOPEN_CONFIRM}</Text>
-          <Form form={reopenForm} layout="vertical">
-            <Form.Item
-              name="reason"
-              label={MSG_CLASS.REOPEN_REASON_LABEL}
-              rules={[
-                { required: true, whitespace: true, message: MSG_CLASS.REASON_REQUIRED },
-                { max: 500, message: 'Lý do tối đa 500 ký tự' },
-              ]}
-            >
-              <TextArea rows={3} />
-            </Form.Item>
-          </Form>
-        </Flex>
-      </Modal>
-    </Flex>
+          <TextArea
+            label={MSG_CLASS.REOPEN_REASON_LABEL}
+            value={reopenForm.values.reason}
+            onChange={(value) => reopenForm.setValue('reason', value)}
+            rows={3}
+            isDisabled={reopenMut.isPending}
+            aria-required="true"
+            status={
+              reopenForm.errorOf('reason')
+                ? { type: 'error', message: reopenForm.errorOf('reason') }
+                : undefined
+            }
+          />
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_S4.CANCEL} onClick={closeModal} />
+            <Button
+              variant="primary"
+              size="lg"
+              label={MSG_CLASS.REOPEN}
+              isLoading={reopenMut.isPending}
+              onClick={submitReopen}
+            />
+          </HStack>
+        </VStack>
+      </Dialog>
+    </Stack>
   );
 }
