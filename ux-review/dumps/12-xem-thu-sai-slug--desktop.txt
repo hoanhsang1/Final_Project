@@ -4,25 +4,26 @@ URL thực tế  : http://127.0.0.1:5173/xem-thu/khong-ton-tai
 Viewport     : desktop 1366x768
 Tiêu đề tab  : Xem thử vai trò — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 9
+Số phần tử antd (.ant-*) trên trang: 3
 Tràn ngang   : không (trang vừa khít viewport 1366px)
 
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<button> Quay lại đăng nhập @604,573 158x36
+<h1> Không có vai trò này @565,334 237x32
+<button> Quay lại đăng nhập @607,430 152x36
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
-- button "Quay lại đăng nhập" @604,573 158x36
+- button "Quay lại đăng nhập" @607,430 152x36
 
 ## Tiêu đề (heading)
-(không có)
+- h1: Không có vai trò này
 
 ## Thông báo / trạng thái
-- [ant-result] No FoundKhông có vai trò nàyĐường dẫn xem thử không đúng. Hãy quay lại trang đăng nhập.Quay lại đăng nhập
+(không có)
 
 ## Hộp thoại đang mở
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Không có vai trò này Đường dẫn xem thử không đúng. Hãy quay lại trang đăng nhập. Quay lại đăng nhập
+404 Không có vai trò này Đường dẫn xem thử không đúng. Hãy quay lại trang đăng nhập. Quay lại đăng nhập

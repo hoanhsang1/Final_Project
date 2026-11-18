@@ -1,9 +1,10 @@
-import { Alert, App, Button, Empty, Flex, Popconfirm, Result, Skeleton, Space, Table, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Empty, Flex, Popconfirm, Skeleton, Space, Table, Tag, Typography, theme } from 'antd';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import MemberFormModal from '../../components/MemberFormModal/MemberFormModal';
 import MemberPositionsModal from '../../components/MemberPositionsModal/MemberPositionsModal';
 import TempPasswordModal from '../../components/TempPasswordModal/TempPasswordModal';
@@ -184,15 +185,11 @@ export default function DepartmentDetailPage() {
 
   if (isMissing || !department) {
     return (
-      <Result
-        status="404"
+      <StatusScreen
+        code="404"
         title={MSG_MEM.NOT_FOUND}
-        subTitle={MSG_MEM.NOT_FOUND_HINT}
-        extra={
-          <Button type="primary" onClick={() => navigate('/to-chuc')}>
-            {MSG_MEM.BACK}
-          </Button>
-        }
+        description={MSG_MEM.NOT_FOUND_HINT}
+        action={{ label: MSG_MEM.BACK, onClick: () => navigate('/to-chuc') }}
       />
     );
   }

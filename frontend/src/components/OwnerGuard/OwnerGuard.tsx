@@ -1,8 +1,8 @@
-import { Button, Result } from 'antd';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { MSG_OWNER } from '../../features/owner/ownerMessages';
 import { useAuthStore } from '../../stores/authStore';
+import StatusScreen from '../StatusScreen/StatusScreen';
 
 /**
  * Chặn route khu vực quản lý tổ chức của Owner (`/to-chuc`).
@@ -31,15 +31,11 @@ export default function OwnerGuard({ children }: PropsWithChildren) {
   // 2. Đã đăng nhập nhưng không phải chủ tổ chức.
   if (!backendRoles.includes('OWNER') && !backendRoles.includes('ORG_OWNER')) {
     return (
-      <Result
-        status="403"
-        title="403"
-        subTitle={MSG_OWNER.NO_PERMISSION}
-        extra={
-          <Button type="primary" onClick={() => navigate('/dang-nhap')}>
-            Về trang đăng nhập
-          </Button>
-        }
+      <StatusScreen
+        code="403"
+        title={MSG_OWNER.NO_PERMISSION}
+        action={{ label: 'Về trang đăng nhập', onClick: () => navigate('/dang-nhap') }}
+        fullHeight
       />
     );
   }

@@ -1,7 +1,6 @@
-import { Button, Flex, Result, theme } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import { useAuthStore } from '../../stores/authStore';
-import { layoutBackground } from '../../theme';
 
 /**
  * Trang 404 — trước đây chỉ là một `<div>` không style, không lối thoát.
@@ -14,7 +13,6 @@ import { layoutBackground } from '../../theme';
  * `ux-console.spec` đang assert theo chuỗi này.
  */
 export default function NotFoundPage() {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const backendRoles = useAuthStore((s) => s.backendRoles);
@@ -22,21 +20,15 @@ export default function NotFoundPage() {
   const isAdmin = isAuthenticated && backendRoles.includes('SUPER_ADMIN');
 
   return (
-    <Flex
-      align="center"
-      justify="center"
-      style={{ minHeight: '100vh', background: layoutBackground, padding: token.paddingLG }}
-    >
-      <Result
-        status="404"
-        title="Không tìm thấy trang"
-        subTitle="Đường dẫn không tồn tại hoặc đã bị di chuyển."
-        extra={
-          <Button type="primary" onClick={() => navigate(isAdmin ? '/quan-tri' : '/dang-nhap')}>
-            {isAdmin ? 'Về trang tổng quan' : 'Về trang đăng nhập'}
-          </Button>
-        }
-      />
-    </Flex>
+    <StatusScreen
+      code="404"
+      title="Không tìm thấy trang"
+      description="Đường dẫn không tồn tại hoặc đã bị di chuyển."
+      action={{
+        label: isAdmin ? 'Về trang tổng quan' : 'Về trang đăng nhập',
+        onClick: () => navigate(isAdmin ? '/quan-tri' : '/dang-nhap'),
+      }}
+      fullHeight
+    />
   );
 }

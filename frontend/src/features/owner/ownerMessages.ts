@@ -120,6 +120,8 @@ export const MSG_POS = {
   PERMISSIONS_LOAD_ERROR: 'Không tải được danh mục quyền.',
   CREATE: 'Thêm chức vụ',
   EDIT: 'Sửa chức vụ',
+  /** Nhãn ngắn trên nút trong bảng (nhãn đầy đủ nằm ở `EDIT`). */
+  EDIT_SHORT: 'Sửa',
   NAME: 'Tên chức vụ',
   DESCRIPTION: 'Mô tả',
   PERMISSIONS: 'Quyền',

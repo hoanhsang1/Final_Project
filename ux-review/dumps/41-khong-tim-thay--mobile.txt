@@ -4,25 +4,26 @@ URL thực tế  : http://127.0.0.1:5173/khong-ton-tai
 Viewport     : mobile 375x667
 Tiêu đề tab  : Không tìm thấy trang — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 7
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 375px)
 
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<button> Về trang đăng nhập @107,522 162x36
+<h1> Không tìm thấy trang @66,294 243x32
+<button> Về trang đăng nhập @110,369 156x36
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
-- button "Về trang đăng nhập" @107,522 162x36
+- button "Về trang đăng nhập" @110,369 156x36
 
 ## Tiêu đề (heading)
-(không có)
+- h1: Không tìm thấy trang
 
 ## Thông báo / trạng thái
-- [ant-result] No FoundKhông tìm thấy trangĐường dẫn không tồn tại hoặc đã bị di chuyển.Về trang đăng nhập
+(không có)
 
 ## Hộp thoại đang mở
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Không tìm thấy trang Đường dẫn không tồn tại hoặc đã bị di chuyển. Về trang đăng nhập
+404 Không tìm thấy trang Đường dẫn không tồn tại hoặc đã bị di chuyển. Về trang đăng nhập

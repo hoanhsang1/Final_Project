@@ -7,7 +7,6 @@ import {
   Descriptions,
   Empty,
   Flex,
-  Result,
   Skeleton,
   Table,
   Tag,
@@ -18,6 +17,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
+import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import {
   AdminApiError,
@@ -184,15 +184,11 @@ export default function OrganizationDetailPage() {
     const status = detailQuery.error instanceof AdminApiError ? detailQuery.error.status : null;
     if (status === 404) {
       return (
-        <Result
-          status="404"
+        <StatusScreen
+          code="404"
           title={MSG_ORG.NOT_FOUND}
-          subTitle="Tổ chức không tồn tại hoặc đã bị gỡ khỏi hệ thống."
-          extra={
-            <Link to={backPath}>
-              <Button type="primary">{MSG_ORG.BACK_TO_LIST}</Button>
-            </Link>
-          }
+          description="Tổ chức không tồn tại hoặc đã bị gỡ khỏi hệ thống."
+          action={{ label: MSG_ORG.BACK_TO_LIST, onClick: () => navigate(backPath) }}
         />
       );
     }

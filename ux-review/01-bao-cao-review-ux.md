@@ -6,6 +6,8 @@
 > **Ràng buộc đã tuân thủ (giai đoạn review):** KHÔNG sửa file source dự án · KHÔNG đổi API/hợp đồng/nghiệp vụ/phân quyền · KHÔNG cài thêm thư viện · KHÔNG gọi API thật ghi dữ liệu · mọi thứ ghi trong `ux-review/`.
 >
 > **Cập nhật (giai đoạn sửa lỗi P1):** sau khi review xong, người dùng đã **cho phép sửa file source** cho 3 lỗi P1. Đã sửa **R-01, R-03, R-05** và **xác minh bằng đo lại** (mục "✅ Đã sửa" trong từng mục + `_probe-p1-before.log` / `_probe-p1-after.log`). Các lỗi còn lại **chưa sửa**. Không đổi API/hợp đồng/nghiệp vụ/phân quyền, không cài thêm thư viện.
+>
+> **Cập nhật (giai đoạn sửa lỗi P2):** sửa tiếp **R-04** (5 màn 403/404 dựng lại bằng Astryx — hết chữ tiếng Anh cho trình đọc màn hình, có `h1`) và **R-07** (nút Sửa/Xoá ở màn Chức vụ nêu tên từng dòng, hộp xác nhận xoá nêu tên chức vụ). Xác minh bằng `probe-p2-verify.mjs` → `_probe-p2-after.log` + chạy lại toàn bộ 87 dump. Chi tiết ở mục "✅ Đã sửa (P2)" trong R-04/R-07.
 
 ---
 
@@ -38,6 +40,8 @@ Kết luận chính:
 
 **Đã sửa (3 lỗi P1):** R-01 (pagination antd về tiếng Việt), R-03 (bỏ `antd/dist/reset.css`, Heading Astryx đúng 600/0px), R-05 (3 trang Tổ chức hết tràn ngang ở 320/375px, desktop không đổi). Chi tiết + bằng chứng trước/sau ở mục 3; kiểm tra chất lượng `tsc`/`eslint`/`vitest`/`vite build` đều đạt.
 
+**Đã sửa (2 lỗi P2):** R-04 (5 màn 403/404 — Admin/Owner/Academic guard, 404 vai trò, 404 trang — dựng lại bằng component Astryx dùng chung `StatusScreen`: có `h1`, **không** còn SVG tiếng Anh "Unauthorized"/"No Found"; kèm 3 màn chi tiết chưa port dùng cùng `Result` 404), R-07 (nút Sửa/Xoá ở màn Chức vụ có `aria-label` nêu tên từng dòng + hộp xác nhận xoá nêu tên chức vụ). Bằng chứng: `probe-p2-verify.mjs` → `_probe-p2-after.log`; dump `37/38/39/12/41` có `h1` và 0 phần tử antd ở 3 màn 403.
+
 ---
 
 ## 2. Bảng ưu tiên
@@ -49,8 +53,8 @@ Kết luận chính:
 | 1 | R-01 | Pagination/chuỗi antd hiện **tiếng Anh** ("Page Size", "20 / page", "Previous Page", "Next Page") | Lỗi thật — ✅ **ĐÃ SỬA** | Mọi trang chưa port (Quản trị, Tổ chức) | dump `16`, `21`, `23`; `frontend/src/main.tsx:28` (locale); probe `_probe-locale.log`, `_probe-a11y.log` |
 | 2 | R-03 | `antd/dist/reset.css` vẫn nạp → **đè Heading Astryx** (đậm 500 vs 600, lề dưới 12px) | Lỗi thật — ✅ **ĐÃ SỬA** | Mọi trang đã port | `frontend/src/main.tsx:12-19` (comment, reset import đã xoá); probe `_probe-heading.log` |
 | 3 | R-05 | **Tràn ngang cả trang** ở 375/320px trên 3 trang Tổ chức | Lỗi thật — ✅ **ĐÃ SỬA** | Điện thoại; vi phạm NFR responsive | dump `26-narrow`, `28-mobile/narrow`, `29-mobile/narrow` |
-| 4 | R-04 | 403/404 lộ **chữ tiếng Anh cho trình đọc màn hình** ("Unauthorized", "No Found") | Lỗi thật | WCAG 2.1 AA; mọi màn 403/404 | dump `37`, `38`, `39`, `12`, `41`; `antd/es/result/unauthorized.js:7`, `noFound.js:7` |
-| 5 | R-07 | Chức vụ: nút **"Sửa chức vụ"/"Xoá" không phân biệt dòng**, hộp xác nhận xoá **không nêu tên** chức vụ | Lỗi thật | Thao tác phá huỷ; WCAG 4.1.2/2.4.6 | dump `28`; `PositionsPage.tsx:116,127` vs `DepartmentsPage.tsx:104-129` |
+| 4 | R-04 | 403/404 lộ **chữ tiếng Anh cho trình đọc màn hình** ("Unauthorized", "No Found") | Lỗi thật — ✅ **ĐÃ SỬA** | WCAG 2.1 AA; mọi màn 403/404 | dump `37`, `38`, `39`, `12`, `41`; `antd/es/result/unauthorized.js:7`, `noFound.js:7` |
+| 5 | R-07 | Chức vụ: nút **"Sửa chức vụ"/"Xoá" không phân biệt dòng**, hộp xác nhận xoá **không nêu tên** chức vụ | Lỗi thật — ✅ **ĐÃ SỬA** | Thao tác phá huỷ; WCAG 4.1.2/2.4.6 | dump `28`; `PositionsPage.tsx:116,127` vs `DepartmentsPage.tsx:104-129` |
 | 6 | R-02 | Nút chỉ-icon của antd có **tên truy cập tiếng Anh** ("search", "left", "right", "Close") | Lỗi thật | WCAG 2.1 AA; mọi trang antd | probe `_probe-a11y.log` (`searchAria`, `paginationAria`) |
 | 7 | R-06 | Skeleton antd để lại `<h3>` rỗng + `<ul>` rỗng trong cây trợ năng | Lỗi thật | Nhẹ; trình đọc màn hình | dump `25` |
 | 8 | R-08 | Thẻ số liệu "Tổ chức chờ duyệt" nêu **sai đích đến** trong tên truy cập | Lỗi thật | Nhẹ; trình đọc màn hình | dump `13`; `OverviewPage.tsx:45`; `adminMessages.ts:22` |
@@ -124,6 +128,14 @@ Kết luận chính:
 - **Góc nhìn (A):** vi phạm WCAG 2.1 AA (3.1.1 ngôn ngữ; 4.1.2). Thêm nữa, các trang này **không có heading** (`h1`) — dump `37`, `41` mục "Tiêu đề (heading)" = "(không có)".
 - **Góc nhìn (B):** không phải chủ đích; các trang 403/404 **chưa được port** sang Astryx (Astryx không có `Result`, phải tự dựng).
 - **Đề xuất (KHÔNG thực hiện):** khi port, tự dựng màn 403/404 bằng Astryx (`Heading` + `Text` + `Button`), bỏ SVG tiếng Anh; thêm `h1`.
+- **✅ Đã sửa (P2):** tạo component dùng chung **`frontend/src/components/StatusScreen/StatusScreen.tsx`** (Astryx: `VStack` + `Heading level={1}` + `Text` + `Button`) — chỉ có chữ, **không SVG**, `h1` là tiêu đề tiếng Việt. Thay `Result` của antd ở **5 màn theo bằng chứng dump**:
+  - `components/AdminGuard/AdminGuard.tsx` (403 `/quan-tri`), `components/OwnerGuard/OwnerGuard.tsx` (403 `/to-chuc`), `components/AcademicGuard/AcademicGuard.tsx` (403 `/dao-tao`) → `code="403"`, `title` = chính chuỗi `NO_PERMISSION` sẵn có (giữ nguyên nội dung hiển thị), `fullHeight`.
+  - `pages/NotFoundPage/NotFoundPage.tsx` (404), `pages/RolePreviewPage/RolePreviewPage.tsx` (404 slug vai trò) → `code="404"`, giữ nguyên `title`/mô tả cũ.
+  - Ba guard giờ **không còn import antd** (chỉ dùng Astryx).
+  - **Mở rộng cùng lỗi (phát hiện khi rà):** 3 màn chi tiết chưa port cũng dùng `Result` 404 → thay bằng `StatusScreen`: `pages/AccountDetailPage/AccountDetailPage.tsx`, `pages/DepartmentDetailPage/DepartmentDetailPage.tsx`, `pages/OrganizationDetailPage/OrganizationDetailPage.tsx`. `grep "<Result"` trong `frontend/src` = **0**.
+  - **Trước** (dump cũ): `37`/`38`/`39` → `[ant-result] Unauthorized403…`; `12`/`41` → `No Found…`; mục "Tiêu đề (heading)" = "(không có)".
+  - **Sau** (`probe-p2-verify.mjs` → `_probe-p2-after.log`): cả 5 route `englishLeak: false`, `svgTitles: []`; mỗi màn có `h1` đúng (`Bạn không có quyền truy cập khu vực quản trị.` / `…quản lý tổ chức.` / `…khu vực này.` / `Không có vai trò này` / `Không tìm thấy trang`). Dump `37/38/39` → "Số phần tử antd: 0", `## Tiêu đề (heading)` có `h1: …`.
+  - **Không phá test:** `router.test.tsx` (`getByText('Không tìm thấy trang')`, `getByText('Bạn không có quyền truy cập khu vực quản lý tổ chức.')`) và `OwnerGuard.test.tsx`, `RolePreviewPage.test.tsx` đều pass; `tsc`/`eslint`/`vitest`(167)/`build` EXIT 0.
 
 ### R-05 — Tràn ngang cả trang ở 375/320px trên 3 trang Tổ chức
 
@@ -164,6 +176,11 @@ Kết luận chính:
 - **Góc nhìn (A):** vi phạm WCAG 2.1 AA (4.1.2; 2.4.6 nhãn/mục đích) và là rủi ro an toàn — thao tác **phá huỷ** mà không xác định đối tượng.
 - **Góc nhìn (B):** không phải chủ đích — chính trang Phòng ban cho thấy dự án biết cách làm đúng.
 - **Đề xuất (KHÔNG thực hiện):** thêm tên chức vụ vào `aria-label` hai nút và vào mô tả `Popconfirm`, giống hệt cách `DepartmentsPage` đang làm.
+- **✅ Đã sửa (P2):** làm đúng theo mẫu `DepartmentsPage`:
+  - `pages/PositionsPage/PositionsPage.tsx` — nút sửa: `aria-label={`${MSG_POS.EDIT} ${position.name}`}`, nhãn hiển thị đổi sang `MSG_POS.EDIT_SHORT` ("Sửa", khớp Phòng ban); nút xoá: `aria-label={`${MSG_POS.DELETE} chức vụ ${position.name}`}`; `Popconfirm.description` = `Chức vụ "${position.name}" sẽ bị xoá. ${MSG_POS.DELETE_CONFIRM}`.
+  - `features/owner/ownerMessages.ts` — thêm `EDIT_SHORT: 'Sửa'` cho `MSG_POS` (trước đó chỉ `MSG_DEPT` có).
+  - **Sau** (`_probe-p2-after.log`): nhãn nút = `Sửa chức vụ Giáo viên`, `Xoá chức vụ Giáo viên`, `Sửa chức vụ Tổ trưởng`, `Xoá chức vụ Tổ trưởng`; hộp xác nhận = `Xoá chức vụ? Chức vụ "Giáo viên" sẽ bị xoá. Thao tác này không hoàn tác được. Huỷ Xoá`.
+  - **Dump** `28-to-chuc-chuc-vu--desktop.txt` (sau) → `button "Sửa chức vụ Giáo viên"`, `button "Xoá chức vụ Giáo viên"` (trước: `button "Sửa chức vụ"` ×2, `button "Xoá"` ×2).
 
 ### R-08 — Thẻ số liệu "Tổ chức chờ duyệt" nêu sai đích đến
 
@@ -322,15 +339,23 @@ Nguồn: `dumps/_index.md` (87 file).
 | `probe-dept-narrow.mjs` → `_probe-dept.log` | Tái hiện **chính xác** R-05 trang Phòng ban ở 320px (dùng đúng regex chặn API như `ux-dump.mjs`) | tràn 32px, bảng 336px, cột "Thao tác" 136px, `.ant-space` 120px `nowrap` |
 | `_probe-a11y-after.log` | Chạy lại `probe-a11y-names.mjs` sau khi sửa | pagination `"Trang Trước"`/`"Trang Kế"`/`"kích thước trang"`/`20 / trang` |
 
-**Nhật ký kiểm tra chất lượng (sau khi sửa):** `_verify-tsc.log` (`tsc -b` EXIT 0) · `_verify-eslint.log` (`eslint . --max-warnings=0` EXIT 0) · `_verify-vitest.log` (24 file / 167 test pass) · `_verify-build.log` (`vite build` EXIT 0) · `_dump-rerun.log` (dump lại 87 file, EXIT 0).
+**Probe cho 2 lỗi P2 (sau khi sửa):**
 
-**File nguồn đối chiếu:** `frontend/src/main.tsx` (:12-19 comment, :24-28 locale import — **đã sửa**; dòng `import 'antd/dist/reset.css'` đã xoá) · `frontend/src/pages/DepartmentsPage/DepartmentsPage.tsx` (:194 `scroll` — **đã thêm**) · `frontend/src/pages/PositionsPage/PositionsPage.tsx` (:192 `scroll` — **đã thêm**; :116, :127 vẫn thiếu nhãn = R-07) · `frontend/src/pages/DepartmentDetailPage/DepartmentDetailPage.tsx` (:246 `scroll` — **đã thêm**) · `frontend/src/pages/OverviewPage/OverviewPage.tsx` (:41-46) · `frontend/src/features/admin/adminMessages.ts` (:22) · `frontend/src/features/owner/ownerMessages.ts` (:61, :66, :134, :137) · `frontend/src/components/AdminGuard/AdminGuard.tsx` (:37-39) · `frontend/src/pages/RegisterPage/RegisterPage.tsx` (:114, :222-237) · `frontend/src/pages/NotFoundPage/NotFoundPage.tsx` · `node_modules/antd/es/result/{unauthorized,noFound,serverError}.js` · `node_modules/rc-table/es/Table.js` (:446-463 logic `table-layout`).
+| File | Nội dung | Kết quả |
+|------|----------|---------|
+| `probe-p2-verify.mjs` → `_probe-p2-after.log` | R-04: 5 màn 403/404 có `h1`, không SVG/chữ tiếng Anh; R-07: nhãn nút + nội dung hộp xác nhận xoá màn Chức vụ | cả 5 route `englishLeak: false`, `svgTitles: []`; nhãn `Sửa chức vụ Giáo viên`…; xác nhận `Chức vụ "Giáo viên" sẽ bị xoá.` |
+
+**Nhật ký kiểm tra chất lượng (sau khi sửa P1):** `_verify-tsc.log` (`tsc -b` EXIT 0) · `_verify-eslint.log` (`eslint . --max-warnings=0` EXIT 0) · `_verify-vitest.log` (24 file / 167 test pass) · `_verify-build.log` (`vite build` EXIT 0) · `_dump-rerun.log` (dump lại 87 file, EXIT 0).
+
+**Nhật ký kiểm tra chất lượng (sau khi sửa P2):** `_p2-tsc.log` (EXIT 0) · `_p2-eslint.log` (EXIT 0) · `_p2-vitest.log` (24 file / 167 test pass) · `_p2-build.log` (EXIT 0) · `_p2-dump.log` (dump lại 87 file, EXIT 0) · `_p2-a11y.log` (chạy lại `probe-a11y-names.mjs` — R-02 vẫn còn, đúng như dự kiến).
+
+**File nguồn đối chiếu:** `frontend/src/main.tsx` (:12-19 comment, :24-28 locale import — **đã sửa**; dòng `import 'antd/dist/reset.css'` đã xoá) · `frontend/src/pages/DepartmentsPage/DepartmentsPage.tsx` (:194 `scroll` — **đã thêm**) · `frontend/src/pages/PositionsPage/PositionsPage.tsx` (:192 `scroll` — **đã thêm**; cột thao tác `aria-label`/`Popconfirm.description` — **đã sửa R-07**) · `frontend/src/features/owner/ownerMessages.ts` (`MSG_POS.EDIT_SHORT` — **đã thêm**) · `frontend/src/components/StatusScreen/StatusScreen.tsx` (**mới** — màn 403/404 dùng chung) · `frontend/src/components/{AdminGuard,OwnerGuard,AcademicGuard}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/{NotFoundPage,RolePreviewPage,AccountDetailPage,DepartmentDetailPage,OrganizationDetailPage}/*.tsx` (**đã sửa R-04**) · `frontend/src/pages/DepartmentDetailPage/DepartmentDetailPage.tsx` (:246 `scroll` — **đã thêm**) · `frontend/src/pages/OverviewPage/OverviewPage.tsx` (:41-46) · `frontend/src/features/admin/adminMessages.ts` (:22) · `frontend/src/pages/RegisterPage/RegisterPage.tsx` (:114, :222-237) · `node_modules/antd/es/result/{unauthorized,noFound,serverError}.js` · `node_modules/rc-table/es/Table.js` (:446-463 logic `table-layout`).
 
 ---
 
 ## Phụ lục C — Nhật ký thử & giới hạn
 
-**Đã thử:** dev server Vite chạy nền (HTTP 200 trên `http://127.0.0.1:5173`); chạy dump full 87 lượt (EXIT=0, 0 lỗi script); 3 probe chẩn đoán (EXIT=0); **sửa 3 lỗi P1 rồi đo lại** (probe trước/sau, dump lại full, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0).
+**Đã thử:** dev server Vite chạy nền (HTTP 200 trên `http://127.0.0.1:5173`); chạy dump full 87 lượt (EXIT=0, 0 lỗi script); 3 probe chẩn đoán (EXIT=0); **sửa 3 lỗi P1 rồi đo lại** (probe trước/sau, dump lại full, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0); **sửa 2 lỗi P2 rồi đo lại** (`probe-p2-verify.mjs`, dump lại full 87, `tsc`/`eslint`/`vitest`/`build` đều EXIT 0).
 **Kẹt gặp phải:** không. Không có bước nào vượt quá 3 lần thử.
   - Một lần **sai kết luận tạm thời** đã tự bắt và sửa: probe đầu tiên chặn API bằng glob `**/api/**` không khớp `/departments` (không có tiền tố `/api`) nên trang ở trạng thái đang tải → tưởng Phòng ban *không* tràn. Viết `probe-dept-narrow.mjs` dùng đúng regex như `ux-dump.mjs` để tái hiện → xác nhận R-05 là **thật**. Các probe P1 sau đó dùng regex không neo đầu chuỗi (Playwright khớp trên URL đầy đủ).
 
@@ -339,4 +364,4 @@ Nguồn: `dumps/_index.md` (87 file).
 2. **Không đọc được hình ảnh** → đánh giá dựa trên cây cấu trúc + toạ độ + `innerText` + mã nguồn CSS, **không** đánh giá được màu sắc tương phản thực tế (cần công cụ đo contrast riêng để kết luận WCAG 1.4.3/1.4.11).
 3. **Nhiều khoảng trống trạng thái** (Phụ lục A) → các kết luận về error/loading/empty chỉ đúng với những màn đã dump.
 4. **Hai câu hỏi đang chờ Sang (BE) trả lời:** (a) có thêm `actorName` không; (b) mã module là `STUDENT_MANAGEMENT` hay `CLASS_MANAGEMENT`. Không ảnh hưởng kết luận UX ở trên.
-5. **Đã thực hiện:** 3 lỗi P1 (R-01, R-03, R-05) — xem mục "✅ Đã sửa". **Chưa thực hiện:** các đề xuất còn lại (R-02, R-04, R-06, R-07, R-08, N-01, N-02) — vẫn theo ràng buộc "chỉ ghi trong `ux-review/`" cho tới khi được yêu cầu.
+5. **Đã thực hiện:** 5 lỗi (P1: R-01, R-03, R-05; P2: R-04, R-07) — xem mục "✅ Đã sửa". **Chưa thực hiện:** các đề xuất còn lại (R-02, R-06, R-08, N-01, N-02) — vẫn theo ràng buộc "chỉ ghi trong `ux-review/`" cho tới khi được yêu cầu.

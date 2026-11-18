@@ -1,8 +1,8 @@
-import { Button, Result } from 'antd';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { MSG_ADM } from '../../features/admin/adminMessages';
 import { useAuthStore } from '../../stores/authStore';
+import StatusScreen from '../StatusScreen/StatusScreen';
 
 /**
  * Chặn route khu vực quản trị — `UC-ADMIN-01`.
@@ -29,15 +29,11 @@ export default function AdminGuard({ children }: PropsWithChildren) {
   // 2. Đã đăng nhập nhưng không có role quản trị.
   if (!backendRoles.includes('SUPER_ADMIN')) {
     return (
-      <Result
-        status="403"
-        title="403"
-        subTitle={MSG_ADM.NO_PERMISSION}
-        extra={
-          <Button type="primary" onClick={() => navigate('/dang-nhap')}>
-            Về trang đăng nhập
-          </Button>
-        }
+      <StatusScreen
+        code="403"
+        title={MSG_ADM.NO_PERMISSION}
+        action={{ label: 'Về trang đăng nhập', onClick: () => navigate('/dang-nhap') }}
+        fullHeight
       />
     );
   }

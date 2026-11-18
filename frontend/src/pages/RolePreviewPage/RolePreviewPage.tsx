@@ -1,5 +1,6 @@
-import { Button, Card, Flex, Result, Space, Tag, theme, Typography } from 'antd';
+import { Button, Card, Flex, Space, Tag, theme, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
+import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import { logout } from '../../features/auth/authApi';
 import { findRole } from '../../features/auth/roles';
 import { useAuthStore } from '../../stores/authStore';
@@ -78,11 +79,11 @@ export default function RolePreviewPage() {
             </Space>
           </Flex>
         ) : (
-          <Result
-            status="404"
+          <StatusScreen
+            code="404"
             title="Không có vai trò này"
-            subTitle="Đường dẫn xem thử không đúng. Hãy quay lại trang đăng nhập."
-            extra={backButton}
+            description="Đường dẫn xem thử không đúng. Hãy quay lại trang đăng nhập."
+            action={{ label: 'Quay lại đăng nhập', onClick: () => navigate('/dang-nhap') }}
           />
         )}
       </Card>

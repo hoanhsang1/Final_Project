@@ -1,9 +1,9 @@
-import { Button, Result } from 'antd';
 import type { PropsWithChildren } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { canAccessAcademicArea } from '../../features/auth/permissions';
 import { MSG_S4 } from '../../features/sprint4/sprint4Messages';
 import { useAuthStore } from '../../stores/authStore';
+import StatusScreen from '../StatusScreen/StatusScreen';
 
 /**
  * Chặn route khu vực đào tạo (`/dao-tao`) — Sprint 4 (option B).
@@ -20,15 +20,11 @@ export default function AcademicGuard({ children }: PropsWithChildren) {
 
   if (!canAccessAcademicArea({ backendRoles, permissions })) {
     return (
-      <Result
-        status="403"
-        title="403"
-        subTitle={MSG_S4.NO_PERMISSION}
-        extra={
-          <Button type="primary" onClick={() => navigate('/dang-nhap')}>
-            Về trang đăng nhập
-          </Button>
-        }
+      <StatusScreen
+        code="403"
+        title={MSG_S4.NO_PERMISSION}
+        action={{ label: 'Về trang đăng nhập', onClick: () => navigate('/dang-nhap') }}
+        fullHeight
       />
     );
   }

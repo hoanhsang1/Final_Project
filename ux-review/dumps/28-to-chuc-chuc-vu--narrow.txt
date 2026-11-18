@@ -26,10 +26,10 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 - button "Mở menu quản lý tổ chức" @8,12 32x32 {expanded=false}
 - button "Đăng xuất" @212,12 92x32
 - button "Thêm chức vụ" @16,182 126x36
-- button "Sửa chức vụ" @689,321 113x36
-- button "Xoá" @811,321 56x36
-- button "Sửa chức vụ" @689,382 113x36
-- button "Xoá" @811,382 56x36
+- button "Sửa chức vụ Giáo viên" @737,321 56x36
+- button "Xoá chức vụ Giáo viên" @801,321 56x36
+- button "Sửa chức vụ Tổ trưởng" @737,382 56x36
+- button "Xoá chức vụ Tổ trưởng" @801,382 56x36
 
 ## Tiêu đề (heading)
 - h1: Chức vụ
@@ -41,4 +41,4 @@ Tràn ngang   : không (trang vừa khít viewport 320px)
 (không có)
 
 ## Toàn văn chữ hiển thị (innerText)
-Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Chức vụ Chức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viên — phòng ban không có quyền riêng. Thêm chức vụ Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Giáo viên Giảng dạy Xem nhân viên phòng ban 01/09/2026 Sửa chức vụ Xoá Tổ trưởng Quản lý tổ Xem nhân viên phòng ban Quản lý nhân viên phòng ban 01/09/2026 Sửa chức vụ Xoá
+Tới nội dung chính MEMS Khu vực tổ chức Đăng xuất Chức vụ Chức vụ là mẫu gồm một tập quyền. Gán chức vụ cho từng nhân viên — phòng ban không có quyền riêng. Thêm chức vụ Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Tên chức vụ Mô tả Quyền Ngày tạo Thao tác Giáo viên Giảng dạy Xem nhân viên phòng ban 01/09/2026 Sửa Xoá Tổ trưởng Quản lý tổ Xem nhân viên phòng ban Quản lý nhân viên phòng ban 01/09/2026 Sửa Xoá

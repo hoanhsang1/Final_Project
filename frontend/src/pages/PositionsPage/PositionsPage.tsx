@@ -113,18 +113,26 @@ export default function PositionsPage() {
       key: 'actions',
       render: (_, position) => (
         <Space size={token.marginXS}>
-          <Button type="link" onClick={() => openEdit(position)}>
-            {MSG_POS.EDIT}
+          <Button
+            type="link"
+            aria-label={`${MSG_POS.EDIT} ${position.name}`}
+            onClick={() => openEdit(position)}
+          >
+            {MSG_POS.EDIT_SHORT}
           </Button>
           <Popconfirm
             title={MSG_POS.DELETE_CONFIRM_TITLE}
-            description={MSG_POS.DELETE_CONFIRM}
+            description={`Chức vụ "${position.name}" sẽ bị xoá. ${MSG_POS.DELETE_CONFIRM}`}
             okText={MSG_POS.DELETE}
             cancelText={MSG_OWNER.CANCEL}
             okButtonProps={{ danger: true }}
             onConfirm={() => void handleDelete(position)}
           >
-            <Button type="link" danger>
+            <Button
+              type="link"
+              danger
+              aria-label={`${MSG_POS.DELETE} chức vụ ${position.name}`}
+            >
               {MSG_POS.DELETE}
             </Button>
           </Popconfirm>

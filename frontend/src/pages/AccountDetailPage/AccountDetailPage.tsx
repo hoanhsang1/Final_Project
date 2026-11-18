@@ -5,7 +5,6 @@ import {
   Button,
   Descriptions,
   Flex,
-  Result,
   Skeleton,
   Tag,
   Typography,
@@ -13,7 +12,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import AccountRoleModal from '../../components/AccountRoleModal/AccountRoleModal';
 import AccountResetPasswordModal from '../../components/AccountResetPasswordModal/AccountResetPasswordModal';
@@ -21,6 +20,7 @@ import type { PasswordResetMode } from '../../components/AccountResetPasswordMod
 import AccountStatusModal from '../../components/AccountStatusModal/AccountStatusModal';
 import type { TargetAccountStatus } from '../../components/AccountStatusModal/AccountStatusModal';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
+import StatusScreen from '../../components/StatusScreen/StatusScreen';
 import {
   AdminApiError,
   resetAccountPassword,
@@ -101,6 +101,7 @@ export default function AccountDetailPage() {
   const { message } = App.useApp();
   const { id: accountId = '' } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [pendingTarget, setPendingTarget] = useState<TargetAccountStatus | null>(null);
@@ -192,14 +193,10 @@ export default function AccountDetailPage() {
 
   if (isNotFound) {
     return (
-      <Result
-        status="404"
+      <StatusScreen
+        code="404"
         title={MSG_ACC.NOT_FOUND}
-        extra={
-          <Link to={backPath}>
-            <Button type="primary">{MSG_ACC.LIST_TITLE}</Button>
-          </Link>
-        }
+        action={{ label: MSG_ACC.LIST_TITLE, onClick: () => navigate(backPath) }}
       />
     );
   }

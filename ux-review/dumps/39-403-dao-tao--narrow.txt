@@ -4,22 +4,23 @@ URL thực tế  : http://127.0.0.1:5173/dao-tao
 Viewport     : narrow 320x640
 Tiêu đề tab  : Đào tạo — MEMS
 data-theme   : mems
-Số phần tử antd (.ant-*) trên trang: 6
+Số phần tử antd (.ant-*) trên trang: 0
 Tràn ngang   : không (trang vừa khít viewport 320px)
 
 ## API đã gọi (0)
 
 ## Cấu trúc (cây thụt lề, kèm toạ độ @x,y WxH)
-<button> Về trang đăng nhập @79,461 162x36
+<h1> Bạn không có quyền truy cập khu vực này. @24,280 272x64
+<button> Về trang đăng nhập @82,356 156x36
 
 ## Điều khiển tương tác (trên→dưới, trái→phải)
-- button "Về trang đăng nhập" @79,461 162x36
+- button "Về trang đăng nhập" @82,356 156x36
 
 ## Tiêu đề (heading)
-(không có)
+- h1: Bạn không có quyền truy cập khu vực này.
 
 ## Thông báo / trạng thái
-- [ant-result] Unauthorized403Bạn không có quyền truy cập khu vực này.Về trang đăng nhập
+(không có)
 
 ## Hộp thoại đang mở
 (không có)
