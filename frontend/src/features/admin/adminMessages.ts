@@ -124,7 +124,23 @@ export const MSG_ORG = {
   ALL_STATUSES: 'Tất cả trạng thái',
   /** Giá trị mặc định của bộ lọc loại. */
   ALL_TYPES: 'Tất cả loại',
+  /** Nút bấm tìm kiếm (Astryx tách ô nhập và nút, khác `Input.Search` của antd). */
+  SEARCH_ACTION: 'Tìm',
+  /** Tên cho `nav` phân trang màn chờ duyệt — không trùng landmark giữa các màn. */
+  PAGINATION_LABEL: 'Phân trang danh sách tổ chức chờ duyệt',
+  /** Tên cho `nav` phân trang màn tất cả tổ chức. */
+  ALL_PAGINATION_LABEL: 'Phân trang danh sách tổ chức',
 } as const;
+
+/**
+ * Dòng tổng số phía trên bảng tất cả tổ chức — "Tổng 12 tổ chức".
+ *
+ * Số này là `total` BE trả về (sau khi lọc), không phải số dòng đang hiện trên
+ * một trang — nên không thể lấy `data.length`.
+ */
+export function orgTotalLabel(total: number): string {
+  return `Tổng ${total} tổ chức`;
+}
 
 /** `MSG-ORG-07` — duyệt thành công. */
 export function msgApproved(orgName: string): string {

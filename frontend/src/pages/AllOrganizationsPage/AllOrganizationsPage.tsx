@@ -1,20 +1,39 @@
-import { Alert, App, Button, Empty, Flex, Input, Select, Table, Tag, theme } from 'antd';
-import type { SelectProps, TableProps } from 'antd';
+import {
+  Badge,
+  Banner,
+  Button,
+  HStack,
+  pixel,
+  proportional,
+  Selector,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  useTablePagination,
+  useTableSortable,
+} from '@astryxdesign/core';
+import type { TableColumn, TableSortState } from '@astryxdesign/core';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { AppLink } from '../../components/AppLink/AppLink';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import SuspendOrganizationModal from '../../components/SuspendOrganizationModal/SuspendOrganizationModal';
 import { AdminApiError } from '../../features/admin/adminApi';
-import { MSG_ORG, msgBackendPending, msgReactivated, msgSuspended } from '../../features/admin/adminMessages';
 import {
-  organizationStatusLabel,
-  orgTypeLabel,
-} from '../../features/admin/statusLabels';
+  MSG_ORG,
+  msgBackendPending,
+  msgReactivated,
+  msgSuspended,
+  orgTotalLabel,
+} from '../../features/admin/adminMessages';
+import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/statusLabels';
 import { useSuspendOrganization } from '../../features/admin/use-suspend-organization';
 import type { OrganizationAction } from '../../features/admin/use-suspend-organization';
 import type { OrganizationListItem } from '../../features/admin/types';
+import { useNotify } from '../../hooks/useNotify';
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_OPTIONS,
@@ -27,9 +46,28 @@ const ENDPOINT_CODE = 'D-20';
 /** Giá trị hiển thị khi BE chưa trả (`D-19`). */
 const EMPTY_VALUE = '—';
 
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn
+ * `OrganizationListItem` là interface nên không tự thoả — giao thêm `Record`
+ * để thoả ràng buộc mà **không** nới lỏng DTO (xem `docs/ui-conventions.md` §6.11).
+ */
+type OrgRow = OrganizationListItem & Record<string, unknown>;
+
+/** Hai cột BE cho sắp xếp (`?sort=<key>,<asc|desc>`). */
+const SORT_KEYS = ['name', 'created_at'] as const;
+type OrgSortKey = (typeof SORT_KEYS)[number];
+
+/** Dựng state sắp xếp của plugin từ tham số `sort` trên URL (nguồn sự thật). */
+function parseSort(sort: string): TableSortState<OrgSortKey> {
+  const [key, direction] = (sort ?? '').split(',');
+  if (!(SORT_KEYS as readonly string[]).includes(key)) {
+    return [];
+  }
+  return [{ sortKey: key as OrgSortKey, direction: direction === 'desc' ? 'descending' : 'ascending' }];
+}
+
 /** Lựa chọn bộ lọc trạng thái — giá trị là ENUM `organization.status`. */
-const STATUS_OPTIONS: SelectProps['options'] = [
-  { value: '', label: MSG_ORG.ALL_STATUSES },
+const STATUS_OPTIONS = [
   { value: 'pending', label: organizationStatusLabel('pending').label },
   { value: 'active', label: organizationStatusLabel('active').label },
   { value: 'rejected', label: organizationStatusLabel('rejected').label },
@@ -37,8 +75,7 @@ const STATUS_OPTIONS: SelectProps['options'] = [
 ];
 
 /** Lựa chọn bộ lọc loại tổ chức — giá trị là ENUM `organization.org_type`. */
-const TYPE_OPTIONS: SelectProps['options'] = [
-  { value: '', label: MSG_ORG.ALL_TYPES },
+const TYPE_OPTIONS = [
   { value: 'school', label: orgTypeLabel('school') },
   { value: 'center', label: orgTypeLabel('center') },
 ];
@@ -59,27 +96,67 @@ function formatDateTime(value: string | null | undefined): string {
  * làm xong, màn này hiện "Tính năng đang chờ backend" (xem §4.5 của đặc tả),
  * KHÔNG hiện Empty rỗng để tránh hiểu nhầm là không có tổ chức nào.
  *
- * Trạng thái: **loading** (PageLoading) · **empty** (Empty) · **error** (Alert +
- * Thử lại) · **success**. No-permission do `AdminGuard` chặn trước.
+ * Trạng thái: **loading** (PageLoading) · **empty** (EmptyState) · **error**
+ * (Banner + Thử lại) · **success**. No-permission do `AdminGuard` chặn trước.
  */
 export default function AllOrganizationsPage() {
-  const { token } = theme.useToken();
-  const { message } = App.useApp();
-  const navigate = useNavigate();
+  const notify = useNotify();
   const { result, page, size, keyword, status, orgType, sort, updateParams } =
     useAllOrganizationsPage();
 
+  // Ô nhập tách khỏi tham số URL: gõ chưa xong thì chưa lọc (khớp `Input.Search` cũ).
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [suspendTarget, setSuspendTarget] = useState<OrganizationListItem | null>(null);
   const [suspendAction, setSuspendAction] = useState<OrganizationAction>('suspend');
   /**
    * Lỗi của thao tác vô hiệu hoá / kích hoạt lại gần nhất.
    *
-   * Chuyển từ `message.error` (toast tự biến mất, bị modal che) sang `Alert`
+   * Chuyển từ `message.error` (toast tự biến mất, bị modal che) sang `Banner`
    * để người dùng đọc được lý do thất bại và bấm thử lại (NFR-REL-001).
    */
   const [actionError, setActionError] = useState<string | null>(null);
 
   const suspendMutation = useSuspendOrganization(suspendTarget?.id ?? '');
+
+  // Server là nguồn sự thật cho phân trang (§3): dùng số BE trả về để nhãn
+  // `aria-rowindex` và số trang khớp dữ liệu đang hiện.
+  const currentPage = result.data?.page ?? page;
+  const pageSize = result.data?.size ?? size;
+  const total = result.data?.total ?? 0;
+  const rows = (result.data?.items ?? []) as OrgRow[];
+
+  const pagination = useTablePagination<OrgRow>({
+    page: currentPage,
+    onPageChange: (next) =>
+      updateParams({ page: next > 1 ? String(next) : null }, { resetPage: false }),
+    totalItems: total,
+    pageSize,
+    onPageSizeChange: (next) =>
+      updateParams({ size: next !== DEFAULT_PAGE_SIZE ? String(next) : null, page: null }),
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
+    label: MSG_ORG.ALL_PAGINATION_LABEL,
+  });
+
+  // Sắp xếp điều khiển từ URL (`?sort=name,asc`) để mũi tên bảng luôn khớp với
+  // thứ tự BE đang thực sự áp dụng (không lệch sau khi reload trang).
+  const sortPlugin = useTableSortable<OrgRow, OrgSortKey>({
+    sort: parseSort(sort),
+    onSortChange: (next) => {
+      const first = next[0];
+      updateParams(
+        {
+          sort: first
+            ? `${first.sortKey},${first.direction === 'ascending' ? 'asc' : 'desc'}`
+            : null,
+        },
+        { resetPage: false },
+      );
+    },
+  });
+
+  const applySearch = () => {
+    updateParams({ q: keywordInput.trim() || null });
+  };
 
   const handleSuspendError = (error: unknown) => {
     const httpStatus = error instanceof AdminApiError ? error.status : null;
@@ -95,206 +172,224 @@ export default function AllOrganizationsPage() {
     setActionError(MSG_ORG.SAVE_FAILED);
   };
 
-  const columns = useMemo<TableProps<OrganizationListItem>['columns']>(() => {
-    // Sorter điều khiển từ URL (`?sort=name,asc`) để mũi tên bảng luôn khớp
-    // với thứ tự đang thực sự áp dụng (không lệch sau khi reload trang).
-    const [sortField, sortDirection] = (sort ?? '').split(',');
-    const sortOrderFor = (key: string) =>
-      sortField === key ? (sortDirection === 'desc' ? 'descend' : 'ascend') : null;
+  const columns: TableColumn<OrgRow>[] = [
+    {
+      key: 'name',
+      header: 'Tên tổ chức',
+      width: proportional(1, { minWidth: 200 }),
+      sortable: true,
+      renderCell: (row) => row.name,
+    },
+    {
+      key: 'org_type',
+      header: MSG_ORG.FILTER_TYPE,
+      width: pixel(110),
+      renderCell: (row) => orgTypeLabel(row.org_type),
+    },
+    {
+      key: 'owner_username',
+      header: 'Người đại diện',
+      width: pixel(170),
+      renderCell: (row) => row.owner_username,
+    },
+    {
+      key: 'owner_email',
+      header: 'Email',
+      width: pixel(220),
+      renderCell: (row) => row.owner_email,
+    },
+    {
+      key: 'status',
+      header: MSG_ORG.FILTER_STATUS,
+      width: pixel(130),
+      // BR-08: Badge LUÔN kèm chữ, không chỉ dựa vào màu.
+      renderCell: (row) => {
+        const statusLabel = organizationStatusLabel(row.status);
+        return <Badge variant={statusLabel.badge} label={statusLabel.label} />;
+      },
+    },
+    {
+      key: 'created_at',
+      header: 'Ngày gửi',
+      width: pixel(150),
+      sortable: true,
+      renderCell: (row) => formatDateTime(row.created_at),
+    },
+    {
+      key: 'action',
+      header: 'Hành động',
+      width: pixel(200),
+      renderCell: (row) => {
+        // Ma trận đặc tả §3.3: `pending` → chỉ Duyệt/Từ chối ở màn chi tiết;
+        // `active`/`rejected` → Vô hiệu hoá; `suspended` → Kích hoạt lại.
+        const nextAction: OrganizationAction | null =
+          row.status === 'suspended'
+            ? 'reactivate'
+            : row.status === 'pending'
+              ? null
+              : 'suspend';
+        const nextLabel = nextAction === 'suspend' ? MSG_ORG.SUSPEND : MSG_ORG.REACTIVATE;
 
-    return [
-      {
-        title: 'Tên tổ chức',
-        dataIndex: 'name',
-        key: 'name',
-        sorter: true,
-        sortOrder: sortOrderFor('name'),
-      },
-      {
-        title: MSG_ORG.FILTER_TYPE,
-        dataIndex: 'org_type',
-        key: 'org_type',
-        render: (value: string) => orgTypeLabel(value),
-      },
-      { title: 'Người đại diện', dataIndex: 'owner_username', key: 'owner_username' },
-      { title: 'Email', dataIndex: 'owner_email', key: 'owner_email' },
-      {
-        title: MSG_ORG.FILTER_STATUS,
-        dataIndex: 'status',
-        key: 'status',
-        // BR-08: Tag LUÔN kèm chữ, không chỉ màu.
-        render: (value: string) => {
-          const statusLabel = organizationStatusLabel(value);
-          return <Tag color={statusLabel.color}>{statusLabel.label}</Tag>;
-        },
-      },
-      {
-        title: 'Ngày gửi',
-        dataIndex: 'created_at',
-        key: 'created_at',
-        sorter: true,
-        sortOrder: sortOrderFor('created_at'),
-        render: (value: string | null) => formatDateTime(value),
-      },
-      {
-        title: 'Hành động',
-        key: 'action',
-        render: (_value, record) => {
-          // Ma trận đặc tả §3.3: `pending` → chỉ Duyệt/Từ chối ở màn chi tiết;
-          // `active`/`rejected` → Vô hiệu hoá; `suspended` → Kích hoạt lại.
-          const nextAction: OrganizationAction | null =
-            record.status === 'suspended' ? 'reactivate' : record.status === 'pending' ? null : 'suspend';
-          const nextLabel =
-            nextAction === 'suspend' ? MSG_ORG.SUSPEND : MSG_ORG.REACTIVATE;
-
-          return (
-            <Flex gap={token.marginXS} wrap>
+        return (
+          <HStack gap={2} align="center">
+            <AppLink
+              to={`/quan-tri/to-chuc/${row.id}?from=to-chuc-tat-ca`}
+              label={`Xem chi tiết tổ chức ${row.name}`}
+            >
+              {MSG_ORG.VIEW}
+            </AppLink>
+            {nextAction ? (
               <Button
-                type="link"
-                aria-label={`Xem chi tiết tổ chức ${record.name}`}
-                onClick={() => navigate(`/quan-tri/to-chuc/${record.id}?from=to-chuc-tat-ca`)}
-              >
-                {MSG_ORG.VIEW}
-              </Button>
-              {nextAction && (
-                <Button
-                  type="link"
-                  danger={nextAction === 'suspend'}
-                  aria-label={`${nextLabel} tổ chức ${record.name}`}
-                  onClick={() => {
-                    setActionError(null);
-                    setSuspendTarget(record);
-                    setSuspendAction(nextAction);
-                  }}
-                >
-                  {nextLabel}
-                </Button>
-              )}
-            </Flex>
-          );
-        },
+                variant="ghost"
+                size="sm"
+                label={nextLabel}
+                aria-label={`${nextLabel} tổ chức ${row.name}`}
+                onClick={() => {
+                  setActionError(null);
+                  setSuspendTarget(row);
+                  setSuspendAction(nextAction);
+                }}
+              />
+            ) : null}
+          </HStack>
+        );
       },
-    ];
-  }, [navigate, token.marginXS, sort]);
-
-  const handleTableChange: TableProps<OrganizationListItem>['onChange'] = (
-    pag,
-    _filters,
-    sorter,
-  ) => {
-    const single = Array.isArray(sorter) ? sorter[0] : sorter;
-    const field = single?.field ? String(single.field) : null;
-    const order = single?.order;
-
-    updateParams(
-      {
-        page: pag.current && pag.current > 1 ? String(pag.current) : null,
-        size: pag.pageSize && pag.pageSize !== DEFAULT_PAGE_SIZE ? String(pag.pageSize) : null,
-        sort: field && order ? `${field},${order === 'ascend' ? 'asc' : 'desc'}` : null,
-      },
-      { resetPage: false },
-    );
-  };
+    },
+  ];
 
   // 404 từ endpoint COLLECTION = BE chưa làm endpoint → hiện "chờ backend", KHÔNG hiện Empty.
   const isEndpointMissing =
-    result.isError &&
-    result.error instanceof AdminApiError &&
-    result.error.status === 404;
+    result.isError && result.error instanceof AdminApiError && result.error.status === 404;
 
   if (isEndpointMissing) {
     return (
-      <Flex vertical gap={token.marginMD}>
+      <Stack direction="vertical" gap={4}>
         <PageHeader title={MSG_ORG.ALL_LIST_TITLE} subtitle={MSG_ORG.ALL_LIST_SUBTITLE} />
-        <Alert
-          type="info"
-          showIcon
-          role="status"
-          message={msgBackendPending(ENDPOINT_CODE)}
+        <Banner
+          status="info"
+          title={msgBackendPending(ENDPOINT_CODE)}
           description="Backend cần thêm endpoint GET /api/v1/organizations để màn này hoạt động. Bấm Thử lại sau khi backend cập nhật."
-          action={
-            <Button onClick={() => void result.refetch()} loading={result.isFetching}>
-              {MSG_ORG.RETRY}
-            </Button>
+          collapsible={false}
+          role="status"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={result.isFetching}
+              onClick={() => void result.refetch()}
+            />
           }
         />
-      </Flex>
+      </Stack>
     );
   }
 
   if (result.isError) {
     return (
-      <Alert
-        type="error"
-        showIcon
-        role="alert"
-        message={MSG_ORG.LOAD_ERROR}
-        description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
-        action={
-          <Button onClick={() => void result.refetch()} loading={result.isFetching}>
-            {MSG_ORG.RETRY}
-          </Button>
-        }
-      />
+      <Stack direction="vertical" gap={4}>
+        <PageHeader title={MSG_ORG.ALL_LIST_TITLE} subtitle={MSG_ORG.ALL_LIST_SUBTITLE} />
+        <Banner
+          status="error"
+          title={MSG_ORG.LOAD_ERROR}
+          description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
+          collapsible={false}
+          role="alert"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={result.isFetching}
+              onClick={() => void result.refetch()}
+            />
+          }
+        />
+      </Stack>
     );
   }
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader title={MSG_ORG.ALL_LIST_TITLE} subtitle={MSG_ORG.ALL_LIST_SUBTITLE}>
-        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
-          <Input.Search
-            allowClear
-            aria-label={MSG_ORG.SEARCH}
-            placeholder="Tìm theo tên tổ chức hoặc email"
-            defaultValue={keyword}
-            onSearch={(value) => updateParams({ q: value.trim() || null })}
-            style={{ maxWidth: 320 }}
-          />
-          <Select
-            aria-label={MSG_ORG.FILTER_STATUS}
-            value={status?.[0] ?? ''}
+        <HStack gap={3} wrap="wrap" align="end">
+          <HStack gap={2} wrap="wrap" align="end">
+            <TextInput
+              type="search"
+              label={MSG_ORG.SEARCH}
+              isLabelHidden
+              startIcon="search"
+              enterKeyHint="search"
+              hasClear
+              placeholder="Tìm theo tên tổ chức hoặc email"
+              value={keywordInput}
+              width={320}
+              onChange={(value) => {
+                setKeywordInput(value);
+                // Xoá nhanh: bỏ luôn điều kiện lọc thay vì phải bấm nút tìm.
+                if (value === '') {
+                  updateParams({ q: null });
+                }
+              }}
+              onEnter={applySearch}
+            />
+            <Button
+              variant="secondary"
+              size="lg"
+              label={MSG_ORG.SEARCH_ACTION}
+              onClick={applySearch}
+            />
+          </HStack>
+
+          <Selector
+            label={MSG_ORG.FILTER_STATUS}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_ORG.ALL_STATUSES}
             options={STATUS_OPTIONS}
-            style={{ minWidth: 170 }}
+            value={status?.[0] ?? null}
+            width={180}
             onChange={(value) => updateParams({ status: value || null })}
           />
-          <Select
-            aria-label={MSG_ORG.FILTER_TYPE}
-            value={orgType ?? ''}
+          <Selector
+            label={MSG_ORG.FILTER_TYPE}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_ORG.ALL_TYPES}
             options={TYPE_OPTIONS}
-            style={{ minWidth: 150 }}
+            value={orgType ?? null}
+            width={160}
             onChange={(value) => updateParams({ orgType: value || null })}
           />
-        </Flex>
+        </HStack>
       </PageHeader>
 
       {/* Lỗi thao tác — hiện khi modal đã đóng; khi modal còn mở thì lỗi nằm
-          trong modal (Alert chồng lên bảng thì người dùng không thấy). */}
-      {actionError && suspendTarget === null && (
-        <Alert type="error" showIcon role="alert" message={actionError} />
-      )}
+          trong modal (Banner chồng lên bảng thì người dùng không thấy). */}
+      {actionError && suspendTarget === null ? (
+        <Banner status="error" title={actionError} collapsible={false} role="alert" />
+      ) : null}
 
       {result.isPending ? (
         <PageLoading />
       ) : (
-        <Table<OrganizationListItem>
-          rowKey="id"
-          columns={columns}
-          dataSource={result.data?.items ?? []}
-          loading={result.isFetching}
-          locale={{ emptyText: <Empty description={MSG_ORG.ALL_EMPTY} /> }}
-          onChange={handleTableChange}
-          pagination={{
-            current: page,
-            pageSize: size,
-            total: result.data?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (total) => `Tổng ${total} tổ chức`,
-          }}
-          // Ở 320px bảng cuộn ngang thay vì vỡ layout.
-          scroll={{ x: 980 }}
-        />
+        <Stack direction="vertical" gap={3}>
+          {/* `total` là số BE trả về (sau khi lọc), không phải số dòng một trang. */}
+          <Text type="supporting">{orgTotalLabel(total)}</Text>
+          <Table<OrgRow>
+            data={rows}
+            columns={columns}
+            idKey="id"
+            hasHover
+            textOverflow="truncate"
+            // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự
+            // trong mảng một trang.
+            rowIndexStart={(currentPage - 1) * pageSize + 1}
+            rowCount={total}
+            emptyState={<EmptyState description={MSG_ORG.ALL_EMPTY} compact />}
+            plugins={{ sort: sortPlugin, pagination }}
+          />
+        </Stack>
       )}
 
       <SuspendOrganizationModal
@@ -309,7 +404,7 @@ export default function AllOrganizationsPage() {
             { action: suspendAction, reason },
             {
               onSuccess: () => {
-                message.success(
+                notify.success(
                   suspendAction === 'suspend'
                     ? msgSuspended(suspendTarget?.name ?? '')
                     : msgReactivated(suspendTarget?.name ?? ''),
@@ -322,6 +417,6 @@ export default function AllOrganizationsPage() {
           )
         }
       />
-    </Flex>
+    </Stack>
   );
 }

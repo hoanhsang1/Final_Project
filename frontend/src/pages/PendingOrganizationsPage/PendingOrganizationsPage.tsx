@@ -1,13 +1,36 @@
-import { Alert, Button, Empty, Flex, Table, Tag, theme } from 'antd';
-import type { TableProps } from 'antd';
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  Badge,
+  Banner,
+  Button,
+  paginateData,
+  pixel,
+  proportional,
+  Stack,
+  Table,
+  useTablePagination,
+  useTableSortable,
+  useTableSortableState,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
+import { useState } from 'react';
+import { AppLink } from '../../components/AppLink/AppLink';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
 import { MSG_ORG } from '../../features/admin/adminMessages';
 import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/statusLabels';
 import type { PendingOrganization } from '../../features/admin/types';
 import { usePendingOrganizations } from './use-pending-organizations';
+
+/** Số dòng / trang — bản antd cũ dùng `pageSize: 10`, `showSizeChanger: false`. */
+const PAGE_SIZE = 10;
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `PendingOrganization`
+ * là interface nên không tự thoả — giao thêm `Record` để thoả ràng buộc mà **không**
+ * nới lỏng DTO (xem `docs/ui-conventions.md` §6.11).
+ */
+type PendingOrgRow = PendingOrganization & Record<string, unknown>;
 
 /**
  * Màn danh sách tổ chức chờ duyệt — `UC-ORG-02` (Đặc tả Sprint 2 §3.2).
@@ -18,104 +41,127 @@ import { usePendingOrganizations } from './use-pending-organizations';
  * khi người dùng không có role `SUPER_ADMIN`).
  */
 export default function PendingOrganizationsPage() {
-  const { token } = theme.useToken();
-  const navigate = useNavigate();
   const query = usePendingOrganizations();
+  const [page, setPage] = useState(1);
 
-  // Cột bảng không phụ thuộc state → dựng 1 lần, tránh dựng lại mỗi render.
-  const columns = useMemo<TableProps<PendingOrganization>['columns']>(
-    () => [
-      {
-        title: 'Tên tổ chức',
-        dataIndex: 'name',
-        key: 'name',
-        sorter: (a, b) => a.name.localeCompare(b.name, 'vi'),
-      },
-      {
-        title: 'Loại',
-        dataIndex: 'org_type',
-        key: 'org_type',
-        render: (value: string) => orgTypeLabel(value),
-      },
-      {
-        title: 'Người đại diện',
-        dataIndex: 'owner_username',
-        key: 'owner_username',
-      },
-      {
-        title: 'Email',
-        dataIndex: 'owner_email',
-        key: 'owner_email',
-      },
-      {
-        title: 'Trạng thái',
-        dataIndex: 'status',
-        key: 'status',
-        // BR-08: Tag luôn kèm CHỮ, không chỉ dựa vào màu.
-        render: (value: string) => {
-          const status = organizationStatusLabel(value);
-          return <Tag color={status.color}>{status.label}</Tag>;
-        },
-      },
-      {
-        title: 'Hành động',
-        key: 'action',
-        render: (_value, record) => (
-          <Button
-            type="link"
-            aria-label={`Xem chi tiết tổ chức ${record.name}`}
-            onClick={() => navigate(`/quan-tri/to-chuc/${record.id}`)}
-          >
-            {MSG_ORG.VIEW}
-          </Button>
-        ),
-      },
-    ],
-    [navigate],
-  );
+  const rows = (query.data ?? []) as PendingOrgRow[];
 
-  if (query.isError) {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        role="alert"
-        message={MSG_ORG.LOAD_ERROR}
-        description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
-        action={
-          <Button onClick={() => query.refetch()} loading={query.isFetching}>
-            {MSG_ORG.RETRY}
-          </Button>
-        }
-      />
-    );
-  }
+  // Sắp xếp + phân trang đều phía client (NFR-PER-001). `useTableSortableState`
+  // giữ state sắp xếp và trả dữ liệu đã sắp — plugin `sort` chỉ vẽ nút trên
+  // header chứ không tự sắp, nên nếu thiếu bước này mũi tên sẽ nói dối.
+  const { sortedData, sortConfig } = useTableSortableState<PendingOrgRow, 'name'>({
+    data: rows,
+    comparators: {
+      // Khớp bản antd cũ: `localeCompare(..., 'vi')` để "Đ" xếp đúng chỗ.
+      name: (a, b) => a.name.localeCompare(b.name, 'vi'),
+    },
+  });
+  const sortPlugin = useTableSortable<PendingOrgRow, 'name'>(sortConfig);
+
+  // antd cũ dùng `showSizeChanger: false` + tự ẩn thanh phân trang khi chỉ 1 trang.
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  const pagination = useTablePagination<PendingOrgRow>({
+    page: currentPage,
+    onPageChange: setPage,
+    totalItems: sortedData.length,
+    pageSize: PAGE_SIZE,
+    variant: totalPages > 1 ? 'pages' : 'none',
+    label: MSG_ORG.PAGINATION_LABEL,
+  });
+
+  const columns: TableColumn<PendingOrgRow>[] = [
+    {
+      key: 'name',
+      header: 'Tên tổ chức',
+      width: proportional(1, { minWidth: 200 }),
+      sortable: true,
+      renderCell: (row) => row.name,
+    },
+    {
+      key: 'org_type',
+      header: 'Loại',
+      width: pixel(120),
+      renderCell: (row) => orgTypeLabel(row.org_type),
+    },
+    {
+      key: 'owner_username',
+      header: 'Người đại diện',
+      width: pixel(180),
+      renderCell: (row) => row.owner_username,
+    },
+    {
+      key: 'owner_email',
+      header: 'Email',
+      width: pixel(220),
+      renderCell: (row) => row.owner_email,
+    },
+    {
+      key: 'status',
+      header: 'Trạng thái',
+      width: pixel(130),
+      // BR-08: Badge LUÔN kèm chữ, không chỉ dựa vào màu.
+      renderCell: (row) => {
+        const status = organizationStatusLabel(row.status);
+        return <Badge variant={status.badge} label={status.label} />;
+      },
+    },
+    {
+      key: 'action',
+      header: 'Hành động',
+      width: pixel(110),
+      renderCell: (row) => (
+        <AppLink to={`/quan-tri/to-chuc/${row.id}`} label={`Xem chi tiết tổ chức ${row.name}`}>
+          {MSG_ORG.VIEW}
+        </AppLink>
+      ),
+    },
+  ];
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
+      {/* Giữ header cả ở nhánh lỗi (khác bản antd cũ vốn bỏ header) để người
+          dùng luôn biết mình đang ở màn nào — theo mẫu `DepartmentsPage`. */}
       <PageHeader title={MSG_ORG.LIST_TITLE} subtitle={MSG_ORG.LIST_SUBTITLE} />
 
-      {/* Trạng thái loading — `PageLoading` (NFR-PER-001, `TC-ORG-14`).
-          KHÔNG render bảng rỗng lúc đang tải để tránh nhấp nháy "không có dữ liệu". */}
-      {query.isPending ? (
+      {query.isError ? (
+        <Banner
+          status="error"
+          title={MSG_ORG.LOAD_ERROR}
+          description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
+          collapsible={false}
+          role="alert"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={query.isFetching}
+              onClick={() => void query.refetch()}
+            />
+          }
+        />
+      ) : query.isPending ? (
+        // Trạng thái loading — `PageLoading` (NFR-PER-001, `TC-ORG-14`).
+        // KHÔNG render bảng rỗng lúc đang tải để tránh nhấp nháy "không có dữ liệu".
         <PageLoading />
       ) : (
-        <Table<PendingOrganization>
-          rowKey="id"
+        <Table<PendingOrgRow>
+          data={paginateData(sortedData, currentPage, PAGE_SIZE)}
           columns={columns}
-          dataSource={query.data ?? []}
+          idKey="id"
+          hasHover
+          textOverflow="truncate"
+          // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự
+          // trong mảng một trang.
+          rowIndexStart={(currentPage - 1) * PAGE_SIZE + 1}
+          rowCount={sortedData.length}
           // Trạng thái empty — KHÔNG để bảng trắng (TC-ORG-12).
-          locale={{ emptyText: <Empty description={MSG_ORG.EMPTY} /> }}
-          // Phân trang phía client (NFR-PER-001); `showTotal` tiếng Việt nhờ locale vi_VN.
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: false,
-            showTotal: (total) => `Tổng ${total} tổ chức`,
-          }}
-          // Ở màn hình 320px bảng cuộn ngang thay vì vỡ layout (TC-ADM-10).
-          scroll={{ x: 860 }}
+          emptyState={<EmptyState description={MSG_ORG.EMPTY} compact />}
+          plugins={{ sort: sortPlugin, pagination }}
         />
       )}
-    </Flex>
+    </Stack>
   );
 }

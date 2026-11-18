@@ -6,12 +6,21 @@
  * Lưu ý: cùng một giá trị thô có nghĩa khác nhau theo ngữ cảnh — tổ chức `active`
  * là "Đã duyệt" còn module `active` là "Đang dùng" — nên tách riêng từng hàm.
  */
+import type { BadgeVariant } from '@astryxdesign/core';
 
-/** Nhãn + màu Tag của một trạng thái. */
+/** Nhãn + màu của một trạng thái. */
 export interface StatusLabel {
   label: string;
-  /** Màu Tag antd — luôn đi kèm `label` để không dùng màu làm tín hiệu duy nhất. */
+  /**
+   * Màu `Tag` antd — còn dùng ở các màn CHƯA port; sẽ bỏ khi gỡ antd (P5-D).
+   * Luôn đi kèm `label` để không dùng màu làm tín hiệu duy nhất (BR-08).
+   */
   color: string;
+  /**
+   * Biến thể `Badge` của Astryx — bản thay `color` cho các màn đã port. Luôn đi
+   * kèm `label`; màu chỉ là tín hiệu phụ (BR-08).
+   */
+  badge: BadgeVariant;
 }
 
 /**
@@ -34,16 +43,16 @@ export function isPendingStatus(status: string | null | undefined): boolean {
 export function organizationStatusLabel(status: string): StatusLabel {
   switch (normalizeStatus(status)) {
     case 'pending':
-      return { label: 'Chờ duyệt', color: 'processing' };
+      return { label: 'Chờ duyệt', color: 'processing', badge: 'info' };
     case 'active':
-      return { label: 'Đã duyệt', color: 'success' };
+      return { label: 'Đã duyệt', color: 'success', badge: 'success' };
     case 'rejected':
-      return { label: 'Đã từ chối', color: 'error' };
+      return { label: 'Đã từ chối', color: 'error', badge: 'error' };
     // BR-04: chữ là "Vô hiệu hoá", KHÔNG phải "Xoá".
     case 'suspended':
-      return { label: 'Vô hiệu hoá', color: 'default' };
+      return { label: 'Vô hiệu hoá', color: 'default', badge: 'neutral' };
     default:
-      return { label: status, color: 'default' };
+      return { label: status, color: 'default', badge: 'neutral' };
   }
 }
 
@@ -51,13 +60,13 @@ export function organizationStatusLabel(status: string): StatusLabel {
 export function moduleStatusLabel(status: string): StatusLabel {
   switch (normalizeStatus(status)) {
     case 'requested':
-      return { label: 'Chờ duyệt', color: 'processing' };
+      return { label: 'Chờ duyệt', color: 'processing', badge: 'info' };
     case 'active':
-      return { label: 'Đang dùng', color: 'success' };
+      return { label: 'Đang dùng', color: 'success', badge: 'success' };
     case 'rejected':
-      return { label: 'Đã từ chối', color: 'error' };
+      return { label: 'Đã từ chối', color: 'error', badge: 'error' };
     default:
-      return { label: status, color: 'default' };
+      return { label: status, color: 'default', badge: 'neutral' };
   }
 }
 
@@ -65,16 +74,16 @@ export function moduleStatusLabel(status: string): StatusLabel {
 export function accountStatusLabel(status: string): StatusLabel {
   switch (normalizeStatus(status)) {
     case 'pending':
-      return { label: 'Chờ duyệt', color: 'processing' };
+      return { label: 'Chờ duyệt', color: 'processing', badge: 'info' };
     case 'active':
-      return { label: 'Đang hoạt động', color: 'success' };
+      return { label: 'Đang hoạt động', color: 'success', badge: 'success' };
     case 'locked':
-      return { label: 'Đang khoá', color: 'warning' };
+      return { label: 'Đang khoá', color: 'warning', badge: 'warning' };
     // BR-04: chữ là "Vô hiệu hoá", KHÔNG phải "Xoá".
     case 'disabled':
-      return { label: 'Vô hiệu hoá', color: 'default' };
+      return { label: 'Vô hiệu hoá', color: 'default', badge: 'neutral' };
     default:
-      return { label: status, color: 'default' };
+      return { label: status, color: 'default', badge: 'neutral' };
   }
 }
 

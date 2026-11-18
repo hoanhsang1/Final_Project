@@ -8,7 +8,7 @@ import type { OrgStatus, OrgType } from '../../features/admin/types';
 export const DEFAULT_PAGE_SIZE = 20;
 
 /** Các lựa chọn số dòng / trang — khớp quy ước đặc tả §4.1. */
-export const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100'];
+export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 /**
  * Container — server state + bộ lọc của màn Tất cả tổ chức `/quan-tri/to-chuc/tat-ca`.
