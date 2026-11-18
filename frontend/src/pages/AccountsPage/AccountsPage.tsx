@@ -1,23 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
-  App,
+  Badge,
+  Banner,
   Button,
-  Empty,
-  Flex,
-  Input,
-  Select,
+  HStack,
+  pixel,
+  proportional,
+  Selector,
+  Stack,
   Table,
-  Tag,
-  theme,
-} from 'antd';
-import type { SelectProps, TableProps } from 'antd';
+  TextInput,
+  useTablePagination,
+  useTableSortable,
+} from '@astryxdesign/core';
+import type { TableColumn, TableSortState } from '@astryxdesign/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { AppLink } from '../../components/AppLink/AppLink';
+import AccountCreateModal from '../../components/AccountCreateModal/AccountCreateModal';
+import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
-import AccountCreateModal from '../../components/AccountCreateModal/AccountCreateModal';
 import {
   AdminApiError,
   createAccount,
@@ -28,6 +31,7 @@ import { MSG_ACC, MSG_ORG, msgBackendPending } from '../../features/admin/adminM
 import { ROLE_OPTIONS, roleLabel } from '../../features/admin/roleLabels';
 import { accountStatusLabel } from '../../features/admin/statusLabels';
 import type { AccountCreatePayload, AccountItem } from '../../features/admin/types';
+import { useNotify } from '../../hooks/useNotify';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, useAccountsPage } from './use-accounts';
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
@@ -36,19 +40,37 @@ const ENDPOINT_CODE = 'D-24';
 /** Giá trị hiển thị khi BE chưa trả. */
 const EMPTY_VALUE = '—';
 
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `AccountItem`
+ * là interface nên không tự thoả — giao thêm `Record` để thoả ràng buộc mà
+ * **không** nới lỏng DTO (xem `docs/ui-conventions.md` §6.11).
+ */
+type AccountRow = AccountItem & Record<string, unknown>;
+
+/** Hai cột BE cho sắp xếp (`?sort=<key>,<asc|desc>`). */
+const SORT_KEYS = ['username', 'created_at'] as const;
+type AccountSortKey = (typeof SORT_KEYS)[number];
+
+/** Dựng state sắp xếp của plugin từ tham số `sort` trên URL (nguồn sự thật). */
+function parseSort(sort: string): TableSortState<AccountSortKey> {
+  const [key, direction] = (sort ?? '').split(',');
+  if (!(SORT_KEYS as readonly string[]).includes(key)) {
+    return [];
+  }
+  return [
+    {
+      sortKey: key as AccountSortKey,
+      direction: direction === 'desc' ? 'descending' : 'ascending',
+    },
+  ];
+}
+
 /** Lựa chọn bộ lọc trạng thái — giá trị là ENUM `account.status`. */
-const STATUS_OPTIONS: SelectProps['options'] = [
-  { value: '', label: MSG_ACC.ALL_STATUSES },
+const STATUS_OPTIONS = [
   { value: 'pending', label: accountStatusLabel('pending').label },
   { value: 'active', label: accountStatusLabel('active').label },
   { value: 'locked', label: accountStatusLabel('locked').label },
   { value: 'disabled', label: accountStatusLabel('disabled').label },
-];
-
-/** Lựa chọn bộ lọc vai trò — giá trị là **role backend gốc** (`account.role`). */
-const ROLE_FILTER_OPTIONS: SelectProps['options'] = [
-  { value: '', label: MSG_ACC.ALL_ROLES },
-  ...ROLE_OPTIONS,
 ];
 
 /** Định dạng ngày giờ; trả về "—" khi BE chưa trả. */
@@ -69,14 +91,16 @@ function formatDateTime(value: string | null | undefined): string {
  * Đổi trạng thái tài khoản nằm ở màn **chi tiết** — màn này giữ vai trò liệt kê
  * + lọc + tìm kiếm + **tạo tài khoản** (`D-29`), bấm 1 dòng → chi tiết (`/:id`).
  *
- * Trạng thái: **loading** · **empty** · **error** · **success**. No-permission
- * do `AdminGuard` chặn trước.
+ * Trạng thái: **loading** (PageLoading) · **empty** (EmptyState) · **error**
+ * (Banner + Thử lại) · **success**. No-permission do `AdminGuard` chặn trước.
  */
 export default function AccountsPage() {
-  const { token } = theme.useToken();
-  const navigate = useNavigate();
+  const notify = useNotify();
   const { result, page, size, keyword, status, organizationId, role, sort, updateParams } =
     useAccountsPage();
+
+  // Ô nhập tách khỏi tham số URL: gõ chưa xong thì chưa lọc (khớp `Input.Search` cũ).
+  const [keywordInput, setKeywordInput] = useState(keyword);
 
   // Dropdown "Tổ chức" (`D-20b`) — query riêng, lỗi KHÔNG chặn màn (chỉ mất
   // lựa chọn lọc; bảng vẫn hiện bình thường).
@@ -87,36 +111,32 @@ export default function AccountsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const orgFilterOptions: SelectProps['options'] = [
-    { value: '', label: MSG_ACC.ALL_ORGS },
-    ...(orgOptionsQuery.data ?? []).map((option) => ({
-      value: option.id,
-      label: option.name,
-    })),
-  ];
+  const orgFilterOptions = (orgOptionsQuery.data ?? []).map((option) => ({
+    value: option.id,
+    label: option.name,
+  }));
 
   // Modal tạo tài khoản (`D-29`) — lỗi hiện TRONG modal, không toast (NFR-REL-001).
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { message } = App.useApp();
 
   const createMutation = useMutation({
     mutationFn: (payload: AccountCreatePayload) => createAccount(payload),
     onSuccess: () => {
-      message.success(MSG_ACC.CREATE_SUCCESS);
+      notify.success(MSG_ACC.CREATE_SUCCESS);
       setCreateOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       // Tạo tài khoản cũng ghi nhật ký hệ thống (`D-22`).
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (error) => {
-      const status = error instanceof AdminApiError ? error.status : null;
-      if (status === 409) {
+      const httpStatus = error instanceof AdminApiError ? error.status : null;
+      if (httpStatus === 409) {
         setCreateError(MSG_ACC.DUPLICATE);
-      } else if (status === 403) {
+      } else if (httpStatus === 403) {
         setCreateError(MSG_ORG.FORBIDDEN);
-      } else if (status === 404) {
+      } else if (httpStatus === 404) {
         setCreateError(msgBackendPending('D-29'));
       } else {
         setCreateError(MSG_ACC.CREATE_FAILED);
@@ -124,231 +144,279 @@ export default function AccountsPage() {
     },
   });
 
-  const columns = useMemo<TableProps<AccountItem>['columns']>(() => {
-    // Sorter điều khiển từ URL (?sort=username,asc) để mũi tên bảng luôn khớp
-    // thứ tự đang thực sự áp dụng sau khi reload trang.
-    const [sortField, sortDirection] = (sort ?? '').split(',');
-    const sortOrderFor = (key: string) =>
-      sortField === key ? (sortDirection === 'desc' ? 'descend' : 'ascend') : null;
+  // Server là nguồn sự thật cho phân trang (§3): dùng số BE trả về để nhãn
+  // `aria-rowindex` và số trang khớp dữ liệu đang hiện.
+  const currentPage = result.data?.page ?? page;
+  const pageSize = result.data?.size ?? size;
+  const total = result.data?.total ?? 0;
+  const rows = (result.data?.items ?? []) as AccountRow[];
 
-    return [
-      {
-        title: 'Tên đăng nhập',
-        dataIndex: 'username',
-        key: 'username',
-        sorter: true,
-        sortOrder: sortOrderFor('username'),
-        fixed: 'left',
-      },
-      {
-        title: 'Email',
-        dataIndex: 'email',
-        key: 'email',
-        render: (value?: string) => value || EMPTY_VALUE,
-      },
-      {
-        title: MSG_ACC.FULL_NAME,
-        dataIndex: 'full_name',
-        key: 'full_name',
-        render: (value?: string | null) => value || EMPTY_VALUE,
-      },
-      {
-        title: MSG_ACC.ORGANIZATION,
-        dataIndex: 'organization_name',
-        key: 'organization_name',
-        render: (value?: string | null) => value || EMPTY_VALUE,
-      },
-      {
-        title: MSG_ACC.ROLE,
-        dataIndex: 'role',
-        key: 'role',
-        render: (value: string) => roleLabel(value),
-      },
-      {
-        title: MSG_ACC.FILTER_STATUS,
-        dataIndex: 'status',
-        key: 'status',
-        // BR-08: Tag LUÔN kèm chữ, không chỉ màu.
-        render: (value: string) => {
-          const statusLabel = accountStatusLabel(value);
-          return <Tag color={statusLabel.color}>{statusLabel.label}</Tag>;
+  const pagination = useTablePagination<AccountRow>({
+    page: currentPage,
+    onPageChange: (next) =>
+      updateParams({ page: next > 1 ? String(next) : null }, { resetPage: false }),
+    totalItems: total,
+    pageSize,
+    onPageSizeChange: (next) =>
+      updateParams({ size: next !== DEFAULT_PAGE_SIZE ? String(next) : null, page: null }),
+    pageSizeOptions: PAGE_SIZE_OPTIONS,
+    label: MSG_ACC.PAGINATION_LABEL,
+  });
+
+  // Sắp xếp điều khiển từ URL (`?sort=username,asc`) để mũi tên bảng luôn khớp
+  // với thứ tự BE đang thực sự áp dụng (không lệch sau khi reload trang).
+  const sortPlugin = useTableSortable<AccountRow, AccountSortKey>({
+    sort: parseSort(sort),
+    onSortChange: (next) => {
+      const first = next[0];
+      updateParams(
+        {
+          sort: first
+            ? `${first.sortKey},${first.direction === 'ascending' ? 'asc' : 'desc'}`
+            : null,
         },
-      },
-      {
-        title: MSG_ACC.CREATED_AT,
-        dataIndex: 'created_at',
-        key: 'created_at',
-        sorter: true,
-        sortOrder: sortOrderFor('created_at'),
-        render: (value?: string | null) => formatDateTime(value),
-      },
-      {
-        title: MSG_ACC.LAST_LOGIN,
-        dataIndex: 'last_login_at',
-        key: 'last_login_at',
-        render: (value?: string | null) => formatDateTime(value),
-      },
-      {
-        title: 'Hành động',
-        key: 'action',
-        fixed: 'right',
-        render: (_value, record) => (
-          <Button
-            type="link"
-            aria-label={`Xem chi tiết tài khoản ${record.username}`}
-            onClick={() => navigate(`/quan-tri/tai-khoan/${record.id}?from=tai-khoan`)}
-          >
-            {MSG_ORG.VIEW}
-          </Button>
-        ),
-      },
-    ];
-  }, [navigate, sort]);
+        { resetPage: false },
+      );
+    },
+  });
 
-  const handleTableChange: TableProps<AccountItem>['onChange'] = (pag, _filters, sorter) => {
-    const single = Array.isArray(sorter) ? sorter[0] : sorter;
-    const field = single?.field ? String(single.field) : null;
-    const order = single?.order;
-
-    updateParams(
-      {
-        page: pag.current && pag.current > 1 ? String(pag.current) : null,
-        size: pag.pageSize && pag.pageSize !== DEFAULT_PAGE_SIZE ? String(pag.pageSize) : null,
-        sort: field && order ? `${field},${order === 'ascend' ? 'asc' : 'desc'}` : null,
-      },
-      { resetPage: false },
-    );
+  const applySearch = () => {
+    updateParams({ q: keywordInput.trim() || null });
   };
 
-  // 404 từ endpoint COLLECTION = BE chưa làm endpoint → hiện "chờ backend".
+  const columns: TableColumn<AccountRow>[] = [
+    {
+      key: 'username',
+      header: 'Tên đăng nhập',
+      width: proportional(1, { minWidth: 160 }),
+      sortable: true,
+      renderCell: (row) => row.username,
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      width: pixel(220),
+      renderCell: (row) => row.email || EMPTY_VALUE,
+    },
+    {
+      key: 'full_name',
+      header: MSG_ACC.FULL_NAME,
+      width: pixel(180),
+      renderCell: (row) => row.full_name || EMPTY_VALUE,
+    },
+    {
+      key: 'organization_name',
+      header: MSG_ACC.ORGANIZATION,
+      width: pixel(200),
+      renderCell: (row) => row.organization_name || EMPTY_VALUE,
+    },
+    {
+      key: 'role',
+      header: MSG_ACC.ROLE,
+      width: pixel(150),
+      renderCell: (row) => roleLabel(row.role),
+    },
+    {
+      key: 'status',
+      header: MSG_ACC.FILTER_STATUS,
+      width: pixel(130),
+      // BR-08: Badge LUÔN kèm chữ, không chỉ dựa vào màu.
+      renderCell: (row) => {
+        const statusLabel = accountStatusLabel(row.status);
+        return <Badge variant={statusLabel.badge} label={statusLabel.label} />;
+      },
+    },
+    {
+      key: 'created_at',
+      header: MSG_ACC.CREATED_AT,
+      width: pixel(150),
+      sortable: true,
+      renderCell: (row) => formatDateTime(row.created_at),
+    },
+    {
+      key: 'last_login_at',
+      header: MSG_ACC.LAST_LOGIN,
+      width: pixel(150),
+      renderCell: (row) => formatDateTime(row.last_login_at),
+    },
+    {
+      key: 'action',
+      header: 'Hành động',
+      width: pixel(110),
+      renderCell: (row) => (
+        <AppLink
+          to={`/quan-tri/tai-khoan/${row.id}?from=tai-khoan`}
+          label={`Xem chi tiết tài khoản ${row.username}`}
+        >
+          {MSG_ORG.VIEW}
+        </AppLink>
+      ),
+    },
+  ];
+
+  // 404 từ endpoint COLLECTION = BE chưa làm endpoint → hiện "chờ backend", KHÔNG hiện Empty.
   const isEndpointMissing =
     result.isError && result.error instanceof AdminApiError && result.error.status === 404;
 
   if (isEndpointMissing) {
     return (
-      <Flex vertical gap={token.marginMD}>
+      <Stack direction="vertical" gap={4}>
         <PageHeader title={MSG_ACC.LIST_TITLE} subtitle={MSG_ACC.LIST_SUBTITLE} />
-        <Alert
-          type="info"
-          showIcon
-          role="status"
-          message={msgBackendPending(ENDPOINT_CODE)}
+        <Banner
+          status="info"
+          title={msgBackendPending(ENDPOINT_CODE)}
           description="Backend cần thêm endpoint GET /api/v1/accounts để màn này hoạt động. Bấm Thử lại sau khi backend cập nhật."
-          action={
-            <Button onClick={() => void result.refetch()} loading={result.isFetching}>
-              Thử lại
-            </Button>
+          collapsible={false}
+          role="status"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={result.isFetching}
+              onClick={() => void result.refetch()}
+            />
           }
         />
-      </Flex>
+      </Stack>
     );
   }
 
   if (result.isError) {
     return (
-      <Alert
-        type="error"
-        showIcon
-        role="alert"
-        message={MSG_ACC.LOAD_ERROR}
-        description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
-        action={
-          <Button onClick={() => void result.refetch()} loading={result.isFetching}>
-            Thử lại
-          </Button>
-        }
-      />
+      <Stack direction="vertical" gap={4}>
+        {/* Giữ header cả ở nhánh lỗi (khác bản antd cũ vốn bỏ header) để người
+            dùng luôn biết mình đang ở màn nào — theo mẫu `PendingOrganizationsPage`. */}
+        <PageHeader title={MSG_ACC.LIST_TITLE} subtitle={MSG_ACC.LIST_SUBTITLE} />
+        <Banner
+          status="error"
+          title={MSG_ACC.LOAD_ERROR}
+          description="Kiểm tra kết nối máy chủ rồi thử lại. Danh sách chưa được tải."
+          collapsible={false}
+          role="alert"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={result.isFetching}
+              onClick={() => void result.refetch()}
+            />
+          }
+        />
+      </Stack>
     );
   }
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader
         title={MSG_ACC.LIST_TITLE}
         subtitle={MSG_ACC.LIST_SUBTITLE}
         extra={
           <Button
-            type="primary"
+            variant="primary"
+            size="lg"
+            label={MSG_ACC.CREATE_TITLE}
             onClick={() => {
               setCreateError(null);
               setCreateOpen(true);
             }}
-          >
-            {MSG_ACC.CREATE_TITLE}
-          </Button>
+          />
         }
       >
-        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
-          <Input.Search
-            allowClear
-            aria-label={MSG_ACC.SEARCH}
-            placeholder="Tìm theo tên đăng nhập, email hoặc họ tên"
-            defaultValue={keyword}
-            onSearch={(value) => updateParams({ q: value.trim() || null })}
-            style={{ maxWidth: 320 }}
-          />
-          <Select
-            aria-label={MSG_ACC.FILTER_ORG}
-            value={organizationId ?? ''}
+        <HStack gap={3} wrap="wrap" align="end">
+          <HStack gap={2} wrap="wrap" align="end">
+            <TextInput
+              type="search"
+              label={MSG_ACC.SEARCH}
+              isLabelHidden
+              startIcon="search"
+              enterKeyHint="search"
+              hasClear
+              placeholder="Tìm theo tên đăng nhập, email hoặc họ tên"
+              value={keywordInput}
+              width={320}
+              onChange={(value) => {
+                setKeywordInput(value);
+                // Xoá nhanh: bỏ luôn điều kiện lọc thay vì phải bấm nút tìm.
+                if (value === '') {
+                  updateParams({ q: null });
+                }
+              }}
+              onEnter={applySearch}
+            />
+            <Button
+              variant="secondary"
+              size="lg"
+              label={MSG_ACC.SEARCH_ACTION}
+              onClick={applySearch}
+            />
+          </HStack>
+
+          <Selector
+            label={MSG_ACC.FILTER_ORG}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_ACC.ALL_ORGS}
             options={orgFilterOptions}
-            loading={orgOptionsQuery.isFetching}
-            style={{ minWidth: 200 }}
+            value={organizationId}
+            isLoading={orgOptionsQuery.isFetching}
+            width={200}
             onChange={(value) => updateParams({ organizationId: value || null })}
           />
-          <Select
-            aria-label={MSG_ACC.FILTER_ROLE}
-            value={role ?? ''}
-            options={ROLE_FILTER_OPTIONS}
-            style={{ minWidth: 180 }}
+          <Selector
+            label={MSG_ACC.FILTER_ROLE}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_ACC.ALL_ROLES}
+            options={[...ROLE_OPTIONS]}
+            value={role}
+            width={180}
             onChange={(value) => updateParams({ role: value || null })}
           />
-          <Select
-            aria-label={MSG_ACC.FILTER_STATUS}
-            value={status?.[0] ?? ''}
+          <Selector
+            label={MSG_ACC.FILTER_STATUS}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_ACC.ALL_STATUSES}
             options={STATUS_OPTIONS}
-            style={{ minWidth: 170 }}
+            value={status?.[0] ?? null}
+            width={170}
             onChange={(value) => updateParams({ status: value || null })}
           />
-        </Flex>
+        </HStack>
       </PageHeader>
 
       {result.isPending ? (
+        // Trạng thái loading — `PageLoading`. KHÔNG render bảng rỗng lúc đang tải
+        // để tránh nhấp nháy "không có dữ liệu".
         <PageLoading />
       ) : (
-        <Table<AccountItem>
-          rowKey="id"
+        <Table<AccountRow>
+          data={rows}
           columns={columns}
-          dataSource={result.data?.items ?? []}
-          loading={result.isFetching}
-          locale={{
-            emptyText: <Empty description={MSG_ACC.EMPTY} />,
-          }}
-          onChange={handleTableChange}
-          pagination={{
-            current: page,
-            pageSize: size,
-            total: result.data?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: PAGE_SIZE_OPTIONS,
-            showTotal: (total) => `Tổng ${total} tài khoản`,
-          }}
-          // Ở 320px bảng cuộn ngang thay vì vỡ layout.
-          scroll={{ x: 1140 }}
+          idKey="id"
+          hasHover
+          textOverflow="truncate"
+          // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự
+          // trong mảng một trang.
+          rowIndexStart={(currentPage - 1) * pageSize + 1}
+          rowCount={total}
+          emptyState={<EmptyState description={MSG_ACC.EMPTY} compact />}
+          plugins={{ sort: sortPlugin, pagination }}
         />
       )}
 
       <AccountCreateModal
         open={createOpen}
         // Danh sách tổ chức THẬT từ query (bỏ lựa chọn "Tất cả tổ chức").
-        orgOptions={(orgOptionsQuery.data ?? []).map((option) => ({
-          value: option.id,
-          label: option.name,
-        }))}
+        orgOptions={orgFilterOptions}
         loading={createMutation.isPending}
         error={createError}
         onCancel={() => setCreateOpen(false)}
         onConfirm={(payload) => createMutation.mutate(payload)}
       />
-    </Flex>
+    </Stack>
   );
 }

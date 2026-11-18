@@ -301,6 +301,10 @@ export const MSG_ACC = {
   FILTER_STATUS: 'Trạng thái',
   /** Ô tìm kiếm. */
   SEARCH: 'Tìm kiếm',
+  /** Nút bấm tìm kiếm (Astryx tách ô nhập và nút, khác `Input.Search` của antd). */
+  SEARCH_ACTION: 'Tìm',
+  /** Tên cho `nav` phân trang màn Quản lý tài khoản — không trùng landmark giữa các màn. */
+  PAGINATION_LABEL: 'Phân trang danh sách tài khoản',
   /** Giá trị mặc định của bộ lọc tổ chức. */
   ALL_ORGS: 'Tất cả tổ chức',
   /** Giá trị mặc định của bộ lọc trạng thái. */

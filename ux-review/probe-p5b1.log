@@ -1,0 +1,44 @@
+﻿PASS  danh s├ích: h1 = "Quß║ún l├╜ t├ái khoß║ún" ΓÇö Quß║ún l├╜ t├ái khoß║ún
+PASS  danh s├ích: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  danh s├ích: nh├ún vai tr├▓ tiß║┐ng Viß╗çt
+PASS  danh s├ích: badge trß║íng th├íi k├¿m chß╗»
+PASS  danh s├ích: trang 1 hiß╗çn 20 d├▓ng (server, size=20) ΓÇö count=20
+PASS  danh s├ích: link "Xem" c├│ aria-label ri├¬ng
+PASS  danh s├ích: href = /quan-tri/tai-khoan/acc-2?from=tai-khoan ΓÇö /quan-tri/tai-khoan/acc-2?from=tai-khoan
+PASS  danh s├ích: kh├┤ng c├│ pageerror
+PASS  danh s├ích: t├¼m kiß║┐m gß╗¡i keyword ΓÇö {"page":"1","size":"20","keyword":"lequydon","sort":"username,asc"}
+PASS  danh s├ích: lß╗ìc tß╗ò chß╗⌐c gß╗¡i organizationId ΓÇö {"page":"1","size":"20","keyword":"lequydon","organizationId":"11111111-1111-4111-8111-111111111111","sort":"username,asc"}
+PASS  danh s├ích: lß╗ìc vai tr├▓ gß╗¡i role=TEACHER ΓÇö {"page":"1","size":"20","keyword":"lequydon","organizationId":"11111111-1111-4111-8111-111111111111","role":"TEACHER","sort":"username,asc"}
+PASS  danh s├ích: lß╗ìc trß║íng th├íi gß╗¡i status=locked ΓÇö {"page":"1","size":"20","keyword":"lequydon","status":"locked","organizationId":"11111111-1111-4111-8111-111111111111","role":"TEACHER","sort":"username,asc"}
+PASS  danh s├ích: xo├í nhanh bß╗Ö lß╗ìc trß║íng th├íi ΓåÆ bß╗Å status ΓÇö {"page":"1","size":"20","keyword":"lequydon","organizationId":"11111111-1111-4111-8111-111111111111","role":"TEACHER","sort":"username,asc"}
+PASS  danh s├ích: sß║»p xß║┐p cß╗Öt "Ng├áy tß║ío" gß╗¡i sort=created_at,asc ΓÇö {"page":"1","size":"20","keyword":"lequydon","organizationId":"11111111-1111-4111-8111-111111111111","role":"TEACHER","sort":"created_at,asc"}
+PASS  danh s├ích: URL giß╗» tham sß╗æ sß║»p xß║┐p ΓÇö http://127.0.0.1:5173/quan-tri/tai-khoan?q=lequydon&organizationId=11111111-1111-4111-8111-111111111111&role=TEACHER&sort=created_at%2Casc
+PASS  danh s├ích: c├│ thanh ph├ón trang (nh├ún tiß║┐ng Viß╗çt)
+PASS  danh s├ích: ─æß╗òi trang gß╗ìi lß║íi API vß╗¢i page=2 ΓÇö {"page":"2","size":"20","sort":"username,asc"}
+PASS  danh s├ích rß╗ùng: hiß╗çn c├óu rß╗ùng
+PASS  danh s├ích rß╗ùng: vß║½n c├▓n ti├¬u ─æß╗ü cß╗Öt
+PASS  danh s├ích 404: hiß╗çn "T├¡nh n─âng ─æang chß╗¥ backend (D-24)."
+PASS  danh s├ích 404: v├╣ng tin l├á role=status (kh├┤ng phß║úi alert)
+PASS  danh s├ích 404: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  danh s├ích 404: KH├öNG hiß╗çn bß║úng rß╗ùng
+PASS  danh s├ích 404: vß║½n giß╗» h1
+PASS  danh s├ích lß╗ùi: c├óu lß╗ùi
+PASS  danh s├ích lß╗ùi: c├│ banner role=alert
+PASS  danh s├ích lß╗ùi: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  danh s├ích lß╗ùi: Vß║¬N giß╗» h1 (kh├íc bß║ún antd c┼⌐)
+PASS  tß║ío: mß╗ƒ dialog
+PASS  tß║ío: ti├¬u ─æß╗ü "Tß║ío t├ái khoß║ún"
+PASS  tß║ío: c├│ gß╗úi ├╜ CREATE_HINT
+PASS  tß║ío: POST payload ─æß╗º 4 tr╞░ß╗¥ng ΓÇö {"email":"giaovienmoi@example.edu.vn","full_name":"Gi├ío vi├¬n mß╗¢i","role":"ORG_ADMIN","organization_id":"11111111-1111-4111-8111-111111111111"}
+PASS  tß║ío: toast "─É├ú tß║ío t├ái khoß║ún."
+PASS  tß║ío: dialog ─æ├│ng
+PASS  tß║ío: d├▓ng mß╗¢i xuß║Ñt hiß╗çn (username sinh tß╗½ email)
+PASS  tß║ío lß╗ùi validate: hiß╗çn "Vui l├▓ng nhß║¡p email"
+PASS  tß║ío lß╗ùi validate: KH├öNG gß╗¡i POST
+PASS  tß║ío lß╗ùi validate: KH├öNG c├│ toast th├ánh c├┤ng
+PASS  tß║ío lß╗ùi validate: dialog vß║½n mß╗ƒ
+PASS  tß║ío 409: c├óu lß╗ùi trong modal
+PASS  tß║ío 409: KH├öNG toast th├ánh c├┤ng
+PASS  tß║ío 409: dialog vß║½n mß╗ƒ
+
+== Tß╗öNG: 42/42 PASS ==

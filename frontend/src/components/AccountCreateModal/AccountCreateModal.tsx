@@ -1,16 +1,33 @@
-﻿import { Alert, Form, Input, Modal, Select, theme } from 'antd';
+﻿import {
+  Banner,
+  Button,
+  Dialog,
+  DialogHeader,
+  HStack,
+  Selector,
+  TextInput,
+  VStack,
+} from '@astryxdesign/core';
+import type { FormEvent } from 'react';
 import { useEffect } from 'react';
 import { MSG_ACC, MSG_ORG } from '../../features/admin/adminMessages';
 import { CREATE_ROLE_OPTIONS } from '../../features/admin/roleLabels';
 import type { AccountCreatePayload } from '../../features/admin/types';
+import { useFormState } from '../../hooks/useFormState';
 
-/** Giá trị form của modal tạo tài khoản. */
-interface AccountCreateFormValues {
+/** Cùng quy ước với các form khác trong repo (khai cục bộ, chưa có hằng dùng chung). */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Là `type` chứ không phải `interface`: `useFormState<T>` buộc
+ * `T extends Record<string, unknown>` (xem `DepartmentFormModal`).
+ */
+type AccountCreateFormValues = {
   email: string;
   fullName: string;
   role: string;
   organizationId: string;
-}
+};
 
 interface AccountCreateModalProps {
   open: boolean;
@@ -19,7 +36,7 @@ interface AccountCreateModalProps {
   /** Đang gửi yêu cầu → nút xác nhận khoá + loading. */
   loading: boolean;
   /**
-   * Lỗi từ BE — hiện bằng `Alert` trong modal (khác toast: toast tự biến mất
+   * Lỗi từ BE — hiện bằng `Banner` trong modal (khác toast: toast tự biến mất
    * và bị modal che — NFR-REL-001).
    */
   error?: string | null;
@@ -33,7 +50,8 @@ interface AccountCreateModalProps {
  *
  * Không có ô username/mật khẩu: BE sinh từ email + gửi mật khẩu tạm qua email
  * (Q-36). Vai trò chỉ nhận các role `CREATE_ROLE_OPTIONS` — **không** có
- * `SUPER_ADMIN` (Q-35). Validate bằng antd `rules` (FE cho UX; BE là chốt).
+ * `SUPER_ADMIN` (Q-35). Validate ở FE chỉ để UX; `AccountCreatePayload` của BE
+ * mới là chốt cuối.
  */
 export default function AccountCreateModal({
   open,
@@ -43,97 +61,134 @@ export default function AccountCreateModal({
   onCancel,
   onConfirm,
 }: AccountCreateModalProps) {
-  const { token } = theme.useToken();
-  const [form] = Form.useForm<AccountCreateFormValues>();
+  const form = useFormState<AccountCreateFormValues>(
+    { email: '', fullName: '', role: '', organizationId: '' },
+    {
+      email: (value) => {
+        if (!value.trim()) return MSG_ACC.EMAIL_REQUIRED;
+        return EMAIL_PATTERN.test(value.trim()) ? undefined : MSG_ACC.EMAIL_INVALID;
+      },
+      fullName: (value) => (value.trim() ? undefined : MSG_ACC.FULL_NAME_REQUIRED),
+      role: (value) => (value ? undefined : MSG_ACC.ROLE_REQUIRED),
+      organizationId: (value) => (value ? undefined : MSG_ACC.ORG_REQUIRED),
+    },
+  );
+  // `reset` có identity ổn định (useCallback deps rỗng) — tách ra để effect bên
+  // dưới không phải phụ thuộc cả object `form` (đổi mỗi render → effect lặp vô hạn).
+  const resetForm = form.reset;
 
+  // Xoá form mỗi lần mở (thay `Form.resetFields` + `forceRender`).
   useEffect(() => {
-    if (open) {
-      form.resetFields();
-    }
-  }, [open, form]);
+    if (open) resetForm();
+  }, [open, resetForm]);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.validate()) return;
+    onConfirm({
+      email: form.values.email.trim(),
+      full_name: form.values.fullName.trim(),
+      role: form.values.role,
+      organization_id: form.values.organizationId,
+    });
+  };
 
   return (
-    <Modal
-      open={open}
-      title={MSG_ACC.CREATE_TITLE}
-      okText={MSG_ACC.CREATE_TITLE}
-      cancelText={MSG_ORG.CANCEL}
-      confirmLoading={loading}
-      okButtonProps={{ disabled: loading }}
-      onOk={() => form.submit()}
-      onCancel={onCancel}
-      // `forceRender` giữ Form luôn gắn với antd Form instance (tránh cảnh báo).
-      forceRender
+    <Dialog
+      isOpen={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      // `form`: bấm ra ngoài KHÔNG đóng để không mất dữ liệu đang nhập; ESC vẫn đóng.
+      purpose="form"
+      width={520}
     >
-      {/* Lỗi BE xếp trên form — `open` phải đúng vì modal mount sẵn cả khi đóng. */}
-      {open && error && (
-        <Alert
-          type="error"
-          showIcon
-          role="alert"
-          message={error}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
-
-      <Alert
-        type="info"
-        showIcon
-        message={MSG_ACC.CREATE_HINT}
-        style={{ marginBottom: token.margin }}
+      <DialogHeader
+        title={MSG_ACC.CREATE_TITLE}
+        onOpenChange={(next) => {
+          if (!next) onCancel();
+        }}
       />
 
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={false}
-        onFinish={(values) => {
-          onConfirm({
-            email: values.email.trim(),
-            full_name: values.fullName.trim(),
-            role: values.role,
-            organization_id: values.organizationId,
-          });
-        }}
-      >
-        <Form.Item
-          label={MSG_ACC.EMAIL_LABEL}
-          name="email"
-          rules={[
-            { required: true, message: MSG_ACC.EMAIL_REQUIRED },
-            { type: 'email', message: MSG_ACC.EMAIL_INVALID },
-          ]}
-        >
-          <Input autoComplete="off" placeholder="ten@example.edu.vn" />
-        </Form.Item>
-        <Form.Item
-          label={MSG_ACC.FULL_NAME}
-          name="fullName"
-          rules={[{ required: true, message: MSG_ACC.FULL_NAME_REQUIRED }]}
-        >
-          <Input autoComplete="off" placeholder="Nguyễn Văn A" />
-        </Form.Item>
-        <Form.Item
-          label={MSG_ACC.ROLE}
-          name="role"
-          rules={[{ required: true, message: MSG_ACC.ROLE_REQUIRED }]}
-        >
-          {/* Không có `SUPER_ADMIN` trong danh sách (Q-35). */}
-          <Select options={[...CREATE_ROLE_OPTIONS]} placeholder={MSG_ACC.ROLE_REQUIRED} />
-        </Form.Item>
-        <Form.Item
-          label={MSG_ACC.ORGANIZATION}
-          name="organizationId"
-          rules={[{ required: true, message: MSG_ACC.ORG_REQUIRED }]}
-        >
-          <Select
-            options={[...orgOptions]}
-            showSearch
-            optionFilterProp="label"
-            placeholder={MSG_ACC.ORG_REQUIRED}
+      <form noValidate onSubmit={handleSubmit} style={{ marginTop: 'var(--spacing-4)' }}>
+        <VStack gap={4}>
+          {/* Lỗi BE xếp trên form (NFR-REL-001). */}
+          {error ? <Banner status="error" title={error} collapsible={false} role="alert" /> : null}
+
+          <Banner status="info" title={MSG_ACC.CREATE_HINT} collapsible={false} />
+
+          <TextInput
+            type="email"
+            label={MSG_ACC.EMAIL_LABEL}
+            value={form.values.email}
+            onChange={(value) => form.setValue('email', value)}
+            placeholder="ten@example.edu.vn"
+            autoComplete="off"
+            isDisabled={loading}
+            aria-required="true"
+            status={
+              form.errorOf('email') ? { type: 'error', message: form.errorOf('email') } : undefined
+            }
           />
-        </Form.Item>
-      </Form>
-    </Modal>
+
+          <TextInput
+            label={MSG_ACC.FULL_NAME}
+            value={form.values.fullName}
+            onChange={(value) => form.setValue('fullName', value)}
+            placeholder="Nguyễn Văn A"
+            autoComplete="off"
+            isDisabled={loading}
+            aria-required="true"
+            status={
+              form.errorOf('fullName')
+                ? { type: 'error', message: form.errorOf('fullName') }
+                : undefined
+            }
+          />
+
+          {/* Không có `SUPER_ADMIN` trong danh sách (Q-35). */}
+          <Selector
+            label={MSG_ACC.ROLE}
+            options={[...CREATE_ROLE_OPTIONS]}
+            value={form.values.role}
+            onChange={(value) => form.setValue('role', value)}
+            placeholder={MSG_ACC.ROLE_REQUIRED}
+            isDisabled={loading}
+            aria-required="true"
+            status={
+              form.errorOf('role') ? { type: 'error', message: form.errorOf('role') } : undefined
+            }
+          />
+
+          <Selector
+            label={MSG_ACC.ORGANIZATION}
+            options={[...orgOptions]}
+            value={form.values.organizationId}
+            onChange={(value) => form.setValue('organizationId', value)}
+            placeholder={MSG_ACC.ORG_REQUIRED}
+            hasSearch
+            isDisabled={loading}
+            aria-required="true"
+            status={
+              form.errorOf('organizationId')
+                ? { type: 'error', message: form.errorOf('organizationId') }
+                : undefined
+            }
+          />
+
+          <HStack justify="end" gap={2}>
+            <Button variant="secondary" size="lg" label={MSG_ORG.CANCEL} onClick={onCancel} />
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              label={MSG_ACC.CREATE_TITLE}
+              isLoading={loading}
+              isDisabled={loading}
+            />
+          </HStack>
+        </VStack>
+      </form>
+    </Dialog>
   );
 }
