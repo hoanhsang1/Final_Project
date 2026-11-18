@@ -1,0 +1,35 @@
+﻿Chat\ChatPastedTextToken.generated.js :: @astryx.chat.pastedText.label
+Chat\useTriggerMenu.generated.js :: @astryx.chatTriggerMenu.searching
+CodeBlock\CodeBlock.generated.js :: @astryx.codeBlock.copyFailed
+CommandPalette\CommandPaletteInput.generated.js :: @astryx.commandPalette.input.label
+DateInput\useTypedDate.generated.js :: @astryx.dateInput.calendarDescription, @astryx.dateInput.formatHint, @astryx.dateInput.nonexistentDate, @astryx.dateInput.outOfRangeDate
+DropdownMenu\DropdownMenuSubMenu.generated.js :: @astryx.dropdownMenu.backTo
+Field\FieldLabel.generated.js :: @astryx.field.labelTooltip
+Field\InputClearButton.generated.js :: @astryx.inputClearButton.tooltip
+FileInput\FileInput.generated.js :: @astryx.fileInput.fileSize.bytes, @astryx.fileInput.fileSize.kilobytes, @astryx.fileInput.fileSize.megabytes
+hooks\useScrollRegionProps.generated.js :: @astryx.scrollRegion.label
+InfoTip\InfoTip.generated.js :: @astryx.infoTip.label
+Kbd\Kbd.generated.js :: @astryx.kbd.key.alt, @astryx.kbd.key.altShort, @astryx.kbd.key.backspace, @astryx.kbd.key.command, @astryx.kbd.key.control, @astryx.kbd.key.controlShort, @astryx.kbd.key.down, @astryx.kbd.key.enter, @astryx.kbd.key.escape, @astryx.kbd.key.escapeShort, @astryx.kbd.key.left, @astryx.kbd.key.plus, @astryx.kbd.key.right, @astryx.kbd.key.shift, @astryx.kbd.key.shiftShort, @astryx.kbd.key.tab, @astryx.kbd.key.up, @astryx.kbd.key.windowsShort, @astryx.kbd.shortcut
+Lightbox\Lightbox.generated.js :: @astryx.lightbox.captionLess, @astryx.lightbox.captionMore
+List\listReorderEngine.generated.js :: @astryx.list.reorderCancelled, @astryx.list.reorderDone, @astryx.list.reorderDropped, @astryx.list.reorderHint, @astryx.list.reorderItemAt, @astryx.list.reorderModeDone, @astryx.list.reorderMoveDown, @astryx.list.reorderMoveUp, @astryx.list.reorderPickedUp, @astryx.list.reorderPlace, @astryx.list.reorderPlaceEnd, @astryx.list.reorderPlaceTop, @astryx.list.reorderRefused
+List\ListReorderHandle.generated.js :: @astryx.list.reorderHandle, @astryx.list.reorderHandleAt, @astryx.list.reorderHandleVerb
+Markdown\plugins\HeadingLinksRenderer.generated.js :: @astryx.markdownHeadingLinks.copied, @astryx.markdownHeadingLinks.copy
+MultiSelector\MultiSelector.generated.js :: @astryx.multiSelector.createOption, @astryx.multiSelector.optionCreated, @astryx.multiSelector.selectedCount
+NumberInput\NumberInput.generated.js :: @astryx.numberInput.invalidNumber
+PowerSearch\formatTokenValue.generated.js :: @astryx.powersearch.token.fieldOperator, @astryx.powersearch.token.labelValue
+PowerSearch\PowerSearch.generated.js :: @astryx.powersearch.allFiltersRemoved, @astryx.powersearch.editableFiltersRemoved
+PowerSearch\PowerSearchBottomSheet.generated.js :: @astryx.powersearch.allFiltersRemoved, @astryx.powersearch.editableFiltersRemoved, @astryx.powersearch.sheet.addFilter, @astryx.powersearch.sheet.clearAll, @astryx.powersearch.sheet.clearAllCancel, @astryx.powersearch.sheet.clearAllConfirm, @astryx.powersearch.sheet.clearAllDescription, @astryx.powersearch.sheet.clearAllTitle, @astryx.powersearch.sheet.discardConfirm, @astryx.powersearch.sheet.discardDescription, @astryx.powersearch.sheet.discardTitle, @astryx.powersearch.sheet.done, @astryx.powersearch.sheet.fieldOperator, @astryx.powersearch.sheet.filtersTitle, @astryx.powersearch.sheet.filterUnavailable, @astryx.powersearch.sheet.keepEditing, @astryx.powersearch.sheet.labelValue, @astryx.powersearch.sheet.noFilters, @astryx.powersearch.sheet.noFiltersDescription, @astryx.powersearch.sheet.noFiltersInDraft, @astryx.powersearch.sheet.noMatchingFields, @astryx.powersearch.sheet.noResults, @astryx.powersearch.sheet.removeFilter, @astryx.powersearch.sheet.search, @astryx.powersearch.sheet.searchFields, @astryx.powersearch.sheet.searchFieldsPlaceholder, @astryx.powersearch.sheet.searchResults, @astryx.powersearch.sheet.tryDifferentSearch, @astryx.powersearch.sheet.ungroupedFields
+PowerSearch\PowerSearchValueEditor.generated.js :: @astryx.powersearch.sheet.relativeDaysAgo, @astryx.powersearch.sheet.relativeDaysFromNow, @astryx.powersearch.sheet.relativeMonthsAgo, @astryx.powersearch.sheet.relativeMonthsFromNow, @astryx.powersearch.sheet.relativeWeeksAgo, @astryx.powersearch.sheet.relativeWeeksFromNow
+Slider\Slider.generated.js :: @astryx.slider.maximumThumb, @astryx.slider.minimumThumb
+Switch\Switch.generated.js :: @astryx.switch.loading
+Table\plugins\columnResize\useTableColumnResize.generated.js :: @astryx.table.columnResize.resizeColumn, @astryx.table.columnResize.widthValue
+Table\plugins\infiniteScroll\useTableInfiniteScroll.generated.js :: @astryx.table.loadMore
+Table\plugins\rowExpansion\useTableRowExpansion.generated.js :: @astryx.tableRowExpansion.collapseRowNamed, @astryx.tableRowExpansion.expandRowNamed
+Table\plugins\sortable\useTableSortable.generated.js :: @astryx.table.sort.priority
+Table\plugins\tree\useTableTreeData.generated.js :: @astryx.tableTree.collapseRowNamed, @astryx.tableTree.expandRowNamed
+Table\TableSelectionToolbar.generated.js :: @astryx.table.selection.bulkActionsLabel, @astryx.table.selection.clearAll, @astryx.table.selection.selectedCount
+TextArea\TextArea.generated.js :: @astryx.textArea.counter
+Timestamp\TimestampHoverCard.generated.js :: @astryx.timestamp.copyFailed
+Tokenizer\Tokenizer.generated.js :: @astryx.tokenizer.allRemoved, @astryx.tokenizer.create, @astryx.tokenizer.selectedCount
+Tokenizer\TokenizerBottomSheet.generated.js :: @astryx.tokenizer.add, @astryx.tokenizer.addValue, @astryx.tokenizer.allRemoved, @astryx.tokenizer.clearAllDescription, @astryx.tokenizer.clearAllTitle, @astryx.tokenizer.clearSelection, @astryx.tokenizer.create, @astryx.tokenizer.discardChanges, @astryx.tokenizer.discardChangesDescription, @astryx.tokenizer.discardChangesTitle, @astryx.tokenizer.keepEditing, @astryx.tokenizer.noResultsDescription, @astryx.tokenizer.nothingToClear, @astryx.tokenizer.save, @astryx.tokenizer.search, @astryx.tokenizer.searchPlaceholder, @astryx.tokenizer.selectionLimit
+Typeahead\Typeahead.generated.js :: @astryx.typeahead.selectionCleared

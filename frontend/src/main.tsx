@@ -55,11 +55,23 @@ document.body.style.fontFamily = fontFamily;
 // với `dist/i18n/generated-locales/vi-VN.generated.js`. Khoá thiếu ở vi-VN sẽ rơi
 // về tiếng Anh (`resolve.js` bước 5) — hiện ra màn hình chứ không báo lỗi.
 //
-// Đã xác minh: `MultiSelector` thiếu `selectedCount` → trigger hiện "1 selected"
-// sau khi chọn (mọi `MultiSelector` dùng `triggerDisplay="count"` mặc định).
+// Đã xác minh:
+//  - `MultiSelector` thiếu `selectedCount` → trigger hiện "1 selected" sau khi
+//    chọn (mọi `MultiSelector` dùng `triggerDisplay="count"` mặc định).
+//  - `InputClearButton` thiếu `tooltip` → nút xoá nhanh của field `hasClear`
+//    (có giá trị) hiện tooltip "Clear" khi hover/focus, và gắn luôn vào
+//    `aria-describedby`. App dùng `hasClear` ở các trang Đào tạo.
 // Bù tại ĐÂY, KHÔNG sửa `node_modules` (file generated, mất khi cập nhật gói).
 const astryxViOverrides = {
   '@astryx.multiSelector.selectedCount': 'Đã chọn {count}',
+  // Chỉ nêu HÀNH ĐỘNG, không lặp nhãn field (theo chú thích trong
+  // `InputClearButton.js`: nhãn field đã nằm cạnh biểu tượng).
+  //
+  // Chọn "Xóa" (dấu ở `o`) chứ KHÔNG phải "Xoá" như chữ do app tự viết: đây là
+  // cách viết mà chính gói Astryx dùng cho MỌI nút xoá nhanh — tên đọc được của
+  // cùng nút này là `@astryx.textInput.clearLabel` = "Xóa {label}". Giữ khớp để
+  // tên đọc được và tooltip không lệch nhau (WCAG 2.5.3 — label in name).
+  '@astryx.inputClearButton.tooltip': 'Xóa',
 };
 
 // Client dùng chung cho TanStack Query (server state). Không retry khi lỗi 4xx

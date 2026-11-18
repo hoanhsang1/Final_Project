@@ -1,0 +1,12 @@
+﻿PASS  trang Gi├ío vi├¬n tß║úi ─æ╞░ß╗úc
+PASS  danh s├ích gi├ío vi├¬n hiß╗çn
+PASS  field rß╗ùng: ch╞░a c├│ n├║t xo├í nhanh ΓÇö count=0
+PASS  c├│ gi├í trß╗ï: n├║t xo├í nhanh xuß║Ñt hiß╗çn ΓÇö count=1
+PASS  t├¬n ─æß╗ìc ─æ╞░ß╗úc cß╗ºa n├║t xo├í l├á tiß║┐ng Viß╗çt ΓÇö aria-label="X├│a T├¼m theo m├ú nh├ón sß╗▒ hoß║╖c hß╗ì t├¬n"
+PASS  hover: tooltip hiß╗çn ΓÇö X├│a
+PASS  tooltip bß║▒ng tiß║┐ng Viß╗çt "X├│a" ΓÇö X├│a
+PASS  tooltip KH├öNG phß║úi "Clear" ΓÇö X├│a
+PASS  bß║Ñm n├║t xo├í: field trß╗ƒ vß╗ü rß╗ùng ΓÇö value=""
+PASS  kh├┤ng c├│ pageerror
+
+== Tß╗öNG: 10/10 PASS ==

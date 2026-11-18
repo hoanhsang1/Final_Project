@@ -1,0 +1,13 @@
+﻿
+ RUN  v5.0.4 D:/Final_Project/frontend
+
+
+ Test Files  25 passed (25)
+      Tests  169 passed (169)
+   Start at  13:40:02
+   Duration  124.54s (setup 44%, import 30%, environment 13%, tests 12%)
+
+     Import  101 modules were evaluated 309 times ┬╖ 37.03s total, 30% of tracked time
+             ~24.93s faster with isolate: false ΓÇö shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+
