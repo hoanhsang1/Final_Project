@@ -1,18 +1,27 @@
-import { Alert, Button, Empty, Table, Tag, Typography } from 'antd';
-import type { TableProps } from 'antd';
+import {
+  Badge,
+  Banner,
+  Button,
+  pixel,
+  proportional,
+  Stack,
+  Table,
+  Text,
+  useTablePagination,
+} from '@astryxdesign/core';
+import type { TableColumn } from '@astryxdesign/core';
 import type { UseQueryResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { Link } from 'react-router-dom';
+import { AppLink } from '../AppLink/AppLink';
+import EmptyState from '../EmptyState/EmptyState';
 import PageLoading from '../PageLoading/PageLoading';
 import {
   auditActionLabel,
   auditTargetPath,
   auditTargetTypeLabel,
 } from '../../features/admin/auditLabels';
-import { MSG_AUD } from '../../features/admin/adminMessages';
+import { MSG_AUD, MSG_ORG, auditTotalLabel } from '../../features/admin/adminMessages';
 import type { AuditLogItem, PageResponse } from '../../features/admin/types';
-
-const { Text } = Typography;
 
 /** Giá trị hiển thị khi BE chưa trả. */
 const EMPTY_VALUE = '—';
@@ -25,6 +34,13 @@ function formatDateTime(value: string | null | undefined): string {
   const parsed = dayjs(value);
   return parsed.isValid() ? parsed.format('DD/MM/YYYY HH:mm') : EMPTY_VALUE;
 }
+
+/**
+ * `Table` của Astryx buộc `T extends Record<string, unknown>`, còn `AuditLogItem`
+ * là interface nên không tự thoả — giao thêm `Record` để thoả ràng buộc mà
+ * **không** nới lỏng DTO (xem `docs/ui-conventions.md` §6.11).
+ */
+type AuditRow = AuditLogItem & Record<string, unknown>;
 
 interface AuditLogTableProps {
   /** Kết quả query danh sách nhật ký — component này xử lý cả 4 trạng thái loading/error/empty/success. */
@@ -46,6 +62,13 @@ interface AuditLogTableProps {
   emptyText: string;
   /** Câu chữ khi tải lỗi. */
   errorText: string;
+  /** Nhãn phân trang (tiếng Việt) — mặc định nhãn của màn Nhật ký hệ thống. */
+  paginationLabel?: string;
+  /**
+   * Cấp heading của câu rỗng. Mặc định 2 vì trang đã có H1; đặt 3 khi bảng nằm
+   * trong một `DetailSection` (đã có H2) để heading không nhảy cấp.
+   */
+  emptyHeadingLevel?: 2 | 3 | 4;
 }
 
 /**
@@ -57,7 +80,7 @@ interface AuditLogTableProps {
  * Nguồn dữ liệu: `GET /api/v1/audit-logs` (`D-22`) với tham số lọc khác nhau.
  *
  * ⚠️ Ghi chú là dữ liệu người dùng nhập ⇒ render **TEXT THUẦN**, không
- * `dangerouslySetInnerHTML` (`ADR-FE-003` §9). `BR-08`: Tag hành động luôn kèm chữ.
+ * `dangerouslySetInnerHTML` (`ADR-FE-003` §9). `BR-08`: Badge hành động luôn kèm chữ.
  */
 export default function AuditLogTable({
   query,
@@ -67,52 +90,71 @@ export default function AuditLogTable({
   onPaginationChange,
   emptyText,
   errorText,
+  paginationLabel,
+  emptyHeadingLevel = 2,
 }: AuditLogTableProps) {
-  const columns = [
+  const total = query.data?.total ?? 0;
+  const rows = (query.data?.items ?? []) as AuditRow[];
+
+  // Hook phân trang phải gọi vô điều kiện (rules of hooks). Khi màn không phân
+  // trang (`onPaginationChange` trống) thì plugin vẫn dựng nhưng không truyền vào
+  // `Table` — điều khiển không xuất hiện.
+  const pagination = useTablePagination<AuditRow>({
+    page,
+    onPageChange: onPaginationChange ?? (() => {}),
+    totalItems: total,
+    pageSize,
+    label: paginationLabel ?? MSG_AUD.PAGINATION_LABEL,
+  });
+
+  const targetColumn: TableColumn<AuditRow> = {
+    key: 'target',
+    header: MSG_AUD.TARGET,
+    width: proportional(1, { minWidth: 200 }),
+    renderCell: (row) => {
+      const path = auditTargetPath(row);
+      const label = `${auditTargetTypeLabel(row.target_type)}: ${row.target_name}`;
+      return path ? (
+        <AppLink to={path} label={`Xem chi tiết ${label}`}>
+          {label}
+        </AppLink>
+      ) : (
+        <Text aria-label={label}>{label}</Text>
+      );
+    },
+  };
+
+  const columns: TableColumn<AuditRow>[] = [
     {
-      title: MSG_AUD.TIME,
       key: 'created_at',
-      render: (_value: unknown, record: AuditLogItem) => formatDateTime(record.created_at),
+      header: MSG_AUD.TIME,
+      width: pixel(150),
+      renderCell: (row) => formatDateTime(row.created_at),
     },
     {
-      title: MSG_AUD.ACTION,
       key: 'action',
-      render: (_value: unknown, record: AuditLogItem) => {
-        const actionLabel = auditActionLabel(record.action);
-        // BR-08: Tag LUÔN kèm chữ, không chỉ màu.
-        return <Tag color={actionLabel.color}>{actionLabel.label}</Tag>;
+      header: MSG_AUD.ACTION,
+      width: proportional(1, { minWidth: 180 }),
+      // BR-08: Badge LUÔN kèm chữ, không chỉ màu.
+      renderCell: (row) => {
+        const actionLabel = auditActionLabel(row.action);
+        return <Badge variant={actionLabel.badge} label={actionLabel.label} />;
       },
     },
-    ...(showTarget
-      ? [
-          {
-            title: MSG_AUD.TARGET,
-            key: 'target',
-            render: (_value: unknown, record: AuditLogItem) => {
-              const path = auditTargetPath(record);
-              const label = `${auditTargetTypeLabel(record.target_type)}: ${record.target_name}`;
-              return path ? (
-                <Link to={path} aria-label={`Xem chi tiết ${label}`}>
-                  {label}
-                </Link>
-              ) : (
-                <Text aria-label={label}>{label}</Text>
-              );
-            },
-          },
-        ]
-      : []),
+    ...(showTarget ? [targetColumn] : []),
     {
-      title: MSG_AUD.ACTOR,
       key: 'actor_username',
-      render: (_value: unknown, record: AuditLogItem) => record.actor_username || EMPTY_VALUE,
+      header: MSG_AUD.ACTOR,
+      width: pixel(160),
+      renderCell: (row) => row.actor_username || EMPTY_VALUE,
     },
     {
-      title: MSG_AUD.DESCRIPTION,
       key: 'description',
-      render: (_value: unknown, record: AuditLogItem) => record.description || EMPTY_VALUE,
+      header: MSG_AUD.DESCRIPTION,
+      width: proportional(1, { minWidth: 200 }),
+      renderCell: (row) => row.description || EMPTY_VALUE,
     },
-  ] satisfies TableProps<AuditLogItem>['columns'];
+  ];
 
   if (query.isPending) {
     return <PageLoading />;
@@ -120,42 +162,43 @@ export default function AuditLogTable({
 
   if (query.isError) {
     return (
-      <Alert
-        type="error"
-        showIcon
+      <Banner
+        status="error"
         role="alert"
-        message={errorText}
+        collapsible={false}
+        title={errorText}
         description="Kiểm tra kết nối máy chủ rồi thử lại."
-        action={
-          <Button onClick={() => void query.refetch()} loading={query.isFetching}>
-            Thử lại
-          </Button>
+        endContent={
+          <Button
+            variant="secondary"
+            size="sm"
+            label={MSG_ORG.RETRY}
+            isLoading={query.isFetching}
+            onClick={() => void query.refetch()}
+          />
         }
       />
     );
   }
 
   return (
-    <Table<AuditLogItem>
-      rowKey="id"
-      size="small"
-      columns={columns}
-      dataSource={query.data?.items ?? []}
-      locale={{ emptyText: <Empty description={emptyText} /> }}
-      onChange={onPaginationChange ? (pag) => onPaginationChange(pag.current ?? 1) : undefined}
-      pagination={
-        onPaginationChange
-          ? {
-              current: page,
-              pageSize,
-              total: query.data?.total ?? 0,
-              showSizeChanger: false,
-              showTotal: (total) => `Tổng ${total} sự kiện`,
-            }
-          : false
-      }
-      // Ở 320px bảng cuộn ngang thay vì vỡ layout.
-      scroll={{ x: showTarget ? 900 : 720 }}
-    />
+    <Stack direction="vertical" gap={3}>
+      {/* `total` là số BE trả về (sau khi lọc), không phải số dòng một trang. */}
+      {onPaginationChange ? <Text type="supporting">{auditTotalLabel(total)}</Text> : null}
+      <Table<AuditRow>
+        data={rows}
+        columns={columns}
+        idKey="id"
+        density="compact"
+        hasHover
+        textOverflow="truncate"
+        // `aria-rowindex` phải tính theo trang hiện tại, không theo thứ tự trong
+        // mảng một trang.
+        rowIndexStart={(page - 1) * pageSize + 1}
+        rowCount={total}
+        emptyState={<EmptyState description={emptyText} compact headingLevel={emptyHeadingLevel} />}
+        plugins={onPaginationChange ? { pagination } : undefined}
+      />
+    </Stack>
   );
 }

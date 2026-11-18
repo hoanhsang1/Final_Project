@@ -1,9 +1,17 @@
-import { Alert, Button, DatePicker, Flex, Input, Select, theme } from 'antd';
-import type { SelectProps } from 'antd';
-import dayjs from 'dayjs';
+import {
+  Banner,
+  Button,
+  DateRangeInput,
+  HStack,
+  Selector,
+  Stack,
+  TextInput,
+} from '@astryxdesign/core';
+import type { DateRange, ISODateString } from '@astryxdesign/core';
+import { useState } from 'react';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import { AUDIT_ACTION_OPTIONS } from '../../features/admin/auditLabels';
-import { MSG_AUD, msgBackendPending } from '../../features/admin/adminMessages';
+import { MSG_AUD, MSG_ORG, msgBackendPending } from '../../features/admin/adminMessages';
 import { AdminApiError } from '../../features/admin/adminApi';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
 import { AUDIT_PAGE_SIZE, useAuditLogsPage } from './use-audit-logs';
@@ -11,10 +19,24 @@ import { AUDIT_PAGE_SIZE, useAuditLogsPage } from './use-audit-logs';
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-22';
 
-const ACTION_OPTIONS: SelectProps['options'] = [
-  { value: '', label: MSG_AUD.ALL_ACTIONS },
-  ...AUDIT_ACTION_OPTIONS,
-];
+/** Ngày ISO chỉ-gồm-ngày (`2026-10-21`) — `DateRangeInput` chỉ nhận dạng này. */
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Lựa chọn bộ lọc hành động — bỏ mục rỗng vì `Selector hasClear` đã có nút xoá. */
+const ACTION_OPTIONS = [...AUDIT_ACTION_OPTIONS];
+
+/**
+ * Dựng `DateRange` cho `DateRangeInput` từ 2 tham số URL.
+ *
+ * `DateRangeInput` bắt buộc CẢ hai đầu — trong khi URL có thể chỉ có một đầu
+ * (`allowEmpty` của antd cũ). Chỉ dựng khoảng khi cả `from` và `to` hợp lệ.
+ */
+function toDateRange(from: string | null, to: string | null): DateRange | null {
+  if (!from || !to || !ISO_DATE_PATTERN.test(from) || !ISO_DATE_PATTERN.test(to)) {
+    return null;
+  }
+  return { start: from as ISODateString, end: to as ISODateString };
+}
 
 /**
  * Màn Nhật ký hệ thống `/quan-tri/nhat-ky`.
@@ -26,15 +48,13 @@ const ACTION_OPTIONS: SelectProps['options'] = [
  * do `AdminGuard` chặn trước.
  */
 export default function AuditLogPage() {
-  const { token } = theme.useToken();
   const { result, page, keyword, action, from, to, updateParams } = useAuditLogsPage();
 
-  const handleRangeChange = (values: unknown) => {
-    const [start, end] = (values ?? []) as Array<dayjs.Dayjs | null>;
-    updateParams({
-      from: start ? start.format('YYYY-MM-DD') : null,
-      to: end ? end.format('YYYY-MM-DD') : null,
-    });
+  // Ô nhập tách khỏi tham số URL: gõ chưa xong thì chưa lọc (khớp `Input.Search` cũ).
+  const [keywordInput, setKeywordInput] = useState(keyword);
+
+  const applySearch = () => {
+    updateParams({ q: keywordInput.trim() || null });
   };
 
   // 404 từ endpoint COLLECTION = BE chưa làm endpoint → hiện "chờ backend".
@@ -43,55 +63,82 @@ export default function AuditLogPage() {
 
   if (isEndpointMissing) {
     return (
-      <Flex vertical gap={token.marginMD}>
+      <Stack direction="vertical" gap={4}>
         <PageHeader title={MSG_AUD.TITLE} subtitle={MSG_AUD.SUBTITLE} />
-        <Alert
-          type="info"
-          showIcon
-          role="status"
-          message={msgBackendPending(ENDPOINT_CODE)}
+        <Banner
+          status="info"
+          title={msgBackendPending(ENDPOINT_CODE)}
           description="Backend cần thêm endpoint GET /api/v1/audit-logs để màn này hoạt động. Bấm Thử lại sau khi backend cập nhật."
-          action={
-            <Button onClick={() => void result.refetch()} loading={result.isFetching}>
-              Thử lại
-            </Button>
+          collapsible={false}
+          role="status"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={result.isFetching}
+              onClick={() => void result.refetch()}
+            />
           }
         />
-      </Flex>
+      </Stack>
     );
   }
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       <PageHeader title={MSG_AUD.TITLE} subtitle={MSG_AUD.SUBTITLE}>
-        <Flex gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
-          <Input.Search
-            allowClear
-            aria-label="Tìm trong nhật ký"
-            placeholder="Tìm theo tên đối tượng hoặc mô tả"
-            defaultValue={keyword}
-            onSearch={(value) => updateParams({ q: value.trim() || null })}
-            style={{ maxWidth: 320 }}
-          />
-          <Select
-            aria-label={MSG_AUD.FILTER_ACTION}
-            value={action?.[0] ?? ''}
+        <HStack gap={3} wrap="wrap" align="end">
+          <HStack gap={2} wrap="wrap" align="end">
+            <TextInput
+              type="search"
+              label={MSG_AUD.SEARCH_LABEL}
+              isLabelHidden
+              startIcon="search"
+              enterKeyHint="search"
+              hasClear
+              placeholder={MSG_AUD.SEARCH_PLACEHOLDER}
+              value={keywordInput}
+              width={320}
+              onChange={(value) => {
+                setKeywordInput(value);
+                // Xoá nhanh: bỏ luôn điều kiện lọc thay vì phải bấm nút tìm.
+                if (value === '') {
+                  updateParams({ q: null });
+                }
+              }}
+              onEnter={applySearch}
+            />
+            <Button
+              variant="secondary"
+              size="lg"
+              label={MSG_AUD.SEARCH_ACTION}
+              onClick={applySearch}
+            />
+          </HStack>
+
+          <Selector
+            label={MSG_AUD.FILTER_ACTION}
+            isLabelHidden
+            hasClear
+            placeholder={MSG_AUD.ALL_ACTIONS}
             options={ACTION_OPTIONS}
-            style={{ minWidth: 210 }}
+            value={action?.[0] ?? null}
+            width={210}
             onChange={(value) => updateParams({ action: value || null })}
           />
-          <DatePicker.RangePicker
-            aria-label={MSG_AUD.FILTER_RANGE}
-            format="DD/MM/YYYY"
-            value={[
-              from ? dayjs(from) : null,
-              to ? dayjs(to) : null,
-            ]}
-            onChange={handleRangeChange}
-            allowEmpty={[true, true]}
-            placeholder={['Từ ngày', 'Đến ngày']}
+
+          <DateRangeInput
+            label={MSG_AUD.FILTER_RANGE}
+            isLabelHidden
+            value={toDateRange(from, to)}
+            placeholder={MSG_AUD.RANGE_PLACEHOLDER}
+            width={260}
+            onChange={(value) =>
+              updateParams({ from: value?.start ?? null, to: value?.end ?? null })
+            }
           />
-        </Flex>
+        </HStack>
       </PageHeader>
 
       <AuditLogTable
@@ -105,6 +152,6 @@ export default function AuditLogPage() {
         emptyText={MSG_AUD.EMPTY}
         errorText={MSG_AUD.LOAD_ERROR}
       />
-    </Flex>
+    </Stack>
   );
 }

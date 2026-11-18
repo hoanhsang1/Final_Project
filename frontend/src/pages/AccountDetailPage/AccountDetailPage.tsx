@@ -307,6 +307,9 @@ export default function AccountDetailPage() {
           showTarget={false}
           emptyText="Chưa có sự kiện nào"
           errorText="Không tải được nhật ký của tài khoản."
+          paginationLabel={MSG_ACC.AUDIT_PAGINATION_LABEL}
+          // Khối nhật ký nằm trong `DetailSection` (đã có H2) → câu rỗng là H3.
+          emptyHeadingLevel={3}
         />
       </DetailSection>
 

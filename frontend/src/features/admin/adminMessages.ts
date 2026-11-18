@@ -251,6 +251,8 @@ export const MSG_HIS = {
   EMPTY: 'Chưa có sự kiện nào',
   /** `MSG-HIS-03` — không tải được lịch sử. */
   LOAD_ERROR: 'Không tải được lịch sử tổ chức.',
+  /** Nhãn phân trang của bảng lịch sử tổ chức. */
+  PAGINATION_LABEL: 'Phân trang lịch sử tổ chức',
 } as const;
 
 /** `MSG-ACC-*` — màn Quản lý tài khoản (`UC-19`). */
@@ -371,6 +373,8 @@ export const MSG_ACC = {
   RESET_HINT_EMAIL: 'Mật khẩu tạm sẽ được gửi tới email của tài khoản này.',
   /** `MSG-ACC-39` — bắt buộc nhập mật khẩu mới ở chế độ thủ công. */
   PASSWORD_REQUIRED: 'Vui lòng nhập mật khẩu mới',
+  /** Nhãn phân trang của khối nhật ký ở màn chi tiết tài khoản. */
+  AUDIT_PAGINATION_LABEL: 'Phân trang nhật ký của tài khoản',
 } as const;
 
 /** `MSG-AUD-*` — màn Nhật ký hệ thống `/quan-tri/nhat-ky`. */
@@ -399,7 +403,27 @@ export const MSG_AUD = {
   FILTER_RANGE: 'Khoảng thời gian',
   /** Giá trị mặc định của bộ lọc hành động. */
   ALL_ACTIONS: 'Tất cả hành động',
+  /** Nhãn ô tìm kiếm (ẩn khỏi màn hình, còn cho trình đọc màn hình). */
+  SEARCH_LABEL: 'Tìm trong nhật ký',
+  /** Placeholder ô tìm kiếm. */
+  SEARCH_PLACEHOLDER: 'Tìm theo tên đối tượng hoặc mô tả',
+  /** Nhãn nút tìm kiếm. */
+  SEARCH_ACTION: 'Tìm',
+  /** Placeholder bộ lọc khoảng thời gian. */
+  RANGE_PLACEHOLDER: 'Từ ngày – Đến ngày',
+  /** Nhãn phân trang của bảng nhật ký hệ thống. */
+  PAGINATION_LABEL: 'Phân trang nhật ký hệ thống',
 } as const;
+
+/**
+ * Dòng tổng số phía trên bảng nhật ký — "Tổng 12 sự kiện".
+ *
+ * Số này là `total` BE trả về (sau khi lọc), không phải số dòng đang hiện trên
+ * một trang — nên không thể lấy `data.length`.
+ */
+export function auditTotalLabel(total: number): string {
+  return `Tổng ${total} sự kiện`;
+}
 
 /** `MSG-ORG-20` — vô hiệu hoá thành công (có tên tổ chức). */
 export function msgSuspended(orgName: string): string {

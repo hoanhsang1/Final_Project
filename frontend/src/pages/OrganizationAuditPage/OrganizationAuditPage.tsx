@@ -1,18 +1,16 @@
-import { Alert, Button, Flex, Typography, theme } from 'antd';
+import { Banner, Button, Stack, Text } from '@astryxdesign/core';
 import { useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
 import { AdminApiError } from '../../features/admin/adminApi';
-import { MSG_HIS, msgBackendPending } from '../../features/admin/adminMessages';
+import { MSG_HIS, MSG_ORG, msgBackendPending } from '../../features/admin/adminMessages';
 import { backToListPath } from '../../features/admin/consoleMenu';
 import { useOrganizationDetail } from '../OrganizationDetailPage/use-organization-detail';
 import {
   ORG_AUDIT_PAGE_SIZE,
   useOrganizationAudit,
 } from './use-organization-audit';
-
-const { Text } = Typography;
 
 /** Mã endpoint đang chờ — hiện trên UI để Vy đối chiếu với đặc tả §4.2. */
 const ENDPOINT_CODE = 'D-22';
@@ -30,7 +28,6 @@ const ENDPOINT_CODE = 'D-22';
  * do `AdminGuard` chặn trước.
  */
 export default function OrganizationAuditPage() {
-  const { token } = theme.useToken();
   const { id: orgId = '' } = useParams<{ id: string }>();
   const location = useLocation();
   const [page, setPage] = useState(1);
@@ -53,11 +50,11 @@ export default function OrganizationAuditPage() {
       title={MSG_HIS.TITLE}
       subtitle={
         orgName ? (
-          <Text type="secondary">
-            Tổ chức <Text strong>{orgName}</Text>
+          <Text color="secondary">
+            Tổ chức <Text weight="semibold">{orgName}</Text>
           </Text>
         ) : (
-          <Text type="secondary">Tổ chức {orgId}</Text>
+          <Text color="secondary">Tổ chức {orgId}</Text>
         )
       }
     />
@@ -65,26 +62,30 @@ export default function OrganizationAuditPage() {
 
   if (isEndpointMissing) {
     return (
-      <Flex vertical gap={token.marginMD}>
+      <Stack direction="vertical" gap={4}>
         {pageHeader}
-        <Alert
-          type="info"
-          showIcon
-          role="status"
-          message={msgBackendPending(ENDPOINT_CODE)}
+        <Banner
+          status="info"
+          title={msgBackendPending(ENDPOINT_CODE)}
           description="Backend cần thêm endpoint GET /api/v1/audit-logs để màn này hoạt động. Bấm Thử lại sau khi backend cập nhật."
-          action={
-            <Button onClick={() => void auditQuery.refetch()} loading={auditQuery.isFetching}>
-              Thử lại
-            </Button>
+          collapsible={false}
+          role="status"
+          endContent={
+            <Button
+              variant="secondary"
+              size="sm"
+              label={MSG_ORG.RETRY}
+              isLoading={auditQuery.isFetching}
+              onClick={() => void auditQuery.refetch()}
+            />
           }
         />
-      </Flex>
+      </Stack>
     );
   }
 
   return (
-    <Flex vertical gap={token.marginMD}>
+    <Stack direction="vertical" gap={4}>
       {pageHeader}
       <AuditLogTable
         query={auditQuery}
@@ -93,7 +94,8 @@ export default function OrganizationAuditPage() {
         onPaginationChange={setPage}
         emptyText={MSG_HIS.EMPTY}
         errorText={MSG_HIS.LOAD_ERROR}
+        paginationLabel={MSG_HIS.PAGINATION_LABEL}
       />
-    </Flex>
+    </Stack>
   );
 }

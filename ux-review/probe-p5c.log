@@ -1,0 +1,90 @@
+﻿PASS  nhß║¡t k├╜: h1 = "Nhß║¡t k├╜ hß╗ç thß╗æng" ΓÇö Nhß║¡t k├╜ hß╗ç thß╗æng
+PASS  nhß║¡t k├╜: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  nhß║¡t k├╜: c├│ cß╗Öt "Thß╗¥i ─æiß╗âm"
+PASS  nhß║¡t k├╜: c├│ cß╗Öt "H├ánh ─æß╗Öng"
+PASS  nhß║¡t k├╜: c├│ cß╗Öt "─Éß╗æi t╞░ß╗úng"
+PASS  nhß║¡t k├╜: c├│ cß╗Öt "Ng╞░ß╗¥i thß╗▒c hiß╗çn"
+PASS  nhß║¡t k├╜: c├│ cß╗Öt "Ghi ch├║"
+PASS  nhß║¡t k├╜: Badge h├ánh ─æß╗Öng k├¿m CHß╗« (BR-08)
+PASS  nhß║¡t k├╜: thß╗¥i ─æiß╗âm ─æß╗ïnh dß║íng DD/MM/YYYY HH:mm
+PASS  nhß║¡t k├╜: ng╞░ß╗¥i thß╗▒c hiß╗çn
+PASS  nhß║¡t k├╜: gi├í trß╗ï thiß║┐u hiß╗çn "ΓÇö"
+PASS  nhß║¡t k├╜: d├▓ng "Tß╗òng 7 sß╗▒ kiß╗çn"
+PASS  nhß║¡t k├╜: 7 d├▓ng ΓÇö rows=7
+PASS  nhß║¡t k├╜: ß║⌐n ph├ón trang khi chß╗ë 1 trang
+PASS  nhß║¡t k├╜: link t├ái khoß║ún "aurora" tß╗ôn tß║íi
+PASS  nhß║¡t k├╜: link t├ái khoß║ún trß╗Å /quan-tri/tai-khoan/acc-3 ΓÇö /quan-tri/tai-khoan/acc-3
+PASS  nhß║¡t k├╜: link tß╗ò chß╗⌐c trß╗Å /quan-tri/to-chuc/<id> ΓÇö /quan-tri/to-chuc/55555555-5555-5555-5555-555555555555
+PASS  nhß║¡t k├╜: kh├┤ng c├│ pageerror
+PASS  ph├ón trang: d├▓ng "Tß╗òng 25 sß╗▒ kiß╗çn"
+PASS  ph├ón trang: trang 1 c├│ 20 d├▓ng ΓÇö rows=20
+PASS  ph├ón trang: c├│ nav "Ph├ón trang nhß║¡t k├╜ hß╗ç thß╗æng"
+PASS  ph├ón trang: c├│ n├║t "─Éß║┐n trang 2"
+PASS  ph├ón trang: URL c├│ page=2 ΓÇö http://127.0.0.1:5173/quan-tri/nhat-ky?page=2
+PASS  ph├ón trang: trang 2 c├│ 5 d├▓ng ΓÇö rows=5
+PASS  ph├ón trang: request trang 2 gß╗¡i page=2 ΓÇö {"page":"2","size":"20"}
+PASS  lß╗ìc: n├║t T├¼m gß╗¡i keyword=aurora ΓÇö {"page":"1","size":"20","keyword":"aurora"}
+PASS  lß╗ìc: URL c├│ q=aurora ΓÇö http://127.0.0.1:5173/quan-tri/nhat-ky?q=aurora
+PASS  lß╗ìc: chß╗ìn h├ánh ─æß╗Öng gß╗¡i action=ORG_APPROVED ΓÇö {"page":"1","size":"20","keyword":"aurora","action":"ORG_APPROVED"}
+PASS  lß╗ìc: Selector h├ánh ─æß╗Öng c├│ n├║t clear "X├│a H├ánh ─æß╗Öng"
+PASS  lß╗ìc: xo├í h├ánh ─æß╗Öng khß╗Åi URL ΓÇö http://127.0.0.1:5173/quan-tri/nhat-ky?q=aurora
+PASS  lß╗ìc: c├│ nh├ún "Khoß║úng thß╗¥i gian"
+PASS  ng├áy: gß╗¡i cß║ú from + to khi ─æß╗º 2 ─æß║ºu ΓÇö {"page":"1","size":"20","from":"2026-10-01","to":"2026-10-31"}
+PASS  ng├áy: kh├┤ng pageerror
+PASS  ng├áy: chß╗ë gß╗¡i from khi thiß║┐u to (kh├┤ng dß╗▒ng khoß║úng nß╗¡a vß╗¥i) ΓÇö {"page":"1","size":"20","from":"2026-10-01"}
+PASS  ng├áy: thiß║┐u `to` kh├┤ng g├óy pageerror
+PASS  nhß║¡t k├╜ 404: c├óu "T├¡nh n─âng ─æang chß╗¥ backend (D-22)."
+PASS  nhß║¡t k├╜ 404: KH├öNG hiß╗çn "Ch╞░a c├│ sß╗▒ kiß╗çn n├áo"
+PASS  nhß║¡t k├╜ 404: GIß╗« ti├¬u ─æß╗ü "Nhß║¡t k├╜ hß╗ç thß╗æng"
+PASS  nhß║¡t k├╜ 404: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  nhß║¡t k├╜ 404: banner role=status
+PASS  nhß║¡t k├╜ lß╗ùi: c├óu "Kh├┤ng tß║úi ─æ╞░ß╗úc nhß║¡t k├╜ hß╗ç thß╗æng."
+PASS  nhß║¡t k├╜ lß╗ùi: banner role=alert
+PASS  nhß║¡t k├╜ lß╗ùi: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  nhß║¡t k├╜ lß╗ùi: KH├öNG hiß╗çn "Ch╞░a c├│ sß╗▒ kiß╗çn n├áo" (NFR-REL-001)
+PASS  nhß║¡t k├╜ lß╗ùi: kh├┤ng pageerror
+PASS  nhß║¡t k├╜ rß╗ùng: hiß╗çn "Ch╞░a c├│ sß╗▒ kiß╗çn n├áo"
+PASS  nhß║¡t k├╜ rß╗ùng: d├▓ng "Tß╗òng 0 sß╗▒ kiß╗çn"
+PASS  module: h1 = "Danh mß╗Ñc module" ΓÇö Danh mß╗Ñc module
+PASS  module: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  module TC-MDL-01: cell "Quß║ún l├╜ ph├▓ng hß╗ìc"
+PASS  module TC-MDL-01: c├│ nh├ún "L├╡i"
+PASS  module TC-MDL-01: c├│ nh├ún "Mß╗ƒ rß╗Öng"
+PASS  module: c├│ cß╗Öt "M├ú module"
+PASS  module: c├│ cß╗Öt "T├¬n module"
+PASS  module: c├│ cß╗Öt "Ph├ón loß║íi"
+PASS  module: KH├öNG hiß╗çn "undefined"
+PASS  module: m├┤ tß║ú thiß║┐u hiß╗çn "ΓÇö"
+PASS  module: 6 d├▓ng ΓÇö rows=6
+PASS  module: kh├┤ng pageerror
+PASS  module TC-MDL-02: hiß╗çn "Quß║ún l├╜ hß╗ìc sinh"
+PASS  module TC-MDL-02: ß║⌐n "Quß║ún l├╜ ph├▓ng hß╗ìc"
+PASS  module TC-MDL-03: hiß╗çn "Kh├┤ng t├¼m thß║Ñy module ph├╣ hß╗úp."
+PASS  module TC-MDL-04: hiß╗çn "Danh mß╗Ñc module ─æang trß╗æng."
+PASS  module TC-MDL-04: KH├öNG hiß╗çn "undefined"
+PASS  module: t├¼m live cß║¡p nhß║¡t URL q=ph├▓ng ΓÇö http://127.0.0.1:5173/quan-tri/module?q=ph%C3%B2ng
+PASS  module: lß╗ìc c├▓n "Quß║ún l├╜ ph├▓ng hß╗ìc"
+PASS  module: ß║⌐n "Quß║ún l├╜ hß╗ìc sinh"
+PASS  module: xo├í tß╗½ kho├í ΓåÆ 6 d├▓ng ΓÇö rows=6
+PASS  module sort: t─âng dß║ºn ΓåÆ d├▓ng ─æß║ºu CLASS_MANAGEMENT ΓÇö CLASS_MANAGEMENT
+PASS  module sort: giß║úm dß║ºn ΓåÆ d├▓ng ─æß║ºu TEACHER_MANAGEMENT ΓÇö TEACHER_MANAGEMENT
+PASS  module lß╗ùi: c├óu "Kh├┤ng tß║úi ─æ╞░ß╗úc danh mß╗Ñc module."
+PASS  module lß╗ùi: banner role=alert
+PASS  module lß╗ùi: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  module lß╗ùi: GIß╗« ti├¬u ─æß╗ü "Danh mß╗Ñc module"
+PASS  module lß╗ùi: kh├┤ng pageerror
+PASS  lß╗ïch sß╗¡: h1 = "Lß╗ïch sß╗¡ duyß╗çt tß╗ò chß╗⌐c"
+PASS  lß╗ïch sß╗¡: hiß╗çn t├¬n tß╗ò chß╗⌐c
+PASS  lß╗ïch sß╗¡: hiß╗çn sß╗▒ kiß╗çn "─Éß╗òi cß║Ñu h├¼nh module"
+PASS  lß╗ïch sß╗¡: KH├öNG c├│ cß╗Öt "─Éß╗æi t╞░ß╗úng"
+PASS  lß╗ïch sß╗¡: d├▓ng "Tß╗òng 1 sß╗▒ kiß╗çn"
+PASS  lß╗ïch sß╗¡: c├│ breadcrumb link "Tß╗ò chß╗⌐c"
+PASS  lß╗ïch sß╗¡: 0 phß║ºn tß╗¡ antd ΓÇö count=0
+PASS  lß╗ïch sß╗¡: kh├┤ng pageerror
+PASS  lß╗ïch sß╗¡ 404: c├óu "T├¡nh n─âng ─æang chß╗¥ backend (D-22)."
+PASS  lß╗ïch sß╗¡ 404: GIß╗« ti├¬u ─æß╗ü "Lß╗ïch sß╗¡ duyß╗çt tß╗ò chß╗⌐c"
+PASS  lß╗ïch sß╗¡ 404: c├│ n├║t "Thß╗¡ lß║íi"
+PASS  chi tiß║┐t t├ái khoß║ún: 0 phß║ºn tß╗¡ antd (AuditLogTable ─æ├ú port) ΓÇö count=0
+PASS  chi tiß║┐t t├ái khoß║ún: kh├┤ng pageerror
+
+== Tß╗öNG: 88/88 PASS ==

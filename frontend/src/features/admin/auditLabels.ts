@@ -1,3 +1,4 @@
+import type { BadgeVariant } from '@astryxdesign/core';
 import type { AuditAction, AuditLogItem, AuditTargetType } from './types';
 
 /**
@@ -7,23 +8,31 @@ import type { AuditAction, AuditLogItem, AuditTargetType } from './types';
  * ⚠️ Hợp đồng này CHƯA có ở BE (`D-22`) — khi Sang đổi tên hằng, chỉ cần sửa file này.
  */
 
-/** Nhãn + màu Tag của một hành động. */
+/** Nhãn + màu của một hành động. */
 export interface AuditActionLabel {
   label: string;
-  /** Màu Tag antd — luôn đi kèm `label` để không dùng màu làm tín hiệu duy nhất. */
+  /**
+   * Màu `Tag` antd — còn dùng ở màn CHƯA port; sẽ bỏ khi gỡ antd (P5-D).
+   * Luôn đi kèm `label` để không dùng màu làm tín hiệu duy nhất (BR-08).
+   */
   color: string;
+  /**
+   * Biến thể `Badge` của Astryx — bản thay `color` cho các màn đã port. Luôn đi
+   * kèm `label`; màu chỉ là tín hiệu phụ (BR-08).
+   */
+  badge: BadgeVariant;
 }
 
 const ACTION_LABELS: Record<AuditAction, AuditActionLabel> = {
-  ORG_APPROVED: { label: 'Duyệt tổ chức', color: 'success' },
-  ORG_REJECTED: { label: 'Từ chối tổ chức', color: 'error' },
-  ORG_SUSPENDED: { label: 'Vô hiệu hoá tổ chức', color: 'default' },
-  ORG_REACTIVATED: { label: 'Kích hoạt lại tổ chức', color: 'processing' },
-  ORG_MODULES_UPDATED: { label: 'Đổi cấu hình module', color: 'warning' },
-  ACCOUNT_STATUS_CHANGED: { label: 'Đổi trạng thái tài khoản', color: 'warning' },
-  ACCOUNT_CREATED: { label: 'Tạo tài khoản', color: 'success' },
-  ACCOUNT_ROLE_CHANGED: { label: 'Đổi vai trò tài khoản', color: 'warning' },
-  ACCOUNT_PASSWORD_RESET: { label: 'Đặt lại mật khẩu', color: 'processing' },
+  ORG_APPROVED: { label: 'Duyệt tổ chức', color: 'success', badge: 'success' },
+  ORG_REJECTED: { label: 'Từ chối tổ chức', color: 'error', badge: 'error' },
+  ORG_SUSPENDED: { label: 'Vô hiệu hoá tổ chức', color: 'default', badge: 'neutral' },
+  ORG_REACTIVATED: { label: 'Kích hoạt lại tổ chức', color: 'processing', badge: 'info' },
+  ORG_MODULES_UPDATED: { label: 'Đổi cấu hình module', color: 'warning', badge: 'warning' },
+  ACCOUNT_STATUS_CHANGED: { label: 'Đổi trạng thái tài khoản', color: 'warning', badge: 'warning' },
+  ACCOUNT_CREATED: { label: 'Tạo tài khoản', color: 'success', badge: 'success' },
+  ACCOUNT_ROLE_CHANGED: { label: 'Đổi vai trò tài khoản', color: 'warning', badge: 'warning' },
+  ACCOUNT_PASSWORD_RESET: { label: 'Đặt lại mật khẩu', color: 'processing', badge: 'info' },
 };
 
 /**
@@ -32,7 +41,9 @@ const ACTION_LABELS: Record<AuditAction, AuditActionLabel> = {
  * Không đoán: hành động lạ → hiện nguyên mã gốc để Admin thấy được sự lệch.
  */
 export function auditActionLabel(action: string): AuditActionLabel {
-  return ACTION_LABELS[action as AuditAction] ?? { label: action, color: 'default' };
+  return (
+    ACTION_LABELS[action as AuditAction] ?? { label: action, color: 'default', badge: 'neutral' }
+  );
 }
 
 /** Loại đối tượng → nhãn tiếng Việt. */
