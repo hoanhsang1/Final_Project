@@ -1,136 +1,115 @@
-# MEMS — Frontend
+# MEMS Frontend — FE-00.1 / FE-01
 
-Phần giao diện của **MEMS** (Hệ thống Quản lý Giáo dục theo Module).
+Frontend duy nhất của **MEMS (Modular Education Management System)**, nằm trong `frontend/` và
+phục vụ tại `http://localhost:5173/`. Toàn bộ mã Ant Design cũ đã được thay bằng kiến trúc
+React 19 + TypeScript + Vite + Tailwind v4 + Radix (giữ lại các contract API tốt).
 
-> Hướng dẫn đầy đủ để dựng cả hệ thống (database, backend, frontend) nằm ở
-> [`../README.md`](../README.md). File này chỉ nói về phần frontend.
+> Trạng thái: **FE-00.1 + FE-01 (một phần)** — nền tảng, phòng ban/nhân sự, chi tiết tổ chức,
+> quản lý module OWNER. Các module nghiệp vụ còn lại giữ route PLANNED đúng phạm vi.
+> Xem [báo cáo](docs/01-FE00-REPORT.md), [ma trận tích hợp](docs/04-INTEGRATION-MATRIX.md) và
+> [phụ thuộc backend](docs/BACKEND_DEPENDENCIES.md).
 
-## Công nghệ
-
-React 19 · TypeScript · Vite · React Router · TanStack Query (dữ liệu từ server) ·
-Zustand (trạng thái phía trình duyệt) · Axios · Ant Design 5 · React Hook Form + Zod ·
-dayjs · Recharts · Vitest + React Testing Library · Playwright · ESLint + Prettier.
-
-## Chạy
+## Chạy nhanh
 
 ```bash
+cd frontend
 npm install
-npm run dev
+npm run dev          # http://localhost:5173
 ```
 
-Mở http://localhost:5173
+Mặc định chạy ở **chế độ dữ liệu demo** (`VITE_DATA_SOURCE=mock`): toàn bộ dữ liệu nằm trong
+`src/services/mock/`, không gọi backend. Giao diện hiển thị rõ “Dữ liệu demo · chưa nối API”.
 
-⚠️ Gõ đúng `localhost:5173`, **đừng** dùng `127.0.0.1:5173` — Vite lắng nghe trên IPv6.
+### Kết nối backend thật
 
-Frontend cần backend đang chạy. Nếu chưa, xem [`../README.md`](../README.md) mục 6.
+1. Chạy backend (docker-compose hoặc 4 service + API Gateway ở `:8080`).
+2. Tạo `.env.local`:
+
+```bash
+VITE_DATA_SOURCE=api
+VITE_API_BASE_URL=/api/v1
+VITE_API_PROXY_TARGET=http://localhost:8080
+VITE_ENABLE_DEMO_TOOLBAR=false
+```
+
+3. `npm run dev`. Vite proxy `/api`, `/departments`, `/positions`, `/students`, `/classes`,
+   `/teachers`, `/specialties`, `/transfer-requests`, `/notifications` sang gateway (backend
+   không bật CORS nên bắt buộc đi qua proxy).
+
+> **Cảnh báo runtime:** backend đang chạy trên máy là bản build cũ hơn source repo (JWT thiếu
+> `permissionScopes`, quyền legacy UPPER_SNAKE; `/notifications`, `/transfer-requests/inbox`,
+> `/organizations/my/modules` trả 404/403). Vì vậy chế độ `api` mới chỉ xác minh được đăng nhập,
+> tổ chức, phòng ban, nhân sự cơ bản. Chi tiết và danh sách BLOCKED: [BACKEND_DEPENDENCIES.md](docs/BACKEND_DEPENDENCIES.md).
+
+## Tài khoản demo
+
+| Tài khoản | Mật khẩu | Vai trò | Ghi chú |
+|---|---|---|---|
+| `platform_admin` | `123456` | SUPER_ADMIN | Duyệt tổ chức, nhật ký hệ thống |
+| `sample_owner` | `Sample@123456` | OWNER | Toàn quyền tổ chức mẫu |
+| `sample_hr` | `Sample@123456` | MANAGER + chức vụ HR | Vào tổng quan tổ chức |
+| `sample_academic` | `Sample@123456` | STAFF + Giáo vụ | |
+| `sample_teacher` | `Sample@123456` | STAFF + Giáo viên | |
+| `sample_head` | `Sample@123456` | STAFF + Trưởng phòng | |
+| `csvc_lam` | `Sample@123456` | STAFF + CSVC | Còn mật khẩu tạm, bị buộc đổi |
+
+Biểu tượng bình thí nghiệm trên topbar (chỉ hiện ở chế độ mock) cho phép đổi nhanh vai trò demo.
 
 ## Lệnh
 
-| Lệnh | Việc nó làm |
+| Lệnh | Việc |
 |---|---|
-| `npm run dev` | Dev server, tự cập nhật khi sửa code |
-| `npm run build` | Kiểm tra type rồi build production |
-| `npm test` | Chạy toàn bộ unit test |
-| `npm run test:watch` | Chạy test ở chế độ theo dõi |
-| `npm run test:e2e` | Chạy test e2e (Playwright) — tự build rồi bật preview server ở cổng 4173 |
-| `npm run test:e2e:ui` | Mở Playwright UI để xem từng ca e2e chạy thế nào |
-| `npm run lint` | Kiểm tra ESLint |
-| `npm run format` | Định dạng code bằng Prettier |
-| `npm run preview` | Xem thử bản đã build |
+| `npm run dev` | Dev server cổng 5173 |
+| `npm run build` | `tsc -b` + build production |
+| `npm run preview` | Xem bản build |
+| `npm run lint` | ESLint (0 error; cảnh báo `set-state-in-effect` có chủ đích) |
+| `npm test` | Vitest + Testing Library (53 test) |
+| `npm run format` | Prettier |
 
 ## Cấu trúc
 
 ```
 src/
-├── pages/          # Mỗi trang một thư mục (kèm test ngay cạnh)
-├── components/     # Component dùng chung
-├── features/auth/  # Gọi API, kiểu dữ liệu, ánh xạ vai trò
-├── features/modules/ # Danh mục module (lấy từ GET /api/v1/modules, dùng chung)
-├── features/admin/ # Gọi API + câu chữ cho console quản trị
-├── stores/         # Zustand — chỉ giữ trạng thái phía trình duyệt
-├── lib/api.ts      # Axios + interceptor gắn token, tự refresh khi gặp 401
-├── theme.ts        # Token của Ant Design
-└── router.tsx
-e2e/                # Test e2e Playwright cho console quản trị
+  app/            # App, providers, error boundary, test luồng
+  layouts/        # AppShell, sidebar, topbar, auth layout, command palette
+  routes/         # guards, planned page, 404
+  features/
+    auth/         # đăng nhập, đổi mật khẩu, hồ sơ
+    platform/     # tổ chức, danh mục module, nhật ký (SUPER_ADMIN)
+    organization/ # phòng ban, nhân sự, chức vụ, điều chuyển, dashboard
+  components/ui/  # Design System (button, table, dialog, drawer…)
+  services/       # http client + mock adapter (tách khỏi code production)
+  stores/         # session (token) + UI state
+  hooks/          # breadcrumb, debounce, badge điều hướng
+  lib/            # jwt, quyền, điều hướng, format, lỗi
+  styles/         # design tokens + base CSS
+  tests/          # setup
 ```
 
-## Quên / đặt lại mật khẩu
+## Nguyên tắc đã áp dụng
 
-| Đường dẫn | Màn | Ai được vào |
-|---|---|---|
-| `/quen-mat-khau` | Nhập email → gửi liên kết đặt lại | Công khai |
-| `/dat-lai-mat-khau?token=…` | Đặt mật khẩu mới bằng token trong email | Công khai (cần token) |
+- Menu và nút bấm lọc theo **quyền hiệu lực** (permission), không theo role cứng. OWNER được
+  backend bypass nhưng FE vẫn lấy quyền từ JWT; `MANAGER`/`STAFF` không tự có quyền gì.
+- Backend luôn là nơi kiểm tra quyền thật; FE chỉ ẩn/hiện.
+- Không dùng endpoint không tồn tại. Màn hình chưa làm được đánh dấu **PLANNED** và route giữ chỗ.
+- Mock tách biệt hoàn toàn: chỉ nạp động khi `VITE_DATA_SOURCE=mock`; bản build API không tải dữ liệu demo.
+- Mọi thông báo lỗi backend (tiếng Anh) được dịch theo `code`, không hiển thị nguyên văn.
 
-- Thông báo sau khi gửi là **trung tính** ("Nếu email đã đăng ký…") để không ai dùng màn này
-  dò email nào có trong hệ thống.
-- BE chưa có `D-32`/`D-33` (`docs/api.md`) → bấm gửi hiện *"chức năng chưa sẵn sàng"*,
-  **không** giả thành công (`NFR-REL-001`).
+## Tài liệu
 
-## Console quản trị (Sprint 2)
+- [Báo cáo FE-00 (deliverables 1–11)](docs/01-FE00-REPORT.md)
+- [Design System](docs/02-DESIGN-SYSTEM.md)
+- [Sitemap & điều hướng theo quyền](docs/03-SITEMAP.md)
+- [Ma trận tích hợp FE–BE](docs/04-INTEGRATION-MATRIX.md)
+- Ảnh giao diện: `docs/screenshots/`
 
-| Đường dẫn | Màn | Ai được vào |
-|---|---|---|
-| `/quan-tri` | Tổng quan (số liệu chờ duyệt + danh mục module) | `SUPER_ADMIN` |
-| `/quan-tri/to-chuc` | Danh sách tổ chức chờ duyệt | `SUPER_ADMIN` |
-| `/quan-tri/to-chuc/:id` | Chi tiết tổ chức + duyệt/từ chối + cấu hình module + vô hiệu hoá | `SUPER_ADMIN` |
-| `/quan-tri/to-chuc/tat-ca` | Tất cả tổ chức (bộ lọc theo trạng thái/loại/từ khoá) | `SUPER_ADMIN` |
-| `/quan-tri/to-chuc/:id/lich-su` | Lịch sử duyệt của 1 tổ chức | `SUPER_ADMIN` |
-| `/quan-tri/module` | Danh mục module (lõi / mở rộng) | `SUPER_ADMIN` |
-| `/quan-tri/tai-khoan` | Quản lý tài khoản | `SUPER_ADMIN` |
-| `/quan-tri/tai-khoan/:id` | Chi tiết tài khoản + đổi trạng thái + nhật ký | `SUPER_ADMIN` |
-| `/quan-tri/nhat-ky` | Nhật ký hệ thống (audit log) | `SUPER_ADMIN` |
+## Giới hạn đã biết (chi tiết ở báo cáo)
 
-- Khung console: **Sider ≥1024px**, **Drawer + nút hamburger <1024px** (menu dùng chung
-  component `ConsoleMenu`). Chi tiết: đặc tả *Sprint 2 — Mở rộng console* §5.2.
-- Bộ lọc và trang của màn "Tất cả tổ chức" / "Tài khoản" / "Nhật ký" lưu **trong URL**
-  (`?status=`, `?page=`, `?q=`) → deep-link được, quay lại giữ nguyên bộ lọc.
-- `AdminGuard` chặn route: chưa đăng nhập → `/dang-nhap`; sai vai trò → màn 403 tại chỗ.
-  **Ẩn UI không phải bảo mật** — backend vẫn phải chặn (`SUPER_ADMIN` trên các endpoint quản trị).
-- Đăng nhập bằng `SUPER_ADMIN` sẽ vào thẳng **Tổng quan** `/quan-tri`. Tài khoản nhiều role thì
-  lấy role quyền cao nhất, không phụ thuộc thứ tự role trong JWT.
-- E2E của các màn mới chạy được **không cần backend** (mock trong `e2e/helpers.ts`), vì
-  `GET /organizations`, `/audit-logs`, `/accounts`… (`D-20`–`D-28`) chưa có ở BE.
-
-## Gọi backend
-
-`vite.config.ts` chuyển tiếp mọi request `/api/...` sang gateway ở cổng 8080:
-
-```ts
-server: { proxy: { '/api': 'http://127.0.0.1:8080' } }
-```
-
-Backend **chưa** cấu hình CORS, nên **không** gọi thẳng `http://localhost:8080` từ
-trình duyệt — phải đi qua proxy này.
-
-## Quy ước khi viết code
-
-- Một component một thư mục: `Component.tsx`, `Component.test.tsx`, `use-component.ts`, `types.ts`.
-- Tách **container** (gọi API, xử lý loading/error) khỏi **presentation** (chỉ nhận props).
-- Đủ **5 trạng thái** khi áp dụng được: loading, empty, error, success, no-permission.
-- Chỉ dùng **Ant Design 5**. Không dùng Tailwind hay CSS framework khác.
-- Mọi màu/khoảng cách/bo góc đi qua **token** của `ConfigProvider` — không hardcode hex hay px.
-- Locale **`vi_VN`** cho Ant Design. Chữ trên giao diện viết **tiếng Việt**; code đặt tên **tiếng Anh**.
-- **Server state = TanStack Query**, **client state = Zustand**. Không nhét dữ liệu server vào store.
-- Lỗi từ backend là tiếng Anh → dịch ở `features/auth/authApi.ts`, không hiện thẳng cho người dùng.
-- Không dùng `dangerouslySetInnerHTML`. Buộc render HTML do người dùng nhập thì phải sanitize.
-- Mục tiêu **WCAG 2.1 AA**: nút chỉ có icon phải có `aria-label`, trạng thái không chỉ thể hiện bằng màu.
-
-## Kiểm thử
-
-```bash
-npm test        # unit test (Vitest + React Testing Library)
-npm run test:e2e  # e2e (Playwright)
-```
-
-Test phải bao phủ cả nhánh **error / empty / no-permission**, không chỉ đường thành công.
-
-### E2E dùng API giả
-
-Các ca e2e của console quản trị chạy trên **API giả** (`page.route` trong `e2e/helpers.ts`)
-vì backend chưa sẵn sàng (`PUT /organizations/{id}/modules` chưa có; `reject` chưa nhận body
-`reason`). Contract của API giả bám đúng code backend thật, nên khi backend xong chỉ cần
-bỏ đi phần chặn route là chạy được ngay trên backend thật.
-
-E2E chạy trên **bản build** (`npm run build` + `vite preview` ở cổng 4173), không phải dev
-server — dev server phải transform hàng trăm module nên nhiều worker chạy song song hay
-gặp ca đỏ giả do hết thời gian.
+- Backend **chưa có** `GET /me`: hồ sơ đọc từ JWT; JWT không có họ tên/email/tên tổ chức/module.
+- `MemberResponse` không có họ tên/email → FE tải thêm chi tiết cho tối đa 30 người (xem
+  `ENRICH_LIMIT`), chờ backend bổ sung trường.
+- Chức vụ, điều chuyển, ủy quyền, đào tạo, lịch, CSVC, thông báo là **PLANNED** — đã có sitemap,
+  quyền và API dự kiến, chưa có giao diện hoạt động.
+- Module đang bật: OWNER nạp từ `GET /api/v1/organizations/my/modules` sau đăng nhập nên menu ẩn
+  module đã tắt. MANAGER/STAFF/giáo viên/sinh viên chưa có nguồn module (JWT không có claim) nên
+  menu chỉ lọc theo quyền; backend vẫn chặn bằng `MODULE_NOT_ENABLED`.

@@ -43,6 +43,8 @@ public enum ErrorCode {
     TRANSFER_CANCEL_NOT_ALLOWED(2021, HttpStatus.FORBIDDEN,
         "Only the requester can cancel a pending transfer request"),
     INVALID_TRANSFER_STEP(2022, HttpStatus.BAD_REQUEST, "Unknown transfer approval step"),
+    RESIGNATION_APPROVER_NOT_ALLOWED(2023, HttpStatus.FORBIDDEN,
+        "No valid resignation approver: department head, delegated general manager or owner"),
 
     // Phòng ban / chức vụ / quyền
     DEPARTMENT_NOT_FOUND(2101, HttpStatus.NOT_FOUND, "Department not found"),

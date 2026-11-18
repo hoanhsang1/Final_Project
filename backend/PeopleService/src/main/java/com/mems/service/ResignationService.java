@@ -20,11 +20,15 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Nghỉ việc — duyệt MỘT bước bởi HR (quy tắc 16).
+ * Nghỉ việc — duyệt theo thứ tự leo thang (kế hoạch v2 §1.5, DEC-08):
+ * HR có quyền → Trưởng phòng → Tổng quản lý có ủy quyền → OWNER.
+ *
+ * <p>Không ai duyệt được yêu cầu của chính mình. Không có tự duyệt/tự từ chối
+ * theo thời gian; quá hạn chỉ nhắc việc.</p>
  *
  * <p>Khi duyệt: vô hiệu tài khoản, thu hồi toàn bộ chức danh, đánh dấu nhân sự
  * RESIGNED, chuyển giáo viên sang NGHI_VIEC và gọi hook phân công lại lớp.
- * TODO(ủy quyền): hệ thống chưa có bảng ủy quyền; khi có, thu hồi tại đây.</p>
+ * TODO(ủy quyền): thu hồi ủy quyền của người nghỉ việc tại đây khi có yêu cầu.</p>
  */
 @Service
 public class ResignationService {
@@ -37,11 +41,14 @@ public class ResignationService {
     private final IdentityClient identity;
     private final PeopleAuditService audit;
     private final TeacherOffboardingHook offboarding;
+    private final ResignationApprovalPolicy approval;
+    private final NotificationService notifications;
 
     public ResignationService(Actor actor, MembershipPolicy policy, DepartmentRepository departments,
                               MemberRepository members, ResignationRepository requests,
                               TeacherRepository teachers, IdentityClient identity,
-                              PeopleAuditService audit, TeacherOffboardingHook offboarding) {
+                              PeopleAuditService audit, TeacherOffboardingHook offboarding,
+                              ResignationApprovalPolicy approval, NotificationService notifications) {
         this.actor = actor;
         this.policy = policy;
         this.departments = departments;
@@ -51,6 +58,8 @@ public class ResignationService {
         this.identity = identity;
         this.audit = audit;
         this.offboarding = offboarding;
+        this.approval = approval;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true)
@@ -60,24 +69,51 @@ public class ResignationService {
         return requests.list(actor.orgId(), departmentId, status);
     }
 
+    /** Yêu cầu nghỉ việc của chính người đang đăng nhập. */
+    @Transactional(readOnly = true)
+    public List<ResignationResponse> mine(String status) {
+        return requests.mine(actor.orgId(), actor.userId(), status);
+    }
+
     @Transactional
     public ResignationResponse create(String departmentId, ResignationCreateRequest request) {
         String orgId = actor.orgId();
         policy.requirePermission(departmentId, "employee.resign");
         departments.require(departmentId, orgId, false);
-        var member = members.require(request.userId(), orgId, departmentId, true);
+        return createInternal(departmentId, request.userId(), request.reason());
+    }
+
+    /** Nhân sự tự gửi yêu cầu nghỉ việc cho chính mình (không cần quyền quản lý). */
+    @Transactional
+    public ResignationResponse createSelf(ResignationCreateRequest request) {
+        if (!actor.userId().equals(request.userId()))
+            throw actor.forbidden("You can only request your own resignation");
+        String orgId = actor.orgId();
+        String departmentId = members.findDepartmentId(actor.userId(), orgId)
+            .orElseThrow(() -> new AppException(ErrorCode.MEMBER_NOT_FOUND));
+        return createInternal(departmentId, request.userId(), request.reason());
+    }
+
+    private ResignationResponse createInternal(String departmentId, String userId, String rawReason) {
+        String orgId = actor.orgId();
+        var member = members.require(userId, orgId, departmentId, true);
         if ("OWNER".equals(member.role()))
             throw actor.forbidden("Owner appointments cannot resign through this workflow");
         if (!"ACTIVE".equals(member.status()))
             throw new AppException(ErrorCode.MEMBER_NOT_ACTIVE);
-        if (requests.hasPending(orgId, request.userId()))
+        if (requests.hasPending(orgId, userId))
             throw new AppException(ErrorCode.RESIGNATION_ALREADY_PENDING);
 
         String id = UUID.randomUUID().toString();
-        String reason = request.reason().trim();
-        requests.create(id, orgId, request.userId(), departmentId, reason, actor.userId());
-        audit.record(orgId, actor.userId(), "RESIGNATION_REQUESTED", request.userId(),
+        String reason = rawReason.trim();
+        requests.create(id, orgId, userId, departmentId, reason, actor.userId());
+        audit.record(orgId, actor.userId(), "RESIGNATION_REQUESTED", userId,
             Map.of("requestId", id, "reason", reason));
+        notifications.notifyAll(orgId,
+            approval.approverIds(orgId, departmentId, actor.userId(), userId),
+            "RESIGNATION_REQUESTED", "Yêu cầu nghỉ việc cần duyệt",
+            "Nhân sự " + userId + " xin nghỉ việc. Lý do: " + reason,
+            "RESIGNATION_REQUEST", id);
         return requests.require(id, orgId, departmentId);
     }
 
@@ -85,12 +121,11 @@ public class ResignationService {
     public ResignationResponse approve(String departmentId, String requestId,
                                        ResignationDecisionRequest request) {
         String orgId = actor.orgId();
-        policy.requirePermission(departmentId, "employee.approve_resignation");
         departments.require(departmentId, orgId, false);
         var resignation = requests.requireForUpdate(requestId, orgId, departmentId);
         requirePending(resignation);
-        if (resignation.requestedBy().equals(actor.userId()))
-            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
+        approval.requireApprover(orgId, departmentId, resignation.requestedBy(),
+            resignation.userId());
 
         var member = members.require(resignation.userId(), orgId, departmentId, true);
         if (!"ACTIVE".equals(member.status()))
@@ -114,6 +149,14 @@ public class ResignationService {
         audit.record(orgId, actor.userId(), "MEMBER_RESIGNED", member.userId(), details);
         audit.record(orgId, actor.userId(), "RESIGNATION_APPROVED", member.userId(),
             Map.of("requestId", requestId));
+        notifications.notify(orgId, resignation.requestedBy(), "RESIGNATION_APPROVED",
+            "Yêu cầu nghỉ việc đã được duyệt",
+            "Nhân sự " + member.userId() + " đã được duyệt nghỉ việc.",
+            "RESIGNATION_REQUEST", requestId);
+        notifications.notify(orgId, member.userId(), "RESIGNATION_APPROVED",
+            "Yêu cầu nghỉ việc đã được duyệt",
+            "Tài khoản và chức danh của bạn đã được vô hiệu hóa.",
+            "RESIGNATION_REQUEST", requestId);
         return requests.require(requestId, orgId, departmentId);
     }
 
@@ -121,13 +164,21 @@ public class ResignationService {
     public ResignationResponse reject(String departmentId, String requestId,
                                       ResignationDecisionRequest request) {
         String orgId = actor.orgId();
-        policy.requirePermission(departmentId, "employee.approve_resignation");
         departments.require(departmentId, orgId, false);
         var resignation = requests.requireForUpdate(requestId, orgId, departmentId);
         requirePending(resignation);
+        approval.requireApprover(orgId, departmentId, resignation.requestedBy(),
+            resignation.userId());
         requests.decide(requestId, "REJECTED", actor.userId(), trimToNull(request.note()));
         audit.record(orgId, actor.userId(), "RESIGNATION_REJECTED", resignation.userId(),
             Map.of("requestId", requestId));
+        String note = trimToNull(request.note()) == null ? "" : request.note().trim();
+        for (String target : new java.util.LinkedHashSet<>(
+            List.of(resignation.requestedBy(), resignation.userId()))) {
+            notifications.notify(orgId, target, "RESIGNATION_REJECTED",
+                "Yêu cầu nghỉ việc bị từ chối", note,
+                "RESIGNATION_REQUEST", requestId);
+        }
         return requests.require(requestId, orgId, departmentId);
     }
 

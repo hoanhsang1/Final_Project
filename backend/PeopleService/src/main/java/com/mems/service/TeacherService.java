@@ -81,6 +81,20 @@ public class TeacherService {
         return detail(row, actor.hasPermissionIn("employee.view_detail", row.departmentId()));
     }
 
+    /** Hồ sơ giáo viên của chính người đang đăng nhập. */
+    @Transactional(readOnly = true)
+    public TeacherDetailResponse me() {
+        String orgId = actor.orgId();
+        return detail(teachers.requireTeacher(actor.userId(), orgId, false), true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeacherClassResponse> myClasses() {
+        String orgId = actor.orgId();
+        teachers.requireTeacher(actor.userId(), orgId, false);
+        return teachers.classes(actor.userId(), orgId);
+    }
+
     @Transactional
     public TeacherDetailResponse update(String userId, TeacherUpdateRequest request) {
         String orgId = actor.orgId(), actorId = actor.userId();

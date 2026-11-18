@@ -91,7 +91,15 @@ public class GeneralManagerRepository {
         List<String> ids = jdbc.queryForList(
             "SELECT id FROM `position` WHERE org_id=? AND name=? AND deleted_at IS NULL",
             String.class, orgId, positionName);
-        return ids.isEmpty() ? null : ids.get(0);
+        if (ids.isEmpty()) return null;
+        String id = ids.get(0);
+        // Chức danh tạo bởi bản cũ mặc định DEPARTMENT; list() chỉ nhận ORGANIZATION
+        // nên bổ nhiệm sẽ ghi assignment nhưng không đọc lại được.
+        jdbc.update("""
+            UPDATE `position` SET scope='ORGANIZATION'
+            WHERE id=? AND (scope IS NULL OR scope<>'ORGANIZATION')
+            """, id);
+        return id;
     }
 
     public String createPosition(String orgId, String positionName, String description) {
@@ -105,17 +113,21 @@ public class GeneralManagerRepository {
 
     /** Thêm assignment ORGANIZATION mà không thu hồi các chức danh đang có. */
     public void addAssignment(String orgId, String userId, String positionId, String actorId, String reason) {
+        Timestamp now = Timestamp.from(Instant.now());
+        // Assignment hết hiệu lực vẫn mang status ACTIVE nên phải lọc theo thời gian,
+        // nếu không lần bổ nhiệm lại sẽ bị bỏ qua và danh sách trả về rỗng.
         Integer active = jdbc.queryForObject("""
             SELECT COUNT(*) FROM assignment
             WHERE org_id=? AND user_id=? AND position_id=? AND status='ACTIVE'
-            """, Integer.class, orgId, userId, positionId);
+              AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?)
+            """, Integer.class, orgId, userId, positionId, now, now);
         if (active != null && active == 0) {
             jdbc.update("""
                 INSERT INTO assignment(id,org_id,user_id,position_id,scope_type,department_id,
                     effective_from,effective_to,status,assigned_by,created_at,reason)
                 VALUES (?,?,?,?,'ORGANIZATION',NULL,?,NULL,'ACTIVE',?,?,?)
                 """, UUID.randomUUID().toString(), orgId, userId, positionId,
-                Timestamp.from(Instant.now()), actorId, Timestamp.from(Instant.now()), reason);
+                now, actorId, now, reason);
         }
         Integer projected = jdbc.queryForObject(
             "SELECT COUNT(*) FROM member_position WHERE user_id=? AND position_id=?",

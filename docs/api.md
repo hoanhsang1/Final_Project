@@ -56,6 +56,20 @@ Tất cả lỗi đều trả về cấu trúc sau:
 | `409` | Conflict (trùng dữ liệu) |
 | `500` | Lỗi hệ thống |
 
+### Error Code Ranges (cập nhật 15/11/2026)
+
+Mỗi service dùng dải mã riêng để FE ánh xạ đúng thông báo.
+
+| Service | Dải mã | Ghi chú |
+|---|---|---|
+| IdentityService | 1001–1223 | Auth, tài khoản, tổ chức, validate DTO |
+| PeopleService — nghiệp vụ | 2001–2411 | Nhân sự, lớp, sinh viên, ủy quyền |
+| PeopleService — validate DTO | **3001–3042** | ⚠️ Trùng với ScheduleService; sẽ chuyển sang 2501–2599 ở Phần 0.8 |
+| ScheduleService | 3001–3113 | Lịch học, module guard |
+| FacilityService | 4001–4108 | Cơ sở vật chất |
+
+> ⚠️ **Dải 3001–3042 bị trùng** giữa PeopleService (validate DTO) và ScheduleService. Phần 0.8 sẽ chuyển validate DTO của PeopleService sang dải 2501–2599.
+
 ### JWT Access Token
 
 - Loại: **Bearer JWT**
@@ -171,9 +185,11 @@ Tất cả lỗi đều trả về cấu trúc sau:
 
 > ⚠️ `SCHEDULE_MANAGEMENT` tên là **"Quản lý lịch học"** (theo seed `05_seed_admin.sql`),
 > **không phải** "Quản lý thời khoá biểu".
-> `FACILITY_MANAGEMENT` **không tồn tại** — mã thiết bị là `EQUIPMENT_MANAGEMENT`,
-> mã phòng học là `ROOM_MANAGEMENT`. FE trước đây hardcode `FACILITY_MANAGEMENT` và đã
-> đổi sang lấy danh mục từ `GET /api/v1/modules` (`D-03`).
+> `FACILITY_MANAGEMENT` **đã tồn tại** kể từ migration `18_identity_department_modules.sql` —
+> đây là module quản lý cơ sở vật chất (phòng học + thiết bị). `ROOM_MANAGEMENT` và
+> `EQUIPMENT_MANAGEMENT` là module riêng lẻ từ seed cũ, hiện không dùng trong guard hay
+> permission; sẽ được hợp nhất vào `FACILITY_MANAGEMENT` ở Phần 0.1 (xem Q-03).
+> FE nên lấy danh mục từ `GET /api/v1/modules` thay vì hardcode. (`D-03`, cập nhật 15/11/2026)
 > `orgType` ở **request** này là CHỮ HOA (`SCHOOL`/`CENTER`), còn `org_type` ở **response**
 > của các endpoint tổ chức là CHỮ THƯỜNG (`school`/`center`) — xem `D-08`.
 
@@ -305,13 +321,11 @@ Lấy danh sách tất cả module đang active trong hệ thống.
 
 > Danh sách được sắp xếp theo `code` (alphabet). Chỉ trả về module có `is_active = TRUE`.
 >
-> ⚠️ **Đúng theo seed hiện tại** (`05_seed_admin.sql`) — danh mục **chỉ có 6 module**.
-> SRS §4.2 mô tả 10 module; 4 module còn thiếu (`STAFF_MANAGEMENT`,
-> `COMPUTER_ROOM_MANAGEMENT`, `TEACHER_ASSIGNMENT`, `ROOM_USAGE_MANAGEMENT`) ⇒ `D-15`.
-> Bảng `module` **không có cột `is_core`** ⇒ luật "4 module lõi không thể tắt" (`BR-06`)
-> chưa có chỗ biểu diễn ở tầng BE.
-> Lưu ý: `FACILITY_MANAGEMENT` **không tồn tại** — mã thiết bị là `EQUIPMENT_MANAGEMENT`,
-> mã phòng học là `ROOM_MANAGEMENT`.
+> Cập nhật 15/11/2026: DB hiện có **7 module** (`STUDENT_MANAGEMENT`, `TEACHER_MANAGEMENT`,
+> `CLASS_MANAGEMENT`, `SCHEDULE_MANAGEMENT`, `ROOM_MANAGEMENT`, `EQUIPMENT_MANAGEMENT`,
+> `FACILITY_MANAGEMENT`). `FACILITY_MANAGEMENT` **đã có** kể từ migration `18`.
+> Cột `is_core` đang được thêm qua migration `28` (Phần 0.1); sau đó sẽ trả thêm trường này
+> trong response để FE hiển thị module lõi không thể tắt (`BR-06`).
 
 ---
 
@@ -466,8 +480,9 @@ Từ chối đăng ký tổ chức.
 
 ### PUT /api/v1/organizations/{id}/modules
 
-> ⚠️ **CHƯA CÓ — BE chưa làm (`D-16`).** Mục này mô tả **contract FE đang dùng** để
-> BE cài theo, và để tester biết cần chờ gì. Hiện gọi endpoint này sẽ trả **404**.
+> ✅ **ĐÃ CÓ** — `OrganizationApprovalService.updateModules()` + `OrganizationController.updateModules()`.
+> Cập nhật 15/11/2026: endpoint đã hoạt động. Auth guard chưa có (`G-06`) — đang chờ Phần 0.2.
+> Hành vi "chặn tắt module lõi" chưa thực thi ở BE, chỉ ở FE (`G-05`) — sẽ sửa ở Phần 0.2.
 
 Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn chi tiết tổ chức).
 
@@ -509,7 +524,8 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 | `409` | `Organization has already been reviewed` | Tổ chức không còn ở trạng thái `pending` |
 
 > ⚠️ **BE chưa có `is_core`** (`D-15`) ⇒ luật "4 module lõi không thể tắt" (`BR-06`)
-> hiện **chỉ chặn ở FE**. Khi BE làm xong, luật này phải có ở cả 2 tầng
+> hiện **chỉ chặn ở FE**. Migration `28_identity_module_core_flag.sql` sẽ thêm cột này
+> (Phần 0.1). Khi BE làm xong, luật này phải có ở cả 2 tầng
 > (FE chặn cho UX, BE chặn thật — ẩn UI không phải bảo mật).
 
 ---
@@ -536,7 +552,7 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 | `D-29` | `POST /api/v1/accounts` | Body `{ email, full_name, role, organization_id }` — BE sinh `username` + mật khẩu tạm, gửi email | `201` item vừa tạo · `409` trùng email/username · `400` · `403` | ❌ chưa có |
 | `D-30` | `PATCH /api/v1/accounts/{id}/role` | Body `{ role }` — không nhận `SUPER_ADMIN` | `204` · `409` khi tự đổi vai trò chính mình | ❌ chưa có |
 | `D-31` | `POST /api/v1/accounts/{id}/reset-password` | Body `{}` → sinh mật khẩu tạm + gửi email · `{ new_password }` → đặt thẳng (≥ 8 ký tự) | `204` · `400` khi mật khẩu ngắn hơn 8 | ❌ chưa có |
-| `D-16` | `PUT /api/v1/organizations/{id}/modules` | — | `204` | ❌ chưa có |
+| `D-16` | `PUT /api/v1/organizations/{id}/modules` | — | `204` | ✅ có (auth guard chưa có, sửa ở Phần 0.2) |
 
 **Quy ước chung cho các endpoint mới**
 

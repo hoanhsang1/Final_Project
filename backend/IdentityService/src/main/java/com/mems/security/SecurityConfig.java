@@ -67,6 +67,13 @@ public class SecurityConfig {
                 ).permitAll()
 
                 // Chi SUPER_ADMIN duoc quan ly phe duyet
+                // QUAN TRONG: OWNER /my/** phai dat TRUOC wildcard organizations/**
+                // de Spring Security khop dung matcher
+                .requestMatchers(
+                    "/api/v1/organizations/my",
+                    "/api/v1/organizations/my/**"
+                ).hasRole("OWNER")
+
                 .requestMatchers(
                     "/api/v1/organizations/**",
                     "/api/v1/accounts/**",

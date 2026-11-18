@@ -44,6 +44,18 @@ public enum ErrorCode {
     INVALID_MODULE(1125, HttpStatus.BAD_REQUEST, "Invalid module: %s"),
     DEPARTMENT_PERMISSIONS_UNAVAILABLE(1126, HttpStatus.SERVICE_UNAVAILABLE,
         "Department permissions are temporarily unavailable"),
+    MODULE_IS_CORE(1127, HttpStatus.BAD_REQUEST,
+        "Core modules cannot be disabled"),
+    MODULE_LOCKED_BY_ADMIN(1128, HttpStatus.FORBIDDEN,
+        "This module has been locked by a system administrator and cannot be changed by the owner"),
+    MODULE_NOT_OPTIONAL(1129, HttpStatus.BAD_REQUEST,
+        "Only Optional modules can be toggled by the owner"),
+    MODULE_PENDING_WORKFLOWS(1130, HttpStatus.CONFLICT,
+        "Cannot disable module: there are pending workflows that depend on it"),
+    MODULE_LOCK_REASON_REQUIRED(1131, HttpStatus.BAD_REQUEST,
+        "A reason is required when locking a module"),
+    MODULE_ALREADY_IN_STATE(1132, HttpStatus.CONFLICT,
+        "Module is already in the requested state"),
 
     // Validate DTO
     USERNAME_REQUIRED(1201, HttpStatus.BAD_REQUEST, "Username is required"),

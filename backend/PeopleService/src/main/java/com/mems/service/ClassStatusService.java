@@ -13,6 +13,7 @@ import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class ClassStatusService {
         this(repository, classRepository, actor, moduleGuard, null, null);
     }
 
+    @Autowired
     public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard,
                               ClassApprovalPolicy approvalPolicy, NotificationService notifications) {
@@ -97,7 +99,7 @@ public class ClassStatusService {
 
         String reason = requireReason(request.reason(), "reason");
         if (before.studentCount() > 0) {
-            if (repository.requestCancel(classId, orgId, reason, request.version()) == 0) {
+            if (repository.requestCancel(classId, orgId, reason, request.version(), actor.userId()) == 0) {
                 throw statusChanged();
             }
             repository.insertCloseEvent(classId, orgId, "CANCEL_REQUESTED", actor.userId(), reason);
@@ -124,17 +126,15 @@ public class ClassStatusService {
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
         requirePendingCancel(before);
-        requireApprover(orgId);
-        if (actor.userId().equals(repository.lastEventActor(classId, orgId, "CANCEL_REQUESTED"))) {
-            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
-        }
+        String requesterId = repository.cancelRequester(classId, orgId);
+        requireDecisionAllowed(orgId, requesterId);
         String reason = before.cancelRequestReason();
         if (repository.approveCancel(classId, orgId) == 0) {
             throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
         }
         repository.insertStatusLog(classId, orgId, before.status(), "DA_HUY", reason, actor.userId());
         repository.insertCloseEvent(classId, orgId, "CANCEL_APPROVED", actor.userId(), reason);
-        notifyRequester(orgId, classId, "Yêu cầu hủy lớp đã được duyệt",
+        notifyRequester(orgId, classId, requesterId, "Yêu cầu hủy lớp đã được duyệt",
             "Lớp " + before.classCode() + " đã bị hủy.");
         return classRepository.require(classId, orgId, false);
     }
@@ -147,13 +147,14 @@ public class ClassStatusService {
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
         requirePendingCancel(before);
-        requireApprover(orgId);
+        String requesterId = repository.cancelRequester(classId, orgId);
+        requireDecisionAllowed(orgId, requesterId);
         String reason = requireReason(request.reason(), "reason");
         if (repository.rejectCancel(classId, orgId) == 0) {
             throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
         }
         repository.insertCloseEvent(classId, orgId, "CANCEL_REJECTED", actor.userId(), reason);
-        notifyRequester(orgId, classId, "Yêu cầu hủy lớp bị từ chối",
+        notifyRequester(orgId, classId, requesterId, "Yêu cầu hủy lớp bị từ chối",
             "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
         return classRepository.require(classId, orgId, false);
     }
@@ -161,8 +162,8 @@ public class ClassStatusService {
     @Transactional(readOnly = true)
     public List<ClassStatusLogResponse> statusLogs(String classId) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
-        classRepository.require(classId, orgId, false);
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
+        requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.statusLogs(classId, orgId);
     }
 
@@ -181,7 +182,7 @@ public class ClassStatusService {
         }
 
         String note = request.note() == null || request.note().isBlank() ? null : request.note().trim();
-        if (repository.requestClose(classId, orgId) == 0) {
+        if (repository.requestClose(classId, orgId, actor.userId()) == 0) {
             throw closeStateChanged();
         }
         repository.insertCloseEvent(classId, orgId, "REQUESTED", actor.userId(), note);
@@ -198,10 +199,7 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
-        requireApprover(orgId);
-        if (actor.userId().equals(repository.lastRequester(classId, orgId))) {
-            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
-        }
+        requireDecisionAllowed(orgId, repository.closeRequester(classId, orgId));
         if (repository.approveClose(classId, orgId) == 0) {
             throw closeStateChanged();
         }
@@ -219,7 +217,7 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
-        requireApprover(orgId);
+        requireDecisionAllowed(orgId, repository.closeRequester(classId, orgId));
         String reason = requireReason(request.reason(), "reason");
         if (repository.rejectClose(classId, orgId) == 0) {
             throw closeStateChanged();
@@ -235,6 +233,7 @@ public class ClassStatusService {
         refreshOrganization(orgId);
 
         SchoolClassResponse before = classRepository.require(classId, orgId, true);
+        requirePermissionScope(orgId, before, "class.reopen");
         if (!"CLOSED".equals(before.closeState())) {
             throw closeStateChanged();
         }
@@ -249,9 +248,22 @@ public class ClassStatusService {
     @Transactional(readOnly = true)
     public List<ClassCloseEventResponse> closeEvents(String classId) {
         String orgId = actor.orgId();
-        moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
-        classRepository.require(classId, orgId, false);
+        moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
+        requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.closeEvents(classId, orgId);
+    }
+
+    private void requireViewScope(String orgId, SchoolClassResponse schoolClass) {
+        requirePermissionScope(orgId, schoolClass, "class.view");
+    }
+
+    /** Quyền chỉ ở phạm vi DEPARTMENT thì lớp phải do phòng ban đó phụ trách. */
+    private void requirePermissionScope(String orgId, SchoolClassResponse schoolClass, String permission) {
+        if (actor.owner() || actor.hasOrganizationScope(permission)) return;
+        Set<String> departments = actor.departmentScopes(permission);
+        if (!classRepository.inDepartments(orgId, schoolClass.id(), departments)) {
+            throw actor.forbidden("Class is outside your department scope");
+        }
     }
 
     private void requirePendingCancel(SchoolClassResponse schoolClass) {
@@ -260,8 +272,15 @@ public class ClassStatusService {
         }
     }
 
-    private void requireApprover(String orgId) {
-        if (approvalPolicy != null) approvalPolicy.requireApprover(orgId);
+    /**
+     * A decision on a class lifecycle request is never allowed for its own requester,
+     * and the actor must be an eligible approver under the escalation policy.
+     */
+    private void requireDecisionAllowed(String orgId, String requesterId) {
+        if (requesterId != null && requesterId.equals(actor.userId())) {
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
+        }
+        if (approvalPolicy != null) approvalPolicy.requireApprover(orgId, requesterId);
     }
 
     private void notifyManagers(String orgId, String classId, String title, String body) {
@@ -271,9 +290,10 @@ public class ClassStatusService {
             "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
     }
 
-    private void notifyRequester(String orgId, String classId, String title, String body) {
+    private void notifyRequester(String orgId, String classId, String requesterId,
+                                 String title, String body) {
         if (notifications == null) return;
-        notifications.notify(orgId, repository.lastEventActor(classId, orgId, "CANCEL_REQUESTED"),
+        notifications.notify(orgId, requesterId,
             "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
     }
 

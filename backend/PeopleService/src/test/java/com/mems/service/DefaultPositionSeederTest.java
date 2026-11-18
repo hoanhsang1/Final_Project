@@ -31,9 +31,28 @@ class DefaultPositionSeederTest {
         assertThat(countPositions("org-new")).isEqualTo(7);
         assertThat(profileType("org-new", "Giáo viên")).isEqualTo("TEACHER");
         assertThat(profileType("org-new", "Giáo vụ")).isEqualTo("GENERAL");
+        // Giáo viên chỉ xem dữ liệu của chính mình; xem cả phòng ban là quyền của trưởng phòng.
         assertThat(permissions("org-new", "Giáo viên"))
-            .containsExactly("class.view", "schedule.view", "student.view");
-        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(41);
+            .containsExactly("class.self_view", "schedule.self_view");
+        assertThat(permissions("org-new", "Trưởng phòng ban"))
+            .contains("employee.view", "class.view", "schedule.view");
+        assertThat(permissions("org-new", "Giáo vụ"))
+            .contains("subject.view", "subject.manage");
+        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(49);
+    }
+
+    @Test
+    @DisplayName("Trưởng phòng ban nhận employee.view ở phạm vi phòng ban, không có quyền ghi nhân sự")
+    void departmentHeadGetsDepartmentEmployeeView() {
+        seeder.ensureForOrg("org-head");
+
+        assertThat(permissions("org-head", "Trưởng phòng ban")).contains("employee.view");
+        assertThat(permissions("org-head", "Trưởng phòng ban"))
+            .doesNotContain("employee.create", "employee.edit", "employee.delete",
+                "employee.assign_position");
+        assertThat(jdbc.queryForObject(
+            "SELECT scope FROM position WHERE org_id=? AND name='Trưởng phòng ban'", String.class, "org-head"))
+            .isEqualTo("DEPARTMENT");
     }
 
     @Test
@@ -48,7 +67,7 @@ class DefaultPositionSeederTest {
             JOIN position p ON p.id = pp.position_id
             WHERE p.org_id = ? AND p.name = 'Giáo viên'
             """, Integer.class, "org-twice");
-        assertThat(links).isEqualTo(3);
+        assertThat(links).isEqualTo(2);
     }
 
     @Test

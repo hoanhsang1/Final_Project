@@ -2,58 +2,54 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/api/:path*"
+      "destination": "https://placeholder-tunnel.trycloudflare.com/api/:path*"
     },
     {
-      "source": "/departments",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/departments"
+      "source": "/users/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/users/:path*"
     },
     {
-      "source": "/departments/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/departments/:path+"
+      "source": "/departments/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/departments/:path*"
     },
     {
-      "source": "/positions",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/positions"
+      "source": "/positions/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/positions/:path*"
     },
     {
-      "source": "/positions/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/positions/:path+"
+      "source": "/permissions/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/permissions/:path*"
     },
     {
-      "source": "/permissions",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permissions"
+      "source": "/permission-bundles/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/permission-bundles/:path*"
     },
     {
-      "source": "/permissions/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permissions/:path+"
+      "source": "/students/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/students/:path*"
     },
     {
-      "source": "/permission-bundles",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permission-bundles"
+      "source": "/classes/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/classes/:path*"
     },
     {
-      "source": "/permission-bundles/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/permission-bundles/:path+"
+      "source": "/teachers/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/teachers/:path*"
     },
     {
-      "source": "/students",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/students"
+      "source": "/specialties/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/specialties/:path*"
     },
     {
-      "source": "/students/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/students/:path+"
+      "source": "/transfer-requests/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/transfer-requests/:path*"
     },
     {
-      "source": "/classes",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/classes"
+      "source": "/notifications/:path*",
+      "destination": "https://placeholder-tunnel.trycloudflare.com/notifications/:path*"
     },
     {
-      "source": "/classes/:path+",
-      "destination": "https://made-modified-prints-inclusion.trycloudflare.com/classes/:path+"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api(?:/|$)|users(?:/|$)|departments(?:/|$)|positions(?:/|$)|permissions(?:/|$)|permission-bundles(?:/|$)|students(?:/|$)|classes(?:/|$)|teachers(?:/|$)|specialties(?:/|$)|transfer-requests(?:/|$)|notifications(?:/|$)|assets(?:/|$)).*)",
       "destination": "/index.html"
     }
   ]

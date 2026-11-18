@@ -49,8 +49,20 @@ public class ResignationRepository {
         return jdbc.query(sql.toString(), this::map, params.toArray());
     }
 
-    public Optional<ResignationResponse> find(String id, String orgId, String departmentId) {
-        var rows = jdbc.query(BASE_QUERY + """
+    /** Yêu cầu nghỉ việc của chính một nhân sự (tự phục vụ). */
+    public List<ResignationResponse> mine(String orgId, String userId, String status) {
+        StringBuilder sql = new StringBuilder(BASE_QUERY)
+            .append(" WHERE r.org_id=? AND r.user_id=? ");
+        List<Object> params = new ArrayList<>(List.of(orgId, userId));
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND r.status=? ");
+            params.add(status.trim().toUpperCase());
+        }
+        sql.append(" ORDER BY r.requested_at DESC, r.id ");
+        return jdbc.query(sql.toString(), this::map, params.toArray());
+    }
+
+    public Optional<ResignationResponse> find(String id, String orgId, String departmentId) {        var rows = jdbc.query(BASE_QUERY + """
              WHERE r.id=? AND r.org_id=? AND r.department_id=?
             """, this::map, id, orgId, departmentId);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));

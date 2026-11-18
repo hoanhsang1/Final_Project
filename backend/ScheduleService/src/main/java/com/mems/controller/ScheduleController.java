@@ -38,7 +38,7 @@ public class ScheduleController {
     public List<ScheduleResponse> mine(@RequestParam(required = false) Instant from,
                                        @RequestParam(required = false) Instant to) {
         String orgId = actor.orgId();
-        modules.requireModule(orgId, "SCHEDULE_MANAGEMENT");
+        modules.requireModuleReadable(orgId, "SCHEDULE_MANAGEMENT");
         actor.requireAnyPermission(SELF_VIEW);
         return schedules.mine(orgId, actor.userId(), actor.role(), from, to);
     }

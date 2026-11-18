@@ -32,3 +32,6 @@ hs_err_pid*
 replay_pid*
 
 .figma-cache/
+
+# Token/JWT tạm cho kiểm thử E2E — không commit
+.e2e_tmp/

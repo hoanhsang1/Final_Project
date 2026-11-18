@@ -112,7 +112,7 @@ class StudentClassManagementTest {
     @DisplayName("Identity lỗi/timeout khi kiểm tra module: 503 IDENTITY_UNAVAILABLE")
     void identityUnavailableThrows503() {
         when(actor.orgId()).thenReturn("org-1");
-        when(identityClient.activeModules("org-1"))
+        when(identityClient.moduleStatus("org-1"))
             .thenThrow(new AppException(ErrorCode.IDENTITY_UNAVAILABLE, "Identity service unavailable"));
 
         assertThatThrownBy(() -> studentService.list(1, 20, null, null, null))
@@ -122,6 +122,26 @@ class StudentClassManagementTest {
                 assertThat(apiEx.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
                 assertThat(apiEx.getCode()).isEqualTo("IDENTITY_UNAVAILABLE");
             });
+    }
+
+    @Test
+    @DisplayName("Module disabled: reads still allowed, writes blocked (DEC-11 read-only)")
+    void disabledModuleIsReadOnly() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(identityClient.moduleStatus("org-1")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "disabled")));
+        when(identityClient.activeModules("org-1")).thenReturn(List.of());
+        when(studentRepository.list("org-1", 1, 20, null, null, null))
+            .thenReturn(java.util.Map.of("items", List.of()));
+
+        assertThat(studentService.list(1, 20, null, null, null)).isNotNull();
+
+        StudentRequest request = new StudentRequest("STU001", "John", LocalDate.of(2000, 1, 1),
+            null, null, "active");
+        assertThatThrownBy(() -> studentService.create(request))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("MODULE_NOT_ENABLED"));
     }
 
     @Test
@@ -166,6 +186,8 @@ class StudentClassManagementTest {
     void crossOrganizationAccessReturns404() {
         when(actor.orgId()).thenReturn("org-A");
         when(identityClient.activeModules("org-A")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.moduleStatus("org-A")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "active")));
 
         when(studentRepository.require("student-B", "org-A", false))
             .thenThrow(new AppException(ErrorCode.STUDENT_NOT_FOUND, "Student not found"));

@@ -57,6 +57,8 @@ class ClassLifecycleTest {
         actor = mock(Actor.class);
         when(actor.orgId()).thenReturn("org-1");
         when(actor.userId()).thenReturn("requester");
+        // Các test này kiểm tra vòng đời lớp, không kiểm tra phạm vi phòng ban.
+        when(actor.hasOrganizationScope(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
 
         OrganizationModuleGuard guard = mock(OrganizationModuleGuard.class);
         classes = new SchoolClassRepository(jdbc);

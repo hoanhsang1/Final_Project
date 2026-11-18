@@ -53,13 +53,15 @@ public final class PermissionCatalog {
         orgAndDept("position.manage", "Create, update and delete positions", null),
         orgAndDept("department.view", "View departments", null),
         orgOnly("department.manage", "Create, update and delete departments", null),
-        // Quản lý đào tạo học sinh / lớp — tài nguyên cấp tổ chức (không có department_id)
+        // Quản lý đào tạo học sinh / lớp — tài nguyên cấp tổ chức.
+        // `class.view` cho phép phạm vi DEPARTMENT để trưởng phòng/HR phòng xem được
+        // lớp trong phòng; PeopleService lọc dữ liệu theo department của người tạo/lớp.
         orgOnly("student.view", "View students", "STUDENT_MANAGEMENT"),
         orgOnly("student.create", "Create students", "STUDENT_MANAGEMENT"),
         orgOnly("student.edit", "Edit students", "STUDENT_MANAGEMENT"),
         orgOnly("student.delete", "Delete students", "STUDENT_MANAGEMENT"),
         orgOnly("student.create_account", "Create login accounts for students", "STUDENT_MANAGEMENT"),
-        orgOnly("class.view", "View classes", "STUDENT_MANAGEMENT"),
+        orgAndDept("class.view", "View classes", "STUDENT_MANAGEMENT"),
         orgOnly("class.create", "Create classes", "STUDENT_MANAGEMENT"),
         orgOnly("class.edit", "Edit classes", "STUDENT_MANAGEMENT"),
         orgOnly("class.delete", "Delete classes", "STUDENT_MANAGEMENT"),
@@ -68,11 +70,16 @@ public final class PermissionCatalog {
         orgOnly("class.cancel", "Cancel classes", "STUDENT_MANAGEMENT"),
         orgOnly("class.request_close", "Request class closure", "STUDENT_MANAGEMENT"),
         orgOnly("class.approve_close", "Approve or reject class closure", "STUDENT_MANAGEMENT"),
-        orgOnly("class.reopen", "Reopen closed classes", "STUDENT_MANAGEMENT"),
-        // Quyền SELF (chỉ dữ liệu của chính người dùng) — không gắn module/phòng ban
-        orgOnly("student.self_view", "View own student profile", null),
-        orgOnly("class.self_view", "View own class", null),
-        orgOnly("schedule.self_view", "View own schedule", null),
+        orgAndDept("class.reopen", "Reopen closed classes", "STUDENT_MANAGEMENT"),
+        // Danh mục môn học — tài nguyên cấp tổ chức, dùng khi tạo/sửa lớp.
+        orgOnly("subject.view", "View subjects", "STUDENT_MANAGEMENT"),
+        orgOnly("subject.manage", "Create, update and activate/deactivate subjects", "STUDENT_MANAGEMENT"),
+        // Quyền SELF (chỉ dữ liệu của chính người dùng) — không gắn module/phòng ban.
+        // Cho phép cả DEPARTMENT vì giáo viên/trưởng phòng giữ chức vụ DEPARTMENT
+        // vẫn cần xem lớp/lịch của chính mình.
+        orgAndDept("student.self_view", "View own student profile", null),
+        orgAndDept("class.self_view", "View own class", null),
+        orgAndDept("schedule.self_view", "View own schedule", null),
         // Lịch học
         orgAndDept("schedule.view", "View department schedules", "SCHEDULE_MANAGEMENT"),
         orgAndDept("schedule.create", "Create department schedules", "SCHEDULE_MANAGEMENT"),
@@ -109,7 +116,8 @@ public final class PermissionCatalog {
             Set.of("student.view", "student.create", "student.edit", "student.delete",
                 "student.create_account", "class.view", "class.create", "class.edit",
                 "class.delete", "class.assign_teacher", "class.teacher.reassign",
-                "class.cancel", "class.request_close", "class.approve_close", "class.reopen"),
+                "class.cancel", "class.request_close", "class.reopen",
+                "subject.view", "subject.manage"),
             Set.of(SCOPE_ORGANIZATION)),
         new BundleDefinition("SCHEDULE_MANAGEMENT", "Quản lý lịch học",
             "Quản lý lịch học của phòng ban",

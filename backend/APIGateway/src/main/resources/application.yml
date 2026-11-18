@@ -95,6 +95,11 @@ spring:
           predicates:
             - Path=/notifications/**,/notifications,/notifications/
 
+        - id: people-users
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/users/**,/users,/users/
+
         # Sprint 4 FE gọi kèm prefix /api; gateway bỏ 1 segment để khớp controller.
         - id: people-teachers-api
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}

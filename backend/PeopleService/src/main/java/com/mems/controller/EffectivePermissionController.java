@@ -41,6 +41,14 @@ public class EffectivePermissionController {
         Optional<String> departmentId = members.findDepartmentId(userId, orgId);
         if (departmentId.isEmpty()) {
             if (actor.owner()) return fullCatalog(userId, orgId);
+            // STUDENT/TEACHER không thuộc phòng ban: quyền SELF nằm trong JWT.
+            Set<String> authorities = new TreeSet<>(actor.authorities());
+            authorities.removeIf(code -> code.startsWith("ROLE_"));
+            if (!authorities.isEmpty()) {
+                Map<String, Set<String>> scopes = new TreeMap<>();
+                for (String code : authorities) scopes.put(code, Set.of("ORGANIZATION"));
+                return new EffectivePermissionsResponse(userId, orgId, null, authorities, scopes);
+            }
             return new EffectivePermissionsResponse(userId, orgId, null, Set.of(), Map.of());
         }
         var effective = effectivePermissions.resolve(orgId, userId, departmentId.get());

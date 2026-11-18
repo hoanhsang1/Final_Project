@@ -52,7 +52,7 @@ class ClassCancelWorkflowTest {
         when(actor.orgId()).thenReturn(ORG);
         when(actor.userId()).thenReturn("requester");
         when(classes.require(eq(CLASS), eq(ORG), anyBoolean())).thenReturn(row("NONE", 3));
-        when(repository.requestCancel(CLASS, ORG, "Trùng lịch", 0L)).thenReturn(1);
+        when(repository.requestCancel(CLASS, ORG, "Trùng lịch", 0L, "requester")).thenReturn(1);
         when(repository.cancel(CLASS, ORG, 0L)).thenReturn(1);
         when(approvalPolicy.classManagers(ORG, "owner")).thenReturn(Set.of("owner", "head-1"));
     }
@@ -65,7 +65,7 @@ class ClassCancelWorkflowTest {
         SchoolClassResponse result = service.cancel(CLASS, new ClassCancelRequest("Trùng lịch", 0L));
 
         assertThat(result.cancelState()).isEqualTo("PENDING");
-        verify(repository).requestCancel(CLASS, ORG, "Trùng lịch", 0L);
+        verify(repository).requestCancel(CLASS, ORG, "Trùng lịch", 0L, "requester");
         verify(repository).insertCloseEvent(CLASS, ORG, "CANCEL_REQUESTED", "requester", "Trùng lịch");
         verify(repository, never()).cancel(anyString(), anyString(), anyLong());
         verify(notifications).notifyAll(eq(ORG), eq(Set.of("owner", "head-1")),
@@ -81,17 +81,17 @@ class ClassCancelWorkflowTest {
 
         verify(repository).cancel(CLASS, ORG, 0L);
         verify(repository).insertStatusLog(CLASS, ORG, "DANG_DIEN_RA", "DA_HUY", "Trùng lịch", "requester");
-        verify(repository, never()).requestCancel(anyString(), anyString(), anyString(), anyLong());
+        verify(repository, never()).requestCancel(anyString(), anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
     @DisplayName("Duyệt hủy: cần đúng trưởng phòng, không được tự duyệt")
     void approveCancelRequiresApproverAndBlocksSelfApproval() {
         when(classes.require(eq(CLASS), eq(ORG), anyBoolean())).thenReturn(row("PENDING", 3));
-        when(repository.approveCancel(CLASS, ORG)).thenReturn(1);
-        when(repository.lastEventActor(CLASS, ORG, "CANCEL_REQUESTED")).thenReturn("head-1");
+        when(repository.cancelRequester(CLASS, ORG)).thenReturn("head-1");
+        when(actor.userId()).thenReturn("approver");
         doThrow(new AppException(ErrorCode.CLASS_APPROVER_NOT_ALLOWED))
-            .when(approvalPolicy).requireApprover(ORG);
+            .when(approvalPolicy).requireApprover(ORG, "head-1");
 
         assertThatThrownBy(() -> service.approveCancel(CLASS))
             .isInstanceOf(AppException.class)
@@ -99,7 +99,8 @@ class ClassCancelWorkflowTest {
             .isEqualTo(ErrorCode.CLASS_APPROVER_NOT_ALLOWED);
 
         reset(approvalPolicy);
-        when(repository.lastEventActor(CLASS, ORG, "CANCEL_REQUESTED")).thenReturn("requester");
+        when(repository.cancelRequester(CLASS, ORG)).thenReturn("requester");
+        when(actor.userId()).thenReturn("requester");
 
         assertThatThrownBy(() -> service.approveCancel(CLASS))
             .isInstanceOf(AppException.class)
@@ -114,7 +115,7 @@ class ClassCancelWorkflowTest {
     void approveCancelMarksClassCancelled() {
         when(classes.require(eq(CLASS), eq(ORG), anyBoolean())).thenReturn(row("PENDING", 3));
         when(repository.approveCancel(CLASS, ORG)).thenReturn(1);
-        when(repository.lastEventActor(CLASS, ORG, "CANCEL_REQUESTED")).thenReturn("requester");
+        when(repository.cancelRequester(CLASS, ORG)).thenReturn("requester");
         when(actor.userId()).thenReturn("head-1");
 
         service.approveCancel(CLASS);
@@ -131,6 +132,8 @@ class ClassCancelWorkflowTest {
     void rejectCancelRequiresReason() {
         when(classes.require(eq(CLASS), eq(ORG), anyBoolean())).thenReturn(row("PENDING", 3));
         when(repository.rejectCancel(CLASS, ORG)).thenReturn(1);
+        when(repository.cancelRequester(CLASS, ORG)).thenReturn("requester");
+        when(actor.userId()).thenReturn("head-1");
 
         assertThatThrownBy(() -> service.rejectCancel(CLASS, new ClassCloseRejectRequest("  ")))
             .isInstanceOf(AppException.class)
@@ -139,7 +142,7 @@ class ClassCancelWorkflowTest {
         service.rejectCancel(CLASS, new ClassCloseRejectRequest("Vẫn còn học sinh"));
 
         verify(repository).rejectCancel(CLASS, ORG);
-        verify(repository).insertCloseEvent(CLASS, ORG, "CANCEL_REJECTED", "requester", "Vẫn còn học sinh");
+        verify(repository).insertCloseEvent(CLASS, ORG, "CANCEL_REJECTED", "head-1", "Vẫn còn học sinh");
     }
 
     private SchoolClassResponse row(String cancelState, int studentCount) {

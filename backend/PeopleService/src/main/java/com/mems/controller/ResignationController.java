@@ -41,8 +41,10 @@ public class ResignationController {
             + "/resignation-requests/" + created.id())).body(created);
     }
 
+    // Authorization is decided by ResignationService -> ResignationApprovalPolicy (DEC-08
+    // escalation: HR holder, then department head, then delegated GM, then owner). A coarse
+    // permission pre-check here would block every level except the HR holder.
     @PostMapping("/{requestId}/approve")
-    @RequirePermission(value = "employee.approve_resignation", department = "departmentId")
     public ResignationResponse approve(@PathVariable String departmentId, @PathVariable String requestId,
                                        @Valid @RequestBody(required = false) ResignationDecisionRequest request) {
         return service.approve(departmentId, requestId,
@@ -50,7 +52,6 @@ public class ResignationController {
     }
 
     @PostMapping("/{requestId}/reject")
-    @RequirePermission(value = "employee.approve_resignation", department = "departmentId")
     public ResignationResponse reject(@PathVariable String departmentId, @PathVariable String requestId,
                                       @Valid @RequestBody(required = false) ResignationDecisionRequest request) {
         return service.reject(departmentId, requestId,

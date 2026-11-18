@@ -47,7 +47,7 @@ public class DepartmentScheduleController {
                                        @RequestParam(required = false) Instant from,
                                        @RequestParam(required = false) Instant to,
                                        @RequestParam(required = false) String classId) {
-        authorize(VIEW, departmentId);
+        authorizeRead(VIEW, departmentId);
         return schedules.list(actor.orgId(), departmentId, from, to, classId);
     }
 
@@ -89,7 +89,12 @@ public class DepartmentScheduleController {
     }
 
     private void authorize(Set<String> codes, String departmentId) {
-        modules.requireModule(actor.orgId(), MODULE);
+        modules.requireModuleForWrite(actor.orgId(), MODULE);
+        actor.requireAnyPermissionIn(codes, departmentId);
+    }
+
+    private void authorizeRead(Set<String> codes, String departmentId) {
+        modules.requireModuleReadable(actor.orgId(), MODULE);
         actor.requireAnyPermissionIn(codes, departmentId);
     }
 }

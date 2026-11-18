@@ -24,16 +24,31 @@ import java.util.UUID;
 public class DefaultPositionSeeder {
     private static final Logger log = LoggerFactory.getLogger(DefaultPositionSeeder.class);
 
-    // Keep in sync with IdentityService PermissionCatalog.ENTRIES.
-    private static final Set<String> ALL_PERMISSIONS = Set.of(
+    /**
+     * Quản trị viên tổ chức: 4 operational bundles + explicit HR permissions.
+     * Excludes: class.approve_close (DEC-02, kế hoạch v2 §0.3),
+     *           delegation.*, general_manager.*, org.module.toggle, org.audit.view (DEC-05).
+     * Keep in sync with PermissionCatalog.ENTRIES.
+     */
+    private static final Set<String> ORG_ADMIN_PERMISSIONS = Set.of(
+        // HR
         "employee.view", "employee.create", "employee.edit", "employee.delete",
-        "employee.reset_password", "employee.assign_position", "position.view", "position.manage",
+        "employee.reset_password", "employee.assign_position", "employee.view_detail",
+        "employee.resign", "employee.approve_resignation", "employee.transfer",
+        "employee.approve_transfer",
+        "position.view", "position.manage",
         "department.view", "department.manage",
+        // Academic (class.approve_close intentionally absent per DEC-02)
         "student.view", "student.create", "student.edit", "student.delete",
-        "class.view", "class.create", "class.edit", "class.delete", "class.assign_teacher",
-        "class.cancel", "class.request_close", "class.approve_close", "class.reopen",
+        "student.create_account",
+        "subject.view", "subject.manage",
+        "class.view", "class.create", "class.edit", "class.delete",
+        "class.assign_teacher", "class.teacher.reassign",
+        "class.cancel", "class.request_close", "class.reopen",
+        // Schedule
         "schedule.view", "schedule.create", "schedule.edit", "schedule.update",
         "schedule.cancel_session", "schedule.delete",
+        // Facility
         "facility.view", "facility.manage",
         "facility.room.view", "facility.room.create", "facility.room.update", "facility.room.delete",
         "facility.equipment.view", "facility.equipment.create", "facility.equipment.update",
@@ -45,23 +60,26 @@ public class DefaultPositionSeeder {
 
     private static final List<DefaultPosition> DEFAULTS = List.of(
         new DefaultPosition("Quản trị viên tổ chức", "Quản trị toàn bộ tổ chức", "GENERAL",
-            "ORGANIZATION", ALL_PERMISSIONS,
+            "ORGANIZATION", ORG_ADMIN_PERMISSIONS,
             Set.of("HR_MANAGEMENT", "ACADEMIC_MANAGEMENT", "SCHEDULE_MANAGEMENT", "FACILITY_MANAGEMENT")),
         new DefaultPosition("Giáo vụ", "Quản lý lớp học và sinh viên", "GENERAL",
             "ORGANIZATION", Set.of(
                 "class.view", "class.create", "class.edit", "class.assign_teacher", "class.cancel",
-                "class.request_close", "student.view", "student.create", "student.edit", "student.delete"),
+                "class.request_close", "student.view", "student.create", "student.edit", "student.delete",
+                "subject.view", "subject.manage"),
             Set.of("ACADEMIC_MANAGEMENT")),
         new DefaultPosition("Giáo viên", "Giáo viên giảng dạy", "TEACHER",
-            "DEPARTMENT", Set.of("class.view", "student.view", "schedule.view"), Set.of()),
+            "DEPARTMENT", Set.of("class.self_view", "schedule.self_view"), Set.of()),
         new DefaultPosition("Trưởng phòng ban", "Phê duyệt đóng lớp trong phòng ban", "GENERAL",
-            "DEPARTMENT", Set.of("class.view", "class.approve_close", "class.reopen"), Set.of()),
+            "DEPARTMENT", Set.of("employee.view", "class.view", "class.approve_close", "class.reopen",
+                "class.self_view", "schedule.view", "schedule.self_view"), Set.of()),
         // Must contain the teacher position's permissions so a MANAGER can assign it (MembershipPolicy).
         new DefaultPosition("Nhân sự phòng ban", "Quản lý nhân sự trong phòng ban", "GENERAL",
             "DEPARTMENT", Set.of(
                 "employee.view", "employee.create", "employee.edit", "employee.delete",
                 "employee.reset_password", "employee.assign_position", "position.view", "position.manage",
-                "department.view", "class.view", "student.view", "schedule.view"),
+                "department.view", "class.view", "class.self_view",
+                "schedule.view", "schedule.self_view"),
             Set.of("HR_MANAGEMENT")),
         new DefaultPosition("Nhân viên cơ sở vật chất", "Quản lý cơ sở vật chất", "GENERAL",
             "DEPARTMENT", Set.of("facility.view", "facility.manage",

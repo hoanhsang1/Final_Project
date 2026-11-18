@@ -1,0 +1,568 @@
+[Heading 1] MEMS — Tài liệu đặc tả toàn dự án
+[Normal] Phiên bản 2.0 · 15/11/2026 · Bản làm việc, đã áp dụng 14 quyết định DEC-01..14. Mục ghi [CẦN XÁC NHẬN] là điểm chưa kiểm chứng với code hoặc SRS.
+[Heading 2] 0. Cách đọc tài liệu
+[List Paragraph] [ĐÃ CÓ]: đã có trong code backend (đối chiếu controller, SQL 01–27, DefaultPositionSeeder, các policy).
+[List Paragraph] [MỚI]: chức năng hoặc quy tắc cần làm theo kế hoạch triển khai.
+[List Paragraph] [CHỐT]: quyết định đã được duyệt (xem mục 13).
+[List Paragraph] [CẦN XÁC NHẬN]: chưa đủ căn cứ, cần hỏi nhóm hoặc SRS.
+[List Paragraph] Nguồn sự thật theo thứ tự ưu tiên: (1) code backend; (2) sơ đồ MEMS_so_do_chuc_nang_theo_vai_tro_v2.drawio (7 trang); (3) kế hoạch MEMS_ke_hoach_trien_khai.md; (4) SRS v0.1 trong repo (bản v0.2 ngoài repo chưa đối chiếu).
+[List Paragraph] Tài liệu này không thay SRS; nó là bản hợp nhất để nhóm, AI và giảng viên cùng đọc một nguồn.
+[Heading 2] 1. Tổng quan
+[Heading 3] 1.1 Mục tiêu
+[Normal] MEMS (Modular Education Management System) là nền tảng quản lý giáo dục đa tổ chức (multi-tenant): nhiều trường học và trung tâm dùng chung một hệ thống. Mỗi tổ chức bật hoặc tắt module theo nhu cầu: quản lý nhân sự, đào tạo (sinh viên, giáo viên, lớp), lịch học, cơ sở vật chất. Phân quyền linh hoạt theo role, chức vụ, bundle quyền, ủy quyền và phạm vi (tổ chức / phòng ban / cá nhân).
+[Heading 3] 1.2 Người dùng và loại tổ chức
+[Normal] Loại tổ chức: trường học và trung tâm. Logic nghiệp vụ dùng chung; khác biệt hiện chỉ là nhãn hiển thị (học sinh / học viên) — để backlog [CHỐT DEC-12].
+[Heading 3] 1.3 Phạm vi
+[Normal] Trong phạm vi (đã làm hoặc đang kế hoạch):
+[List Paragraph] Tổ chức: đăng ký, duyệt, tạm ngưng, module.
+[List Paragraph] Phòng ban, chức vụ, nhân sự, ủy quyền, Tổng quản lý, chuyển phòng 4 bên, nghỉ việc.
+[List Paragraph] Giáo viên (hồ sơ, chuyên môn, hợp đồng, trạng thái giảng dạy), sinh viên, lớp học và vòng đời lớp, môn học.
+[List Paragraph] Lịch học (buổi học, chặn trùng, gợi ý phòng) và các mở rộng: xếp lịch lặp, điểm danh, đổi lịch / dạy bù.
+[List Paragraph] Cơ sở vật chất: phòng, thiết bị, sự cố.
+[List Paragraph] Cổng cá nhân (SELF) cho giáo viên và sinh viên.
+[Normal] Ngoài phạm vi hoặc để sau:
+[List Paragraph] Báo cáo thống kê nâng cao, dashboard (nhóm C), nhập sinh viên từ Excel, gợi ý xếp lịch tự động.
+[List Paragraph] Học phí, tuyển sinh, điểm số, nhập điểm.
+[List Paragraph] Đăng ký tự do và xác thực email cho giáo viên / sinh viên: tài khoản của hai vai trò này do nhân sự tạo.
+[List Paragraph] Chức vụ điều phối lịch riêng (tạm gán bundle SCHEDULE_MANAGEMENT cho Giáo vụ khi cần).
+[List Paragraph] Hạn tự duyệt / tự từ chối theo thời gian [CHỐT DEC-14].
+[Heading 3] 1.4 Nguyên tắc thiết kế
+[List Paragraph] Backend là nơi quyết định quyền; ẩn menu ở frontend chỉ là UX.
+[List Paragraph] org_id lấy từ JWT, không bao giờ nhận từ client; mọi truy vấn lọc theo tổ chức.
+[List Paragraph] Một nhân viên thuộc một phòng ban tại một thời điểm, có thể giữ nhiều chức vụ.
+[List Paragraph] Không ai tự duyệt yêu cầu của chính mình; thiếu người duyệt thì leo thang.
+[List Paragraph] Hành động nhạy cảm đều ghi audit (ai, làm gì, lúc nào, lý do).
+[List Paragraph] Vô hiệu hóa, không xóa cứng dữ liệu nghiệp vụ.
+[List Paragraph] Quyền hiệu lực = role ∪ chức vụ ∪ bundle ∪ ủy quyền còn hiệu lực, sau đó lọc theo phạm vi và module.
+[List Paragraph] Thao tác nhiều bản ghi chạy trong một transaction; xung đột đồng thời xử lý bằng khóa tài nguyên hoặc version.
+[List Paragraph] Phân biệt rõ hiện trạng (AS-IS) với đề xuất (TO-BE); không coi đề xuất của AI là sự thật.
+[Heading 3] 1.5 Đội ngũ và công cụ
+[List Paragraph] Phân vai nhóm: Nghĩa (Frontend), Sang (Backend), Bảo (BA), Vy (QA).
+[List Paragraph] Repo: hoanhsang1/Final_Project; frontend triển khai trên Vercel (gateway cho phép origin *.vercel.app).
+[List Paragraph] Công cụ AI hỗ trợ code theo kế hoạch từng phần có DoD; AI phải đọc code liên quan trước khi sửa.
+[Heading 2] 2. Thuật ngữ
+[Heading 2] 3. Kiến trúc kỹ thuật
+[Heading 3] 3.1 Sơ đồ thành phần
+[Code] Trình duyệt (React, Vite, localhost:5173 hoặc Vercel)
+        │  /api/...
+        ▼
+   API Gateway :8080  ──(Eureka :8761)──  tìm service
+        │
+        ├── IdentityService  :8081  → mems_identity_db
+        ├── PeopleService    :8082  → mems_people_db
+        ├── ScheduleService  :8083  → mems_schedule_db
+        └── FacilityService  :8084  → mems_facility_db
+
+Service ↔ service: REST nội bộ /internal/** (INTERNAL_API_KEY)
+Database: MySQL 8.0.16+ (một schema cho mỗi service)
+[Heading 3] 3.2 Các service
+[Normal] Tên cơ sở dữ liệu theo quy ước mems_<service>_db (xác nhận trong docker-compose.yml).
+[Heading 3] 3.3 Gateway và định tuyến
+[Normal] Gateway chuyển tiếp theo tiền tố đường dẫn:
+[List Paragraph] Identity: /api/v1/auth, /api/v1/modules, /api/v1/organizations, /api/v1/accounts, /api/v1/audit-logs.
+[List Paragraph] People: /departments, /positions, /permissions, /permission-bundles, /students, /classes, /teachers, /specialties, /transfer-requests, /notifications và các bản có tiền tố /api/... (teachers, specialties, subjects, classes, transfer-requests, notifications, delegations, general-manager).
+[List Paragraph] Schedule: /api/departments/*/schedules/**, /api/schedules/**.
+[List Paragraph] Facility: /api/departments/*/facilities/**.
+[Normal] Ghi chú: một số route People tồn tại ở cả dạng không tiền tố và dạng /api/...; khi thêm endpoint mới phải khai báo route tương ứng trong application.yml của gateway.
+[Heading 3] 3.4 Xác thực và phiên
+[List Paragraph] JWT access token (Bearer), ký bằng JWT_SECRET_BASE64 (32 byte ngẫu nhiên mã hóa base64).
+[List Paragraph] Refresh token lưu hash trong refresh_token, xoay vòng mỗi lần dùng (replaced_by), gắn session_id; POST /api/v1/auth/logout thu hồi.
+[List Paragraph] Tài khoản có thể buộc đổi mật khẩu lần đầu (must_change_password, mã lỗi PASSWORD_CHANGE_REQUIRED); frontend đẩy sang /doi-mat-khau.
+[List Paragraph] Bảng account có sẵn failed_login_attempts, locked_until nhưng code chưa dùng để khóa [MỚI, kế hoạch 1.3].
+[List Paragraph] Bảng password_reset_token đã có nhưng chưa có endpoint quên / đặt lại mật khẩu [MỚI, kế hoạch 1.2].
+[List Paragraph] Gọi giữa các service dùng header khóa nội bộ INTERNAL_API_KEY cho /internal/**.
+[List Paragraph] Frontend: Axios interceptor gắn JWT; gặp 401 thì refresh rồi gọi lại; refresh lỗi thì xóa token và về /dang-nhap.
+[Heading 3] 3.5 Giao tiếp giữa các service [ĐÃ CÓ]
+[Heading 3] 3.6 Chuỗi kiểm tra khi gọi API
+[List Paragraph] JWT hợp lệ (hoặc khóa nội bộ).
+[List Paragraph] Role / authority (@PreAuthorize).
+[List Paragraph] Quyền + phạm vi phòng ban (@RequirePermission, Actor, MembershipPolicy).
+[List Paragraph] Module đang bật ở tổ chức và phòng ban.
+[List Paragraph] Trạng thái bản ghi (PENDING, ACTIVE, ...).
+[List Paragraph] Quy tắc nghiệp vụ riêng (không tự duyệt, Trưởng phòng, Owner, ...).
+[Heading 3] 3.7 Hạ tầng và cấu hình
+[List Paragraph] docker-compose.yml dựng Eureka, Identity, People, Schedule, Facility (và gateway); MySQL chạy ngoài compose (host.docker.internal:3306).
+[List Paragraph] Không dùng Flyway/Liquibase: nạp các file SQL ở thư mục gốc theo thứ tự 01 → 27. Migration mới đánh số tiếp (từ 28_...), không sửa file cũ.
+[List Paragraph] Biến môi trường chính: DB_USERNAME, DB_PASSWORD, JWT_SECRET_BASE64, INTERNAL_API_KEY, EUREKA_URL, IDENTITY_SERVICE_URL, PEOPLE_SERVICE_URL, FACILITY_SERVICE_URL, CORS_ALLOWED_ORIGINS, nhóm OWNER_BOOTSTRAP_* (tạo Owner ban đầu cho tổ chức đã ACTIVE; tắt sau lần khởi động đầu), ADMIN_BOOTSTRAP_PASSWORD (tài khoản platform_admin từ 05_seed_admin.sql).
+[List Paragraph] Repo công khai: không commit .env; chỉ giữ .env.example.
+[Heading 3] 3.8 Frontend
+[Normal] TypeScript, Vite, React, React Router; TanStack Query (server state); Zustand (phiên, role, module bật); Axios; Ant Design 5 (không dùng Tailwind); React Hook Form + Zod; dayjs múi giờ Asia/Ho_Chi_Minh; Recharts; Vitest + Playwright. Ràng buộc: style qua token ConfigProvider; locale vi_VN; đủ 5 trạng thái (loading, rỗng, lỗi, thành công, không có quyền); dùng chữ “Vô hiệu hoá” thay “Xoá”; không dùng màu làm tín hiệu duy nhất; lỗi kiểm tra xung đột không hiện thành công; không dùng dangerouslySetInnerHTML; mục tiêu WCAG 2.1 AA.
+[Heading 3] 3.9 Kiểm thử hiện có
+[Normal] Backend có test cho vòng đời lớp (ClassLifecycleTest, ClassCancelWorkflowTest) và các policy; frontend có 117 unit test (theo báo cáo gần nhất) và Playwright E2E.
+[Heading 2] 4. Vai trò, chức vụ và quyền
+[Heading 3] 4.1 Ba lớp quyền
+[Normal] Một tài khoản có thể có đồng thời: ROLE hệ thống (trong JWT) + CHỨC VỤ (kèm bundle và quyền) + ỦY QUYỀN (nếu là Tổng quản lý).
+[Normal] Role cũ ORG_ADMIN, ACADEMIC_STAFF, FACILITY_STAFF còn trong seed nhưng deprecated, không có màn hình tương ứng; dọn ở kế hoạch 0.5 [CHỐT].
+[Heading 3] 4.2 Bốn tầng
+[Heading 3] 4.3 Công thức quyền hiệu lực [ĐÃ CÓ]
+[Normal] Quyền hiệu lực = quyền của ROLE ∪ quyền của CHỨC VỤ ∪ quyền từ BUNDLE của chức vụ ∪ quyền từ ỦY QUYỀN còn hiệu lực, rồi lọc theo:
+[List Paragraph] department_member đang ACTIVE;
+[List Paragraph] assignment đang ACTIVE và trong thời hạn (effective_from, effective_to);
+[List Paragraph] allowed_scopes của quyền chứa ORGANIZATION hoặc DEPARTMENT phù hợp;
+[List Paragraph] module đang bật ở tổ chức và phòng ban.
+[Normal] OWNER bỏ qua bước lọc quyền nhưng vẫn bị giới hạn bởi org_id. Quyền hiệu lực được tính lại từ DB theo phòng ban đích, không chỉ dựa vào token.
+[Heading 3] 4.4 Chức vụ mặc định (DefaultPositionSeeder)
+[Normal] Mỗi tổ chức được seed một lần 7 chức vụ:
+[Normal] Ghi chú: chức vụ “Nhân sự phòng ban” phải chứa các quyền của chức vụ Giáo viên để HR gán được chức vụ này (ràng buộc của MembershipPolicy). Khái niệm “Quản lý đào tạo” được gộp vào “Giáo vụ” [CHỐT].
+[Heading 3] 4.5 Catalog quyền và bundle
+[Normal] Quyền có dạng <tài nguyên>.<hành động>; module_code = NULL nghĩa là quyền nhân sự dùng chung cho mọi phòng ban.
+[Normal] Quyền mới đề xuất [MỚI]:
+[List Paragraph] Tài khoản và hồ sơ (mọi vai trò): account.profile.view/edit, auth.change_password, auth.forgot_password (công khai).
+[List Paragraph] Thông báo và duyệt: notification.view, approval.inbox.view.
+[List Paragraph] Tổ chức (OWNER): org.module.toggle, org.audit.view.
+[List Paragraph] Nền tảng (SUPER_ADMIN): module.catalog.manage, org.module.override.
+[List Paragraph] Nhân sự: teacher.change_status, student.change_status, student.reset_account.
+[List Paragraph] Đào tạo: subject.view, subject.manage, class.view_reassign.
+[List Paragraph] Lịch: schedule.recurring.create, schedule.preview, schedule.attendance.mark/view, schedule.change_request.create/approve; SELF: attendance.self_view.
+[Normal] Mã quyền mới phải thêm vào catalog (Identity), vào DefaultPositionSeeder (People, giữ đồng bộ với PermissionCatalog) và vào bundle bằng migration.
+[Heading 3] 4.6 Quy tắc gán chức vụ [ĐÃ CÓ — MembershipPolicy, CHỐT DEC-04]
+[List Paragraph] OWNER gán được mọi chức vụ trong tổ chức.
+[List Paragraph] Người không phải OWNER không gán được chức vụ phạm vi ORGANIZATION (Tổng quản lý, HR cấp tổ chức, Quản trị viên tổ chức).
+[List Paragraph] Chỉ quản lý STAFF cùng phòng ban (không quản lý MANAGER).
+[List Paragraph] Cần quyền employee.assign_position trong phòng ban đích.
+[List Paragraph] Chức vụ gán phải có tập quyền ⊆ quyền hiệu lực của chính người gán, và thuộc module phòng ban đang bật (PERMISSION_OUT_OF_MODULE, SELF_ESCALATION_NOT_ALLOWED).
+[Heading 3] 4.7 Ủy quyền và Tổng quản lý [ĐÃ CÓ]
+[List Paragraph] Tổng quản lý là chức danh, không tự có quyền; mọi quyền đến từ bảng delegation + delegation_permission.
+[List Paragraph] Chỉ OWNER bổ nhiệm / bãi nhiệm (/general-manager) và tạo / sửa / thu hồi ủy quyền (/delegations).
+[List Paragraph] Ủy quyền có phạm vi (scope), thời hạn (effective_from/to), lý do khi thu hồi; chỉ chứa quyền có allowed_scopes ORGANIZATION; người nhận phải là Tổng quản lý.
+[List Paragraph] Tổng quản lý không ủy quyền lại (DELEGATION_RE_DELEGATION_FORBIDDEN), không vượt quyền Owner (DELEGATION_PERMISSION_NOT_HELD), không tự ủy quyền cho mình (DELEGATION_SELF_NOT_ALLOWED).
+[List Paragraph] Quản trị viên tổ chức khác Tổng quản lý: là chức vụ vận hành, không nhận ủy quyền và không có quyền cấp Owner [CHỐT DEC-05].
+[Heading 3] 4.8 Ranh giới SUPER_ADMIN và OWNER
+[List Paragraph] SUPER_ADMIN: không tạo lớp, không duyệt đơn, không dùng PeopleService. Khi Owner bị khóa, chỉ mở khóa / reset mật khẩu Owner có lý do và audit [CHỐT DEC-06]. Ghi đè / khóa module với một tổ chức [CHỐT].
+[List Paragraph] OWNER: thao tác trực tiếp mọi nghiệp vụ trong tổ chức mình, luôn ghi audit; không bypass kiểm org_id, không tự chuyển phòng ban (TRANSFER_OWNER_NOT_ALLOWED), không xóa audit [CHỐT DEC-13]. Owner không tự duyệt yêu cầu do chính mình tạo ở luồng hủy / đóng lớp [ĐÃ CÓ].
+[Heading 2] 5. Module và bật/tắt
+[Heading 3] 5.1 Bảng ánh xạ module
+[Normal] Bảng này chưa thống nhất giữa SRS, seed và code (kế hoạch 0.1 sẽ chốt tên chuẩn và cờ lõi trong DB). Các tài liệu README và docs/api.md còn ghi sai rằng FACILITY_MANAGEMENT không tồn tại.
+[Heading 3] 5.2 Quy tắc bật / tắt [CHỐT]
+[List Paragraph] OWNER bật / tắt module Optional của tổ chức mình (org.module.toggle [MỚI]). Hiện chỉ SUPER_ADMIN gọi được PUT /api/v1/organizations/{id}/modules [ĐÃ CÓ].
+[List Paragraph] Module lõi không tắt được; chặn ở backend (hiện mới chặn ở frontend).
+[List Paragraph] SUPER_ADMIN chỉ ghi đè / khóa module với một tổ chức (org.module.override); Owner không bật lại được module đang bị khóa.
+[List Paragraph] Tắt module = chỉ đọc [DEC-11]: giữ dữ liệu, chặn tạo / sửa / duyệt. Chặn tắt khi còn yêu cầu đang chờ (chuyển phòng, hủy / đóng lớp, đổi lịch) và báo danh sách. Bật lại thì khôi phục nguyên trạng.
+[List Paragraph] Module phải bật ở tổ chức và phòng ban (module_config, department_module); guard kiểm tra trước mọi thao tác lịch và CSVC.
+[List Paragraph] Mọi lần bật / tắt / khóa có audit.
+[Heading 2] 6. Mô hình dữ liệu
+[Normal] Quy ước chung: khóa chính CHAR(36) (UUID); mọi bảng nghiệp vụ có org_id; xóa mềm bằng deleted_at hoặc status; bảng có version dùng khóa lạc quan (DATA_CHANGED, VERSION_REQUIRED). Mỗi service có một schema riêng, không join chéo schema.
+[Heading 3] 6.1 IdentityService (mems_identity_db) [ĐÃ CÓ]
+[Heading 3] 6.2 PeopleService (mems_people_db) [ĐÃ CÓ]
+[Normal] [CẦN XÁC NHẬN] Ngày bắt đầu / kết thúc của lớp (start_date, end_date) phục vụ trạng thái lớp tự động: kiểm tra school_class có sẵn chưa, chưa có thì thêm bằng migration.
+[Heading 3] 6.3 ScheduleService (mems_schedule_db) [ĐÃ CÓ]
+[Heading 3] 6.4 FacilityService (mems_facility_db) [ĐÃ CÓ]
+[Heading 3] 6.5 Bảng và cột mới đề xuất [MỚI]
+[Heading 2] 7. Đặc tả chức năng theo module
+[Normal] Cột TT: ✔ = đã có trong code; ✚ = mới (theo kế hoạch); ◐ = có một phần.
+[Heading 3] 7.1 Nền tảng và tài khoản (Identity)
+[Heading 3] 7.2 Tổ chức và nhân sự (People)
+[Heading 3] 7.3 Đào tạo (sinh viên, lớp, môn học)
+[Heading 3] 7.4 Lịch học (Schedule)
+[Heading 3] 7.5 Cơ sở vật chất (Facility)
+[Heading 3] 7.6 Cổng cá nhân (SELF)
+[Heading 2] 8. Quy trình nghiệp vụ chi tiết
+[Normal] Mỗi quy trình ghi: actor, điều kiện, các bước, nhánh lỗi, kết quả, mã lỗi / audit và trạng thái hiện thực (✔ đã có, ✚ mới, ◐ một phần).
+[Heading 3] WF-01 — Đăng ký và duyệt tổ chức ◐
+[List Paragraph] Actor: người đăng ký (công khai), SUPER_ADMIN.
+[List Paragraph] Các bước: (1) người đăng ký gửi tên, loại tổ chức, email, tài khoản và danh sách module (POST /api/v1/auth/register); (2) tổ chức ở trạng thái chờ duyệt; (3) SUPER_ADMIN xem danh sách chờ duyệt và chi tiết; (4) duyệt → tổ chức ACTIVE, kích hoạt tài khoản Owner; từ chối → ghi lý do; (5) thông báo và lưu lịch sử.
+[List Paragraph] Nhánh: tạm ngưng (suspend) khiến mọi tài khoản của tổ chức không đăng nhập được (ORGANIZATION_SUSPENDED); kích hoạt lại (reactivate); duyệt hai lần bị chặn (ORGANIZATION_ALREADY_REVIEWED).
+[List Paragraph] Chưa rõ / mới: lưu lý do từ chối đầy đủ, yêu cầu bổ sung hồ sơ, bằng chứng xác minh tổ chức [CẦN XÁC NHẬN theo SRS].
+[List Paragraph] Khởi tạo Owner đầu tiên: biến OWNER_BOOTSTRAP_* chỉ dùng cho tổ chức đã ACTIVE, không ghi đè tài khoản có sẵn; tắt sau lần khởi động đầu.
+[Heading 3] WF-02 — Thiết lập tổ chức ✔
+[List Paragraph] Owner tạo phòng ban và chọn module cho từng phòng (module phải đang bật ở cấp tổ chức).
+[List Paragraph] Hệ thống seed 7 chức vụ mặc định cho tổ chức (một lần, position_seed).
+[List Paragraph] Owner tạo / chỉnh chức vụ riêng (chọn quyền thuộc module phòng ban đang bật; PERMISSION_OUT_OF_MODULE nếu vượt).
+[List Paragraph] Owner hoặc HR tạo nhân sự trong phòng ban (tạo tài khoản qua Identity, mật khẩu tạm, bắt đổi lần đầu), gán chức vụ.
+[List Paragraph] Owner bổ nhiệm Tổng quản lý và tạo ủy quyền (WF-03) nếu cần.
+[Normal] Lỗi thường gặp: STAFF_CODE_EXISTS, EMAIL_EXISTS, ACCOUNT_EXISTS, IDENTITY_UNAVAILABLE (lỗi tạo tài khoản được bù trừ bằng account_compensation).
+[Heading 3] WF-03 — Bổ nhiệm Tổng quản lý và ủy quyền ✔
+[List Paragraph] Actor: chỉ OWNER.
+[List Paragraph] Các bước: chọn người (/general-manager/candidates) → bổ nhiệm chức danh Tổng quản lý → tạo ủy quyền: phạm vi ORGANIZATION, thời hạn từ – đến, tập quyền con chọn từ quyền Owner đang có → Tổng quản lý có quyền hiệu lực = quyền chức vụ + quyền ủy quyền → Owner sửa hoặc thu hồi (có lý do, audit).
+[List Paragraph] Ràng buộc: không ủy quyền lại; không vượt quyền Owner; người nhận phải đang là Tổng quản lý; thu hồi hoặc hết hạn thì quyền mất hiệu lực ngay.
+[List Paragraph] Lỗi: GENERAL_MANAGER_ALREADY_APPOINTED, GENERAL_MANAGER_NOT_APPOINTED, DELEGATE_NOT_GENERAL_MANAGER, DELEGATION_INVALID_WINDOW, DELEGATION_NOT_ACTIVE, DELEGATION_SCOPE_NOT_SUPPORTED.
+[List Paragraph] Owner vắng mặt / bị khóa [CHỐT DEC-06]: ủy quyền còn hiệu lực vẫn chạy; SUPER_ADMIN chỉ mở khóa hoặc reset mật khẩu Owner (WF-02 của kế hoạch 0.7).
+[Heading 3] WF-04 — Chuyển phòng ban của nhân viên (4 bên) ✔ [CHỐT DEC-01..03]
+[List Paragraph] Actor: người có employee.transfer (HR) khởi tạo; Trưởng phòng cũ, Trưởng phòng mới, HR, chính nhân viên.
+[List Paragraph] Điều kiện trước: nhân viên ACTIVE, thuộc một phòng ban; phòng nguồn khác phòng đích (TRANSFER_SAME_DEPARTMENT); cả hai phòng đều có Trưởng phòng (TRANSFER_HEAD_MISSING); không có yêu cầu PENDING khác của cùng nhân viên (TRANSFER_ALREADY_PENDING); nhân viên không phải OWNER (TRANSFER_OWNER_NOT_ALLOWED).
+[List Paragraph] Các bước: khởi tạo (lý do, phòng nguồn / đích) → bước 1 SOURCE_HEAD (Trưởng phòng cũ, theo chức danh) → bước 2 TARGET_HEAD (Trưởng phòng mới) → bước 3 HR (employee.approve_transfer) → bước 4 EMPLOYEE (chính người được chuyển xác nhận đồng ý) → đủ 4 APPROVED thì áp dụng trong một transaction.
+[List Paragraph] Áp dụng: đổi phòng ban; thu hồi chức vụ và phân công cấp phòng cũ, giữ chức vụ cấp tổ chức; gắn cờ “cần phân công lại” cho lớp mà giáo viên đang dạy; ghi audit; thông báo.
+[List Paragraph] Nhánh từ chối: bất kỳ bước nào REJECTED → dừng toàn bộ, không đổi phòng, lưu người từ chối, lý do, thời điểm, gửi thông báo.
+[List Paragraph] Hủy: người khởi tạo hủy khi còn PENDING (/transfer-requests/{id}/cancel, TRANSFER_CANCEL_NOT_ALLOWED nếu đã xong).
+[List Paragraph] Hiệu lực: ngay khi bước 4 được duyệt; không có hạn chờ tự động [CHỐT DEC-14].
+[List Paragraph] Ngoại lệ cần xử lý [CẦN XÁC NHẬN]: một người giữ đồng thời nhiều vai (Trưởng phòng cũ và HR); quyền duyệt bị thu hồi giữa luồng; phòng đích ngừng hoạt động; chuyển người đang phụ trách lớp. Mỗi bước phải do tài khoản khác nhau quyết định; nếu cùng một người, hệ thống phải yêu cầu người thay thế theo chuỗi leo thang (WF-06).
+[List Paragraph] Ghi chú thị trường: nhiều hệ thống nhân sự chỉ thông báo cho nhân viên thay vì xin đồng ý. Nhóm giữ phương án “xin đồng ý” vì đã cài đặt; có thể thành cấu hình về sau.
+[Heading 3] WF-05 — Nghỉ việc ✔ (leo thang ✚)
+[List Paragraph] Actor: HR tạo yêu cầu (employee.resign); HR khác duyệt hoặc từ chối (employee.approve_resignation).
+[List Paragraph] Các bước: tạo yêu cầu có lý do → hệ thống chặn nếu đã có yêu cầu PENDING (RESIGNATION_ALREADY_PENDING) → người duyệt quyết định.
+[List Paragraph] Duyệt: vô hiệu hóa tài khoản đăng nhập (Identity), thu hồi toàn bộ phân công, đánh dấu nhân viên và giáo viên đã nghỉ (INACTIVE), nếu giáo viên có lớp đang dạy thì gắn cờ cần phân công lại; audit MEMBER_RESIGNED, RESIGNATION_APPROVED.
+[List Paragraph] Từ chối: giữ nguyên trạng thái, lưu lý do.
+[List Paragraph] Không tự duyệt: người tạo yêu cầu không được duyệt (SELF_APPROVAL_NOT_ALLOWED — đã có trong ResignationService).
+[List Paragraph] Leo thang [CHỐT DEC-08, MỚI]: nếu phòng chỉ có một HR và người đó là người tạo → Trưởng phòng → Tổng quản lý → OWNER duyệt.
+[Heading 3] WF-06 — Duyệt leo thang (áp dụng cho hủy / đóng lớp, nghỉ việc, đổi lịch) ◐
+[List Paragraph] Hiện trạng ✔: ClassApprovalPolicy.canApprove = OWNER hoặc Trưởng phòng (chức vụ “Trưởng phòng” / “Trưởng phòng ban”) của phòng đang giữ module STUDENT_MANAGEMENT; người tạo không tự duyệt.
+[List Paragraph] Quy tắc mới [CHỐT DEC-07, MỚI]:
+[List Paragraph] Bậc 1: Trưởng phòng phụ trách, khác người yêu cầu.
+[List Paragraph] Nếu phòng không có Trưởng phòng hoặc Trưởng phòng là người yêu cầu → bậc 2: Tổng quản lý (còn ủy quyền hiệu lực).
+[List Paragraph] Nếu vẫn không có → bậc 3: OWNER.
+[List Paragraph] OWNER tự thao tác thì thực hiện trực tiếp, không cần duyệt, bắt buộc audit.
+[List Paragraph] Không có hạn chờ tự động; chỉ gửi thông báo nhắc [CHỐT DEC-14].
+[List Paragraph] Người nhận việc: yêu cầu hiện trong “Việc chờ tôi duyệt” của đúng bậc đang có hiệu lực.
+[Heading 3] WF-07 — Vòng đời lớp học ✔ [CHỐT DEC-09]
+[List Paragraph] Trạng thái: CHUA_BAT_DAU → DANG_DIEN_RA → DA_KET_THUC; nhánh DA_HUY. Các cờ phụ: closeState (NONE, PENDING, CLOSED), cancelState (PENDING).
+[List Paragraph] Tạo và sửa: Giáo vụ tạo lớp (class.create, trạng thái CHUA_BAT_DAU), sửa (class.edit), gán giáo viên (class.assign_teacher).
+[List Paragraph] Hủy lớp: nếu lớp còn sinh viên → gửi yêu cầu hủy (cancelState = PENDING) chờ duyệt; nếu không còn sinh viên → hủy ngay. Duyệt hủy → DA_HUY, lưu lý do và sự kiện.
+[List Paragraph] Đóng lớp: Giáo vụ gửi yêu cầu đóng (closeState = PENDING) → người duyệt (WF-06) duyệt → closeState = CLOSED, status = DA_KET_THUC; từ chối có lý do.
+[List Paragraph] Mở lại: Trưởng phòng hoặc OWNER (class.reopen), không cần duyệt, closeState = NONE; không khôi phục các buổi học cũ.
+[List Paragraph] Liên động [MỚI]: hủy hoặc đóng lớp → hủy mọi buổi chưa diễn ra (WF-10).
+[List Paragraph] Xóa lớp (class.delete) là thao tác riêng; hủy / đóng đi qua state machine và ghi class_status_log, class_close_event.
+[List Paragraph] Lỗi: CLASS_NOT_CANCELLABLE, CLASS_NOT_CLOSABLE, STATUS_CHANGED, CLOSE_STATE_CHANGED, CANCEL_STATE_CHANGED, CLASS_APPROVER_NOT_ALLOWED, SELF_APPROVAL_NOT_ALLOWED.
+[Heading 3] WF-08 — Cấp tài khoản sinh viên và cổng SELF ✔ (reset / khóa ✚)
+[List Paragraph] Giáo vụ tạo hồ sơ sinh viên (student.create).
+[List Paragraph] Giáo vụ cấp tài khoản đăng nhập (student.create_account, cần email, mật khẩu tạm); lỗi: STUDENT_ACCOUNT_EXISTS, STUDENT_EMAIL_REQUIRED.
+[List Paragraph] Sinh viên đăng nhập lần đầu → bắt đổi mật khẩu → vào /sinh-vien.
+[List Paragraph] Sinh viên xem hồ sơ, lớp, lịch, chuyên cần của chính mình; không vào console quản trị.
+[List Paragraph] Mới: Giáo vụ reset mật khẩu hoặc khóa / mở tài khoản; đổi trạng thái sinh viên (đang học, bảo lưu, thôi học, tốt nghiệp).
+[Heading 3] WF-09 — Xếp lịch lặp có xem trước ✚ [CHỐT]
+[List Paragraph] Actor: OWNER hoặc người có schedule.recurring.create.
+[List Paragraph] Đầu vào: lớp, giáo viên, phòng, các thứ trong tuần, giờ bắt đầu / kết thúc, khoảng ngày từ – đến.
+[List Paragraph] Các bước:
+[List Paragraph] POST …/schedules/preview: sinh danh sách buổi (bỏ ngày nghỉ của tổ chức khi đã có holiday).
+[List Paragraph] Với mỗi buổi kiểm tra: trùng giáo viên, phòng, lớp; sức chứa phòng ≥ sĩ số lớp; phòng hoạt động và thiết bị không hỏng; lớp chưa đóng / hủy; giáo viên đang dạy.
+[List Paragraph] Trả danh sách: buổi hợp lệ (xanh), buổi xung đột kèm lý do (đỏ).
+[List Paragraph] Người dùng chọn lưu, bỏ qua buổi trùng hoặc dừng để đổi giờ / phòng.
+[List Paragraph] POST …/schedules/bulk: lưu trong một transaction, khóa tài nguyên (schedule_resource_lock) để hai người xếp cùng lúc không trùng nhau.
+[List Paragraph] Lỗi: TEACHER_SCHEDULE_CONFLICT (3110), ROOM_SCHEDULE_CONFLICT (3111), CLASS_SCHEDULE_CONFLICT (3112), ROOM_NOT_AVAILABLE (3113), CLASS_NOT_SCHEDULABLE (3106), TEACHER_NOT_ASSIGNED (3107), INVALID_TIME_RANGE (3108).
+[List Paragraph] Nguyên tắc: chặn cứng khi trùng; lỗi hoặc quá thời gian khi kiểm tra xung đột không được hiển thị là thành công.
+[Heading 3] WF-10 — Liên động lịch ✚
+[Normal] Giao tiếp giữa service qua API nội bộ (/internal/...) hoặc sự kiện; chọn một cách và dùng nhất quán. Lỗi ở một service không được làm hỏng dữ liệu service kia (thử lại và có bù trừ).
+[Heading 3] WF-11 — Điểm danh, đổi lịch và dạy bù ✚
+[List Paragraph] Điểm danh: buổi diễn ra → giáo viên được phân công buổi đó (hoặc OWNER) điểm danh từng sinh viên (có mặt / vắng / trễ); danh sách chỉ gồm sinh viên đang thuộc lớp; sửa điểm danh có lịch sử và bị khóa sau N ngày [CẦN XÁC NHẬN]; sinh viên xem chuyên cần của mình; Giáo vụ, Trưởng phòng, giáo viên lớp xem báo cáo chuyên cần lớp.
+[List Paragraph] Đổi lịch / dạy bù / nghỉ: giáo viên gửi yêu cầu (lý do bắt buộc) → duyệt leo thang (WF-06) → duyệt thì tạo / đổi buổi (kiểm trùng như WF-09) và thông báo lớp; từ chối thì giữ lịch cũ kèm lý do; người gửi hủy được khi còn chờ.
+[List Paragraph] Buổi học completed: job đêm đổi buổi đã qua giờ sang completed (idempotent); buổi đã hủy không đổi.
+[Heading 3] WF-12 — Trạng thái lớp tự động ✚ [CHỐT]
+[List Paragraph] Mỗi lần đọc lớp, tính trạng thái từ ngày bắt đầu và kết thúc (CHUA_BAT_DAU → DANG_DIEN_RA → DA_KET_THUC) — luôn đúng, không phụ thuộc job.
+[List Paragraph] Job @Scheduled chạy mỗi đêm: ghi class_status_log, gửi thông báo, đồng bộ cột status.
+[List Paragraph] Không ghi đè trạng thái đặt tay (DA_HUY, lớp đã đóng).
+[List Paragraph] Chạy hai lần liên tiếp không tạo log trùng; nếu có nhiều bản service cần khóa job hoặc chạy idempotent.
+[Heading 3] WF-13 — Sự cố cơ sở vật chất ◐
+[List Paragraph] Hiện có ✔: người có facility.issue.report báo sự cố (thiết bị, mô tả) → nhân viên CSVC xem và xử lý (/issues/{id}/resolve) → đóng; ghi equipment_status_log; sự cố đã xử lý không xử lý lại.
+[List Paragraph] Mới ✚ [CHỐT DEC-10]: thêm mức độ (thấp / trung / cao); sự cố mức cao có thể đặt cờ phòng ngừng sử dụng, kéo theo cảnh báo buổi học bị ảnh hưởng (WF-10). Nghiệm thu và chi phí ngoài phạm vi.
+[List Paragraph] Giáo viên chỉ báo sự cố khi được cấp thêm facility.issue.report (chức vụ mặc định chưa có).
+[Heading 3] WF-14 — Bật / tắt module Optional ◐ [CHỐT DEC-11]
+[List Paragraph] Owner xem danh sách module, phụ thuộc và yêu cầu đang chờ liên quan.
+[List Paragraph] Nếu còn yêu cầu chờ (chuyển phòng, hủy / đóng lớp, đổi lịch) → chặn tắt, trả danh sách để xử lý trước.
+[List Paragraph] Tắt được → module chuyển chỉ đọc: giữ dữ liệu, chặn tạo / sửa / duyệt.
+[List Paragraph] Module lõi không tắt được (chặn ở backend).
+[List Paragraph] Bật lại → khôi phục nguyên trạng, không mất dữ liệu.
+[List Paragraph] SUPER_ADMIN có thể khóa module với một tổ chức; Owner không bật lại được cho đến khi mở khóa.
+[List Paragraph] Mọi thao tác ghi audit.
+[Heading 3] WF-15 — Quên mật khẩu và khóa tài khoản ✚
+[List Paragraph] Quên mật khẩu: nhập email → phản hồi luôn giống nhau (không lộ email tồn tại) → gửi liên kết (token hash, hạn 30 phút, một lần) → đặt mật khẩu mới → thu hồi mọi refresh token cũ. Giới hạn số lần yêu cầu mỗi giờ. Môi trường dev dùng MailHog hoặc ghi liên kết ra log.
+[List Paragraph] Khóa tài khoản: sai 5 lần → khóa 15 phút, báo thời gian còn lại; đăng nhập đúng thì xóa bộ đếm; SUPER_ADMIN và OWNER (trong tổ chức mình) mở khóa sớm, có audit.
+[List Paragraph] Tài khoản sinh viên do Giáo vụ cấp: nếu không có email để nhận liên kết thì đặt lại qua Giáo vụ [CẦN XÁC NHẬN].
+[Heading 2] 9. Danh mục API
+[Normal] Liệt kê theo controller hiện có (✔) và endpoint đề xuất (✚). Quyền chính xác nằm ở @PreAuthorize / @RequirePermission của từng endpoint; khi thêm endpoint phải khai báo route ở gateway.
+[Heading 3] 9.1 IdentityService (qua gateway /api/v1/...)
+[Normal] Nội bộ (INTERNAL_API_KEY): POST /internal/accounts, POST /internal/accounts/{id}/reset-password, DELETE /internal/accounts/{id}, PATCH /internal/accounts/{id}/disable, GET /internal/orgs/{orgId}/modules, GET /internal/permissions, GET /internal/permissions/bundles.
+[Heading 3] 9.2 PeopleService
+[Heading 3] 9.3 ScheduleService
+[Heading 3] 9.4 FacilityService
+[Heading 2] 10. Ma trận quyền tóm tắt
+[Normal] ✓ = được phép theo thiết kế; △ = chỉ khi được cấp quyền hoặc ủy quyền; — = không có trong thiết kế mặc định. Quyền thực tế đến từ chức vụ và bundle; bảng đầy đủ (hơn 70 dòng) nằm ở trang 2 và 3 của sơ đồ v2.
+[Normal] Ghi chú: Giáo vụ muốn xếp lịch thì gán thêm bundle SCHEDULE_MANAGEMENT; Giáo viên báo sự cố khi được cấp facility.issue.report.
+[Heading 2] 11. Màn hình và route
+[Heading 3] 11.1 Điều hướng sau đăng nhập
+[Heading 3] 11.2 Route hiện có (✔)
+[Heading 3] 11.3 Route mới (✚)
+[List Paragraph] Dùng chung: /ho-so, /thong-bao, /viec-cho-duyet.
+[List Paragraph] SUPER_ADMIN: nâng cấp /quan-tri/module (thêm / sửa, cờ lõi), nút khóa module ở chi tiết tổ chức.
+[List Paragraph] OWNER: /to-chuc/module, /to-chuc/nhat-ky.
+[List Paragraph] Khu Đào tạo: /dao-tao/mon-hoc, /dao-tao/lich-hoc (tuần / tháng + lọc), /dao-tao/lich-hoc/xep-lich-lap, /dao-tao/diem-danh/:buoiId, /dao-tao/yeu-cau-doi-lich, /dao-tao/lop-hoc?canPhanCong=1.
+[List Paragraph] SELF: /sinh-vien/chuyen-can.
+[Heading 3] 11.4 Menu khu Đào tạo lọc theo quyền
+[Normal] Nhân sự ← employee.view; Chuyển phòng ← employee.transfer / approve_transfer / view; Giáo viên ← employee.view / edit; Lớp học ← class.view; Sinh viên ← student.view; Lịch học ← schedule.view; Lịch của tôi ← schedule.self_view; Cơ sở vật chất ← bất kỳ facility.*; Chức vụ ← position.manage; mới: Môn học ← subject.view, Điểm danh ← schedule.attendance.*, Đổi lịch ← schedule.change_request.*, Việc chờ duyệt ← approval.inbox.view.
+[Normal] Nguyên tắc: ẩn menu / nút không phải bảo mật; mọi endpoint kiểm lại role và quyền (401 / 403); FE guard chỉ là UX.
+=== TABLE 0 ===
+Nhóm | Mô tả
+Quản trị nền tảng (SUPER_ADMIN) | Duyệt, tạm ngưng tổ chức; quản lý tài khoản và nhật ký nền tảng; ghi đè/khóa module; không làm nghiệp vụ trong tổ chức
+Chủ tổ chức (OWNER) | Toàn quyền trong tổ chức của mình; bổ nhiệm Tổng quản lý; ủy quyền; bật/tắt module Optional
+Cán bộ quản lý (qua chức vụ) | Tổng quản lý, Quản trị viên tổ chức, Nhân sự, Giáo vụ, Trưởng phòng, Nhân viên CSVC
+Giáo viên | Xem lớp và lịch được phân công; điểm danh; xin đổi lịch
+Sinh viên (học sinh / học viên) | Xem hồ sơ, lớp, lịch, chuyên cần của chính mình
+=== TABLE 1 ===
+Thuật ngữ | Nghĩa trong MEMS
+Tổ chức (organization) | Một trường hoặc trung tâm; đơn vị cô lập dữ liệu (org_id)
+Phòng ban (department) | Đơn vị con trong tổ chức; có bộ module riêng (department_module)
+Role | Vai trò đăng nhập trong JWT: SUPER_ADMIN, OWNER, MANAGER, STAFF, STUDENT
+Chức vụ (position) | Vị trí do Owner định nghĩa; gắn bundle và quyền; có phạm vi ORGANIZATION hoặc DEPARTMENT
+Bundle | Nhóm quyền dựng sẵn theo module (HR, Đào tạo, Lịch, CSVC)
+Phân công (assignment) | Việc gán một chức vụ cho một người, có phạm vi và thời hạn
+Tổng quản lý | Chức danh, không phải role; nhận quyền do Owner ủy quyền
+Ủy quyền (delegation) | Owner cấp một tập quyền con cho Tổng quản lý, có thời hạn, thu hồi được
+Module lõi / Optional | Lõi: Sinh viên, Giáo viên, Lớp, Lịch (không tắt được); Optional: bật/tắt theo tổ chức
+SELF | Nhóm quyền chỉ xem dữ liệu của chính mình (sinh viên, giáo viên)
+Leo thang | Khi thiếu người duyệt, yêu cầu lên bậc kế tiếp: Trưởng phòng → Tổng quản lý → OWNER
+Audit | Nhật ký hành động nhạy cảm (audit_log, people_audit_log)
+=== TABLE 2 ===
+Service | Cổng | Trách nhiệm chính
+EurekaServer | 8761 | Đăng ký và tìm service
+APIGateway | 8080 | Định tuyến, CORS (localhost, 127.0.0.1, *.vercel.app)
+IdentityService | 8081 | Đăng nhập / đăng ký tổ chức, JWT và refresh token, tổ chức, tài khoản, danh mục module, catalog quyền và bundle, audit nền tảng
+PeopleService | 8082 | Phòng ban, chức vụ, nhân sự, giáo viên, sinh viên, lớp, môn học, chuyên môn, ủy quyền, Tổng quản lý, chuyển phòng, nghỉ việc, thông báo
+ScheduleService | 8083 | Buổi học (session), chặn trùng, gợi ý phòng, lịch của tôi
+FacilityService | 8084 | Phòng học, thiết bị, sự cố, nhật ký trạng thái thiết bị
+=== TABLE 3 ===
+Từ → Đến | Mục đích | Endpoint nội bộ
+People → Identity | Tạo / vô hiệu hóa / reset mật khẩu tài khoản, lấy module và quyền | /internal/accounts, /internal/orgs/{orgId}/modules, /internal/permissions
+Schedule → People | Lấy thông tin lớp, danh sách lớp của sinh viên | /internal/classes/{id}, /internal/students/{id}/classes
+Schedule → Facility | Lấy phòng | /internal/rooms, /internal/rooms/{roomId}
+Gateway/Service → People | Lấy quyền hiệu lực của người dùng | /internal/users/{userId}/authorization
+=== TABLE 4 ===
+Role | Ý nghĩa
+SUPER_ADMIN | Quản trị nền tảng; không có nghiệp vụ phòng ban
+OWNER (ORG_OWNER) | Chủ tổ chức; code bypass bằng hasRole('OWNER') ở mọi controller, nhưng vẫn phải đúng org_id
+MANAGER / STAFF | Role khung của nhân sự; quyền thực tế đến từ chức vụ và bundle
+STUDENT | Sinh viên; quyền SELF
+=== TABLE 5 ===
+Tầng | Ai | Nội dung
+Nền tảng | SUPER_ADMIN | Tổ chức, tài khoản, danh mục module, audit nền tảng
+Tổ chức | OWNER, Tổng quản lý, Quản trị viên tổ chức | Phòng ban, chức vụ, nhân sự, ủy quyền, module
+Phòng ban | HR, Giáo vụ, Trưởng phòng, CSVC | Nghiệp vụ theo bundle và phạm vi
+Cá nhân | Giáo viên, Sinh viên | SELF: chỉ dữ liệu của mình
+=== TABLE 6 ===
+Chức vụ | Phạm vi | Bundle | Quyền chính
+Quản trị viên tổ chức | ORGANIZATION | HR + Đào tạo + Lịch + CSVC | Toàn bộ catalog nghiệp vụ; không có quyền cấp Owner [CHỐT DEC-05]
+Giáo vụ | ORGANIZATION | ACADEMIC_MANAGEMENT | Sinh viên CRUD, cấp tài khoản, lớp CRUD, gán giáo viên, hủy / gửi yêu cầu đóng lớp. Không duyệt đóng/hủy lớp [CHỐT]
+Giáo viên | DEPARTMENT | — | class.view, student.view, schedule.view (+ điểm danh, xin đổi lịch [MỚI])
+Trưởng phòng ban | DEPARTMENT | — | class.view, class.approve_close, class.reopen (+ duyệt đổi lịch [MỚI])
+Nhân sự phòng ban | DEPARTMENT | HR_MANAGEMENT | employee.*, position.*, department.view, class.view, student.view, schedule.view
+Nhân viên cơ sở vật chất | DEPARTMENT | FACILITY_MANAGEMENT | Toàn bộ facility.*
+Nhân viên | DEPARTMENT | — | Không có quyền mặc định
+=== TABLE 7 ===
+Bundle / nhóm | Mã quyền
+HR_MANAGEMENT | employee.view, employee.create, employee.edit, employee.delete, employee.reset_password, employee.assign_position, employee.view_detail, employee.resign, employee.approve_resignation, employee.transfer, employee.approve_transfer, position.view, position.manage, department.view
+ACADEMIC_MANAGEMENT | student.view, student.create, student.edit, student.delete, student.create_account, class.view, class.create, class.edit, class.delete, class.assign_teacher, class.teacher.reassign, class.cancel, class.request_close, class.approve_close, class.reopen
+SCHEDULE_MANAGEMENT | schedule.view, schedule.create, schedule.edit, schedule.update, schedule.cancel_session, schedule.delete
+FACILITY_MANAGEMENT | facility.view, facility.manage, facility.room.view/create/update/delete, facility.equipment.view/create/update/delete, facility.issue.report, facility.issue.resolve
+SELF (gắn trực tiếp role STUDENT, không qua chức vụ) | student.self_view, class.self_view, schedule.self_view
+=== TABLE 8 ===
+Module (SRS) | Mã trong DB / code | Bundle | Loại
+Quản lý sinh viên | STUDENT_MANAGEMENT | ACADEMIC_MANAGEMENT | Lõi
+Quản lý giáo viên | TEACHER_MANAGEMENT (chỉ có trong seed) | HR / ACADEMIC | Lõi
+Quản lý lớp | CLASS_MANAGEMENT (code hiện dùng chung STUDENT_MANAGEMENT cho guard lớp) | ACADEMIC_MANAGEMENT | Lõi
+Quản lý lịch | SCHEDULE_MANAGEMENT | SCHEDULE_MANAGEMENT | Lõi
+Quản lý nhân sự | không có mã module (module_code = NULL) | HR_MANAGEMENT | Dùng chung, không bị chặn theo module
+Cơ sở vật chất | FACILITY_MANAGEMENT (ngoài ra seed còn ROOM_MANAGEMENT, EQUIPMENT_MANAGEMENT) | FACILITY_MANAGEMENT | Optional
+Phân công giáo viên | TEACHER_ASSIGNMENT (cấu hình TEACHER_ASSIGNMENT_MODULE_CODE) | — | Optional [CẦN XÁC NHẬN]
+=== TABLE 9 ===
+Bảng | Nội dung chính
+organization | Tên, loại tổ chức (org_type), trạng thái (PENDING, ACTIVE, SUSPENDED, REJECTED), email liên hệ, người duyệt (approved_by)
+account | org_id, username, email, password_hash, status (active / locked / disabled), failed_login_attempts, locked_until, must_change_password, provisioned_by
+role, account_role, role_permission | Role hệ thống và quyền gắn role
+permission | Mã quyền, mô tả, module_code, allowed_scopes
+permission_bundle, permission_bundle_item | Bundle quyền theo module
+module_config | Module bật / tắt theo tổ chức (org_id, module, enabled, updated_by)
+refresh_token | Hash token, thiết bị, expires_at, replaced_by, session_id
+password_reset_token | Hash token, hạn dùng (chưa có endpoint)
+audit_log | org_id, hành động, thực thể, thời điểm
+=== TABLE 10 ===
+Nhóm | Bảng | Nội dung chính
+Tổ chức | department, department_module, department_member | Phòng ban, module của phòng ban, thành viên (username, appointed_by)
+Chức vụ | position, position_permission, position_bundle, position_seed, assignment | Chức vụ (xóa mềm), quyền và bundle, đánh dấu đã seed, phân công (scope_type, department_id, effective_from/to, status, revoked_*)
+Hồ sơ | staff, staff_profile, teacher, teacher_profile, teacher_specialty, specialty, subject | Nhân viên, hồ sơ (họ tên không dấu để tìm kiếm, version), giáo viên (contract_type CO_HUU / THINH_GIANG, teaching_status), chuyên môn, môn học
+Đào tạo | student, school_class, class_student, class_status_log, class_close_event | Sinh viên (xóa mềm), lớp (class_code, academic_year, status, close_state, cancel_state), ghi danh, lịch sử trạng thái, sự kiện đóng lớp
+Quy trình | resignation_request, transfer_request, transfer_approval | Nghỉ việc; chuyển phòng (từ / đến phòng, trạng thái, applied_at) và từng bước duyệt (step, decision, decided_by)
+Ủy quyền | delegation, delegation_permission | Người ủy quyền / nhận, phạm vi, thời hạn, trạng thái, lý do thu hồi
+Khác | notification, people_audit_log, account_compensation | Thông báo (type, title, body, entity_type/id, read_at), audit, bù trừ khi tạo tài khoản lỗi giữa chừng
+=== TABLE 11 ===
+Bảng | Nội dung chính
+class, class_enrollment, teacher_assignment | Bản sao tối thiểu về lớp, ghi danh, giáo viên phục vụ kiểm tra lịch (đồng bộ từ People)
+session | Buổi học: lớp, phòng (room_id), thời gian, status, department_id, xóa mềm
+schedule_resource_lock | Khóa tài nguyên (giáo viên / phòng / lớp) chống xếp trùng đồng thời
+=== TABLE 12 ===
+Bảng | Nội dung chính
+classroom | Phòng: tên, sức chứa (capacity), loại (room_type), trạng thái, department_id
+computer_room | Phòng máy: machine_count
+equipment | Thiết bị: mã tài sản (asset_code), loại, trạng thái, phòng, department_id
+incident_report | Sự cố: thiết bị, người báo, mô tả, trạng thái, resolved_at
+equipment_status_log | Lịch sử đổi trạng thái thiết bị
+=== TABLE 13 ===
+Dịch vụ | Thay đổi | Phục vụ
+Identity | module_config.locked_by_admin (+ người khóa, lý do) | Khóa module của SUPER_ADMIN (0.2)
+Identity | password_reset_token.used_at (nếu chưa có) | Đặt lại mật khẩu (1.2)
+People | student.status mở rộng: đang học / bảo lưu / thôi học / tốt nghiệp; lịch sử đổi trạng thái | 1.7
+People | Cờ is_active cho subject đã có; thêm audit khi CRUD môn học | 1.8
+Schedule | attendance (session_id, student_id, status PRESENT / ABSENT / LATE, note, marked_by, marked_at, version) | Điểm danh (3.1)
+Schedule | schedule_change_request (session_id, requested_by, type CHANGE / MAKEUP / CANCEL, thời gian và phòng mới, reason, status, decided_by) | Đổi lịch, dạy bù (3.3)
+Schedule | session.flags hoặc cột needs_reassignment | Liên động giáo viên nghỉ / chuyển phòng (2.4)
+Facility | incident_report.severity (LOW / MEDIUM / HIGH), classroom.out_of_service | Sự cố có mức độ, phòng ngừng dùng (2.4, DEC-10)
+Nhóm C | holiday, teacher_availability | Xếp lịch tự động (sau)
+=== TABLE 14 ===
+Mã | Chức năng | Actor | Quyền / ràng buộc | TT
+ID-01 | Đăng ký tổ chức (công khai) POST /api/v1/auth/register | Người đăng ký | Dữ liệu hợp lệ; tổ chức vào trạng thái chờ duyệt | ✔
+ID-02 | Đăng nhập, làm mới token, đăng xuất | Mọi tài khoản | Tài khoản active, tổ chức active; xoay refresh token | ✔
+ID-03 | Đổi mật khẩu khi đang đăng nhập | Mọi vai trò | Nhập đúng mật khẩu cũ; mật khẩu mới khác cũ | ✔
+ID-04 | Quên / đặt lại mật khẩu | Công khai | Token hash, hạn 30 phút, dùng một lần; không lộ email tồn tại | ✚
+ID-05 | Khóa tạm sau 5 lần sai (15 phút); mở khóa | Hệ thống; SUPER_ADMIN, OWNER | OWNER chỉ trong tổ chức mình | ✚
+ID-06 | Duyệt / từ chối / tạm ngưng / kích hoạt tổ chức | SUPER_ADMIN | approve, reject, suspend, reactivate; lưu lý do [CẦN XÁC NHẬN] | ◐
+ID-07 | Bật / tắt module cho tổ chức | OWNER (Optional); SUPER_ADMIN (ghi đè / khóa) | Module lõi không tắt; chỉ đọc khi tắt | ◐
+ID-08 | Danh mục module hệ thống: xem; quản lý (thêm, sửa, cờ lõi) | Mọi người dùng xem; SUPER_ADMIN quản lý | module.catalog.manage | ◐
+ID-09 | Quản lý tài khoản: danh sách, chi tiết, tạo, đổi trạng thái, đổi role, reset mật khẩu | SUPER_ADMIN | Không tạo SUPER_ADMIN | ✔
+ID-10 | Nhật ký: hệ thống (SUPER_ADMIN); tổ chức (OWNER) | SUPER_ADMIN, OWNER | org.audit.view | ◐
+ID-11 | Hồ sơ cá nhân: xem / sửa | Mọi vai trò | Chỉ của chính mình (id lấy từ JWT) | ✚
+ID-12 | Mở khóa / reset mật khẩu Owner | SUPER_ADMIN | Có lý do và audit; không làm nghiệp vụ | ✚
+=== TABLE 15 ===
+Mã | Chức năng | Actor | Quyền / ràng buộc | TT
+PE-01 | Phòng ban: xem, tạo, sửa, xóa; xem quyền khả dụng; xem tác động khi đổi module | OWNER; HR được cấp | department.view; xóa phòng chỉ khi rỗng (DEPARTMENT_NOT_EMPTY) | ✔
+PE-02 | Chức vụ: xem, tạo, sửa, vô hiệu, nhân bản, xem tác động | OWNER; người có position.manage | Chức vụ đang dùng không xóa (POSITION_IN_USE) | ✔
+PE-03 | Nhân sự phòng ban: danh sách, chi tiết, tạo, gán / đổi chức vụ, reset mật khẩu, vô hiệu | HR theo phạm vi; OWNER | Quy tắc gán chức vụ 4.6 | ✔
+PE-04 | Giáo viên: tạo, hồ sơ, chuyên môn, hợp đồng, danh sách giáo viên có thể phân công | HR, OWNER | Chuyên môn bắt buộc; teachingStatus | ✔
+PE-05 | Đổi trạng thái giáo viên (đang dạy / tạm nghỉ / nghỉ việc) | HR, OWNER | teacher.change_status; có lịch sử | ✚
+PE-06 | Chuyên môn: xem, thêm | HR, OWNER | Tên duy nhất | ✔
+PE-07 | Chuyển phòng 4 bên | HR khởi tạo; 4 bên duyệt | Xem WF-04 | ✔
+PE-08 | Nghỉ việc | HR | Xem WF-05; không tự duyệt | ✔
+PE-09 | Bổ nhiệm / bãi nhiệm Tổng quản lý; ủy quyền | OWNER | Xem WF-03 | ✔
+PE-10 | Quyền hiệu lực của tôi / của một thành viên | Chính người dùng; HR | Tính lại từ DB | ✔
+PE-11 | Thông báo: xem, đánh dấu đã đọc, đọc tất cả | Mọi vai trò | Chỉ của chính mình; BE có, FE cần làm | ◐
+PE-12 | Việc chờ tôi duyệt (gộp yêu cầu theo người duyệt) | Người có quyền duyệt | approval.inbox.view | ✚
+=== TABLE 16 ===
+Mã | Chức năng | Actor | Quyền / ràng buộc | TT
+AC-01 | Sinh viên: danh sách, chi tiết, tạo, sửa, vô hiệu hóa | Giáo vụ, OWNER; xem: giáo viên, HR | Mỗi sinh viên thuộc tối đa một lớp tại một thời điểm | ✔
+AC-02 | Cấp tài khoản đăng nhập cho sinh viên | Giáo vụ | Cần email; mật khẩu tạm, bắt đổi lần đầu; bù trừ nếu lỗi giữa chừng | ✔
+AC-03 | Reset mật khẩu, khóa / mở tài khoản sinh viên; đổi trạng thái sinh viên | Giáo vụ, OWNER | student.reset_account, student.change_status | ✚
+AC-04 | Lớp: danh sách, chi tiết, tạo, sửa, xóa; lịch sử trạng thái | Giáo vụ, OWNER; xem: giáo viên, HR, Trưởng phòng | Mã lớp duy nhất; chỉ sửa khi lớp còn cho phép (CLASS_NOT_EDITABLE) | ✔
+AC-05 | Gán giáo viên; phân công lại | Giáo vụ, OWNER | Giáo viên đang dạy, khớp chuyên môn theo tên môn | ◐
+AC-06 | Thêm / bớt sinh viên khỏi lớp | Giáo vụ, OWNER | Không trùng lớp khác (STUDENT_ALREADY_IN_CLASS) | ✔
+AC-07 | Hủy lớp, duyệt / từ chối hủy; yêu cầu đóng, duyệt / từ chối đóng; mở lại | Giáo vụ gửi; Trưởng phòng duyệt; Trưởng phòng / OWNER mở lại | Xem WF-06, WF-07 | ✔
+AC-08 | Môn học: xem danh sách | Người có class.view hoặc quyền gán giáo viên | Chỉ môn đang hoạt động | ✔
+AC-09 | Môn học: tạo, sửa, vô hiệu hóa | Giáo vụ, OWNER | subject.manage; môn đang dùng không xóa cứng | ✚
+AC-10 | Lọc lớp cần phân công lại | Giáo vụ, Trưởng phòng, OWNER | Cờ needsReassignment đã có | ◐
+AC-11 | Trạng thái lớp tự động | Hệ thống | Xem WF-12 | ✚
+=== TABLE 17 ===
+Mã | Chức năng | Actor | Quyền / ràng buộc | TT
+SC-01 | Buổi học: danh sách, tạo, sửa, hủy, xóa mềm theo phòng ban | OWNER; người có schedule.* | Lớp chưa đóng / hủy; phòng sẵn sàng | ✔
+SC-02 | Chặn trùng giáo viên, phòng, lớp | Hệ thống | Mã lỗi 3110, 3111, 3112; chặn cứng [CHỐT] | ✔
+SC-03 | Gợi ý phòng trống | Người xếp lịch | Hiện theo phòng ban; sẽ đọc toàn tổ chức (2.1) | ◐
+SC-04 | Lịch của tôi | Giáo viên, sinh viên | schedule.self_view; id từ JWT | ✔
+SC-05 | Xếp lịch lặp theo tuần, có xem trước | OWNER; người xếp lịch | schedule.recurring.create; một transaction | ✚
+SC-06 | Kiểm tra sức chứa phòng so với sĩ số lớp | Hệ thống | Từ chối nếu phòng nhỏ hơn | ✚
+SC-07 | Liên động: hủy / đóng lớp, giáo viên nghỉ / chuyển phòng, phòng bảo trì | Hệ thống | Xem WF-10 | ✚
+SC-08 | Lịch tuần / tháng, lọc theo lớp, giáo viên, phòng | Người xếp lịch, Trưởng phòng, HR | Giới hạn khoảng ngày | ✚
+SC-09 | Điểm danh; xem chuyên cần lớp; sinh viên xem chuyên cần của mình | Giáo viên; Giáo vụ, Trưởng phòng; sinh viên | Giáo viên chỉ điểm danh buổi của mình | ✚
+SC-10 | Yêu cầu đổi lịch / dạy bù / nghỉ; duyệt | Giáo viên gửi; Trưởng phòng duyệt (leo thang) | schedule.change_request.* | ✚
+SC-11 | Buổi học tự chuyển completed | Hệ thống (job đêm) | Idempotent | ✚
+=== TABLE 18 ===
+Mã | Chức năng | Actor | Quyền / ràng buộc | TT
+FA-01 | Phòng: xem, tạo, sửa, xóa; loại phòng (phòng thường, phòng máy) | Nhân viên CSVC, OWNER | facility.room.*; phòng đang dùng không xóa (ROOM_IN_USE) | ✔
+FA-02 | Thiết bị: xem, tạo, sửa, xóa | Nhân viên CSVC | facility.equipment.*; mã tài sản duy nhất | ✔
+FA-03 | Sự cố: báo, xem, xử lý | Báo: người được cấp facility.issue.report; xử lý: CSVC | Sự cố đã xử lý không xử lý lại (ISSUE_ALREADY_RESOLVED) | ✔
+FA-04 | Mức độ sự cố; cờ phòng ngừng sử dụng | CSVC | Liên kết lịch (WF-10) | ✚
+FA-05 | Đọc phòng đang hoạt động toàn tổ chức để xếp lịch | Người xếp lịch | Phòng tài nguyên cấp tổ chức [CHỐT] | ✚
+=== TABLE 19 ===
+Mã | Chức năng | Actor | TT
+SF-01 | Hồ sơ và lớp của tôi (/students/me, /students/me/classes) | Sinh viên | ✔
+SF-02 | Lịch của tôi (/schedules/me) | Giáo viên, sinh viên | ✔
+SF-03 | Quyền đang được ủy quyền (/delegations/me) | Mọi thành viên tổ chức | ✔
+SF-04 | Chuyên cần của tôi | Sinh viên | ✚
+SF-05 | Hồ sơ cá nhân, thông báo, việc chờ duyệt | Mọi vai trò | ✚
+=== TABLE 20 ===
+Sự kiện | Hành động | Thông báo
+Lớp bị hủy hoặc đóng (đã duyệt) | Hủy mọi buổi chưa diễn ra (cancelled), giữ buổi đã diễn ra | Giáo viên và sinh viên của lớp
+Giáo viên nghỉ việc hoặc chuyển phòng (đã duyệt) | Gắn cờ “cần phân công lại” cho lớp và các buổi tương lai | Người quản lý lớp
+Phòng chuyển bảo trì hoặc thiết bị hỏng / sự cố mức cao | Liệt kê buổi tương lai bị ảnh hưởng, không tự hủy | Người xếp lịch và nhân viên CSVC
+=== TABLE 21 ===
+Phương thức | Đường dẫn | Chức năng | TT
+POST | /auth/login, /auth/refresh, /auth/logout | Đăng nhập, làm mới, đăng xuất | ✔
+POST | /auth/register | Đăng ký tổ chức | ✔
+POST | /auth/change-password | Đổi mật khẩu | ✔
+POST | /auth/forgot-password, /auth/reset-password | Quên / đặt lại mật khẩu | ✚
+GET, PUT | /me | Hồ sơ cá nhân | ✚
+GET | /modules | Danh mục module | ✔
+POST, PUT | /modules, /modules/{code} | Quản lý danh mục module (cờ lõi) | ✚
+GET | /organizations, /organizations/options, /organizations/pending, /organizations/{id} | Danh sách, tùy chọn, chờ duyệt, chi tiết | ✔
+PATCH | /organizations/{id}/approve, /reject, /suspend, /reactivate | Duyệt, từ chối, tạm ngưng, kích hoạt lại | ✔
+PUT | /organizations/{id}/modules | Cấu hình module (hiện SUPER_ADMIN) | ✔
+PUT | /orgs/me/modules (tên đề xuất) | OWNER bật / tắt module Optional | ✚
+PUT | /organizations/{id}/modules/{code}/lock | SUPER_ADMIN khóa module | ✚
+GET, POST | /accounts, /accounts/{id} | Danh sách, chi tiết, tạo | ✔
+PATCH | /accounts/{id}/status, /accounts/{id}/role | Đổi trạng thái, đổi role | ✔
+POST | /accounts/{id}/reset-password | Reset mật khẩu | ✔
+POST | /accounts/{id}/unlock | Mở khóa tài khoản | ✚
+GET | /audit-logs | Nhật ký hệ thống | ✔
+GET | /orgs/me/audit-logs (tên đề xuất) | Nhật ký thay đổi cấp tổ chức | ✚
+=== TABLE 22 ===
+Nhóm | Endpoint | TT
+Phòng ban | GET /departments, /departments/{id}, /{id}/available-permissions, /{id}/module-impact; POST /departments; PUT, DELETE /departments/{id} | ✔
+Thành viên | GET /departments/{departmentId}/members, /{userId}, /{userId}/assignments; POST tạo; PUT /{userId}/positions; POST /{userId}/reset-password; DELETE /{userId} | ✔
+Quyền hiệu lực | GET /users/me/permissions, /departments/{departmentId}/members/{userId}/permissions | ✔
+Chức vụ | GET /positions; POST /positions; PUT, DELETE /positions/{id}; GET /positions/{id}/impact; POST /positions/{id}/clone; GET /permissions, /permission-bundles | ✔
+Tổng quản lý | GET /general-manager, /candidates; POST; DELETE /{userId} | ✔
+Ủy quyền | GET /delegations, /delegations/me; POST; PUT /{id}; POST /{id}/revoke | ✔
+Giáo viên | POST /teachers; GET /teachers, /teachers/assignable, /{staffId}; PUT /{staffId} | ✔
+ | PATCH /teachers/{staffId}/teaching-status | ✚
+Chuyên môn, môn học | GET, POST /specialties; GET /subjects | ✔
+ | POST, PUT, DELETE /subjects | ✚
+Sinh viên | GET /students, /me, /me/classes, /{id}; POST /students, /{id}/account; PUT, DELETE /{id} | ✔
+ | POST /students/{id}/reset-password; PATCH /students/{id}/account-status, /status | ✚
+Lớp | GET, POST /classes; GET /{id}, /{id}/students, /{id}/status-logs, /{id}/close-events; PUT, DELETE /{id}; PUT /{id}/teacher, /{id}/teacher/reassign; PUT, DELETE /{id}/students/{studentId} | ✔
+Vòng đời lớp | POST /{id}/cancel, /cancel-requests/approve, /cancel-requests/reject, /close-requests, /close-requests/approve, /close-requests/reject, /reopen | ✔
+Chuyển phòng | GET /transfer-requests/inbox, /mine, /{id}; POST; POST /{id}/steps/{step}/approve, /reject; POST /{id}/cancel | ✔
+Nghỉ việc | GET, POST /departments/{departmentId}/resignation-requests; POST /{requestId}/approve, /reject | ✔
+Thông báo | GET /notifications; POST /{id}/read, /read-all | ✔
+Việc chờ duyệt | GET /approvals/inbox | ✚
+Nội bộ | GET /internal/classes/{id}, /internal/students/{id}/classes, /internal/users/{userId}/authorization | ✔
+=== TABLE 23 ===
+Phương thức | Đường dẫn | Chức năng | TT
+GET, POST | /departments/{departmentId}/schedules | Danh sách, tạo buổi học | ✔
+PUT, DELETE | /departments/{departmentId}/schedules/{sessionId} | Sửa, xóa mềm | ✔
+POST | /departments/{departmentId}/schedules/{sessionId}/cancel | Hủy buổi | ✔
+GET | /departments/{departmentId}/schedules/room-suggestions | Gợi ý phòng trống | ✔
+GET | /schedules/me | Lịch của tôi | ✔
+POST | …/schedules/preview, …/schedules/bulk | Xếp lịch lặp (xem trước, lưu) | ✚
+GET | …/schedules?from=&to=&classId=&teacherId=&roomId= | Lịch tuần / tháng có lọc | ✚
+POST, PUT, GET | …/sessions/{id}/attendance, /schedules/me/attendance | Điểm danh, chuyên cần | ✚
+POST, GET | …/schedule-change-requests, /{id}/approve, /reject, /cancel | Đổi lịch, dạy bù | ✚
+=== TABLE 24 ===
+Phương thức | Đường dẫn | Chức năng | TT
+GET | /departments/{departmentId}/facilities | Tổng quan | ✔
+GET, POST | …/facilities/rooms; PUT, DELETE …/rooms/{roomId} | Phòng | ✔
+GET, POST | …/facilities/equipment; PUT, DELETE …/equipment/{equipmentId} | Thiết bị | ✔
+GET, POST | …/facilities/issues; POST …/issues/{issueId}/resolve | Sự cố | ✔
+GET | /internal/rooms, /internal/rooms/{roomId} | Phòng cho service khác | ✔
+GET | /facilities/rooms/available (tên đề xuất) | Phòng đang hoạt động toàn tổ chức | ✚
+=== TABLE 25 ===
+Chức năng | SA | Owner | TQL | HR | Giáo vụ | TP | GV | CSVC | SV
+Duyệt, tạm ngưng tổ chức | ✓ | — | — | — | — | — | — | — | —
+Bật / tắt module Optional | △ (ghi đè) | ✓ | △ | — | — | — | — | — | —
+Quản lý danh mục module toàn cục | ✓ | — | — | — | — | — | — | — | —
+Tài khoản nền tảng, nhật ký hệ thống | ✓ | — | — | — | — | — | — | — | —
+Hồ sơ cá nhân, đổi mật khẩu, thông báo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓
+Phòng ban, chức vụ: quản lý | — | ✓ | △ | xem | — | — | — | — | —
+Nhân sự: tạo, sửa, gán chức vụ | — | ✓ | △ | ✓ (quyền ⊆ của mình) | — | — | — | — | —
+Chuyển phòng: duyệt bước của mình | — | ✓ | △ | ✓ | — | ✓ | △ | — | —
+Nghỉ việc: tạo, duyệt | — | ✓ | △ | ✓ (không tự duyệt) | — | — | — | — | —
+Bổ nhiệm Tổng quản lý, ủy quyền | — | ✓ | — | — | — | — | — | — | —
+Sinh viên: tạo, sửa, vô hiệu, cấp tài khoản | — | ✓ | △ | xem | ✓ | — | xem | — | —
+Lớp: tạo, sửa, gán giáo viên | — | ✓ | △ | xem | ✓ | xem | xem | — | —
+Gửi yêu cầu hủy / đóng lớp | — | ✓ | △ | — | ✓ | — | — | — | —
+Duyệt hủy / đóng lớp (leo thang) | — | ✓ | △ | — | — | ✓ | — | — | —
+Mở lại lớp | — | ✓ | △ | — | ✓ | ✓ | — | — | —
+Môn học: xem / tạo, sửa | — | ✓ | △ | xem | ✓ | xem | xem | — | —
+Lịch: tạo, sửa, hủy buổi | — | ✓ | △ | — | — | — | — | — | —
+Xếp lịch lặp, xem lịch tuần / tháng | — | ✓ | △ | xem | — | — | xem | — | —
+Điểm danh buổi học | — | ✓ | △ | — | — | — | ✓ | — | —
+Gửi / duyệt yêu cầu đổi lịch | — | ✓ duyệt | △ | — | — | ✓ duyệt | ✓ gửi | — | —
+Lịch, chuyên cần của tôi | — | — | — | — | — | — | ✓ | — | ✓
+Phòng, thiết bị: quản lý | — | ✓ | △ | — | — | — | — | ✓ | —
+Sự cố: báo / xử lý | — | ✓ | △ | — | — | — | △ báo | ✓ | —
+=== TABLE 26 ===
+Điều kiện | Điểm đến
+SUPER_ADMIN | /quan-tri
+OWNER / ORG_OWNER | /to-chuc
+Có quyền khu Đào tạo (employee.*, class.*, student.*, ...) | /dao-tao
+Có student.self_view | /sinh-vien (cũ /hoc-sinh, giữ redirect)
+Role chưa có màn hình | /xem-thu/{role} hoặc thông báo chưa hỗ trợ
+Còn mật khẩu tạm | /doi-mat-khau trước khi vào console
+=== TABLE 27 ===
+Nhóm | Route
+Công khai | /dang-nhap, /dang-ky, /quen-mat-khau, /dat-lai-mat-khau?token=…, /doi-mat-khau, /xem-thu/:vaiTro
+SUPER_ADMIN | /quan-tri, /quan-tri/to-chuc, /to-chuc/tat-ca, /to-chuc/:id, /to-chuc/:id/lich-su, /quan-tri/module, /quan-tri/tai-khoan, /tai-khoan/:id, /quan-tri/nhat-ky
+OWNER (OwnerGuard) | /to-chuc (phòng ban), /to-chuc/phong-ban/:id, /to-chuc/chuc-vu, /to-chuc/uy-quyen
+Khu Đào tạo (AcademicGuard) | /dao-tao/nhan-su, /chuyen-phong, /chuc-vu (PeopleEditGuard), /giao-vien, /giao-vien/:id, /lop-hoc, /lop-hoc/:id, /sinh-vien, /lich-hoc, /lich-cua-toi, /co-so-vat-chat
+SELF | /hoc-sinh (sẽ là /sinh-vien), /uy-quyen, /lich-cua-toi
