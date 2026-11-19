@@ -3,13 +3,17 @@ package com.mems.service;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
+import com.mems.outbox.OutboxEventTypes;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,9 +30,11 @@ public class FacilityService {
     private static final Set<String> ISSUE_STATUSES = Set.of("open", "in_progress", "resolved", "unresolved");
 
     private final JdbcTemplate jdbc;
+    private final OutboxEventRepository outbox;
 
-    public FacilityService(JdbcTemplate jdbc) {
+    public FacilityService(JdbcTemplate jdbc, OutboxEventRepository outbox) {
         this.jdbc = jdbc;
+        this.outbox = outbox;
     }
 
     // ------------------------------------------------------------------ rooms
@@ -190,6 +196,8 @@ public class FacilityService {
                 now, equipment.id(), orgId);
             logStatus(equipment.id(), orgId, userId, equipment.status(), "broken", "Issue reported");
         }
+        publishIncident(orgId, OutboxEventTypes.FACILITY_INCIDENT_OPENED, id, equipment,
+            "open", Map.of("occurredAt", now.toInstant().toString()));
         return requireIssue(id, orgId, departmentId);
     }
 
@@ -219,6 +227,8 @@ public class FacilityService {
                 restore, now, equipment.id(), orgId);
             logStatus(equipment.id(), orgId, userId, "broken", restore, "Issue resolved");
         }
+        publishIncident(orgId, OutboxEventTypes.FACILITY_INCIDENT_RESOLVED, issueId, equipment,
+            "resolved", Map.of("resolvedAt", now.toInstant().toString()));
         return requireIssue(issueId, orgId, departmentId);
     }
 
@@ -256,6 +266,21 @@ public class FacilityService {
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** SCH-04: chỉ phát event; Schedule đánh dấu buổi bị ảnh hưởng, không tự đổi phòng. */
+    private void publishIncident(String orgId, String eventType, String incidentId,
+                                 EquipmentResponse equipment, String status,
+                                 Map<String, Object> extra) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("incidentId", incidentId);
+        payload.put("equipmentId", equipment.id());
+        payload.put("equipmentName", equipment.name());
+        payload.put("roomId", equipment.roomId());
+        payload.put("status", status);
+        payload.putAll(extra);
+        outbox.append(orgId, "FACILITY_INCIDENT", incidentId, null, eventType, 1,
+            UUID.randomUUID().toString(), payload);
+    }
 
     private RoomResponse requireRoom(String id, String orgId, String departmentId) {
         List<RoomResponse> rows = jdbc.query("""

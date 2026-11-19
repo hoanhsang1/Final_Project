@@ -4,6 +4,7 @@ import com.mems.client.IdentityClient;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.AssignmentRepository;
 import com.mems.repository.PositionRepository;
 import com.mems.repository.SchoolClassRepository;
@@ -65,6 +66,9 @@ class StudentClassManagementTest {
     private SubjectRepository subjectRepository;
 
     @Mock
+    private OutboxEventRepository outbox;
+
+    @Mock
     private AssignmentRepository assignmentRepository;
 
     @Mock
@@ -80,7 +84,7 @@ class StudentClassManagementTest {
         moduleGuard = new OrganizationModuleGuard(identityClient);
         studentService = new StudentService(studentRepository, actor, moduleGuard, audit, identityClient);
         classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit,
-            teacherRepository, classStatusService, subjectRepository, "TEACHER_ASSIGNMENT");
+            teacherRepository, classStatusService, subjectRepository, outbox, "TEACHER_ASSIGNMENT");
         effectivePermissions = new EffectivePermissionsService(jdbc, identityClient,
             assignmentRepository, positionRepository);
     }

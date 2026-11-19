@@ -10,6 +10,8 @@ import com.mems.dto.ClassStatusLogResponse;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
+import com.mems.outbox.OutboxEventTypes;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
@@ -20,10 +22,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class ClassStatusService {
@@ -36,22 +42,20 @@ public class ClassStatusService {
     private final OrganizationModuleGuard moduleGuard;
     private final ClassApprovalPolicy approvalPolicy;
     private final NotificationService notifications;
-
-    public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
-                              Actor actor, OrganizationModuleGuard moduleGuard) {
-        this(repository, classRepository, actor, moduleGuard, null, null);
-    }
+    private final OutboxEventRepository outbox;
 
     @Autowired
     public ClassStatusService(ClassStatusRepository repository, SchoolClassRepository classRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard,
-                              ClassApprovalPolicy approvalPolicy, NotificationService notifications) {
+                              ClassApprovalPolicy approvalPolicy, NotificationService notifications,
+                              OutboxEventRepository outbox) {
         this.repository = repository;
         this.classRepository = classRepository;
         this.actor = actor;
         this.moduleGuard = moduleGuard;
         this.approvalPolicy = approvalPolicy;
         this.notifications = notifications;
+        this.outbox = outbox;
     }
 
     @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Ho_Chi_Minh")
@@ -73,12 +77,14 @@ public class ClassStatusService {
             if (repository.transition(row.id(), orgId, "CHUA_BAT_DAU", "DANG_DIEN_RA") > 0) {
                 repository.insertStatusLog(row.id(), orgId, "CHUA_BAT_DAU", "DANG_DIEN_RA",
                     "AUTO_START", null);
+                publishRefresh(orgId, row, "DANG_DIEN_RA", "AUTO_START");
             }
         }
         for (ClassStatusRepository.TransitionRow row : repository.dueToEnd(orgId, today)) {
             if (repository.transition(row.id(), orgId, "DANG_DIEN_RA", "DA_KET_THUC") > 0) {
                 repository.insertStatusLog(row.id(), orgId, "DANG_DIEN_RA", "DA_KET_THUC",
                     "AUTO_END", null);
+                publishRefresh(orgId, row, "DA_KET_THUC", "AUTO_END");
             }
         }
     }
@@ -107,7 +113,9 @@ public class ClassStatusService {
             notifyManagers(orgId, classId, "CLASS_CANCEL_APPROVAL", "Yêu cầu hủy lớp cần duyệt",
                 "Lớp " + before.classCode() + " còn " + before.studentCount()
                     + " học sinh nên cần trưởng phòng duyệt hủy. Lý do: " + reason);
-            return classRepository.require(classId, orgId, false);
+            SchoolClassResponse requested = classRepository.require(classId, orgId, false);
+            publishAfterChange(orgId, before, requested, reason);
+            return requested;
         }
 
         int updated = repository.cancel(classId, orgId, request.version());
@@ -115,7 +123,9 @@ public class ClassStatusService {
             throw statusChanged();
         }
         repository.insertStatusLog(classId, orgId, before.status(), "DA_HUY", reason, actor.userId());
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse cancelled = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, cancelled, reason);
+        return cancelled;
     }
 
     /** Duyệt hủy lớp có học sinh (quy tắc 14). */
@@ -137,7 +147,9 @@ public class ClassStatusService {
         repository.insertCloseEvent(classId, orgId, "CANCEL_APPROVED", actor.userId(), reason);
         notifyRequester(orgId, classId, requesterId, "CLASS_CANCEL_APPROVAL",
             "Yêu cầu hủy lớp đã được duyệt", "Lớp " + before.classCode() + " đã bị hủy.");
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse approved = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, approved, reason);
+        return approved;
     }
 
     @Transactional
@@ -158,7 +170,9 @@ public class ClassStatusService {
         notifyRequester(orgId, classId, requesterId, "CLASS_CANCEL_APPROVAL",
             "Yêu cầu hủy lớp bị từ chối",
             "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse rejected = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, rejected, reason);
+        return rejected;
     }
 
     @Transactional(readOnly = true)
@@ -208,7 +222,9 @@ public class ClassStatusService {
         notifyManagers(orgId, classId, "CLASS_CLOSE_APPROVAL", "Yêu cầu đóng lớp cần duyệt",
             "Lớp " + before.classCode() + " yêu cầu đóng."
                 + (note == null ? "" : " Ghi chú: " + note));
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse requested = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, requested, note);
+        return requested;
     }
 
     @Transactional
@@ -229,7 +245,9 @@ public class ClassStatusService {
         repository.insertCloseEvent(classId, orgId, "APPROVED", actor.userId(), null);
         notifyRequester(orgId, classId, requesterId, "CLASS_CLOSE_APPROVAL",
             "Yêu cầu đóng lớp đã được duyệt", "Lớp " + before.classCode() + " đã đóng.");
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse approved = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, approved, null);
+        return approved;
     }
 
     @Transactional
@@ -252,7 +270,9 @@ public class ClassStatusService {
         notifyRequester(orgId, classId, requesterId, "CLASS_CLOSE_APPROVAL",
             "Yêu cầu đóng lớp bị từ chối",
             "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse rejected = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, rejected, reason);
+        return rejected;
     }
 
     @Transactional
@@ -271,7 +291,9 @@ public class ClassStatusService {
             throw closeStateChanged();
         }
         repository.insertCloseEvent(classId, orgId, "REOPENED", actor.userId(), reason);
-        return classRepository.require(classId, orgId, false);
+        SchoolClassResponse reopened = classRepository.require(classId, orgId, false);
+        publishAfterChange(orgId, before, reopened, reason);
+        return reopened;
     }
 
     @Transactional(readOnly = true)
@@ -280,6 +302,42 @@ public class ClassStatusService {
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.closeEvents(classId, orgId);
+    }
+
+    /** CLS-03: chỉ phát event; Schedule đánh dấu buổi bị ảnh hưởng, không tự hủy. */
+    private void publishAfterChange(String orgId, SchoolClassResponse before,
+                                    SchoolClassResponse after, String reason) {
+        publishStatusChanged(orgId, after.id(), after.classCode(), after.version(),
+            before.status(), after.status(), before.closeState(), after.closeState(),
+            before.cancelState(), after.cancelState(), reason);
+    }
+
+    private void publishRefresh(String orgId, ClassStatusRepository.TransitionRow row,
+                                String newStatus, String reason) {
+        SchoolClassResponse after = classRepository.require(row.id(), orgId, false);
+        publishStatusChanged(orgId, row.id(), row.classCode(), after.version(),
+            row.status(), newStatus, after.closeState(), after.closeState(),
+            after.cancelState(), after.cancelState(), reason);
+    }
+
+    private void publishStatusChanged(String orgId, String classId, String classCode, long version,
+                                      String previousStatus, String newStatus,
+                                      String previousCloseState, String closeState,
+                                      String previousCancelState, String cancelState,
+                                      String reason) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("classId", classId);
+        payload.put("classCode", classCode);
+        payload.put("previousStatus", previousStatus);
+        payload.put("newStatus", newStatus);
+        payload.put("previousCloseState", previousCloseState);
+        payload.put("closeState", closeState);
+        payload.put("previousCancelState", previousCancelState);
+        payload.put("cancelState", cancelState);
+        payload.put("reason", reason);
+        payload.put("effectiveAt", Instant.now().toString());
+        outbox.append(orgId, "CLASS", classId, version,
+            OutboxEventTypes.CLASS_STATUS_CHANGED, 1, UUID.randomUUID().toString(), payload);
     }
 
     private void requireViewScope(String orgId, SchoolClassResponse schoolClass) {

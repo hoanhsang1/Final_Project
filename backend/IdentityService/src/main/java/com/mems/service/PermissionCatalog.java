@@ -101,7 +101,9 @@ public final class PermissionCatalog {
         orgAndDept("facility.equipment.update", "Update equipment", "FACILITY_MANAGEMENT"),
         orgAndDept("facility.equipment.delete", "Delete equipment", "FACILITY_MANAGEMENT"),
         orgAndDept("facility.issue.report", "Report facility issues", "FACILITY_MANAGEMENT"),
-        orgAndDept("facility.issue.resolve", "Resolve facility issues", "FACILITY_MANAGEMENT")
+        orgAndDept("facility.issue.resolve", "Resolve facility issues", "FACILITY_MANAGEMENT"),
+        // Nhật ký tổ chức — xem thao tác trong toàn tổ chức (CC-06).
+        orgOnly("org.audit.view", "View organization audit logs", null)
     );
 
     public static final List<BundleDefinition> BUNDLES = List.of(

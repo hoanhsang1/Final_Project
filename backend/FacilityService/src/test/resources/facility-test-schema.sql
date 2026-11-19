@@ -19,3 +19,25 @@ CREATE TABLE IF NOT EXISTS equipment_status_log (
  changed_by VARCHAR(36),old_status VARCHAR(20),new_status VARCHAR(20),reason VARCHAR(500),
  changed_at TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS outbox_event (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ event_id VARCHAR(36) NOT NULL,
+ aggregate_type VARCHAR(40) NOT NULL,
+ aggregate_id VARCHAR(36) NOT NULL,
+ aggregate_version BIGINT,
+ event_type VARCHAR(80) NOT NULL,
+ event_version INT NOT NULL DEFAULT 1,
+ organization_id VARCHAR(36) NOT NULL,
+ correlation_id VARCHAR(36),
+ payload LONGTEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ attempts INT NOT NULL DEFAULT 0,
+ next_attempt_at TIMESTAMP NOT NULL,
+ locked_until TIMESTAMP,
+ last_error VARCHAR(1000),
+ replayed_at TIMESTAMP,
+ replayed_by VARCHAR(36),
+ created_at TIMESTAMP NOT NULL,
+ published_at TIMESTAMP,
+ UNIQUE (event_id)
+);

@@ -126,3 +126,26 @@ Quy ước: “Đề xuất” là ý kiến kỹ thuật, không phải quy t�
 - **Q17:** Mã sinh viên/lớp sau xoá mềm có được tái sử dụng không? (STU-04)
 - **Q18:** Khi module FACILITY bị tắt, sự cố đang mở có chặn tắt hay chỉ chuyển chỉ đọc? (MOD-03)
 - **Q19:** Ai được xem nhật ký tổ chức ngoài Owner? (CC-06)
+
+## Phụ lục Phase 2 — đồng bộ liên service (2026-11-20 tạm ghi nhận)
+
+## Q20. Đổi giáo viên lớp có tự thay cho mọi buổi tương lai không? (SCH-01)
+- **Hiện trạng source:** `SchoolClassService.assignTeacher` phát `ClassTeacherChanged` cùng transaction; `ScheduleEventApplier` chỉ ghi `session_impact` cho các buổi `scheduled` tương lai, **không** đổi `session.teacher_id`.
+- **Vấn đề:** nếu tự đổi, giáo viên mới có thể trùng lịch hoặc chưa được phân công; nếu không đổi, lịch hiển thị sai người dạy.
+- **Phương án A:** tự thay `teacher_id` cho mọi buổi tương lai (cần kiểm trùng lịch, báo giáo viên). **B:** giữ nguyên buổi, hiển thị cảnh báo cho trưởng bộ phận/giáo vụ xác nhận từng buổi hoặc hàng loạt.
+- **Khuyến nghị:** B ở giai đoạn này — an toàn, không đổi dữ liệu lịch khi chưa có quy trình xác nhận.
+- **Trạng thái:** CẦN XÁC NHẬN — hiện chỉ đánh dấu impact.
+
+## Q21. Đóng/hủy/kết thúc lớp thì buổi tương lai và ghi danh xử lý thế nào? (CLS-03)
+- **Hiện trạng source:** `ClassStatusService` phát `ClassStatusChanged`; Schedule đánh dấu impact khi lớp bị hủy/kết thúc/đóng và giải phóng khi lớp mở lại. Không hủy buổi, không xóa `class_student`.
+- **Vấn đề:** nghiệp vụ trung tâm có thể muốn hủy toàn bộ buổi tương lai, giữ lại để đối soát, hay chuyển sang trạng thái "cần xử lý"; ghi danh/học phí có hoàn không.
+- **Phương án A:** tự hủy buổi tương lai + đóng ghi danh. **B:** chỉ đánh dấu để người phụ trách quyết định từng lớp. **C:** hủy buổi nhưng **giữ** ghi danh làm lịch sử.
+- **Khuyến nghị:** B trước, sau đó chốt A/C theo quy trình học vụ.
+- **Trạng thái:** CẦN XÁC NHẬN — hiện chỉ đánh dấu/giải phóng impact.
+
+## Q22. Sự cố thiết bị/phòng có yêu cầu chuyển phòng hoặc hủy buổi không? (SCH-04)
+- **Hiện trạng source:** Facility phát `FacilityIncidentOpened/Resolved`; Schedule đánh dấu buổi tương lai dùng phòng đó, giải phóng khi sự cố xong **nếu buổi vẫn ở đúng phòng**. Không đổi phòng, không hủy buổi.
+- **Vấn đề:** thiết bị hỏng (máy chiếu) khác phòng không dùng được; tự đổi phòng có thể trùng lịch.
+- **Phương án A:** tự chuyển phòng theo gợi ý trống. **B:** chỉ cảnh báo để người xếp lịch xử lý. **C:** tự hủy buổi nếu sự cố ở mức "phòng không khả dụng".
+- **Khuyến nghị:** B; chỉ thêm C khi có trường mức độ sự cố (không có trong schema hiện tại).
+- **Trạng thái:** CẦN XÁC NHẬN — hiện chỉ đánh dấu/giải phóng impact.

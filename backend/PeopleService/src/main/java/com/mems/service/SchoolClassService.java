@@ -7,6 +7,8 @@ import com.mems.dto.SchoolClassUpdateRequest;
 import com.mems.dto.StudentResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
+import com.mems.outbox.OutboxEventTypes;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.SubjectRepository;
@@ -22,6 +24,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,12 +38,13 @@ public class SchoolClassService {
     private final TeacherRepository teacherRepository;
     private final ClassStatusService classStatusService;
     private final SubjectRepository subjectRepository;
+    private final OutboxEventRepository outbox;
     private final String teacherAssignmentModuleCode;
 
     public SchoolClassService(SchoolClassRepository repository, StudentRepository studentRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard, PeopleAuditService audit,
                               TeacherRepository teacherRepository, ClassStatusService classStatusService,
-                              SubjectRepository subjectRepository,
+                              SubjectRepository subjectRepository, OutboxEventRepository outbox,
                               @Value("${TEACHER_ASSIGNMENT_MODULE_CODE:TEACHER_ASSIGNMENT}")
                               String teacherAssignmentModuleCode) {
         this.repository = repository;
@@ -51,6 +55,7 @@ public class SchoolClassService {
         this.teacherRepository = teacherRepository;
         this.classStatusService = classStatusService;
         this.subjectRepository = subjectRepository;
+        this.outbox = outbox;
         this.teacherAssignmentModuleCode = teacherAssignmentModuleCode;
     }
 
@@ -193,6 +198,7 @@ public class SchoolClassService {
         }
 
         SchoolClassResponse after = repository.require(classId, orgId, false);
+        publishTeacherChanged(orgId, before, after);
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("before", before.teacher());
         details.put("after", after.teacher());
@@ -202,9 +208,24 @@ public class SchoolClassService {
         return after;
     }
 
+    /** SCH-01: event chỉ báo thay đổi, Schedule quyết định đánh dấu buổi bị ảnh hưởng. */
+    private void publishTeacherChanged(String orgId, SchoolClassResponse before,
+                                       SchoolClassResponse after) {
+        String previousId = before.teacher() == null ? null : before.teacher().id();
+        String newId = after.teacher() == null ? null : after.teacher().id();
+        if (Objects.equals(previousId, newId)) return;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("classId", after.id());
+        payload.put("classCode", after.classCode());
+        payload.put("previousTeacherId", previousId);
+        payload.put("newTeacherId", newId);
+        payload.put("classVersion", after.version());
+        outbox.append(orgId, "CLASS", after.id(), after.version(),
+            OutboxEventTypes.CLASS_TEACHER_CHANGED, 1, UUID.randomUUID().toString(), payload);
+    }
+
     @Transactional(readOnly = true)
-    public List<StudentResponse> listStudents(String classId) {
-        String orgId = actor.orgId();
+    public List<StudentResponse> listStudents(String classId) {        String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         SchoolClassResponse schoolClass = repository.require(classId, orgId, false);
         requireClassInScope(orgId, schoolClass);

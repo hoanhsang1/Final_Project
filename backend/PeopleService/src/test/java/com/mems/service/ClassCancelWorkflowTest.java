@@ -5,6 +5,7 @@ import com.mems.dto.ClassCloseRejectRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
@@ -43,12 +44,14 @@ class ClassCancelWorkflowTest {
     @Mock private OrganizationModuleGuard guard;
     @Mock private ClassApprovalPolicy approvalPolicy;
     @Mock private NotificationService notifications;
+    @Mock private OutboxEventRepository outbox;
 
     private ClassStatusService service;
 
     @BeforeEach
     void setUp() {
-        service = new ClassStatusService(repository, classes, actor, guard, approvalPolicy, notifications);
+        service = new ClassStatusService(repository, classes, actor, guard,
+            approvalPolicy, notifications, outbox);
         when(actor.orgId()).thenReturn(ORG);
         when(actor.userId()).thenReturn("requester");
         when(classes.require(eq(CLASS), eq(ORG), anyBoolean())).thenReturn(row("NONE", 3));

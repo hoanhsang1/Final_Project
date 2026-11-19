@@ -10,6 +10,7 @@ import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.SchoolClassUpdateRequest;
 import com.mems.exception.AppException;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
@@ -63,10 +64,12 @@ class ClassLifecycleTest {
         OrganizationModuleGuard guard = mock(OrganizationModuleGuard.class);
         classes = new SchoolClassRepository(jdbc);
         statusRepository = new ClassStatusRepository(jdbc);
-        statusService = new ClassStatusService(statusRepository, classes, actor, guard);
+        OutboxEventRepository outbox = mock(OutboxEventRepository.class);
+        statusService = new ClassStatusService(statusRepository, classes, actor, guard,
+            mock(ClassApprovalPolicy.class), mock(NotificationService.class), outbox);
         classService = new SchoolClassService(classes, mock(StudentRepository.class), actor, guard,
             mock(PeopleAuditService.class), mock(TeacherRepository.class), statusService,
-            mock(SubjectRepository.class), "TEACHER_ASSIGNMENT");
+            mock(SubjectRepository.class), outbox, "TEACHER_ASSIGNMENT");
     }
 
     @Test

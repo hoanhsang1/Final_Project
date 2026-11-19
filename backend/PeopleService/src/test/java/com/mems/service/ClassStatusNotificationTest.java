@@ -2,6 +2,7 @@ package com.mems.service;
 
 import com.mems.dto.ClassCloseRejectRequest;
 import com.mems.dto.ClassCloseRequest;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
@@ -50,7 +51,7 @@ class ClassStatusNotificationTest {
         notifications = mock(NotificationService.class);
         service = new ClassStatusService(new ClassStatusRepository(jdbc),
             new SchoolClassRepository(jdbc), actor, mock(OrganizationModuleGuard.class),
-            approvalPolicy, notifications);
+            approvalPolicy, notifications, mock(OutboxEventRepository.class));
 
         jdbc.update("""
             INSERT INTO school_class(id,org_id,class_code,name,status,close_state,version,created_by,created_at)

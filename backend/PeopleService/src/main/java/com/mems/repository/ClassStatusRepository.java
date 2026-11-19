@@ -47,7 +47,7 @@ public class ClassStatusRepository {
         );
     };
 
-    public record TransitionRow(String id, String status) {}
+    public record TransitionRow(String id, String status, String classCode) {}
 
     public List<String> organizationsWithClasses() {
         return jdbc.queryForList(
@@ -56,19 +56,21 @@ public class ClassStatusRepository {
 
     public List<TransitionRow> dueToStart(String orgId, LocalDate today) {
         return jdbc.query("""
-            SELECT id, status FROM school_class
+            SELECT id, status, class_code FROM school_class
             WHERE org_id = ? AND deleted_at IS NULL AND status = 'CHUA_BAT_DAU'
               AND start_date IS NOT NULL AND start_date <= ?
-            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status")),
+            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status"),
+            rs.getString("class_code")),
             orgId, Date.valueOf(today));
     }
 
     public List<TransitionRow> dueToEnd(String orgId, LocalDate today) {
         return jdbc.query("""
-            SELECT id, status FROM school_class
+            SELECT id, status, class_code FROM school_class
             WHERE org_id = ? AND deleted_at IS NULL AND status = 'DANG_DIEN_RA'
               AND end_date IS NOT NULL AND end_date < ?
-            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status")),
+            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status"),
+            rs.getString("class_code")),
             orgId, Date.valueOf(today));
     }
 

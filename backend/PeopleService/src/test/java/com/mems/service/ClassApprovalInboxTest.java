@@ -1,6 +1,7 @@
 package com.mems.service;
 
 import com.mems.dto.ClassLifecycleInboxItem;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.security.Actor;
@@ -36,7 +37,7 @@ class ClassApprovalInboxTest {
         actor = mock(Actor.class);
 
         service = new ClassStatusService(mock(ClassStatusRepository.class), classes, actor, guard,
-            policy, mock(NotificationService.class));
+            policy, mock(NotificationService.class), mock(OutboxEventRepository.class));
 
         when(actor.orgId()).thenReturn(ORG);
         when(guard.isReadable(ORG, "STUDENT_MANAGEMENT")).thenReturn(true);

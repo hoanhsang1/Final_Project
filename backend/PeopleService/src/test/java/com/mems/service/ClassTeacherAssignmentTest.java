@@ -5,6 +5,8 @@ import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.ClassTeacherInfo;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.exception.AppException;
+import com.mems.outbox.OutboxEventRepository;
+import com.mems.outbox.OutboxEventTypes;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.SubjectRepository;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -41,6 +44,7 @@ class ClassTeacherAssignmentTest {
     @Mock private IdentityClient identityClient;
     @Mock private PeopleAuditService audit;
     @Mock private ClassStatusService classStatusService;
+    @Mock private OutboxEventRepository outbox;
 
     private SchoolClassService service;
 
@@ -48,7 +52,7 @@ class ClassTeacherAssignmentTest {
     void setUp() {
         service = new SchoolClassService(classes, students, actor,
             new OrganizationModuleGuard(identityClient), audit, teachers, classStatusService, subjects,
-            "TEACHER_ASSIGNMENT");
+            outbox, "TEACHER_ASSIGNMENT");
         when(actor.orgId()).thenReturn("org-1");
         when(actor.userId()).thenReturn("actor-1");
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
@@ -159,6 +163,49 @@ class ClassTeacherAssignmentTest {
         verify(classes).assignTeacher("class-1", "org-1", "teacher-1", 0);
         verify(audit).record(eq("org-1"), eq("actor-1"), eq("CLASS_TEACHER_REASSIGNED"),
             eq("class-1"), any());
+    }
+
+    @Test
+    @DisplayName("SCH-01: đổi giáo viên phát event ClassTeacherChanged kèm giáo viên cũ/mới")
+    void publishesTeacherChangedEvent() {
+        var before = classRow("class-1", "CHUA_BAT_DAU", "NONE", null, 0);
+        var after = classRow("class-1", "CHUA_BAT_DAU", "NONE",
+            new ClassTeacherInfo("teacher-1", "GV001", "Nguyễn Văn An"), 1);
+        when(classes.require("class-1", "org-1", true)).thenReturn(before);
+        when(classes.require("class-1", "org-1", false)).thenReturn(after);
+        when(teachers.requireTeacher("teacher-1", "org-1", false)).thenReturn(teacher("teacher-1", "DANG_DAY"));
+        when(teachers.hasTeacherPosition("teacher-1", "org-1")).thenReturn(true);
+        when(classes.assignTeacher("class-1", "org-1", "teacher-1", 0)).thenReturn(1);
+
+        service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        verify(outbox).append(eq("org-1"), eq("CLASS"), eq("class-1"), eq(1L),
+            eq(OutboxEventTypes.CLASS_TEACHER_CHANGED), eq(1), anyString(), payload.capture());
+        assertThat(payload.getValue()).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+            .containsEntry("classId", "class-1")
+            .containsEntry("previousTeacherId", null)
+            .containsEntry("newTeacherId", "teacher-1")
+            .containsEntry("classVersion", 1L);
+    }
+
+    @Test
+    @DisplayName("SCH-01: giáo viên không đổi thì không phát event thừa")
+    void skipsEventWhenTeacherUnchanged() {
+        var same = new ClassTeacherInfo("teacher-1", "GV001", "Nguyễn Văn An");
+        when(classes.require("class-1", "org-1", true)).thenReturn(
+            classRow("class-1", "CHUA_BAT_DAU", "NONE", same, 0));
+        when(classes.require("class-1", "org-1", false)).thenReturn(
+            classRow("class-1", "CHUA_BAT_DAU", "NONE", same, 1));
+        when(teachers.requireTeacher("teacher-1", "org-1", false)).thenReturn(teacher("teacher-1", "DANG_DAY"));
+        when(teachers.hasTeacherPosition("teacher-1", "org-1")).thenReturn(true);
+        when(classes.assignTeacher("class-1", "org-1", "teacher-1", 0)).thenReturn(1);
+
+        service.assignTeacher("class-1", new ClassTeacherAssignRequest("teacher-1", 0L));
+
+        verify(outbox, never()).append(anyString(), anyString(), anyString(), any(),
+            anyString(), anyInt(), anyString(), any());
     }
 
     private void assertError(AppException ex, HttpStatus status, String code) {

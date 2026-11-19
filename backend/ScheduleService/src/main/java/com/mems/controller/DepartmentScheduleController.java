@@ -3,9 +3,11 @@ package com.mems.controller;
 import com.mems.dto.RoomSuggestionResponse;
 import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
+import com.mems.dto.SessionImpactResponse;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
 import com.mems.service.ScheduleService;
+import com.mems.service.SessionImpactService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,12 +34,14 @@ public class DepartmentScheduleController {
     private static final Set<String> DELETE = Set.of("schedule.delete");
 
     private final ScheduleService schedules;
+    private final SessionImpactService sessionImpacts;
     private final Actor actor;
     private final OrganizationModuleGuard modules;
 
-    public DepartmentScheduleController(ScheduleService schedules, Actor actor,
-                                        OrganizationModuleGuard modules) {
+    public DepartmentScheduleController(ScheduleService schedules, SessionImpactService sessionImpacts,
+                                        Actor actor, OrganizationModuleGuard modules) {
         this.schedules = schedules;
+        this.sessionImpacts = sessionImpacts;
         this.actor = actor;
         this.modules = modules;
     }
@@ -86,6 +90,14 @@ public class DepartmentScheduleController {
                                                          @RequestParam(required = false) Instant endTime) {
         authorize(CREATE, departmentId);
         return schedules.roomSuggestions(actor.orgId(), departmentId, startTime, endTime);
+    }
+
+    /** Buổi học bị ảnh hưởng do đổi giáo viên / lớp đóng-hủy / sự cố cơ sở vật chất. */
+    @GetMapping("/impacts")
+    public List<SessionImpactResponse> impacts(@PathVariable String departmentId,
+                                               @RequestParam(required = false) String status) {
+        authorizeRead(VIEW, departmentId);
+        return sessionImpacts.list(actor.orgId(), departmentId, status);
     }
 
     private void authorize(Set<String> codes, String departmentId) {

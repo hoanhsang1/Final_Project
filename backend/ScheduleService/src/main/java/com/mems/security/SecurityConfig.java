@@ -18,13 +18,17 @@ import java.util.*;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper,
+            @Value("${INTERNAL_API_KEY:}") String internalKey) throws Exception {
         http.csrf(c -> c.disable())
             .cors(org.springframework.security.config.Customizer.withDefaults())
+            .addFilterBefore(new InternalApiFilter(internalKey, mapper),
+                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
             .addFilterAfter(new PasswordChangeRequiredFilter(mapper,Set.of()),
                 org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
+                .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/departments/*/schedules", "/departments/*/schedules/**").authenticated()
                 .requestMatchers("/schedules/me").authenticated()
