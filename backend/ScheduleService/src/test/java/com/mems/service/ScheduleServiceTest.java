@@ -51,7 +51,7 @@ class ScheduleServiceTest {
             VALUES ('class-1',?, 'C1','Lớp 1','Toán',30,'2026-01-01','2026-12-31','ongoing')
             """, ORG);
         when(people.classInfo(ORG, "class-1")).thenReturn(new ClassInfo("class-1", ORG,
-            "C1", "Lớp 1", "DANG_DIEN_RA", "teacher-1", "GV 1",
+            "C1", "Lớp 1", "DANG_DIEN_RA", "NONE", "teacher-1", "GV 1",
             LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31"), "Toán", 20));
         when(facility.room(anyString(), anyString())).thenReturn(
             new RoomInfo("room-1", "R1", "Phòng 1", 40, "active", DEPT, 0));
@@ -98,7 +98,7 @@ class ScheduleServiceTest {
     void rejectsRoomOverlap() {
         service.create(ORG, DEPT, request("room-1", START, END));
         when(people.classInfo(ORG, "class-1")).thenReturn(new ClassInfo("class-1", ORG,
-            "C1", "Lớp 1", "DANG_DIEN_RA", "teacher-2", "GV 2",
+            "C1", "Lớp 1", "DANG_DIEN_RA", "NONE", "teacher-2", "GV 2",
             LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31"), "Toán", 20));
 
         assertThatThrownBy(() -> service.create(ORG, DEPT,
@@ -112,7 +112,20 @@ class ScheduleServiceTest {
     @DisplayName("Lớp đã hủy không được xếp lịch")
     void rejectsCancelledClass() {
         when(people.classInfo(ORG, "class-1")).thenReturn(new ClassInfo("class-1", ORG,
-            "C1", "Lớp 1", "DA_HUY", "teacher-1", "GV 1",
+            "C1", "Lớp 1", "DA_HUY", "NONE", "teacher-1", "GV 1",
+            LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31"), "Toán", 20));
+
+        assertThatThrownBy(() -> service.create(ORG, DEPT, request("room-1", START, END)))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("CLASS_NOT_SCHEDULABLE"));
+    }
+
+    @Test
+    @DisplayName("Lớp đang chờ đóng (closeState=PENDING) không được xếp lịch")
+    void rejectsClassWithClosePending() {
+        when(people.classInfo(ORG, "class-1")).thenReturn(new ClassInfo("class-1", ORG,
+            "C1", "Lớp 1", "DANG_DIEN_RA", "PENDING", "teacher-1", "GV 1",
             LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31"), "Toán", 20));
 
         assertThatThrownBy(() -> service.create(ORG, DEPT, request("room-1", START, END)))

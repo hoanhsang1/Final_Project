@@ -168,8 +168,13 @@ public class TransferService {
 
         TransferResponse request = transfers.requireForUpdate(id, orgId);
         requirePending(request);
+        // TRF-02: người được chuyển không được duyệt bước của chính mình (trừ bước tự xác nhận).
+        if (!"EMPLOYEE".equals(normalized) && actor.userId().equals(request.userId()))
+            throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         if (!canDecide(request, normalized))
             throw new AppException(ErrorCode.TRANSFER_STEP_NOT_ALLOWED);
+        if (approve && !earlierStepsApproved(request, normalized))
+            throw new AppException(ErrorCode.TRANSFER_STEP_OUT_OF_ORDER);
 
         String decision = approve ? "APPROVED" : "REJECTED";
         if (!transfers.decideStep(id, normalized, decision, actor.userId(), trimToNull(note)))
@@ -271,6 +276,7 @@ public class TransferService {
 
     private boolean canDecide(TransferResponse request, String step) {
         String orgId = actor.orgId();
+        if (!"EMPLOYEE".equals(step) && actor.userId().equals(request.userId())) return false;
         return switch (step) {
             case "SOURCE_HEAD" -> transfers
                 .headHolders(orgId, request.fromDepartmentId(), HEAD_POSITION_NAMES)
@@ -293,10 +299,20 @@ public class TransferService {
         if (!"PENDING".equals(request.status())) return List.of();
         List<String> result = new ArrayList<>();
         for (TransferStepResponse step : request.steps()) {
-            if ("PENDING".equals(step.decision()) && canDecide(request, step.step()))
+            if ("PENDING".equals(step.decision()) && canDecide(request, step.step())
+                && earlierStepsApproved(request, step.step()))
                 result.add(step.step());
         }
         return result;
+    }
+
+    /** Các bước đứng trước phải được chấp thuận đủ thì mới tới lượt bước này. */
+    private boolean earlierStepsApproved(TransferResponse request, String step) {
+        for (TransferStepResponse current : request.steps()) {
+            if (current.step().equals(step)) return true;
+            if (!"APPROVED".equals(current.decision())) return false;
+        }
+        return false;
     }
 
     /**

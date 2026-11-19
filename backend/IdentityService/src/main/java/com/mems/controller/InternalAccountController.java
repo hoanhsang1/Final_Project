@@ -21,4 +21,6 @@ public class InternalAccountController {
     public void delete(@PathVariable String id,@RequestParam String orgId) { service.compensate(id,orgId); }
     @PatchMapping("/{id}/disable") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void disable(@PathVariable String id,@RequestParam String orgId) { service.disable(id,orgId); }
+    @PatchMapping("/{id}/enable") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void enable(@PathVariable String id,@RequestParam String orgId) { service.enable(id,orgId); }
 }

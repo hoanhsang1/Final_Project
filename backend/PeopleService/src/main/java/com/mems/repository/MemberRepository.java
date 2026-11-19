@@ -170,9 +170,13 @@ public class MemberRepository {
         assignments.replace(userId, orgId, departmentId, positions, actorId, reason);
     }
 
-    public void delete(String userId, String orgId) {
-        assignments.replace(userId, orgId, null, Set.of(), userId, "Xoá nhân sự");
-        jdbc.update("DELETE FROM department_member WHERE user_id=? AND org_id=?", userId, orgId);
+    /** Ngừng nhân sự: thu hồi chức danh và đánh dấu RESIGNED, giữ hồ sơ để tra cứu. */
+    public void offboard(String userId, String orgId, String actorId, String reason) {
+        assignments.replace(userId, orgId, null, Set.of(), actorId, reason);
+        jdbc.update("""
+            UPDATE department_member SET status='RESIGNED', resigned_at=?
+            WHERE user_id=? AND org_id=? AND status='ACTIVE'
+            """, Timestamp.from(Instant.now()), userId, orgId);
     }
 
     public Optional<String> findDepartmentId(String userId, String orgId) {

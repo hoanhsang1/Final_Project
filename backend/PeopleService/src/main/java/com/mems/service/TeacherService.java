@@ -95,9 +95,33 @@ public class TeacherService {
         return teachers.classes(actor.userId(), orgId);
     }
 
+    private static final Set<String> TEACHING_STATUSES =
+        Set.of("DANG_DAY", "TAM_NGHI", "NGHI_VIEC");
+
+    /** Đổi trạng thái giảng dạy bằng quyền `teacher.change_status` (không dùng employee.edit). */
     @Transactional
-    public TeacherDetailResponse update(String userId, TeacherUpdateRequest request) {
-        String orgId = actor.orgId(), actorId = actor.userId();
+    public TeacherDetailResponse changeTeachingStatus(String userId, TeacherStatusRequest request) {
+        String orgId = actor.orgId();
+        var row = teachers.requireTeacher(userId, orgId, true);
+        actor.requirePermissionIn("teacher.change_status", row.departmentId());
+
+        String status = request.status().trim().toUpperCase(Locale.ROOT);
+        if (!TEACHING_STATUSES.contains(status)) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                "status: must be DANG_DAY, TAM_NGHI or NGHI_VIEC");
+        }
+        if (!status.equals(row.teachingStatus())) {
+            teachers.updateTeachingStatus(userId, orgId, status, actor.userId());
+            Map<String, Object> changes = new LinkedHashMap<>();
+            recordChange(changes, "teachingStatus", row.teachingStatus(), status);
+            audit.record(orgId, actor.userId(), "TEACHER_STATUS_CHANGED", userId, changes);
+        }
+        return detail(teachers.requireTeacher(userId, orgId, false),
+            actor.hasPermissionIn("employee.view_detail", row.departmentId()));
+    }
+
+    @Transactional
+    public TeacherDetailResponse update(String userId, TeacherUpdateRequest request) {        String orgId = actor.orgId(), actorId = actor.userId();
         var row = teachers.requireTeacher(userId, orgId, true);
         actor.requirePermissionIn("employee.edit", row.departmentId());
         specialtyService.validateIds(orgId, request.specialtyIds());

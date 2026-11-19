@@ -35,6 +35,9 @@ public class AuthService implements IAuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AccessProfileService accessProfiles;
+    private final LoginAttemptService loginAttempts;
+    // Real BCrypt hash used to keep the failure path constant-time for unknown usernames.
+    private final String dummyHash;
 
     public AuthService(
             IAccountRepository accountRepository,
@@ -42,7 +45,8 @@ public class AuthService implements IAuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             RefreshTokenService refreshTokenService,
-            AccessProfileService accessProfiles
+            AccessProfileService accessProfiles,
+            LoginAttemptService loginAttempts
     ) {
         this.accountRepository = accountRepository;
         this.organizationRepository = organizationRepository;
@@ -50,6 +54,8 @@ public class AuthService implements IAuthService {
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.accessProfiles = accessProfiles;
+        this.loginAttempts = loginAttempts;
+        this.dummyHash = passwordEncoder.encode("not-a-real-password-" + java.util.UUID.randomUUID());
     }
 
     // Kiem tra trang thai account, role va organization
@@ -105,20 +111,33 @@ public class AuthService implements IAuthService {
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        return login(request, null);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponse login(LoginRequest request, String clientIp) {
+
+        String usernameKey = request.username() == null ? "" : request.username().trim().toLowerCase(java.util.Locale.ROOT);
+
+        // 0. Chan do mat khau truoc khi cham database
+        loginAttempts.assertAllowed(usernameKey, clientIp);
 
         // 1. Tim account
         Account acc = accountRepository
                 .findByUsername(request.username())
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
+                .orElse(null);
 
-        // 2. Xac minh mat khau
-        boolean matches = passwordEncoder.matches(request.password(), acc.getPasswordHash());
-        if (!matches && "123456".equals(request.password()) && ("platform_admin".equals(acc.getUsername()) || "admin".equals(acc.getUsername()))) {
-            matches = true;
-        }
-        if (!matches) {
+        // 2. Xac minh mat khau (luon chay BCrypt de khong lo username qua thoi gian phan hoi)
+        boolean matches = passwordEncoder.matches(
+                request.password(),
+                acc == null ? dummyHash : acc.getPasswordHash());
+
+        if (acc == null || !matches) {
+            loginAttempts.recordFailure(usernameKey, clientIp, acc == null ? null : acc.getId());
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
         }
+        loginAttempts.recordSuccess(usernameKey, clientIp);
 
         // 3. Kiem tra quyen va to chuc
         List<String> roles = validateAccount(acc);

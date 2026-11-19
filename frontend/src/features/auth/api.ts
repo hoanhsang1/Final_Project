@@ -37,6 +37,12 @@ export const authApi = {
     return data
   },
 
+  /** Danh mục module công khai cho biểu mẫu đăng ký tổ chức. */
+  async publicModules(): Promise<{ code: string; name: string }[]> {
+    const { data } = await api.get<{ code: string; name: string }[]>('/api/v1/modules')
+    return data
+  },
+
   /** Khả năng duyệt của chính mình (policy chức danh + uỷ quyền), không suy từ role. */
   async approvalCapabilities(): Promise<ApprovalCapabilities> {
     const { data } = await api.get<ApprovalCapabilities>('/users/me/approval-capabilities')

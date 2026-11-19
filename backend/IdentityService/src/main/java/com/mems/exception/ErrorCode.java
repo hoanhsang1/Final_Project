@@ -25,12 +25,15 @@ public enum ErrorCode {
     ROLE_NOT_ASSIGNABLE(1117, HttpStatus.BAD_REQUEST, "Cannot assign SUPER_ADMIN role"),
     INVALID_ROLE(1118, HttpStatus.BAD_REQUEST, "Invalid role: %s"),
     ACCOUNT_STATUS_INVALID(1119, HttpStatus.BAD_REQUEST, "Status must be active, locked, or disabled"),
-    PASSWORD_TOO_SHORT(1120, HttpStatus.BAD_REQUEST, "Password must be at least 8 characters"),
+    PASSWORD_TOO_SHORT(1120, HttpStatus.BAD_REQUEST, "Password must be at least 12 characters"),
     CURRENT_PASSWORD_INCORRECT(1121, HttpStatus.BAD_REQUEST, "Current password is incorrect"),
     PASSWORD_UNCHANGED(1122, HttpStatus.BAD_REQUEST,
         "Choose a different password, at most 72 UTF-8 bytes"),
+    PASSWORD_TOO_LONG(1134, HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes"),
     PROVISION_ROLLBACK_NOT_ALLOWED(1123, HttpStatus.CONFLICT,
         "Only unused provisioned accounts may be rolled back"),
+    LOGIN_RATE_LIMITED(1133, HttpStatus.TOO_MANY_REQUESTS,
+        "Too many login attempts. Please try again later."),
 
     // Tổ chức
     ORGANIZATION_REQUIRED(1108, HttpStatus.FORBIDDEN, "Organization is required"),

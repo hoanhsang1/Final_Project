@@ -26,6 +26,10 @@ public class IdentityDataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        jdbc.update("""
+            INSERT INTO role(code,name,scope,description) VALUES ('SUPER_ADMIN','System administrator','platform','Approves organizations and manages platform')
+            ON DUPLICATE KEY UPDATE name=VALUES(name), scope=VALUES(scope)
+            """);
         for (String role : new String[]{"OWNER", "MANAGER", "STAFF", "TEACHER", "STUDENT"}) {
             jdbc.update("""
                 INSERT INTO role(code,name,scope,description) VALUES (?,?,'organization',?)
@@ -75,9 +79,7 @@ public class IdentityDataInitializer implements ApplicationRunner {
                     """, permission, bundle.code());
             }
         }
-        try {
-            jdbc.update("UPDATE account SET password_hash=? WHERE username IN ('platform_admin', 'admin')", encoder.encode("123456"));
-        } catch (Exception ignored) {}
+        bootstrapSuperAdmin();
         if (!env.getProperty("OWNER_BOOTSTRAP_ENABLED", Boolean.class, false)) return;
 
         String orgId = required("OWNER_BOOTSTRAP_ORG_ID");
@@ -115,6 +117,36 @@ public class IdentityDataInitializer implements ApplicationRunner {
         jdbc.update("""
             INSERT INTO account_role(account_id,role_id)
             SELECT ?,id FROM role WHERE code='OWNER'
+            """, accountId);
+    }
+
+    // One-time platform admin bootstrap. Never touches an existing account and
+    // forces a password change on first login.
+    private void bootstrapSuperAdmin() {
+        if (!env.getProperty("SUPER_ADMIN_BOOTSTRAP_ENABLED", Boolean.class, false)) return;
+
+        String email = required("SUPER_ADMIN_BOOTSTRAP_EMAIL").trim();
+        String username = env.getProperty("SUPER_ADMIN_BOOTSTRAP_USERNAME", "").trim();
+        if (username.isBlank()) username = email;
+        String password = required("SUPER_ADMIN_BOOTSTRAP_PASSWORD");
+        if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") || email.length() > 255
+                || username.length() < 3 || username.length() > 100
+                || password.length() < 12 || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalStateException("Invalid SUPER_ADMIN bootstrap email, username or password (12 characters minimum, 72 UTF-8 bytes maximum)");
+        }
+
+        var existing = jdbc.queryForList(
+                "SELECT id FROM account WHERE username=? OR email=?", String.class, username, email);
+        if (!existing.isEmpty()) return;
+
+        String accountId = UUID.randomUUID().toString();
+        jdbc.update("""
+            INSERT INTO account(id,org_id,username,email,password_hash,status,must_change_password)
+            VALUES (?,NULL,?,?,?,'active',1)
+            """, accountId, username, email, encoder.encode(password));
+        jdbc.update("""
+            INSERT INTO account_role(account_id,role_id)
+            SELECT ?,id FROM role WHERE code='SUPER_ADMIN'
             """, accountId);
     }
 

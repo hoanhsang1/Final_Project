@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -233,18 +235,24 @@ public class AccountService {
         }
 
         if (newPassword != null && !newPassword.isBlank()) {
-            if (newPassword.length() < 8) {
-                throw new AppException(ErrorCode.PASSWORD_TOO_SHORT);
-            }
+            PasswordPolicy.validate(newPassword);
             jdbc.update("UPDATE account SET password_hash = ?, must_change_password = TRUE WHERE id = ?",
                 passwordEncoder.encode(newPassword), accountId);
+            revokeSessions(accountId);
             return Map.of();
         }
 
         String tempPassword = generateTemporaryPassword();
         jdbc.update("UPDATE account SET password_hash = ?, must_change_password = TRUE WHERE id = ?",
             passwordEncoder.encode(tempPassword), accountId);
+        revokeSessions(accountId);
         return Map.of("temporaryPassword", tempPassword);
+    }
+
+    /** Đặt lại mật khẩu phải thu hồi mọi phiên đăng nhập cũ. */
+    private void revokeSessions(String accountId) {
+        jdbc.update("UPDATE refresh_token SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL",
+            Timestamp.from(Instant.now()), accountId);
     }
 
     private String generateTemporaryPassword() {

@@ -103,6 +103,22 @@ class TransferWorkflowRepositoryTest {
     }
 
     @Test
+    @DisplayName("Danh sách PENDING nạp đủ bước duyệt cho mọi yêu cầu (TRF-04)")
+    void listPendingLoadsStepsForEveryRequest() {
+        transfers.create("r1", "org-1", "u1", "dept-old", "dept-new", "Lý do 1", "requester");
+        transfers.create("r2", "org-1", "u1", "dept-old", "dept-new", "Lý do 2", "requester");
+        transfers.decideStep("r1", "SOURCE_HEAD", "APPROVED", "head-1", "Đồng ý");
+
+        assertThat(transfers.listPending("org-1"))
+            .hasSize(2)
+            .allSatisfy(row -> assertThat(row.steps())
+                .extracting(step -> step.step())
+                .containsExactly("SOURCE_HEAD", "TARGET_HEAD", "HR", "EMPLOYEE"));
+        assertThat(transfers.listPending("org-1").get(0).steps().get(0).decision()).isEqualTo("APPROVED");
+        assertThat(transfers.listRelated("org-1", "requester")).hasSize(2);
+    }
+
+    @Test
     @DisplayName("Đánh dấu cần phân công lại chỉ áp dụng cho lớp chưa kết thúc")
     void marksOnlyActiveClasses() {
         SchoolClassRepository classes = new SchoolClassRepository(jdbc);

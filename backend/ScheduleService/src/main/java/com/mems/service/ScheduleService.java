@@ -253,6 +253,10 @@ public class ScheduleService {
         if (CLASS_CANCELLED.equals(info.status()) || CLASS_FINISHED.equals(info.status())) {
             throw new AppException(ErrorCode.CLASS_NOT_SCHEDULABLE);
         }
+        // Lớp đang chờ đóng/đã đóng cũng không nhận buổi học mới.
+        if (info.closeState() != null && !"NONE".equals(info.closeState())) {
+            throw new AppException(ErrorCode.CLASS_NOT_SCHEDULABLE);
+        }
         return info;
     }
 

@@ -66,6 +66,7 @@ class EffectivePermissionsServiceTest {
                 Set.of("employee.view", "position.view"), Set.of("ORGANIZATION", "DEPARTMENT"))
         ));
         when(positions.bundleCodes(anyString())).thenReturn(Set.of());
+        when(identityClient.activeModules(anyString())).thenReturn(List.of());
     }
 
     @Test
@@ -98,6 +99,7 @@ class EffectivePermissionsServiceTest {
     void effectivePermissionsAreUnionOfActivePositions() {
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
             .thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
         when(assignments.active("user-1", "org-1")).thenReturn(List.of(
             new AssignmentRepository.ActiveAssignment("pos-employee", "ORGANIZATION", null),
             new AssignmentRepository.ActiveAssignment("pos-class", "ORGANIZATION", null)
@@ -145,6 +147,39 @@ class EffectivePermissionsServiceTest {
     }
 
     @Test
+    @DisplayName("Assignment ORGANIZATION lọc theo module của TỔ CHỨC, không theo module phòng ban")
+    void organizationAssignmentUsesOrganizationModules() {
+        when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
+            .thenReturn(List.of());
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(assignments.active("user-1", "org-1")).thenReturn(List.of(
+            new AssignmentRepository.ActiveAssignment("pos-academic", "ORGANIZATION", null)
+        ));
+        when(positions.permissions("pos-academic")).thenReturn(Set.of("student.view", "class.view"));
+
+        var effective = service.resolve("org-1", "user-1", "dept-1");
+
+        assertThat(effective.permissions()).containsExactlyInAnyOrder("student.view", "class.view");
+        assertThat(effective.scopes().get("student.view")).containsExactly("ORGANIZATION");
+    }
+
+    @Test
+    @DisplayName("Assignment ORGANIZATION bị loại quyền khi TỔ CHỨC không bật module đó")
+    void organizationAssignmentDroppedWhenOrganizationLacksModule() {
+        when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
+            .thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.activeModules("org-1")).thenReturn(List.of());
+        when(assignments.active("user-1", "org-1")).thenReturn(List.of(
+            new AssignmentRepository.ActiveAssignment("pos-academic", "ORGANIZATION", null)
+        ));
+        when(positions.permissions("pos-academic")).thenReturn(Set.of("student.view"));
+
+        var effective = service.resolve("org-1", "user-1", "dept-1");
+
+        assertThat(effective.permissions()).isEmpty();
+    }
+
+    @Test
     @DisplayName("Quyền chỉ cho phép ORGANIZATION bị loại khỏi chức vụ phạm vi DEPARTMENT")
     void organizationOnlyPermissionIsDroppedForDepartmentScope() {
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
@@ -164,6 +199,7 @@ class EffectivePermissionsServiceTest {
     void bundlePermissionsAreExpanded() {
         when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
             .thenReturn(List.of());
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
         when(assignments.active("user-1", "org-1")).thenReturn(List.of(
             new AssignmentRepository.ActiveAssignment("pos-hr", "ORGANIZATION", null)
         ));

@@ -70,6 +70,8 @@ public class RefreshTokenService implements IRefreshTokenService {
                 .orElseThrow(this::invalidToken);
 
         if (token.getRevokedAt() != null) {
+            // Token đã xoay/thu hồi bị dùng lại → coi là lộ token, thu hồi toàn bộ phiên.
+            repository.revokeAllActive(token.getAccountId(), nowUtc());
             throw invalidToken();
         }
 

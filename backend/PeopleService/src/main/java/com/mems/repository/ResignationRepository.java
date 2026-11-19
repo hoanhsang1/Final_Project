@@ -62,6 +62,23 @@ public class ResignationRepository {
         return jdbc.query(sql.toString(), this::map, params.toArray());
     }
 
+    /**
+     * Toàn bộ yêu cầu trong tổ chức — dùng cho hộp duyệt hợp nhất. Bộ lọc thẩm
+     * quyền (DEC-08) nằm ở {@link com.mems.service.ResignationApprovalPolicy};
+     * truy vấn này cố ý không phụ thuộc quyền xem phòng ban/nhân sự.
+     */
+    public List<ResignationResponse> listOrg(String orgId, String status) {
+        StringBuilder sql = new StringBuilder(BASE_QUERY)
+            .append(" WHERE r.org_id=? ");
+        List<Object> params = new ArrayList<>(List.of(orgId));
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND r.status=? ");
+            params.add(status.trim().toUpperCase());
+        }
+        sql.append(" ORDER BY r.requested_at DESC, r.id ");
+        return jdbc.query(sql.toString(), this::map, params.toArray());
+    }
+
     public Optional<ResignationResponse> find(String id, String orgId, String departmentId) {        var rows = jdbc.query(BASE_QUERY + """
              WHERE r.id=? AND r.org_id=? AND r.department_id=?
             """, this::map, id, orgId, departmentId);
@@ -94,10 +111,12 @@ public class ResignationRepository {
     }
 
     private static final String BASE_QUERY = """
-        SELECT r.id, r.user_id, dm.username, sp.full_name, r.department_id, r.reason, r.status,
+        SELECT r.id, r.user_id, dm.username, sp.full_name, r.department_id, d.name AS department_name,
+               r.reason, r.status,
                r.requested_by, rq.full_name AS requested_by_name, r.requested_at,
                r.decided_by, dc.full_name AS decided_by_name, r.decided_at, r.decision_note
         FROM resignation_request r
+        LEFT JOIN department d ON d.id=r.department_id AND d.org_id=r.org_id
         LEFT JOIN department_member dm ON dm.user_id=r.user_id AND dm.org_id=r.org_id
         LEFT JOIN staff_profile sp ON sp.user_id=r.user_id AND sp.org_id=r.org_id
         LEFT JOIN staff_profile rq ON rq.user_id=r.requested_by AND rq.org_id=r.org_id
@@ -111,7 +130,7 @@ public class ResignationRepository {
             rs.getString("status"), rs.getString("requested_by"), rs.getString("requested_by_name"),
             instant(rs.getTimestamp("requested_at")), rs.getString("decided_by"),
             rs.getString("decided_by_name"), instant(rs.getTimestamp("decided_at")),
-            rs.getString("decision_note"));
+            rs.getString("department_name"), rs.getString("decision_note"));
     }
 
     private Instant instant(Timestamp value) {

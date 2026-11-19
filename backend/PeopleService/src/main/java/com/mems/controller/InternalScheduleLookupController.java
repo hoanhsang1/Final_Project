@@ -30,7 +30,7 @@ public class InternalScheduleLookupController {
     public ClassScheduleInfo classInfo(@PathVariable String classId, @RequestParam String orgId) {
         SchoolClassResponse info = classes.require(classId, orgId, false);
         return new ClassScheduleInfo(info.id(), info.orgId(), info.classCode(), info.name(),
-            info.status(), info.teacher() == null ? null : info.teacher().id(),
+            info.status(), info.closeState(), info.teacher() == null ? null : info.teacher().id(),
             info.teacher() == null ? null : info.teacher().fullName(),
             info.startDate(), info.endDate(), info.subjectName(), info.studentCount());
     }

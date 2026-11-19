@@ -6,6 +6,7 @@ import com.mems.dto.ResignationDecisionRequest;
 import com.mems.dto.ResignationResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.repository.DelegationRepository;
 import com.mems.repository.DepartmentRepository;
 import com.mems.repository.MemberRepository;
 import com.mems.repository.ResignationRepository;
@@ -43,12 +44,14 @@ public class ResignationService {
     private final TeacherOffboardingHook offboarding;
     private final ResignationApprovalPolicy approval;
     private final NotificationService notifications;
+    private final DelegationRepository delegations;
 
     public ResignationService(Actor actor, MembershipPolicy policy, DepartmentRepository departments,
                               MemberRepository members, ResignationRepository requests,
                               TeacherRepository teachers, IdentityClient identity,
                               PeopleAuditService audit, TeacherOffboardingHook offboarding,
-                              ResignationApprovalPolicy approval, NotificationService notifications) {
+                              ResignationApprovalPolicy approval, NotificationService notifications,
+                              DelegationRepository delegations) {
         this.actor = actor;
         this.policy = policy;
         this.departments = departments;
@@ -60,6 +63,7 @@ public class ResignationService {
         this.offboarding = offboarding;
         this.approval = approval;
         this.notifications = notifications;
+        this.delegations = delegations;
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +77,21 @@ public class ResignationService {
     @Transactional(readOnly = true)
     public List<ResignationResponse> mine(String status) {
         return requests.mine(actor.orgId(), actor.userId(), status);
+    }
+
+    /**
+     * Hộp duyệt nghỉ việc: mọi yêu cầu trong tổ chức mà người gọi có thẩm quyền
+     * xử lý theo DEC-08. Cố ý không yêu cầu {@code employee.view}/{@code
+     * department.view} — quyền duyệt và quyền xem danh sách là hai việc khác nhau.
+     */
+    @Transactional(readOnly = true)
+    public List<ResignationResponse> inbox(String status) {
+        String orgId = actor.orgId();
+        String effectiveStatus = status == null || status.isBlank() ? "PENDING" : status;
+        return requests.listOrg(orgId, effectiveStatus).stream()
+            .filter(request -> approval.canApprove(orgId, request.departmentId(),
+                request.requestedBy(), request.userId()))
+            .toList();
     }
 
     @Transactional
@@ -112,7 +131,7 @@ public class ResignationService {
         notifications.notifyAll(orgId,
             approval.approverIds(orgId, departmentId, actor.userId(), userId),
             "RESIGNATION_REQUESTED", "Yêu cầu nghỉ việc cần duyệt",
-            "Nhân sự " + userId + " xin nghỉ việc. Lý do: " + reason,
+            "Nhân sự " + displayName(member) + " xin nghỉ việc. Lý do: " + reason,
             "RESIGNATION_REQUEST", id);
         return requests.require(id, orgId, departmentId);
     }
@@ -132,13 +151,17 @@ public class ResignationService {
             throw new AppException(ErrorCode.MEMBER_NOT_ACTIVE);
 
         String reason = "Nghỉ việc: " + resignation.reason();
-        identity.disableAccount(member.userId(), orgId);
         members.revokeAll(member.userId(), orgId, actor.userId(), reason);
         members.markResigned(member.userId(), orgId);
         teachers.markResigned(member.userId(), orgId);
         long activeClasses = teachers.activeClassCount(member.userId(), orgId);
         if (activeClasses > 0) {
             offboarding.teacherNeedsReassignment(orgId, member.userId(), activeClasses);
+        }
+        for (String delegationId : delegations.revokeAllForDelegate(
+                orgId, member.userId(), actor.userId(), "Nhân sự nghỉ việc")) {
+            audit.record(orgId, actor.userId(), "DELEGATION_REVOKED", delegationId,
+                Map.of("reason", "Nhân sự nghỉ việc", "delegateId", member.userId()));
         }
         requests.decide(requestId, "APPROVED", actor.userId(), trimToNull(request.note()));
 
@@ -151,12 +174,15 @@ public class ResignationService {
             Map.of("requestId", requestId));
         notifications.notify(orgId, resignation.requestedBy(), "RESIGNATION_APPROVED",
             "Yêu cầu nghỉ việc đã được duyệt",
-            "Nhân sự " + member.userId() + " đã được duyệt nghỉ việc.",
+            "Nhân sự " + displayName(member) + " đã được duyệt nghỉ việc.",
             "RESIGNATION_REQUEST", requestId);
         notifications.notify(orgId, member.userId(), "RESIGNATION_APPROVED",
             "Yêu cầu nghỉ việc đã được duyệt",
             "Tài khoản và chức danh của bạn đã được vô hiệu hóa.",
             "RESIGNATION_REQUEST", requestId);
+        // Gọi Identity sau cùng và idempotent: lỗi mạng chỉ rollback DB, duyệt lại
+        // sẽ disable lần nữa mà không sai trạng thái.
+        identity.disableAccount(member.userId(), orgId);
         return requests.require(requestId, orgId, departmentId);
     }
 
@@ -191,5 +217,11 @@ public class ResignationService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /** RES-05: thông báo hiển thị username thay vì UUID. */
+    private String displayName(com.mems.dto.MemberResponse member) {
+        return member.username() == null || member.username().isBlank()
+            ? member.userId() : member.username();
     }
 }

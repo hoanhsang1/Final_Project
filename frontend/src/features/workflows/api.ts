@@ -1,5 +1,6 @@
 import { api } from '@/services/http'
 import type {
+  ApprovalInbox,
   Delegation,
   DelegationInput,
   EffectivePermissions,
@@ -12,6 +13,16 @@ import type {
   TransferRequest,
   TransferStepCode,
 } from '@/features/workflows/types'
+
+export const approvalInboxApi = {
+  /** Hộp duyệt hợp nhất: điều chuyển + nghỉ việc + vòng đời lớp. */
+  async get(resignationStatus?: string): Promise<ApprovalInbox> {
+    const { data } = await api.get<ApprovalInbox>('/users/me/approval-inbox', {
+      params: { resignationStatus: resignationStatus || undefined },
+    })
+    return data
+  },
+}
 
 export const resignationsApi = {
   async list(departmentId: string, status?: string): Promise<ResignationRequest[]> {

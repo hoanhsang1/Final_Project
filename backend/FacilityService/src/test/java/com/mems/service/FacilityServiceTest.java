@@ -79,6 +79,38 @@ class FacilityServiceTest {
     }
 
     @Test
+    @DisplayName("FAC-01: xử lý sự cố khôi phục đúng trạng thái trước khi báo hỏng")
+    void resolveRestoresPreviousEquipmentStatus() {
+        RoomResponse created = room("R1");
+        EquipmentResponse equipment = service.createEquipment("org-1", "dept-1",
+            new EquipmentRequest("EQ-1", "Máy chiếu", "projector", created.id(), "in_storage", null));
+        IssueResponse issue = service.reportIssue("org-1", "dept-1", "user-1",
+            new IssueReportRequest(equipment.id(), "Hỏng", null));
+
+        service.resolveIssue("org-1", "dept-1", "user-1", issue.id());
+
+        assertThat(jdbc.queryForObject("SELECT status FROM equipment WHERE id=?",
+            String.class, equipment.id())).isEqualTo("in_storage");
+    }
+
+    @Test
+    @DisplayName("FAC-01: còn sự cố khác đang mở thì thiết bị vẫn broken")
+    void equipmentStaysBrokenWhileOtherIssuesOpen() {
+        RoomResponse created = room("R1");
+        EquipmentResponse equipment = service.createEquipment("org-1", "dept-1",
+            new EquipmentRequest("EQ-1", "Máy chiếu", "projector", created.id(), "in_use", null));
+        IssueResponse first = service.reportIssue("org-1", "dept-1", "user-1",
+            new IssueReportRequest(equipment.id(), "Hỏng 1", null));
+        service.reportIssue("org-1", "dept-1", "user-1",
+            new IssueReportRequest(equipment.id(), "Hỏng 2", null));
+
+        service.resolveIssue("org-1", "dept-1", "user-1", first.id());
+
+        assertThat(jdbc.queryForObject("SELECT status FROM equipment WHERE id=?",
+            String.class, equipment.id())).isEqualTo("broken");
+    }
+
+    @Test
     @DisplayName("Không xử lý được sự cố của tổ chức khác")
     void cannotSeeIssuesFromAnotherOrganization() {
         RoomResponse created = room("R1");

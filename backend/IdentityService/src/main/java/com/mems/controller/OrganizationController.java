@@ -3,6 +3,8 @@ package com.mems.controller;
 import com.mems.service.OrganizationApprovalService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -59,48 +61,55 @@ public class OrganizationController {
 
     @PatchMapping("/{id}/approve")
     public ResponseEntity<Void> approve(
-            @PathVariable String id
+            @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        approvalService.approve(id);
+        approvalService.approve(id, jwt.getSubject());
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/reject")
     public ResponseEntity<Void> reject(
-            @PathVariable String id
+            @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) Map<String, Object> body
     ) {
-        approvalService.reject(id);
+        String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : null;
+        approvalService.reject(id, jwt.getSubject(), reason);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/suspend")
     public ResponseEntity<Void> suspend(
             @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestBody(required = false) Map<String, Object> body
     ) {
         String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : null;
-        approvalService.suspend(id, reason);
+        approvalService.suspend(id, jwt.getSubject(), reason);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/reactivate")
     public ResponseEntity<Void> reactivate(
             @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestBody(required = false) Map<String, Object> body
     ) {
         String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : null;
-        approvalService.reactivate(id, reason);
+        approvalService.reactivate(id, jwt.getSubject(), reason);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/modules")
     public ResponseEntity<Void> updateModules(
             @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
             @RequestBody Map<String, Object> body
     ) {
         @SuppressWarnings("unchecked")
         List<String> modules = (List<String>) body.get("modules");
-        approvalService.updateModules(id, modules);
+        approvalService.updateModules(id, jwt.getSubject(), modules);
         return ResponseEntity.noContent().build();
     }
 }

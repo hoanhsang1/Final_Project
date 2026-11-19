@@ -1,5 +1,5 @@
 import { ArrowLeftRight, CheckCircle2, FileText, Inbox, XCircle } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -21,12 +21,16 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
+import { useClassMutations } from '@/features/academic/hooks'
+import { CLASS_STATUS_LABELS } from '@/features/academic/types'
 import { usePermission } from '@/features/auth/hooks'
-import { useDepartments, useDepartmentMembers } from '@/features/organization/hooks'
 import { TRANSFER_STATUS_LABELS, TRANSFER_STEP_LABELS } from '@/features/organization/types'
-import type { ResignationRequest } from '@/features/workflows/types'
-import { RESIGNATION_STATUS_LABELS } from '@/features/workflows/types'
-import { useResignationMutations, useResignations, useTransferWorkflow } from '@/features/workflows/hooks'
+import { useApprovalInbox, useInboxResignationDecision } from '@/features/workflows/hooks'
+import {
+  RESIGNATION_STATUS_LABELS,
+  type ClassLifecycleInboxItem,
+  type ResignationStatus,
+} from '@/features/workflows/types'
 import { PERM } from '@/lib/permissions'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime } from '@/lib/format'
@@ -37,98 +41,100 @@ const STATUS_TONE: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> 
   REJECTED: 'danger',
 }
 
+const CLASS_KIND_LABELS: Record<string, string> = {
+  CLOSE: 'Đóng lớp',
+  CANCEL: 'Hủy lớp',
+}
+
 export function ApprovalsPage() {
-  const { can, isOwner, session } = usePermission()
-  const departments = useDepartments()
-  const transfer = useTransferWorkflow()
+  const { can } = usePermission()
+  const [resignationStatus, setResignationStatus] = useState<ResignationStatus>('PENDING')
+  const inbox = useApprovalInbox(resignationStatus)
+  const resignationDecision = useInboxResignationDecision()
+  const classMutations = useClassMutations()
 
-  const [departmentId, setDepartmentId] = useState<string>('')
-  const [status, setStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
-  const [decisionTarget, setDecisionTarget] = useState<ResignationRequest | null>(null)
-  const [decision, setDecision] = useState<'approve' | 'reject'>('approve')
-  const [note, setNote] = useState('')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createUserId, setCreateUserId] = useState('')
-  const [createReason, setCreateReason] = useState('')
-  const [createError, setCreateError] = useState<string>()
+  const [resignationTarget, setResignationTarget] = useState<{
+    requestId: string
+    departmentId: string
+    subject: string
+    decision: 'approve' | 'reject'
+  } | null>(null)
+  const [resignationNote, setResignationNote] = useState('')
 
-  const activeDepartmentId = departmentId || departments.data?.[0]?.id || ''
-  const resignations = useResignations(activeDepartmentId || undefined, status)
-  const members = useDepartmentMembers(activeDepartmentId || undefined)
-  const mutations = useResignationMutations(activeDepartmentId || undefined)
+  const [classTarget, setClassTarget] = useState<{
+    item: ClassLifecycleInboxItem
+    decision: 'approve' | 'reject'
+  } | null>(null)
+  const [classReason, setClassReason] = useState('')
 
-  const canCreate = can(PERM.employeeResign)
-  // Thẩm quyền duyệt do backend tính theo chức danh + uỷ quyền; không suy từ role MANAGER.
-  const showResignationDecisions =
-    isOwner ||
-    can(PERM.employeeApproveResignation) ||
-    Boolean(session?.approvals?.resignation) ||
-    (session?.delegatedPermissions ?? []).includes(PERM.employeeApproveResignation)
+  const transfers = inbox.data?.transfers ?? []
+  const resignations = inbox.data?.resignations ?? []
+  const classItems = inbox.data?.classLifecycle ?? []
+  const total = inbox.data?.total ?? 0
 
-  const memberMap = useMemo(
-    () => new Map((members.data ?? []).map((member) => [member.userId, member])),
-    [members.data],
-  )
-
-  const transferInbox = transfer.inbox.data ?? []
-  const pendingCount = transferInbox.length + (resignations.data?.length ?? 0)
-
-  const openDecision = (request: ResignationRequest, next: 'approve' | 'reject') => {
-    setDecisionTarget(request)
-    setDecision(next)
-    setNote('')
+  const openResignationDecision = (
+    requestId: string,
+    departmentId: string,
+    subject: string,
+    decision: 'approve' | 'reject',
+  ) => {
+    setResignationTarget({ requestId, departmentId, subject, decision })
+    setResignationNote('')
   }
 
-  const submitDecision = () => {
-    if (!decisionTarget) return
-    mutations.decide.mutate(
+  const submitResignationDecision = () => {
+    if (!resignationTarget) return
+    resignationDecision.mutate(
       {
-        requestId: decisionTarget.id,
-        decision,
-        note: note.trim() || undefined,
+        departmentId: resignationTarget.departmentId,
+        requestId: resignationTarget.requestId,
+        decision: resignationTarget.decision,
+        note: resignationNote.trim() || undefined,
       },
       {
         onSuccess: () => {
-          toast.success(decision === 'approve' ? 'Đã chấp thuận nghỉ việc' : 'Đã từ chối yêu cầu')
-          setDecisionTarget(null)
-          setNote('')
+          toast.success(
+            resignationTarget.decision === 'approve'
+              ? 'Đã chấp thuận nghỉ việc'
+              : 'Đã từ chối yêu cầu nghỉ việc',
+          )
+          setResignationTarget(null)
         },
         onError: (error) => toast.error(ApiError.from(error).message),
       },
     )
   }
 
-  const openCreate = () => {
-    setCreateUserId('')
-    setCreateReason('')
-    setCreateError(undefined)
-    setCreateOpen(true)
+  const openClassDecision = (item: ClassLifecycleInboxItem, decision: 'approve' | 'reject') => {
+    setClassTarget({ item, decision })
+    setClassReason('')
   }
 
-  const submitCreate = () => {
-    if (!activeDepartmentId) return
-    setCreateError(undefined)
-    if (!createUserId) {
-      setCreateError('Chọn nhân sự cần tạo yêu cầu nghỉ việc.')
+  const submitClassDecision = () => {
+    if (!classTarget) return
+    const { item, decision } = classTarget
+    const reason = classReason.trim()
+    if (decision === 'reject' && !reason) {
+      toast.error('Vui lòng nhập lý do từ chối.')
       return
     }
-    if (!createReason.trim()) {
-      setCreateError('Vui lòng nhập lý do nghỉ việc.')
-      return
+    const onSuccess = () => {
+      toast.success(decision === 'approve' ? 'Đã duyệt yêu cầu của lớp' : 'Đã từ chối yêu cầu của lớp')
+      setClassTarget(null)
     }
-    mutations.create.mutate(
-      { userId: createUserId, reason: createReason.trim() },
-      {
-        onSuccess: () => {
-          toast.success('Đã tạo yêu cầu nghỉ việc.')
-          setCreateOpen(false)
-          setCreateUserId('')
-          setCreateReason('')
-        },
-        onError: (cause) =>
-          setCreateError(ApiError.from(cause).message || 'Không tạo được yêu cầu nghỉ việc.'),
-      },
-    )
+    const onError = (error: unknown) => toast.error(ApiError.from(error).message)
+
+    if (item.kind === 'CLOSE') {
+      if (decision === 'approve') {
+        classMutations.approveClose.mutate(item.classId, { onSuccess, onError })
+      } else {
+        classMutations.rejectClose.mutate({ id: item.classId, reason }, { onSuccess, onError })
+      }
+    } else if (decision === 'approve') {
+      classMutations.approveCancel.mutate(item.classId, { onSuccess, onError })
+    } else {
+      classMutations.rejectCancel.mutate({ id: item.classId, reason }, { onSuccess, onError })
+    }
   }
 
   return (
@@ -136,146 +142,128 @@ export function ApprovalsPage() {
       <PageHeader
         eyebrow="Cá nhân · Việc chờ duyệt"
         title="Việc chờ tôi duyệt"
-        description="Các bước điều chuyển tới lượt bạn và yêu cầu nghỉ việc trong phòng ban."
+        description="Điều chuyển, nghỉ việc và thay đổi vòng đời lớp mà bạn có thẩm quyền quyết định."
         meta={
           <>
-            <Badge tone={pendingCount ? 'warning' : 'success'} dot>
-              {pendingCount} việc đang chờ
+            <Badge tone={total ? 'warning' : 'success'} dot>
+              {total} việc đang chờ
             </Badge>
             <span className="text-xs text-ink-400">
-              Quyền quyết định do backend kiểm theo chức danh và uỷ quyền.
+              Danh sách do backend lọc theo chức danh và uỷ quyền — không phụ thuộc quyền xem
+              phòng ban.
             </span>
           </>
         }
       />
 
-      <div className="mt-5">
-        <Tabs defaultValue="transfers">
-          <TabsList variant="underline">
-            <TabsTrigger variant="underline" value="transfers">
-              Điều chuyển ({transferInbox.length})
-            </TabsTrigger>
-            <TabsTrigger variant="underline" value="resignations">
-              Nghỉ việc ({resignations.data?.length ?? 0})
-            </TabsTrigger>
-          </TabsList>
+      {inbox.isError ? (
+        <div className="mt-5">
+          <ErrorState
+            title="Không tải được hộp duyệt"
+            description={ApiError.from(inbox.error).message}
+            onRetry={() => void inbox.refetch()}
+          />
+        </div>
+      ) : (
+        <div className="mt-5">
+          <Tabs defaultValue="transfers">
+            <TabsList variant="underline">
+              <TabsTrigger variant="underline" value="transfers">
+                Điều chuyển ({transfers.length})
+              </TabsTrigger>
+              <TabsTrigger variant="underline" value="resignations">
+                Nghỉ việc ({resignations.length})
+              </TabsTrigger>
+              <TabsTrigger variant="underline" value="classes">
+                Vòng đời lớp ({classItems.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="transfers" className="mt-4">
-            {transfer.inbox.isError ? (
-              <ErrorState
-                title="Không tải được hộp duyệt điều chuyển"
-                description={ApiError.from(transfer.inbox.error).message}
-                onRetry={() => void transfer.inbox.refetch()}
-              />
-            ) : transferInbox.length === 0 && !transfer.inbox.isLoading ? (
-              <EmptyState
-                icon={<ArrowLeftRight className="size-5" aria-hidden="true" />}
-                title="Không có bước điều chuyển chờ bạn"
-                description="Yêu cầu điều chuyển tới lượt bạn sẽ xuất hiện tại đây."
-                action={{ label: 'Mở trang điều chuyển', onClick: () => window.location.assign('/to-chuc/chuyen-phong'), variant: 'outline' }}
-              />
-            ) : (
-              <div className="flex flex-col gap-3">
-                {transferInbox.map((request) => (
-                  <Card key={request.id}>
-                    <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">
-                          {request.fullName || request.username}: {request.fromDepartmentName} →{' '}
-                          {request.toDepartmentName}
-                        </p>
-                        <p className="text-xs text-ink-500">
-                          Bước chờ:{' '}
-                          {request.actionableSteps
-                            .map((step) => TRANSFER_STEP_LABELS[step] ?? step)
-                            .join(', ')}{' '}
-                          · {TRANSFER_STATUS_LABELS[request.status] ?? request.status}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link to="/to-chuc/chuyen-phong">Xử lý</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="resignations" className="mt-4">
-            <div className="mb-3 flex flex-wrap items-end gap-3">
-              <Field label="Phòng ban" labelSize="sm" className="w-full sm:w-72">
-                <select
-                  value={activeDepartmentId}
-                  onChange={(event) => setDepartmentId(event.target.value)}
-                  className="h-9.5 w-full rounded-md border border-line-strong bg-surface px-2 text-sm"
-                >
-                  {(departments.data ?? []).map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
+            <TabsContent value="transfers" className="mt-4">
+              {transfers.length === 0 && !inbox.isLoading ? (
+                <EmptyState
+                  icon={<ArrowLeftRight className="size-5" aria-hidden="true" />}
+                  title="Không có bước điều chuyển chờ bạn"
+                  description="Yêu cầu điều chuyển tới lượt bạn sẽ xuất hiện tại đây."
+                  action={{
+                    label: 'Mở trang điều chuyển',
+                    onClick: () => window.location.assign('/to-chuc/chuyen-phong'),
+                    variant: 'outline',
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {transfers.map((request) => (
+                    <Card key={request.id}>
+                      <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">
+                            {request.fullName || request.username}: {request.fromDepartmentName} →{' '}
+                            {request.toDepartmentName}
+                          </p>
+                          <p className="text-xs text-ink-500">
+                            Yêu cầu bởi {request.requestedByName} ·{' '}
+                            {formatDateTime(request.requestedAt)}
+                          </p>
+                          <p className="text-xs text-ink-500">
+                            Bước chờ:{' '}
+                            {request.actionableSteps
+                              .map((step) => TRANSFER_STEP_LABELS[step] ?? step)
+                              .join(', ')}{' '}
+                            · {TRANSFER_STATUS_LABELS[request.status] ?? request.status}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to="/to-chuc/chuyen-phong">Xử lý</Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
                   ))}
-                </select>
-              </Field>
-              <Field label="Trạng thái" labelSize="sm" className="w-full sm:w-48">
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    setStatus(event.target.value as 'PENDING' | 'APPROVED' | 'REJECTED')
-                  }
-                  className="h-9.5 w-full rounded-md border border-line-strong bg-surface px-2 text-sm"
-                >
-                  <option value="PENDING">Chờ duyệt</option>
-                  <option value="APPROVED">Đã chấp thuận</option>
-                  <option value="REJECTED">Bị từ chối</option>
-                </select>
-              </Field>
-            </div>
+                </div>
+              )}
+            </TabsContent>
 
-            <Alert tone="info" className="mb-3" title="DEC-08">
-              Thứ tự thẩm quyền: HR giữ quyền trực tiếp → Trưởng phòng ban → Tổng quản lý có uỷ
-              quyền → Chủ tổ chức. Người tạo và người xin nghỉ không được tự duyệt.
-            </Alert>
+            <TabsContent value="resignations" className="mt-4">
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                <Field label="Trạng thái" labelSize="sm" className="w-full sm:w-56">
+                  <select
+                    value={resignationStatus}
+                    onChange={(event) =>
+                      setResignationStatus(event.target.value as ResignationStatus)
+                    }
+                    className="h-9.5 w-full rounded-md border border-line-strong bg-surface px-2 text-sm"
+                  >
+                    <option value="PENDING">Chờ duyệt</option>
+                    <option value="APPROVED">Đã chấp thuận</option>
+                    <option value="REJECTED">Bị từ chối</option>
+                  </select>
+                </Field>
+                {can(PERM.employeeApproveResignation) ? null : (
+                  <Alert tone="info" className="max-w-xl" title="Thẩm quyền">
+                    Chỉ các yêu cầu backend xác nhận bạn có quyền theo DEC-08 mới hiển thị.
+                  </Alert>
+                )}
+              </div>
 
-            {resignations.isError ? (
-              <ErrorState
-                title="Không tải được yêu cầu nghỉ việc"
-                description={
-                  ApiError.from(resignations.error).status === 403
-                    ? 'Bạn không có quyền xem hộp nghỉ việc của phòng ban này.'
-                    : ApiError.from(resignations.error).message
-                }
-                onRetry={() => void resignations.refetch()}
-              />
-            ) : resignations.isLoading ? (
-              <Card>
-                <CardContent className="py-8 text-center text-sm text-ink-500">Đang tải…</CardContent>
-              </Card>
-            ) : (resignations.data ?? []).length === 0 ? (
-              <EmptyState
-                icon={<Inbox className="size-5" aria-hidden="true" />}
-                title="Không có yêu cầu nghỉ việc"
-                description="Yêu cầu nghỉ việc ở trạng thái đã chọn sẽ hiển thị tại đây."
-              />
-            ) : (
-              <div className="flex flex-col gap-3">
-                {(resignations.data ?? []).map((request) => {
-                  const member = memberMap.get(request.userId)
-                  return (
+              {resignations.length === 0 && !inbox.isLoading ? (
+                <EmptyState
+                  icon={<Inbox className="size-5" aria-hidden="true" />}
+                  title="Không có yêu cầu nghỉ việc"
+                  description="Yêu cầu nghỉ việc ở trạng thái đã chọn mà bạn được duyệt sẽ hiển thị tại đây."
+                />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {resignations.map((request) => (
                     <Card key={request.id}>
                       <CardHeader className="pb-2">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <CardTitle className="text-base">
                               {request.fullName || request.username}
-                              {member?.role ? (
-                                <span className="ml-2 text-xs font-normal text-ink-400">
-                                  {member.role}
-                                </span>
-                              ) : null}
                             </CardTitle>
                             <p className="mt-0.5 text-xs text-ink-500">
-                              Tạo bởi {request.requestedByName} · {formatDateTime(request.requestedAt)}
+                              {request.departmentName ?? 'Phòng ban đã xoá'} · Tạo bởi{' '}
+                              {request.requestedByName} · {formatDateTime(request.requestedAt)}
                             </p>
                           </div>
                           <Badge tone={STATUS_TONE[request.status] ?? 'neutral'} dot>
@@ -291,137 +279,203 @@ export function ApprovalsPage() {
                             {request.decidedByName ? ` · ${request.decidedByName}` : ''}
                           </p>
                         ) : null}
-                        {request.status === 'PENDING' && showResignationDecisions ? (
+                        {request.status === 'PENDING' ? (
                           <div className="flex flex-wrap justify-end gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => openDecision(request, 'reject')}
+                              onClick={() =>
+                                openResignationDecision(
+                                  request.id,
+                                  request.departmentId,
+                                  request.fullName || request.username,
+                                  'reject',
+                                )
+                              }
                             >
                               <XCircle aria-hidden="true" />
                               Từ chối
                             </Button>
-                            <Button size="sm" onClick={() => openDecision(request, 'approve')}>
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                openResignationDecision(
+                                  request.id,
+                                  request.departmentId,
+                                  request.fullName || request.username,
+                                  'approve',
+                                )
+                              }
+                            >
                               <CheckCircle2 aria-hidden="true" />
                               Chấp thuận
                             </Button>
                           </div>
                         ) : null}
-                        {request.status === 'PENDING' && !showResignationDecisions ? (
-                          <p className="text-xs text-ink-400">
-                            Bạn chỉ xem được yêu cầu; người có thẩm quyền theo DEC-08 sẽ quyết định.
-                          </p>
-                        ) : null}
                       </CardContent>
                     </Card>
-                  )
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </TabsContent>
 
-            {canCreate && activeDepartmentId ? (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-line bg-surface-muted px-3 py-2">
-                <p className="text-xs text-ink-500">
-                  Nhân sự có quyền tạo yêu cầu nghỉ việc cho nhân viên trong phòng ban.
-                </p>
-                <Button size="sm" variant="outline" onClick={openCreate}>
-                  Tạo yêu cầu nghỉ việc
-                </Button>
-              </div>
-            ) : null}
-          </TabsContent>
-        </Tabs>
-      </div>
+            <TabsContent value="classes" className="mt-4">
+              {classItems.length === 0 && !inbox.isLoading ? (
+                <EmptyState
+                  icon={<Inbox className="size-5" aria-hidden="true" />}
+                  title="Không có yêu cầu vòng đời lớp"
+                  description="Yêu cầu đóng hoặc hủy lớp đang chờ duyệt sẽ xuất hiện tại đây."
+                />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {classItems.map((item) => (
+                    <Card key={`${item.kind}-${item.classId}`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <CardTitle className="text-base">
+                              {item.classCode} · {item.className}
+                            </CardTitle>
+                            <p className="mt-0.5 text-xs text-ink-500">
+                              {CLASS_KIND_LABELS[item.kind] ?? item.kind} ·{' '}
+                              {CLASS_STATUS_LABELS[item.classStatus] ?? item.classStatus} ·{' '}
+                              {item.studentCount} học sinh
+                            </p>
+                            <p className="text-xs text-ink-500">
+                              Yêu cầu bởi {item.requesterName ?? item.requesterId} ·{' '}
+                              {item.requestedAt ? formatDateTime(item.requestedAt) : '—'}
+                            </p>
+                          </div>
+                          <Badge tone="warning" dot>
+                            Chờ duyệt
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-3 pt-1">
+                        {item.reason ? <p className="text-sm text-ink-600">{item.reason}</p> : null}
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClassDecision(item, 'reject')}
+                          >
+                            <XCircle aria-hidden="true" />
+                            Từ chối
+                          </Button>
+                          <Button size="sm" onClick={() => openClassDecision(item, 'approve')}>
+                            <CheckCircle2 aria-hidden="true" />
+                            Chấp thuận
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={Boolean(resignationTarget)}
+        onOpenChange={(open) => {
+          if (!open) setResignationTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Tạo yêu cầu nghỉ việc</DialogTitle>
-            <DialogDescription>
-              Chọn nhân sự đang hoạt động trong phòng ban và ghi rõ lý do. Backend kiểm tra lại
-              quyền tạo và thứ tự duyệt DEC-08.
-            </DialogDescription>
+            <DialogTitle>
+              {resignationTarget?.decision === 'approve'
+                ? 'Chấp thuận nghỉ việc'
+                : 'Từ chối yêu cầu nghỉ việc'}
+            </DialogTitle>
+            <DialogDescription>{resignationTarget?.subject ?? ''}</DialogDescription>
           </DialogHeader>
-          <DialogBody className="space-y-3">
-            <Field label="Nhân sự" required>
-              <select
-                value={createUserId}
-                onChange={(event) => setCreateUserId(event.target.value)}
-                className="h-9.5 w-full rounded-md border border-line-strong bg-surface px-2 text-sm"
-              >
-                <option value="">Chọn nhân sự</option>
-                {(members.data ?? [])
-                  .filter((member) => member.status === 'ACTIVE')
-                  .map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.username} · {member.role}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-            <Field label="Lý do nghỉ việc" required hint="Tối đa 1000 ký tự.">
+          <DialogBody>
+            <Field label="Ghi chú" hint="Tuỳ chọn, tối đa 1000 ký tự.">
               <Textarea
                 rows={3}
-                value={createReason}
+                value={resignationNote}
                 maxLength={1000}
-                onChange={(event) => setCreateReason(event.target.value)}
+                onChange={(event) => setResignationNote(event.target.value)}
               />
             </Field>
-            {createError ? <Alert tone="danger">{createError}</Alert> : null}
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-400">
+              <FileText className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              Backend kiểm tra lại thẩm quyền và trả SELF_APPROVAL_NOT_ALLOWED /
+              RESIGNATION_APPROVER_NOT_ALLOWED nếu không hợp lệ.
+            </p>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => setResignationTarget(null)}>
               Huỷ
             </Button>
-            <Button isLoading={mutations.create.isPending} onClick={submitCreate}>
-              Tạo yêu cầu
+            <Button
+              variant={resignationTarget?.decision === 'reject' ? 'danger' : 'primary'}
+              isLoading={resignationDecision.isPending}
+              onClick={submitResignationDecision}
+            >
+              {resignationTarget?.decision === 'approve' ? 'Chấp thuận' : 'Từ chối'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog
-        open={Boolean(decisionTarget)}
+        open={Boolean(classTarget)}
         onOpenChange={(open) => {
-          if (!open) setDecisionTarget(null)
+          if (!open) setClassTarget(null)
         }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {decision === 'approve' ? 'Chấp thuận nghỉ việc' : 'Từ chối yêu cầu nghỉ việc'}
+              {classTarget?.decision === 'approve'
+                ? 'Chấp thuận yêu cầu của lớp'
+                : 'Từ chối yêu cầu của lớp'}
             </DialogTitle>
             <DialogDescription>
-              {decisionTarget
-                ? `${decisionTarget.fullName || decisionTarget.username} · ${RESIGNATION_STATUS_LABELS[decisionTarget.status]}`
+              {classTarget
+                ? `${CLASS_KIND_LABELS[classTarget.item.kind] ?? classTarget.item.kind} · ${
+                    classTarget.item.classCode
+                  }`
                 : ''}
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <Field label="Ghi chú" hint="Tuỳ chọn, tối đa 1000 ký tự.">
+            <Field
+              label="Lý do"
+              required={classTarget?.decision === 'reject'}
+              hint={
+                classTarget?.decision === 'reject'
+                  ? 'Bắt buộc khi từ chối, tối đa 1000 ký tự.'
+                  : 'Tuỳ chọn khi chấp thuận.'
+              }
+            >
               <Textarea
                 rows={3}
-                value={note}
                 maxLength={1000}
-                onChange={(event) => setNote(event.target.value)}
+                value={classReason}
+                onChange={(event) => setClassReason(event.target.value)}
               />
             </Field>
-            <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-400">
-              <FileText className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              Backend sẽ kiểm tra lại thẩm quyền và trả SELF_APPROVAL_NOT_ALLOWED /
-              RESIGNATION_APPROVER_NOT_ALLOWED nếu không hợp lệ.
-            </p>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDecisionTarget(null)}>
+            <Button variant="outline" onClick={() => setClassTarget(null)}>
               Huỷ
             </Button>
             <Button
-              variant={decision === 'reject' ? 'danger' : 'primary'}
-              isLoading={mutations.decide.isPending}
-              onClick={submitDecision}
+              variant={classTarget?.decision === 'reject' ? 'danger' : 'primary'}
+              isLoading={
+                classMutations.approveClose.isPending ||
+                classMutations.rejectClose.isPending ||
+                classMutations.approveCancel.isPending ||
+                classMutations.rejectCancel.isPending
+              }
+              onClick={submitClassDecision}
             >
-              {decision === 'approve' ? 'Chấp thuận' : 'Từ chối'}
+              Xác nhận
             </Button>
           </DialogFooter>
         </DialogContent>

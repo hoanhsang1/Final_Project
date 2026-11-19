@@ -117,12 +117,7 @@ class AccountServiceTest {
         assertThat(temporaryPassword).isNotNull();
         assertThat(temporaryPassword).hasSizeGreaterThanOrEqualTo(8);
 
-        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).update(sql.capture(), args.capture());
-        assertThat(sql.getValue()).contains("must_change_password = TRUE");
-        assertThat(args.getValue()).hasSize(2);
-        assertThat(args.getValue()[1]).isEqualTo("acct-1");
+        verify(jdbc).update(startsWith("UPDATE account SET password_hash"), anyString(), eq("acct-1"));
     }
 
     @Test
@@ -134,12 +129,9 @@ class AccountServiceTest {
 
         assertThat(result).isEmpty();
         verify(encoder).encode("ChosenPass123");
+        verify(jdbc).update(startsWith("UPDATE refresh_token SET revoked_at"), any(), eq("acct-1"));
 
-        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc).update(sql.capture(), args.capture());
-        assertThat(sql.getValue()).contains("must_change_password = TRUE");
-        assertThat(args.getValue()).contains("acct-1");
+        verify(jdbc).update(startsWith("UPDATE account SET password_hash"), anyString(), eq("acct-1"));
     }
 
     @Test

@@ -203,11 +203,21 @@ public class FacilityService {
             WHERE id=? AND org_id=?
             """, now, now, issueId, orgId);
         EquipmentResponse equipment = requireEquipment(issue.equipmentId(), orgId, departmentId);
-        if (!"in_use".equals(equipment.status())) {
-            jdbc.update("UPDATE equipment SET status='in_use', updated_at=? WHERE id=? AND org_id=?",
-                now, equipment.id(), orgId);
-            // TODO(PHẦN 7): chính sách đưa thiết bị về in_use sau khi xử lý sự cố chưa được chốt.
-            logStatus(equipment.id(), orgId, userId, equipment.status(), "in_use", "Issue resolved");
+        Integer openIssues = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM incident_report
+            WHERE org_id=? AND equipment_id=? AND status='open'
+            """, Integer.class, orgId, equipment.id());
+        // FAC-01: chỉ khôi phục khi không còn sự cố mở, và về đúng trạng thái trước khi báo hỏng.
+        if (openIssues != null && openIssues == 0 && "broken".equals(equipment.status())) {
+            String restore = jdbc.query("""
+                SELECT old_status FROM equipment_status_log
+                WHERE equipment_id=? AND new_status='broken'
+                ORDER BY changed_at DESC, id DESC LIMIT 1
+                """, rs -> rs.next() ? rs.getString(1) : null, equipment.id());
+            if (restore == null || restore.isBlank()) restore = "in_use";
+            jdbc.update("UPDATE equipment SET status=?, updated_at=? WHERE id=? AND org_id=?",
+                restore, now, equipment.id(), orgId);
+            logStatus(equipment.id(), orgId, userId, "broken", restore, "Issue resolved");
         }
         return requireIssue(issueId, orgId, departmentId);
     }

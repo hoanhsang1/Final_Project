@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS department_module (
 );
 CREATE TABLE IF NOT EXISTS position (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
- name VARCHAR(200) NOT NULL, description VARCHAR(1000), created_at TIMESTAMP NOT NULL,
+ name VARCHAR(200) NOT NULL, system_code VARCHAR(50), description VARCHAR(1000), created_at TIMESTAMP NOT NULL,
  profile_type VARCHAR(20) NOT NULL DEFAULT 'GENERAL',
  scope VARCHAR(20) NOT NULL DEFAULT 'DEPARTMENT', department_id VARCHAR(36), deleted_at TIMESTAMP,
  UNIQUE(org_id,name), UNIQUE(id,org_id)

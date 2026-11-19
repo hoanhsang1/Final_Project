@@ -28,14 +28,16 @@ public class MemberService {
     private final TeacherRepository teachers;
     private final SpecialtyService specialties;
     private final PositionRepository positions;
+    private final DelegationRepository delegations;
     private final SecureRandom random=new SecureRandom();
     public MemberService(DepartmentRepository departments,MemberRepository members,MembershipPolicy policy,
             IdentityClient identity,AccountCompensationService compensation,PeopleAuditService audit,Actor actor,
             StaffProfileRepository staff,TeacherRepository teachers,SpecialtyService specialties,
-            PositionRepository positions,PlatformTransactionManager manager) {
+            PositionRepository positions,DelegationRepository delegations,PlatformTransactionManager manager) {
         this.departments=departments;this.members=members;this.policy=policy;this.identity=identity;
         this.compensation=compensation;this.audit=audit;this.actor=actor;
         this.staff=staff;this.teachers=teachers;this.specialties=specialties;this.positions=positions;
+        this.delegations=delegations;
         this.tx=new TransactionTemplate(manager);this.tx.setTimeout(15);
     }
     @Transactional(readOnly=true)
@@ -134,9 +136,16 @@ public class MemberService {
         var before=members.require(userId,actor.orgId(),departmentId,true);
         policy.requirePermission(departmentId, "employee.delete");
         if("OWNER".equals(before.role())) throw actor.forbidden("Owner appointments cannot be removed");
-        members.delete(userId,actor.orgId());
-        identity.disableAccount(userId,actor.orgId());
-        audit.record(actor.orgId(),actor.userId(),"MEMBER_REMOVED",userId,before);
+        String orgId=actor.orgId(),actorId=actor.userId();
+        // Offboarding hợp nhất: không xoá cứng để giữ lịch sử và quyền đã cấp.
+        members.offboard(userId,orgId,actorId,"Gỡ nhân sự");
+        teachers.markResigned(userId,orgId);
+        for (String delegationId : delegations.revokeAllForDelegate(orgId,userId,actorId,"Gỡ nhân sự")) {
+            audit.record(orgId,actorId,"DELEGATION_REVOKED",delegationId,
+                Map.of("reason","Gỡ nhân sự","delegateId",userId));
+        }
+        identity.disableAccount(userId,orgId);
+        audit.record(orgId,actorId,"MEMBER_REMOVED",userId,before);
     }
     private void validate(String departmentId,MemberRequest request) {
         departments.require(departmentId,actor.orgId(),true);

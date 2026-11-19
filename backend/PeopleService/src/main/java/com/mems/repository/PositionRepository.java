@@ -90,14 +90,21 @@ public class PositionRepository {
     }
 
     public PositionResponse save(String id, String orgId, PositionRequest request, boolean create) {
+        return save(id, orgId, request, create, null);
+    }
+
+    /** `profileType` chỉ dùng khi tạo mới; update giữ nguyên loại hồ sơ hiện có. */
+    public PositionResponse save(String id, String orgId, PositionRequest request, boolean create,
+                                 String profileType) {
         String scope = "ORGANIZATION".equals(request.scope()) ? "ORGANIZATION" : "DEPARTMENT";
         String departmentId = "ORGANIZATION".equals(scope) ? null : request.departmentId();
         if (create) {
             jdbc.update("""
-                INSERT INTO `position`(id, org_id, name, description, created_at, scope, department_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO `position`(id, org_id, name, description, created_at, scope, department_id,
+                                       profile_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, id, orgId, request.name().trim(), request.description(), Timestamp.from(Instant.now()),
-                scope, departmentId);
+                scope, departmentId, profileType == null ? "GENERAL" : profileType);
         } else {
             jdbc.update("UPDATE `position` SET name=?, description=?, scope=?, department_id=?"
                     + " WHERE id=? AND org_id=? AND deleted_at IS NULL",

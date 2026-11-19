@@ -208,6 +208,48 @@ class TeacherServiceTest {
             .satisfies(ex -> assertError((AppException) ex, HttpStatus.NOT_FOUND, "TEACHER_NOT_FOUND"));
     }
 
+    @Test
+    @DisplayName("Đổi trạng thái giảng dạy cập nhật hồ sơ và ghi audit TEACHER_STATUS_CHANGED")
+    void changeTeachingStatusUpdatesProfileAndAudits() {
+        var result = service.changeTeachingStatus("t001", new com.mems.dto.TeacherStatusRequest(" nghi_viec "));
+
+        assertThat(result.teachingStatus()).isEqualTo("NGHI_VIEC");
+        assertThat(jdbc.queryForObject(
+            "SELECT teaching_status FROM teacher_profile WHERE user_id='t001'", String.class))
+            .isEqualTo("NGHI_VIEC");
+        verify(audit).record(eq("org-1"), eq("actor-1"), eq("TEACHER_STATUS_CHANGED"), eq("t001"), any());
+        verify(actor).requirePermissionIn("teacher.change_status", "dept-1");
+    }
+
+    @Test
+    @DisplayName("Trạng thái giảng dạy ngoài danh sách chuẩn bị từ chối 400")
+    void changeTeachingStatusRejectsUnknownValue() {
+        assertThatThrownBy(() -> service.changeTeachingStatus("t001",
+            new com.mems.dto.TeacherStatusRequest("DA_NGHI")))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR"));
+
+        assertThat(jdbc.queryForObject(
+            "SELECT teaching_status FROM teacher_profile WHERE user_id='t001'", String.class))
+            .isEqualTo("DANG_DAY");
+    }
+
+    @Test
+    @DisplayName("Không có teacher.change_status trong phòng ban: 403, không đổi trạng thái")
+    void changeTeachingStatusRequiresPermissionInDepartment() {
+        doThrow(new AppException(ErrorCode.FORBIDDEN, "Missing permission in scope: teacher.change_status"))
+            .when(actor).requirePermissionIn("teacher.change_status", "dept-1");
+
+        assertThatThrownBy(() -> service.changeTeachingStatus("t001",
+            new com.mems.dto.TeacherStatusRequest("NGHI_VIEC")))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertError((AppException) ex, HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+        assertThat(jdbc.queryForObject(
+            "SELECT teaching_status FROM teacher_profile WHERE user_id='t001'", String.class))
+            .isEqualTo("DANG_DAY");
+    }
+
     private TeacherUpdateRequest update(String fullName, String email, String phone, Set<String> specialtyIds,
                                         String contractType, Long version, Boolean confirm) {
         return new TeacherUpdateRequest(fullName, email, phone, specialtyIds, contractType, version, confirm);

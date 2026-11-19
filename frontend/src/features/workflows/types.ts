@@ -8,6 +8,8 @@ export interface ResignationRequest {
   username: string
   fullName: string | null
   departmentId: string
+  /** Có thể null với dữ liệu cũ đã xoá phòng ban. */
+  departmentName: string | null
   reason: string
   status: ResignationStatus
   requestedBy: string
@@ -17,6 +19,28 @@ export interface ResignationRequest {
   decidedByName: string | null
   decidedAt: string | null
   decisionNote: string | null
+}
+
+export type ClassLifecycleKind = 'CLOSE' | 'CANCEL'
+
+export interface ClassLifecycleInboxItem {
+  classId: string
+  classCode: string
+  className: string
+  classStatus: string
+  kind: ClassLifecycleKind
+  requesterId: string | null
+  requesterName: string | null
+  reason: string | null
+  requestedAt: string | null
+  studentCount: number
+}
+
+export interface ApprovalInbox {
+  transfers: TransferRequest[]
+  resignations: ResignationRequest[]
+  classLifecycle: ClassLifecycleInboxItem[]
+  total: number
 }
 
 export type TransferStepCode = 'SOURCE_HEAD' | 'TARGET_HEAD' | 'HR' | 'EMPLOYEE'

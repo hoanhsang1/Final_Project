@@ -4,6 +4,7 @@ import com.mems.dto.ClassCancelRequest;
 import com.mems.dto.ClassCloseEventResponse;
 import com.mems.dto.ClassCloseRejectRequest;
 import com.mems.dto.ClassCloseRequest;
+import com.mems.dto.ClassLifecycleInboxItem;
 import com.mems.dto.ClassReopenRequest;
 import com.mems.dto.ClassStatusLogResponse;
 import com.mems.dto.SchoolClassResponse;
@@ -103,7 +104,7 @@ public class ClassStatusService {
                 throw statusChanged();
             }
             repository.insertCloseEvent(classId, orgId, "CANCEL_REQUESTED", actor.userId(), reason);
-            notifyManagers(orgId, classId, "Yêu cầu hủy lớp cần duyệt",
+            notifyManagers(orgId, classId, "CLASS_CANCEL_APPROVAL", "Yêu cầu hủy lớp cần duyệt",
                 "Lớp " + before.classCode() + " còn " + before.studentCount()
                     + " học sinh nên cần trưởng phòng duyệt hủy. Lý do: " + reason);
             return classRepository.require(classId, orgId, false);
@@ -134,8 +135,8 @@ public class ClassStatusService {
         }
         repository.insertStatusLog(classId, orgId, before.status(), "DA_HUY", reason, actor.userId());
         repository.insertCloseEvent(classId, orgId, "CANCEL_APPROVED", actor.userId(), reason);
-        notifyRequester(orgId, classId, requesterId, "Yêu cầu hủy lớp đã được duyệt",
-            "Lớp " + before.classCode() + " đã bị hủy.");
+        notifyRequester(orgId, classId, requesterId, "CLASS_CANCEL_APPROVAL",
+            "Yêu cầu hủy lớp đã được duyệt", "Lớp " + before.classCode() + " đã bị hủy.");
         return classRepository.require(classId, orgId, false);
     }
 
@@ -154,7 +155,8 @@ public class ClassStatusService {
             throw new AppException(ErrorCode.CANCEL_STATE_CHANGED);
         }
         repository.insertCloseEvent(classId, orgId, "CANCEL_REJECTED", actor.userId(), reason);
-        notifyRequester(orgId, classId, requesterId, "Yêu cầu hủy lớp bị từ chối",
+        notifyRequester(orgId, classId, requesterId, "CLASS_CANCEL_APPROVAL",
+            "Yêu cầu hủy lớp bị từ chối",
             "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
         return classRepository.require(classId, orgId, false);
     }
@@ -165,6 +167,23 @@ public class ClassStatusService {
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         requireViewScope(orgId, classRepository.require(classId, orgId, false));
         return repository.statusLogs(classId, orgId);
+    }
+
+    /**
+     * Hộp duyệt vòng đời lớp: các yêu cầu đóng/hủy đang chờ mà người gọi có
+     * thẩm quyền quyết định (quy tắc 14). Chỉ cần module đọc được — không phụ
+     * thuộc quyền xem danh sách nhân sự/phòng ban. Module chưa đăng ký thì trả
+     * rỗng để không làm hỏng hộp duyệt hợp nhất.
+     */
+    @Transactional(readOnly = true)
+    public List<ClassLifecycleInboxItem> approvalInbox() {
+        String orgId = actor.orgId();
+        if (approvalPolicy == null || !moduleGuard.isReadable(orgId, "STUDENT_MANAGEMENT")) {
+            return List.of();
+        }
+        return classRepository.pendingLifecycle(orgId).stream()
+            .filter(item -> approvalPolicy.canApprove(orgId, item.requesterId()))
+            .toList();
     }
 
     @Transactional
@@ -186,6 +205,9 @@ public class ClassStatusService {
             throw closeStateChanged();
         }
         repository.insertCloseEvent(classId, orgId, "REQUESTED", actor.userId(), note);
+        notifyManagers(orgId, classId, "CLASS_CLOSE_APPROVAL", "Yêu cầu đóng lớp cần duyệt",
+            "Lớp " + before.classCode() + " yêu cầu đóng."
+                + (note == null ? "" : " Ghi chú: " + note));
         return classRepository.require(classId, orgId, false);
     }
 
@@ -199,11 +221,14 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
-        requireDecisionAllowed(orgId, repository.closeRequester(classId, orgId));
+        String requesterId = repository.closeRequester(classId, orgId);
+        requireDecisionAllowed(orgId, requesterId);
         if (repository.approveClose(classId, orgId) == 0) {
             throw closeStateChanged();
         }
         repository.insertCloseEvent(classId, orgId, "APPROVED", actor.userId(), null);
+        notifyRequester(orgId, classId, requesterId, "CLASS_CLOSE_APPROVAL",
+            "Yêu cầu đóng lớp đã được duyệt", "Lớp " + before.classCode() + " đã đóng.");
         return classRepository.require(classId, orgId, false);
     }
 
@@ -217,12 +242,16 @@ public class ClassStatusService {
         if (!"PENDING".equals(before.closeState())) {
             throw closeStateChanged();
         }
-        requireDecisionAllowed(orgId, repository.closeRequester(classId, orgId));
+        String requesterId = repository.closeRequester(classId, orgId);
+        requireDecisionAllowed(orgId, requesterId);
         String reason = requireReason(request.reason(), "reason");
         if (repository.rejectClose(classId, orgId) == 0) {
             throw closeStateChanged();
         }
         repository.insertCloseEvent(classId, orgId, "REJECTED", actor.userId(), reason);
+        notifyRequester(orgId, classId, requesterId, "CLASS_CLOSE_APPROVAL",
+            "Yêu cầu đóng lớp bị từ chối",
+            "Lớp " + before.classCode() + " tiếp tục hoạt động. Lý do: " + reason);
         return classRepository.require(classId, orgId, false);
     }
 
@@ -283,18 +312,18 @@ public class ClassStatusService {
         if (approvalPolicy != null) approvalPolicy.requireApprover(orgId, requesterId);
     }
 
-    private void notifyManagers(String orgId, String classId, String title, String body) {
+    private void notifyManagers(String orgId, String classId, String type, String title, String body) {
         if (notifications == null || approvalPolicy == null) return;
         String creator = classRepository.require(classId, orgId, false).createdBy();
         notifications.notifyAll(orgId, approvalPolicy.classManagers(orgId, creator),
-            "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
+            type, title, body, "SCHOOL_CLASS", classId);
     }
 
     private void notifyRequester(String orgId, String classId, String requesterId,
-                                 String title, String body) {
+                                 String type, String title, String body) {
         if (notifications == null) return;
         notifications.notify(orgId, requesterId,
-            "CLASS_CANCEL_APPROVAL", title, body, "SCHOOL_CLASS", classId);
+            type, title, body, "SCHOOL_CLASS", classId);
     }
 
     private String requireReason(String value, String field) {

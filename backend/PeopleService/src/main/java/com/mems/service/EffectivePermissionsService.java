@@ -153,12 +153,18 @@ public class EffectivePermissionsService {
         Set<String> effective = new TreeSet<>();
         Set<String> delegated = new TreeSet<>();
         Map<String, Set<String>> scopes = new TreeMap<>();
+        Set<String> organizationModules = null;
         for (AssignmentRepository.ActiveAssignment assignment : assignments.active(userId, orgId)) {
             String scopeToken;
             String scopeType;
+            Set<String> modules;
             if ("ORGANIZATION".equals(assignment.scopeType())) {
                 scopeType = "ORGANIZATION";
                 scopeToken = "ORGANIZATION";
+                if (organizationModules == null) {
+                    organizationModules = new HashSet<>(identityClient.activeModules(orgId));
+                }
+                modules = organizationModules;
             } else {
                 String assignmentDepartment = assignment.departmentId() != null
                     ? assignment.departmentId() : departmentId;
@@ -167,6 +173,7 @@ public class EffectivePermissionsService {
                 }
                 scopeType = "DEPARTMENT";
                 scopeToken = "DEPARTMENT:" + assignmentDepartment;
+                modules = deptModules;
             }
 
             Set<String> raw = new TreeSet<>(positions.permissions(assignment.positionId()));
@@ -175,7 +182,7 @@ public class EffectivePermissionsService {
 
             for (String permission : raw) {
                 String requiredModule = moduleMap.get(permission);
-                if (requiredModule != null && !requiredModule.isBlank() && !deptModules.contains(requiredModule)) {
+                if (requiredModule != null && !requiredModule.isBlank() && !modules.contains(requiredModule)) {
                     continue;
                 }
                 Set<String> allowed = allowedScopes.get(permission);

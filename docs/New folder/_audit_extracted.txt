@@ -1,0 +1,882 @@
+MEMS – Modular Education Management System
+Báo cáo đánh giá nghiệp vụ & luồng vận hành
+Hiện trạng thực tế trong code, điểm chưa ổn và hướng thay đổi đề xuất
+Ngày lập: 19/11/2026
+Phạm vi: toàn bộ file được đính kèm – backend (IdentityService, PeopleService, ScheduleService, FacilityService), frontend React/TypeScript và PROJECT_CONTEXT.md.
+Phương pháp: đọc code và đối chiếu chéo FE ↔ BE; chưa chạy hệ thống. Các điểm chưa chắc chắn được gắn nhãn [Cần xác minh].
+Giới hạn: không có API Gateway, schema SQL, docs/api.md, test backend và cấu hình triển khai trong bộ file, nên các kết luận phụ thuộc vào những phần này được ghi rõ.
+1. Tóm tắt điều hành
+Thiết kế nghiệp vụ của MEMS khá chín: phân quyền theo chức danh + phạm vi + ủy quyền có thời hạn; luồng duyệt leo thang có chống tự duyệt; saga bù trừ khi tạo tài khoản giữa hai dịch vụ; khóa bi quan khi xếp lịch; chế độ chỉ đọc khi tắt module; audit trail dày. Phần lớn luồng trong PeopleService đi đúng hướng và dữ liệu được lọc theo org_id nhất quán.
+Tuy nhiên có một lỗ hổng bảo mật nghiêm trọng (mật khẩu cửa hậu cho SUPER_ADMIN), một nhóm lỗi nghiệp vụ chặn luồng thực tế (sinh viên không thể sang lớp mới, trạng thái FE–BE lệch nhau, phòng học theo phòng ban), và nhiều điểm thiếu nhất quán giữa các service (lịch học, thông báo, thu hồi ủy quyền). Kết luận: chưa nên đưa vào vận hành thật khi chưa xử lý nhóm ưu tiên P0 ở mục 7.
+Thống kê vấn đề theo mức độ
+Mức độ
+Số lượng
+Ý nghĩa
+Nghiêm trọng
+1
+Mất an toàn hoặc chặn hoàn toàn nghiệp vụ; sửa ngay
+Cao
+13
+Sai nghiệp vụ rõ ràng hoặc rủi ro lớn; sửa trước khi vận hành thật
+Trung bình
+33
+Thiếu sót/thiếu nhất quán, có cách né tạm; đưa vào sprint kế
+Thấp
+16
+Cải thiện chất lượng, trải nghiệm, bảo trì
+Tổng
+63
+
+
+Điểm đã làm tốt
+Mọi truy vấn nghiệp vụ lọc theo org_id; org_id lấy từ JWT, không nhận từ client.
+Quyền theo chức danh với phạm vi ORGANIZATION/DEPARTMENT; chống tự nâng quyền; quyền người gán ⊆ quyền của mình.
+Ủy quyền có thời hạn, hiệu lực tức thời nhờ filter đọc DB ở mỗi request; Tổng quản lý không có quyền mặc định.
+Luồng duyệt leo thang (nghỉ việc, đóng/hủy lớp) có cấm tự duyệt, khóa dòng, thông báo và audit.
+Saga + job bù trừ khi tạo tài khoản nhân sự giữa People và Identity.
+Khóa lạc quan (version) cho lớp/giáo viên; khóa bi quan tài nguyên khi xếp lịch.
+Chế độ chỉ đọc khi tắt/khóa module (DEC-11), nhớ trạng thái trước khi khóa.
+FE: 5 trạng thái giao diện, dịch lỗi sang tiếng Việt, không hiển thị message thô của BE, single-flight refresh token, có nhiều test.
+Mười việc cần làm trước
+AUTH-01 – xóa mật khẩu cửa hậu 123456 và đổi mật khẩu quản trị trên mọi môi trường.
+RBAC-01 – sửa kiểm tra quyền khi cập nhật chức danh (đang dùng dữ liệu từ request).
+STU-01 – gỡ khóa chết xếp lớp (mô hình enrollment).
+CLS-01, TCH-01, MOD-01 – đồng bộ trạng thái/mã module giữa FE và BE (đang gây lỗi 400 và lọc sai).
+SCH-02 – chốt mô hình phòng học là tài nguyên cấp tổ chức.
+AUTH-02 – giới hạn đăng nhập sai.
+CC-02 – chặn /internal/**, tách khóa ký JWT, giới hạn CORS.
+AUTH-07 – xác minh kiểu cột status tổ chức để luồng đăng ký → duyệt không hỏng.
+HR-01 và DEL-02 – hợp nhất 'gỡ' và 'nghỉ việc' vào một offboarding.
+CC-01 – cache danh mục quyền/module để tránh hàng chục cuộc gọi Identity mỗi request.
+2. Kiến trúc và mô hình quyền thực tế
+Thành phần
+Cổng
+Vai trò thực tế
+IdentityService
+8081
+Tài khoản, tổ chức, module, JWT HS256 (15 phút) + refresh token, danh mục quyền/bundle, SUPER_ADMIN console.
+PeopleService
+8082
+Phòng ban, chức danh, nhân sự, giáo viên, sinh viên, lớp, điều chuyển, nghỉ việc, ủy quyền, thông báo, audit; cung cấp API nội bộ cho Identity/Schedule.
+ScheduleService
+8083
+Buổi học; giữ bản sao lớp; gọi People (lớp, sinh viên) và Facility (phòng).
+FacilityService
+8084
+Phòng học, thiết bị, sự cố; API nội bộ cho Schedule.
+API Gateway / Eureka
+8080 / 8761
+Không có trong bộ file – chưa đánh giá.
+Frontend
+5173
+React + TS + Vite, TanStack Query, Zustand; điều hướng lọc theo quyền hiệu lực; mock adapter cho demo.
+
+Quyền hiệu lực của một người = hợp các assignment đang hiệu lực (chức danh + bundle) đã lọc theo module của phòng ban và allowedScopes của từng quyền, cộng quyền ủy quyền (ORGANIZATION). Kiểm tra truy cập theo ba tầng: (1) filter JWT, (2) @PreAuthorize/@RequirePermission ở controller, (3) policy trong service kiểm lại từ DB. Các service nghiệp vụ nói chuyện với nhau qua HTTP đồng bộ với khóa X-Internal-Api-Key; không có hàng đợi/sự kiện.
+3. Đánh giá từng luồng nghiệp vụ
+Mỗi luồng gồm: mục đích, các bước diễn ra thực tế trong code, điểm làm tốt, và các vấn đề (mã vấn đề → mức độ → hiện trạng → đề xuất). Bảng tổng hợp đầy đủ ở mục 6.
+Mã
+Luồng
+Đánh giá
+Số vấn đề
+F1
+Đăng ký & duyệt tổ chức
+Ổn có lưu ý
+4
+F2
+Xác thực & phiên
+Cần sửa gấp
+7
+F3
+Module của tổ chức
+Cần sửa
+3
+F4
+Phòng ban, chức danh, phân quyền
+Cần sửa
+7
+F5
+Nhân sự
+Cần sửa
+4
+F6
+Tổng quản lý & ủy quyền
+Ổn có lưu ý
+4
+F7
+Điều chuyển phòng ban
+Ổn có lưu ý
+4
+F8
+Nghỉ việc
+Ổn có lưu ý
+5
+F9
+Sinh viên
+Cần sửa
+4
+F10
+Giáo viên
+Cần sửa
+2
+F11
+Lớp học
+Cần sửa
+4
+F12
+Lịch học
+Cần sửa
+5
+F13
+Cơ sở vật chất & sự cố
+Ổn có lưu ý
+2
+F14
+Thông báo & nhật ký
+Ổn có lưu ý
+1
+
+F1. Đăng ký & duyệt tổ chức
+Đánh giá:  Ổn có lưu ý    Mục đích: Một trường/trung tâm đăng ký, SUPER_ADMIN duyệt, chủ tổ chức bắt đầu sử dụng.
+Luồng thực tế
+Người đăng ký gọi POST /api/v1/auth/register: tên tổ chức, loại SCHOOL/CENTER, tài khoản chủ (mật khẩu ≥ 12 ký tự), danh sách module đề nghị. FE hiện chỉ có trang giữ chỗ.
+BE tạo organization (PENDING), account chủ (pending), gán role ORG_OWNER, ghi organization_module = 'requested'.
+SUPER_ADMIN xem hàng chờ /quan-tri/to-chuc/cho-duyet. Duyệt: tổ chức active, tài khoản chủ active, module requested → active. Từ chối: rejected, tài khoản chủ disabled, module rejected.
+SUPER_ADMIN có thể tạm ngưng / kích hoạt lại tổ chức (vô hiệu/mở lại tài khoản chủ), cập nhật tập module, khóa/mở khóa module kèm lý do.
+Chủ tổ chức đăng nhập; 7 chức danh mặc định được seed lần đầu khi gọi /positions hoặc tạo phòng ban (và khi service khởi động).
+Điểm làm tốt
+Đăng ký chạy trong một transaction; kiểm tra username trùng và module hợp lệ; không trả hash/mật khẩu.
+Duyệt/từ chối dùng SELECT … FOR UPDATE nên hai SUPER_ADMIN không xử lý trùng.
+Trạng thái tổ chức được kiểm lại ở mỗi lần login/refresh nên tổ chức bị tạm ngưng sẽ mất quyền truy cập tối đa sau 15 phút.
+Vấn đề phát hiện và đề xuất
+AUTH-05   Trung bình   Chủ tổ chức duy nhất, không có chuyển giao
+Hiện trạng: Mỗi tổ chức có một tài khoản OWNER tạo khi đăng ký; OWNER không có bản ghi nhân sự nên không thể nghỉ việc/chuyển; không có đồng sở hữu hay quy trình chuyển giao. Mất tài khoản chủ = tê liệt các luồng chỉ Owner làm được (bổ nhiệm Tổng quản lý, ủy quyền, chức danh cấp tổ chức, module).
+Đề xuất: Cho phép nhiều OWNER hoặc luồng chuyển giao có xác nhận hai bên + SUPER_ADMIN, ghi audit; tối thiểu có quy trình khôi phục quyền chủ do SUPER_ADMIN thực hiện sau kiểm chứng.
+Nguồn: OrganizationRegistrationService.java, GeneralManagerRepository.java
+AUTH-06   Trung bình   Tên vai trò không thống nhất (ORG_OWNER / OWNER / ORG_ADMIN…)
+Hiện trạng: Đăng ký tổ chức gán role ORG_OWNER; bootstrap/seed dùng OWNER; nhiều truy vấn phải viết IN ('ORG_OWNER','OWNER'); FE còn ORG_ADMIN, ACADEMIC_STAFF, FACILITY_STAFF, TEACHER (deprecated). IdentityDataInitializer không seed ORG_OWNER — nếu DB không có sẵn thì register ném IllegalStateException.
+Đề xuất: Chốt một bộ role (SUPER_ADMIN, OWNER, STAFF/MANAGER nếu còn cần, STUDENT), migrate dữ liệu cũ, dọn khỏi FE/BE; thêm kiểm tra khởi động xác nhận role bắt buộc đã seed.
+Nguồn: OrganizationRegistrationService.java, IdentityDataInitializer.java, session.ts
+AUTH-07   Trung bình   [Cần xác minh] status tổ chức: enum PENDING vs so sánh 'pending'
+Hiện trạng: Organization.status là enum UPPERCASE lưu EnumType.STRING, trong khi OrganizationApprovalService/AuthService so sánh Java bằng chuỗi chữ thường ('pending','active') và SQL dùng chữ thường. Nếu cột là VARCHAR (không phải ENUM của MySQL) thì tổ chức đăng ký lưu 'PENDING' và requirePending/validateAccount luôn sai. Chưa có schema SQL trong bộ file nên chưa kết luận được.
+Đề xuất: Kiểm tra kiểu cột trong 01_identity_db.sql; thống nhất một dạng (khuyến nghị chữ thường ở DB + AttributeConverter) và thêm integration test đăng ký → duyệt → đăng nhập.
+Nguồn: Organization.java, OrganizationApprovalService.java, AuthService.java
+AUTH-08   Trung bình   Duyệt/từ chối/tạm ngưng tổ chức không ghi người thực hiện và lý do
+Hiện trạng: OrganizationApprovalService.recordAudit luôn truyền actorId = null; reject/suspend/reactivate nhận reason nhưng không lưu (D-05). Nhật ký hiển thị 'system'. Chủ tổ chức không biết bị từ chối vì sao.
+Đề xuất: Lấy sub từ JWT ở controller truyền xuống service; lưu reason vào bảng review; hiển thị cho owner; gửi email thông báo kết quả.
+Nguồn: OrganizationController.java, OrganizationApprovalService.java
+F2. Xác thực & phiên
+Đánh giá:  Cần sửa gấp    Mục đích: Đăng nhập, duy trì phiên, đổi/đặt lại mật khẩu.
+Luồng thực tế
+Login: tìm account → BCrypt → validateAccount (active, có role, SUPER_ADMIN không có org, các tài khoản khác bắt buộc org đang active) → AccessProfileService tính quyền (Owner: toàn bộ catalog; MANAGER/STAFF: hỏi PeopleService; STUDENT/TEACHER: role_permission + quyền SELF).
+Access token HS256, sống 60–900 giây (mặc định 900): roles, role, permissions, permissionScopes, delegatedPermissions, departmentId, orgId, mustChangePassword. Refresh token 32 byte ngẫu nhiên, lưu SHA-256, sống 7 ngày.
+Refresh: khóa bản ghi token, kiểm tra lại account/org, cấp access token mới và rotate refresh token.
+Tài khoản mật khẩu tạm (mustChangePassword): các service chặn 403 PASSWORD_CHANGE_REQUIRED; FE chuyển sang /doi-mat-khau. Đổi mật khẩu: khóa hàng, ≥ 12 ký tự, khác mật khẩu cũ, thu hồi mọi refresh token.
+FE: interceptor bắt 401 → một lần refresh dùng chung (single-flight) → thử lại; thất bại → xóa phiên và về đăng nhập.
+Điểm làm tốt
+Refresh token được băm, rotate có khóa bi quan; kiểm tra lại trạng thái tài khoản/tổ chức khi refresh.
+TTL access token bị chặn cứng trong khoảng 60–900 giây.
+FE xử lý refresh đồng thời đúng (một promise dùng chung) và không bao giờ hiển thị nguyên văn message tiếng Anh của BE.
+Vấn đề phát hiện và đề xuất
+AUTH-01   Nghiêm trọng   Mật khẩu cửa hậu 123456 cho tài khoản quản trị
+Hiện trạng: AuthService.login chấp nhận mật khẩu 123456 cho username platform_admin/admin dù hash không khớp, và IdentityDataInitializer ghi đè password_hash của hai tài khoản này về 123456 ở MỖI lần service khởi động. Bất kỳ ai biết username đều đăng nhập được quyền SUPER_ADMIN (duyệt/tạm ngưng tổ chức, đổi vai trò, reset mật khẩu mọi tài khoản).
+Đề xuất: Xóa ngay cả hai đoạn code; đổi mật khẩu hai tài khoản trên mọi môi trường đã triển khai; seed SUPER_ADMIN qua biến môi trường một lần (giống OWNER_BOOTSTRAP_*) và bắt buộc đổi mật khẩu lần đầu; thêm test chặn hồi quy.
+Nguồn: IdentityService: AuthService.java, IdentityDataInitializer.java
+AUTH-02   Cao   Không giới hạn đăng nhập sai
+Hiện trạng: Không có rate-limit, khóa tạm hay độ trễ lũy tiến ở /api/v1/auth/login. FE đã có thông báo ACCOUNT_LOCKED nhưng BE không bao giờ sinh mã này. Kết hợp với mật khẩu tạm do hệ thống cấp, rủi ro bị dò mật khẩu.
+Đề xuất: Rate-limit theo IP + username ở gateway; đếm số lần sai và khóa tạm (vd 5 lần/15 phút); ghi audit đăng nhập thất bại; băm giả khi username không tồn tại để không lộ qua thời gian phản hồi.
+Nguồn: AuthService.java, error-messages.ts
+AUTH-03   Trung bình   Refresh token: không phát hiện dùng lại; reset mật khẩu không thu hồi phiên
+Hiện trạng: Token đã rotate bị dùng lại chỉ trả INVALID_REFRESH_TOKEN, không thu hồi cả chuỗi (dấu hiệu bị đánh cắp). Admin reset mật khẩu (AccountService.resetPassword) và HR reset mật khẩu nhân sự không thu hồi refresh_token nên phiên cũ vẫn gia hạn được tới 7 ngày (PasswordChangeService thì có thu hồi).
+Đề xuất: Dùng replaced_by đã có để phát hiện reuse và thu hồi toàn bộ chuỗi; mọi thao tác reset/disable/đổi vai trò phải revoke refresh token của account.
+Nguồn: RefreshTokenService.java, AccountService.java, AccountProvisioningService.java
+AUTH-04   Trung bình   Thiếu quên/đặt lại mật khẩu; trang đăng ký tổ chức chưa có ở FE
+Hiện trạng: BE chưa có forgot-password/reset-password (FE chỉ là trang giữ chỗ); trang đăng ký tổ chức FE chưa làm dù BE đã có endpoint. Quên mật khẩu chỉ có cách nhờ HR/SUPER_ADMIN reset (và người reset biết mật khẩu tạm). Chưa có email — hệ thống dùng thông báo trong ứng dụng thay thế.
+Đề xuất: Làm luồng quên mật khẩu bằng token một lần qua email (bảng token đã có); đưa mail worker vào Phần 5; hoàn thiện trang đăng ký; reset bởi HR/Admin nên gửi link đặt lại thay vì hiển thị mật khẩu.
+Nguồn: public-planned-page.tsx, PROJECT_CONTEXT.md
+AUTH-10   Trung bình   Đổi vai trò/trạng thái ở Identity không đồng bộ với People
+Hiện trạng: SUPER_ADMIN đổi role tài khoản (AccountService.updateRole) chỉ sửa account_role; People vẫn giữ department_member.role và các assignment. Token lấy role của MANAGER/STAFF từ People nên role hai nơi có thể lệch nhau. AccountsPage còn cho chọn role ACADEMIC_STAFF không được seed (INVALID_ROLE).
+Đề xuất: Chỉ để SUPER_ADMIN quản lý vai trò nền tảng (SUPER_ADMIN/OWNER); vai trò trong tổ chức chỉ đổi qua People hoặc đồng bộ qua sự kiện; dọn danh sách role ở FE.
+Nguồn: AccountService.java, accounts-page.tsx
+AUTH-11   Trung bình   Đăng nhập phụ thuộc cứng vào PeopleService
+Hiện trạng: Với MANAGER/STAFF, AccessProfileService gọi PeopleService lúc login và refresh; People lỗi → DEPARTMENT_PERMISSIONS_UNAVAILABLE (503), không đăng nhập được kể cả khi tài khoản không cần quyền nghiệp vụ.
+Đề xuất: Cache hồ sơ quyền ngắn hạn, hoặc cho đăng nhập với quyền tối thiểu + cờ 'permissionsStale' rồi FE nạp lại qua /users/me/permissions.
+Nguồn: AccessProfileService.java, PeopleAuthorizationClient.java
+AUTH-09   Thấp   Chính sách mật khẩu không đồng nhất
+Hiện trạng: Đăng ký/đổi mật khẩu yêu cầu 12–72 ký tự; AccountService.resetPassword cho phép tối thiểu 8; mật khẩu tạm của AccountService là 10 ký tự hex + 'A1!' (~40 bit ngẫu nhiên), trong khi nơi khác dùng 24 byte ngẫu nhiên.
+Đề xuất: Một PasswordPolicy dùng chung; dùng SecureRandom 18–24 byte cho mọi mật khẩu tạm.
+Nguồn: AccountService.java, ChangePasswordRequest.java
+F3. Module của tổ chức
+Đánh giá:  Cần sửa    Mục đích: Bật/tắt module theo tổ chức và gắn module cho phòng ban; tắt module = chỉ đọc.
+Luồng thực tế
+SUPER_ADMIN chọn module khi duyệt hoặc PUT /organizations/{id}/modules; khóa/mở khóa từng module kèm lý do bắt buộc.
+Owner bật/tắt module tùy chọn qua PATCH /organizations/my/modules/{code}; module lõi không tắt được; module bị admin khóa thì Owner không đổi được.
+Mọi service kiểm tra module mỗi request: ghi cần trạng thái active; đọc chấp nhận active/disabled/locked (chế độ chỉ đọc – DEC-11).
+Phòng ban gắn tối đa 6 module; quyền hiệu lực chỉ còn nếu module thuộc phòng đang bật; có API module-impact cảnh báo chức danh/nhân sự bị ảnh hưởng trước khi gỡ.
+Điểm làm tốt
+Lưu status_before_lock để mở khóa không vô tình bật module mà Owner đã tắt.
+Audit ghi cùng transaction với thay đổi — audit lỗi thì thay đổi rollback.
+Cảnh báo ảnh hưởng (module-impact) không tự xóa quyền; chế độ chỉ đọc giữ nguyên dữ liệu.
+Vấn đề phát hiện và đề xuất
+MOD-01   Cao   Mã module FE – BE – danh mục quyền không khớp
+Hiện trạng: FE (MODULE_CATALOG, nav) dùng 7 mã: STUDENT/TEACHER/CLASS/SCHEDULE/FACILITY/ROOM/EQUIPMENT_MANAGEMENT. DepartmentService.validateModules chỉ chấp nhận mã xuất hiện trong PermissionCatalog (STUDENT_, SCHEDULE_, FACILITY_MANAGEMENT) nên gắn TEACHER_/CLASS_/ROOM_/EQUIPMENT_MANAGEMENT cho phòng ban bị trả MODULE_NOT_ENABLED. Ngược lại menu 'Giáo viên', 'Lớp học' của FE đòi TEACHER_/CLASS_MANAGEMENT trong khi BE bảo vệ API lớp/giáo viên bằng STUDENT_MANAGEMENT.
+Đề xuất: Chốt danh mục module một nguồn (bảng module ở Identity + bảng ánh xạ module → quyền → menu); FE lấy danh sách từ /api/v1/modules/status, không hard-code; BE guard dùng đúng mã module sở hữu nghiệp vụ; viết contract test cho module/permission.
+Nguồn: DepartmentService.java, modules.ts, nav.ts, SchoolClassService.java
+MOD-02   Thấp   Chính sách fail-open/fail-closed không nhất quán
+Hiện trạng: DepartmentService.activeModulesOrFailOpen và PositionService.availablePermissions coi mọi module là đang bật khi Identity lỗi → có thể gắn module/quyền không thuộc tổ chức. Schedule/Facility lại fail-closed.
+Đề xuất: Thao tác GHI cấu hình phải fail-closed; chỉ thao tác ĐỌC mới được fail-open.
+Nguồn: DepartmentService.java, PositionService.java
+MOD-03   Thấp   [Cần xác minh] Kiểm tra workflow chờ trước khi tắt module gần như là mã chết
+Hiện trạng: Chỉ STUDENT_MANAGEMENT có kiểm tra pending (lớp có yêu cầu đóng/hủy) nhưng module này được FE/mock xếp là module lõi không thể tắt; module tùy chọn như FACILITY không có kiểm tra (sự cố đang mở vẫn cho tắt).
+Đề xuất: Xác nhận is_core trong DB; nếu module không tắt được thì bỏ nhánh chết; nếu FACILITY tắt được, BA quyết định sự cố đang mở có chặn hay chỉ chuyển chỉ đọc.
+Nguồn: OrganizationModuleService.java, InternalModulePendingController.java
+F4. Phòng ban, chức danh, phân quyền
+Đánh giá:  Cần sửa    Mục đích: Cơ cấu tổ chức và mô hình quyền: phòng ban → chức danh (quyền + bundle + phạm vi) → gán cho nhân sự.
+Luồng thực tế
+Owner tạo phòng ban (department.manage chỉ cấp tổ chức) và gắn module.
+Chức danh = tập quyền + bundle + phạm vi ORGANIZATION hoặc DEPARTMENT. Seed sẵn 7 chức danh (Quản trị viên tổ chức, Giáo vụ, Giáo viên, Trưởng phòng ban, Nhân sự phòng ban, Nhân viên CSVC, Nhân viên).
+Người không phải Owner chỉ tạo/sửa/gán chức danh có quyền ⊆ quyền của chính mình (quy tắc 18); chức danh cấp tổ chức chỉ Owner gán; không ai tự đổi chức danh của mình (chống tự nâng quyền).
+Quyền hiệu lực = hợp các assignment ACTIVE (kèm bundle) đã lọc theo module của phòng và allowedScopes của quyền, cộng quyền ủy quyền (ORGANIZATION).
+Kiểm tra truy cập ba tầng: filter JWT → @PreAuthorize/@RequirePermission (mã quyền + phạm vi) → policy trong service (kiểm lại từ DB).
+Điểm làm tốt
+Có xem tác động trước khi xóa chức danh, soft delete, nhân bản có báo quyền/bundle bị loại.
+Assignment không xóa cứng (lịch sử bổ nhiệm đầy đủ, có lý do, người gán/thu hồi).
+Quyền cấp tổ chức vs phòng ban được mô hình hóa rõ (allowedScopes theo từng quyền).
+Vấn đề phát hiện và đề xuất
+RBAC-01   Cao   Sửa chức danh dùng scope/phòng ban lấy từ request, không đối chiếu dữ liệu hiện tại
+Hiện trạng: PositionService.update gọi requireWithinOwnPermissions với request.scope()/request.departmentId() thay vì before.scope()/before.departmentId(). Người quản lý chức danh cấp PHÒNG BAN có thể gửi request sửa chức danh của phòng khác — hoặc chức danh mẫu dùng chung (departmentId = null như 'Trưởng phòng ban', 'Giáo viên') — với departmentId = phòng của mình: kiểm tra quyền vượt qua, chức danh bị đổi tên/quyền/chuyển sang phòng mình, ảnh hưởng mọi người đang giữ. Chức danh không có quyền nào (vd 'Nhân viên') bỏ qua hẳn vòng kiểm tra.
+Đề xuất: Kiểm tra theo dữ liệu hiện có: người không phải OWNER chỉ được sửa/xóa chức danh có departmentId nằm trong scope DEPARTMENT của mình; chức danh mẫu (departmentId = null) và cấp tổ chức chỉ OWNER; cấm đổi scope/department của chức danh đang có người giữ; thêm test ma trận phân quyền cho Position.
+Nguồn: PositionService.java (update, requireWithinOwnPermissions)
+RBAC-02   Cao   Logic nghiệp vụ gắn cứng vào TÊN chức danh
+Hiện trạng: 'Tổng quản lý' (GeneralManagerService) và 'Trưởng phòng'/'Trưởng phòng ban' (TransferService, ResignationApprovalPolicy, ClassApprovalPolicy) được tìm theo chuỗi tên. Chức danh cho phép đổi tên (Owner, và xem RBAC-01). Đổi tên hoặc tạo bản sao tên khác làm luồng duyệt chuyển phòng/nghỉ việc/đóng lớp hỏng âm thầm (không còn ai là trưởng phòng → TRANSFER_HEAD_MISSING hoặc rơi xuống cấp cao hơn).
+Đề xuất: Thêm cột system_code (GENERAL_MANAGER, DEPARTMENT_HEAD…) hoặc cờ is_head; seed bất biến, không cho đổi tên/xóa chức danh hệ thống; truy vấn theo mã, không theo tên.
+Nguồn: GeneralManagerService.java, TransferService.java, ClassApprovalPolicy.java, ResignationApprovalPolicy.java
+RBAC-03   Trung bình   Quyền cấp tổ chức bị lọc theo module của phòng ban người nắm giữ
+Hiện trạng: EffectivePermissionsService.resolve lấy departmentModules của phòng người dùng áp cho cả assignment phạm vi ORGANIZATION. Giáo vụ (chức danh cấp tổ chức) đặt ở phòng không bật STUDENT_MANAGEMENT sẽ mất toàn bộ quyền student./class./subject. dù chức danh có.
+Đề xuất: Assignment ORGANIZATION: lọc theo module đang bật của TỔ CHỨC (Identity); assignment DEPARTMENT: lọc theo module của phòng đó.
+Nguồn: EffectivePermissionsService.java (resolve)
+RBAC-04   Trung bình   Tạo/nhân bản chức danh không mang loại hồ sơ (profileType)
+Hiện trạng: PositionRequest không có profileType và PositionRepository.save không ghi cột này; PositionService.clone không sao chép. Chỉ chức danh 'Giáo viên' seed mới có TEACHER; nhân bản sang phòng khác hoặc tạo 'Giáo viên bộ môn' cho ra chức danh GENERAL → không tạo được giáo viên (TeacherService.create đòi TEACHER). FE (PositionPicker, drawer) lại giả định profileType có thể là TEACHER.
+Đề xuất: Thêm profileType vào PositionRequest/Response và clone; hoặc chốt chỉ có một chức danh TEACHER hệ thống dùng chung và ẩn tùy chọn nhân bản/tạo loại này.
+Nguồn: PositionRequest.java, PositionRepository.java, PositionService.clone
+RBAC-05   Trung bình   Quyền trong JWT là ảnh chụp 15 phút; hai mức kiểm tra không đồng đều
+Hiện trạng: Chỉ quyền ủy quyền được DelegatedAuthorityFilter đồng bộ mỗi request. Quyền từ chức vụ/bundle (đổi chức vụ, nghỉ việc, sửa chức danh, tắt module) chỉ có hiệu lực khi token hết hạn. Một số API chỉ dựa vào token (@PreAuthorize ở Student/Class/Teacher controller) trong khi MembershipPolicy kiểm lại từ DB.
+Đề xuất: Đưa authz_version vào JWT + cache phía service để vô hiệu hóa ngay khi quyền đổi; hoặc rút ngắn TTL cho thao tác nhạy cảm; thống nhất một Authorizer dùng chung.
+Nguồn: DelegatedAuthorityFilter.java, MembershipPolicy.java
+RBAC-06   Thấp   Role MANAGER/STAFF còn sót dù quyền theo chức danh
+Hiện trạng: MembershipPolicy chỉ cho người không phải Owner quản lý nhân sự có role 'STAFF'; FE gắn nhãn 'Quản lý phòng ban' cho MANAGER; test nav khẳng định MANAGER không có quyền tự động — dễ gây hiểu nhầm.
+Đề xuất: Bỏ role MANAGER khỏi luồng tạo nhân sự hoặc mô tả rõ chỉ là nhãn; thay ràng buộc 'chỉ quản lý STAFF' bằng ràng buộc theo quyền/phạm vi.
+Nguồn: MembershipPolicy.java, employee-create-drawer.tsx
+RBAC-07   Thấp   Mã quyền ở FE không có trong danh mục BE
+Hiện trạng: permissions.ts chứa nhiều mã không có trong PermissionCatalog (teacher.change_status, student.change_status, student.reset_account, class.view_reassign, schedule.recurring.create, schedule.attendance.*, schedule.change_request.*, org.module.toggle, org.audit.view, approval.inbox.view…). Màn hình dựa vào các mã này không bao giờ cấp được cho người không phải Owner. Menu 'Tổng quản lý & ủy quyền' hiện cho người có employee.assign_position nhưng trang chỉ dành cho Owner.
+Đề xuất: Sinh PERM từ API /permissions hoặc kiểm tra FE ⊆ BE trong CI; sửa điều kiện menu/route theo đúng đối tượng sử dụng.
+Nguồn: permissions.ts, nav.ts, PermissionCatalog.java
+F5. Nhân sự
+Đánh giá:  Cần sửa    Mục đích: Vòng đời nhân sự trong phòng ban: tạo, gán chức danh, đặt lại mật khẩu, gỡ.
+Luồng thực tế
+Tạo: validate (phòng ban, quyền, chức danh, email duy nhất trong tổ chức, hồ sơ giáo viên) → ghi account_compensation → tạo tài khoản ở Identity (mật khẩu tạm 24 byte) → transaction cục bộ: department_member, assignment, staff_profile, teacher_profile (nếu có) → hoàn tất. Lỗi → bù trừ xóa tài khoản chưa từng đăng nhập; job chạy lại mỗi phút.
+Gán chức danh: thay toàn bộ tập chức danh, có lý do; chức danh TEACHER yêu cầu đã có hồ sơ giáo viên; người không phải Owner chỉ quản lý STAFF cùng phòng.
+Đặt lại mật khẩu: Identity sinh mật khẩu tạm, hiển thị một lần cho người thao tác, ép đổi ở lần đăng nhập sau.
+Gỡ: xóa department_member, thu hồi chức danh, vô hiệu tài khoản (xem HR-01).
+Điểm làm tốt
+Saga + job bù trừ cho việc tạo tài khoản giữa hai dịch vụ là thiết kế tốt.
+Che email/điện thoại theo quyền employee.view_detail; mã nhân sự do hệ thống sinh (GV/NS); Owner không bị gỡ/reset tại luồng này.
+Vấn đề phát hiện và đề xuất
+HR-01   Cao   Gỡ nhân sự bỏ qua quy trình offboarding
+Hiện trạng: MemberService.remove xóa cứng department_member, thu hồi assignment, vô hiệu tài khoản nhưng KHÔNG: gắn nhãn lớp cần phân công lại, chuyển teaching_status, hủy yêu cầu nghỉ việc/chuyển phòng đang chờ, thu hồi ủy quyền/chức danh Tổng quản lý. Giáo viên bị gỡ để lại các lớp gắn teacher_id của tài khoản đã khóa. Ngoài ra trái nguyên tắc BR-04 (vô hiệu hóa, không xóa) mà FE đã tuân thủ.
+Đề xuất: Gộp 'gỡ' và 'nghỉ việc' vào một OffboardingService duy nhất (đổi trạng thái, không xóa cứng) dùng chung: hook phân công lại lớp, thu hồi ủy quyền, hủy yêu cầu chờ, audit. Nếu vẫn giữ nút 'Gỡ' thì chỉ cho phép khi nhân sự chưa có phát sinh nghiệp vụ.
+Nguồn: MemberService.remove, MemberRepository.delete
+HR-02   Trung bình   Mật khẩu tạm hiển thị cho người thao tác, không qua email
+Hiện trạng: Tạo nhân sự và reset mật khẩu trả temporaryPassword về HR/Admin để bàn giao tay: người bàn giao biết mật khẩu người khác; mật khẩu nằm trong response body (có thể lọt log gateway/proxy).
+Đề xuất: Gửi link kích hoạt/đặt mật khẩu một lần có hạn qua email; nếu chưa có mail worker: che mật khẩu khỏi log, ghi audit 'đã xem mật khẩu tạm', hết hạn sau X giờ.
+Nguồn: MemberService.create/resetPassword, temp-password-dialog.tsx
+HR-04   Trung bình   Đổi/gỡ chức danh giáo viên không xét lớp đang phụ trách
+Hiện trạng: MemberService.updatePositions cho phép bỏ chức danh TEACHER của người đang dạy: hasTeacherPosition = false nên giáo viên không còn 'khả dụng', nhưng lớp vẫn gắn teacher_id, không gắn nhãn cần phân công lại, không cảnh báo.
+Đề xuất: Khi gỡ chức danh TEACHER: cảnh báo số lớp đang dạy, yêu cầu xác nhận và gọi hook phân công lại như nghỉ việc.
+Nguồn: MemberService.updatePositions, TeacherRepository.hasTeacherPosition
+HR-03   Thấp   Mã nhân viên: FE yêu cầu nhập nhưng BE tự sinh; có thể trùng khi tạo đồng thời
+Hiện trạng: FE bắt buộc nhập mã NV cho giáo viên trong khi MemberService.withGeneratedStaffCode luôn sinh mã nếu trống. nextStaffCode dùng MAX+1 không khóa nên hai yêu cầu đồng thời có thể cùng mã (→ STAFF_CODE_EXISTS cho người dùng).
+Đề xuất: Bỏ ô nhập ở FE (hiển thị mã sau khi tạo); sinh mã bằng bảng sequence theo tổ chức hoặc tự retry khi DuplicateKey.
+Nguồn: employee-create-drawer.tsx, StaffProfileRepository.nextStaffCode
+F6. Tổng quản lý & ủy quyền
+Đánh giá:  Ổn có lưu ý    Mục đích: Owner trao quyền có kiểm soát cho Tổng quản lý qua ủy quyền có thời hạn.
+Luồng thực tế
+Owner bổ nhiệm một nhân sự đang hoạt động vào chức danh cấp tổ chức 'Tổng quản lý' (không kèm quyền nào).
+Owner tạo ủy quyền: tập quyền (phải có trong catalog, hỗ trợ ORGANIZATION), thời hạn, lý do; không ủy quyền cho chính mình.
+Mỗi request, DelegatedAuthorityFilter bỏ quyền ủy quyền cũ trong token và cộng lại quyền còn hiệu lực từ bảng delegation → sửa/thu hồi/hết hạn có hiệu lực ngay.
+Tổng quản lý được ủy quyền tham gia leo thang duyệt nghỉ việc/đóng lớp sau trưởng phòng; bãi nhiệm thu hồi toàn bộ ủy quyền còn hiệu lực.
+Điểm làm tốt
+Nguyên tắc 'chức danh không tự có quyền, mọi quyền đến từ ủy quyền' rõ ràng và được cưỡng chế.
+Hiệu lực tức thời, có audit tạo/sửa/thu hồi/dùng quyền (trừ các luồng duyệt — DEL-01).
+Vấn đề phát hiện và đề xuất
+DEL-01   Trung bình   Audit 'dùng quyền ủy quyền' bỏ sót các luồng duyệt chính
+Hiện trạng: DelegationUsageInterceptor chỉ đọc quyền từ @RequirePermission/@PreAuthorize. Các thao tác hay dùng nhất — duyệt nghỉ việc, duyệt đóng/hủy lớp, bước HR của chuyển phòng — được kiểm bằng policy trong service, không có annotation nên không sinh DELEGATION_PERMISSION_USED. Quy tắc 7 (mọi lần dùng quyền ủy quyền đều có dấu vết) không đạt ở chỗ quan trọng nhất.
+Đề xuất: Để policy ghi audit trực tiếp khi người quyết định thuộc nhánh 'ủy quyền' (kèm delegationId), hoặc thêm annotation @UsesPermission cho các endpoint duyệt.
+Nguồn: DelegationUsageInterceptor.java, ResignationController.java, SchoolClassController.java
+DEL-02   Trung bình   Ủy quyền không bị thu hồi khi Tổng quản lý nghỉ việc/bị gỡ
+Hiện trạng: Chỉ GeneralManagerService.remove (bãi nhiệm) thu hồi ủy quyền. ResignationService còn TODO, MemberService.remove không làm. revokeAll thu hồi assignment nhưng delegation vẫn ACTIVE, và activeDelegationGrants (dùng cho filter quyền mỗi request) không kiểm tra người nhận còn là Tổng quản lý.
+Đề xuất: Thu hồi mọi ủy quyền + assignment GM trong OffboardingService; activeDelegationGrants phải kiểm tra GM còn hiệu lực; thêm job đánh dấu hết hạn.
+Nguồn: ResignationService.java, EffectivePermissionsService.activeDelegationGrants
+DEL-03   Thấp   Filter đồng bộ ủy quyền có thể làm mất quyền chức vụ
+Hiện trạng: Khi một quyền vừa đến từ chức vụ vừa từ ủy quyền, resolve() ghi nó vào delegatedPermissions; DelegatedAuthorityFilter trừ tập này khỏi quyền cơ sở, nên khi ủy quyền bị thu hồi người đó mất luôn quyền từ chức vụ tới lần đăng nhập sau (an toàn nhưng khó hiểu).
+Đề xuất: Chỉ đánh dấu 'delegated' cho quyền KHÔNG có từ chức vụ; hoặc filter tính lại đầy đủ từ DB (có cache).
+Nguồn: DelegatedAuthorityFilter.java
+DEL-04   Thấp   Vòng đời ủy quyền thiếu trạng thái hết hạn và chống chồng lấn
+Hiện trạng: status chỉ ACTIVE/REVOKED, EXPIRED (FE có nhãn) không bao giờ được ghi; không kiểm tra hai ủy quyền chồng thời gian; nhánh 'không phải owner' trong DelegationService.validatePermissions là mã chết vì chỉ Owner gọi; không báo trước khi sắp hết hạn.
+Đề xuất: Job hằng đêm đặt EXPIRED + thông báo trước 3 ngày; chặn/gộp ủy quyền trùng; dọn mã chết.
+Nguồn: DelegationService.java, DelegationRepository.java
+F7. Điều chuyển phòng ban
+Đánh giá:  Ổn có lưu ý    Mục đích: Chuyển nhân sự sang phòng ban khác qua bốn bên duyệt.
+Luồng thực tế
+Tạo bởi người có employee.transfer (ở phòng cũ hoặc mới) hoặc nhân sự tự gửi; chặn Owner, người không còn hoạt động, người đang có yêu cầu chờ, cùng phòng; cả hai phòng phải có trưởng phòng.
+Bốn bước độc lập: trưởng phòng cũ, trưởng phòng mới, nhân sự (quyền employee.approve_transfer), chính người được chuyển.
+Một bước từ chối → yêu cầu bị từ chối. Đủ bốn duyệt → áp dụng trong cùng transaction: thu hồi chức danh phạm vi phòng cũ, giữ chức danh cấp tổ chức, đổi phòng, gắn nhãn lớp cần phân công lại, thông báo.
+Chỉ người tạo mới hủy được yêu cầu đang chờ.
+Điểm làm tốt
+Khóa dòng yêu cầu (FOR UPDATE) nên hai người không quyết cùng một bước.
+FE chỉ hiện nút cho các bước BE trả trong actionableSteps — không suy diễn quyền ở client.
+Có thông báo cho các bên và audit đầy đủ.
+Vấn đề phát hiện và đề xuất
+TRF-01   Trung bình   Yêu cầu điều chuyển có thể treo vĩnh viễn
+Hiện trạng: Bước SOURCE_HEAD/TARGET_HEAD chỉ do người đang giữ chức danh trưởng phòng quyết định (Owner không thay được — khác nghỉ việc/đóng lớp). Nếu trưởng phòng nghỉ/vắng sau khi yêu cầu đã tạo thì yêu cầu kẹt; chưa có scheduler hết hạn (transfer.approval.deadline-days mới là TODO).
+Đề xuất: Cho Owner (hoặc Tổng quản lý được ủy quyền) quyết thay khi không còn trưởng phòng; thêm hạn duyệt + nhắc việc + tự hủy; định nghĩa 'vắng mặt'.
+Nguồn: TransferService.canDecide
+TRF-02   Trung bình   Không chặn một người duyệt nhiều bước / tự duyệt
+Hiện trạng: TransferService.decide không có kiểm tra tự duyệt hay khác người giữa các bước: người tạo yêu cầu có thể là trưởng phòng cũ và tự duyệt bước của mình; một người vừa là trưởng phòng vừa có quyền HR duyệt được nhiều bước. 'Luồng 4 bên' không được cưỡng chế, trong khi nghỉ việc/đóng lớp có cấm tự duyệt.
+Đề xuất: Áp dụng cùng quy tắc: người tạo không duyệt; mỗi người tối đa một bước (trừ Owner) — BA xác nhận.
+Nguồn: TransferService.decide
+TRF-03   Trung bình   Sau chuyển phòng nhân sự không còn chức danh nào
+Hiện trạng: transferToDepartment thu hồi mọi chức danh phạm vi DEPARTMENT của phòng cũ và không gán gì ở phòng mới. Giáo viên mất chức danh TEACHER (không còn khả dụng để phân công) và toàn bộ lớp bị gắn nhãn cần phân công lại, kể cả khi vẫn dạy tiếp.
+Đề xuất: Cho yêu cầu chỉ định chức danh đích (positionIds) áp dụng ở bước cuối; hoặc ánh xạ chức danh mẫu cùng loại sang phòng mới; hỏi BA liệu giáo viên chuyển phòng có giữ lớp.
+Nguồn: MemberRepository.transferToDepartment, TransferService.apply
+TRF-04   Thấp   Truy vấn hộp duyệt N+1
+Hiện trạng: inbox() nạp mọi yêu cầu PENDING của tổ chức rồi mỗi yêu cầu chạy nhiều truy vấn quyết định (headHolders, resolve quyền → còn gọi Identity).
+Đề xuất: Lọc theo phòng của người gọi ở SQL; cache quyền; phân trang.
+Nguồn: TransferService.inbox, TransferRepository
+F8. Nghỉ việc
+Đánh giá:  Ổn có lưu ý    Mục đích: Nhân sự xin nghỉ hoặc HR tạo thay; duyệt theo thứ tự leo thang.
+Luồng thực tế
+Tạo bởi người có employee.resign trong phòng hoặc tự gửi; chặn Owner/người không còn hoạt động/đã có yêu cầu chờ.
+Người duyệt theo DEC-08: người giữ trực tiếp quyền approve_resignation (HR) → trưởng phòng (khi không có HR) → Tổng quản lý có ủy quyền → Owner. Người tạo và người xin nghỉ không được duyệt.
+Duyệt: vô hiệu tài khoản Identity, thu hồi toàn bộ chức danh, đánh dấu RESIGNED, giáo viên → NGHI_VIEC, lớp đang dạy gắn nhãn cần phân công lại và báo người quản lý lớp.
+Từ chối: ghi ghi chú, báo người tạo và người xin nghỉ.
+Điểm làm tốt
+Chống tự duyệt ở mọi cấp; có hook phân công lại lớp; có audit MEMBER_RESIGNED và RESIGNATION_APPROVED.
+Không có tự duyệt/tự từ chối theo thời gian (đúng yêu cầu).
+Vấn đề phát hiện và đề xuất
+RES-01   Trung bình   Gọi Identity trong transaction duyệt nghỉ việc, không bù trừ
+Hiện trạng: ResignationService.approve gọi identity.disableAccount trước rồi mới ghi DB; nếu bước DB sau đó lỗi, DB rollback nhưng tài khoản đã bị vô hiệu → nhân sự 'đang làm việc' mà không đăng nhập được. Luồng tạo nhân sự có saga bù trừ còn luồng này thì không.
+Đề xuất: Ghi DB trước, gọi Identity sau commit (outbox + retry) hoặc dùng lại cơ chế compensation; thao tác disable phải idempotent.
+Nguồn: ResignationService.approve
+RES-02   Trung bình   Cơ chế leo thang 'cấp 1 không khả dụng' không xác định được
+Hiện trạng: ResignationApprovalPolicy: nếu tồn tại bất kỳ người giữ quyền approve_resignation trực tiếp (không tính ủy quyền) thì CHỈ họ duyệt được; trưởng phòng chỉ duyệt khi KHÔNG có HR nào. Không có khái niệm vắng mặt/quá hạn nên HR nghỉ phép đồng nghĩa yêu cầu phải chờ HR hoặc Owner. Việc tính tập người duyệt còn duyệt mọi thành viên tổ chức và resolve quyền từng người (xem CC-01).
+Đề xuất: Định nghĩa 'không khả dụng' (đã nghỉ, đang vắng, quá X ngày) hoặc cho phép leo thang thủ công kèm lý do; tính tập người duyệt bằng một truy vấn theo assignment.
+Nguồn: ResignationApprovalPolicy.java
+RES-03   Trung bình   Không có hộp duyệt tổng hợp; hộp 'Việc chờ tôi duyệt' thiếu đóng/hủy lớp
+Hiện trạng: BE chỉ có danh sách nghỉ việc theo từng phòng ban; FE bắt người duyệt chọn phòng ban rồi xem từng trạng thái; badge số việc chờ chỉ đếm điều chuyển. Yêu cầu đóng/hủy lớp (approval capability classLifecycle) không có danh sách chờ ở bất kỳ đâu (CLS-02).
+Đề xuất: Thêm /approvals/inbox hợp nhất (điều chuyển, nghỉ việc, đóng/hủy lớp) theo quyền người gọi + số đếm cho badge.
+Nguồn: approvals-page.tsx, ResignationController.java, use-nav-badges.ts
+RES-04   Trung bình   [Nghiệp vụ] Nghỉ việc hiệu lực ngay khi duyệt, không có ngày nghỉ thực tế
+Hiện trạng: Duyệt xong là vô hiệu tài khoản, thu hồi toàn bộ chức danh và đổi trạng thái ngay, không có 'ngày làm việc cuối' hay thời gian bàn giao; thực tế nhân sự nghỉ theo ngày đã thỏa thuận.
+Đề xuất: Thêm effective_date; scheduler thực thi offboarding vào ngày đó; cho rút đơn trước ngày hiệu lực.
+Nguồn: ResignationService.approve
+RES-05   Thấp   Thông báo dùng userId thay vì tên
+Hiện trạng: ResignationService tạo thông báo 'Nhân sự {userId} xin nghỉ việc' — người nhận thấy UUID.
+Đề xuất: Dùng họ tên + mã NV; gom mẫu thông báo vào một nơi.
+Nguồn: ResignationService.create/approve
+F9. Sinh viên
+Đánh giá:  Cần sửa    Mục đích: Hồ sơ sinh viên, tài khoản đăng nhập, xếp lớp, cổng sinh viên.
+Luồng thực tế
+Tạo hồ sơ (mã SV tự sinh SV001…, họ tên, ngày sinh, email, trạng thái active/inactive/suspended).
+Cấp tài khoản: cần email; username = email; Identity tạo account role STUDENT với mật khẩu tạm; hiển thị một lần.
+Thêm vào lớp (mỗi sinh viên một lớp), gỡ khỏi lớp, xóa mềm hồ sơ.
+Sinh viên đăng nhập xem hồ sơ, lớp (/students/me, /students/me/classes) và lịch (/schedules/me).
+Điểm làm tốt
+Có audit tạo/sửa/xóa/cấp tài khoản; lọc theo org_id nhất quán; tài khoản sinh viên ở chế độ chỉ đọc bản thân (quyền SELF).
+Vấn đề phát hiện và đề xuất
+STU-01   Cao   Khóa chết: sinh viên không thể vào lớp mới sau khi lớp cũ kết thúc
+Hiện trạng: Mỗi sinh viên chỉ được ở MỘT lớp (enrollStudent ném STUDENT_ALREADY_IN_CLASS nếu đã có bất kỳ class_student nào). Lớp tự chuyển DA_KET_THUC khi quá end_date, còn lớp DA_HUY/CLOSED là chỉ đọc (ensureEditable) nên removeStudent bị CLASS_NOT_EDITABLE. Kết quả: sinh viên học xong một lớp không thể được xếp vào lớp kế tiếp (trừ khi xóa sinh viên). Ngoài ra mô hình 1 lớp/sinh viên không khớp trung tâm (CENTER) nơi học viên học nhiều lớp.
+Đề xuất: Tách bảng enrollment (student_id, class_id, từ/đến ngày, trạng thái); tự đóng enrollment khi lớp kết thúc/hủy; cho gỡ/chuyển khỏi lớp đã kết thúc; BA chốt luật 1-lớp hay nhiều-lớp.
+Nguồn: SchoolClassRepository.enrollStudent, SchoolClassService.removeStudent/ensureEditable
+STU-02   Trung bình   Đình chỉ/tạm dừng/xóa sinh viên không vô hiệu tài khoản đăng nhập
+Hiện trạng: StudentService.update/delete chỉ đổi dữ liệu People; tài khoản Identity (username = email) vẫn active nên sinh viên bị đình chỉ vẫn đăng nhập xem lớp/lịch. Username dùng email có thể trùng username nhân sự.
+Đề xuất: Khi status ≠ active hoặc xóa: disable/enable tài khoản STUDENT; cân nhắc username độc lập (mã SV), email chỉ là thông tin liên hệ.
+Nguồn: StudentService.java
+STU-03   Thấp   Tìm kiếm sinh viên/lớp không bỏ dấu (QC-07)
+Hiện trạng: StudentRepository.list và SchoolClassRepository.list dùng LOWER(...) LIKE thay vì cột *_unaccented như giáo viên/chuyên môn/môn học → gõ 'nguyen' không ra 'Nguyễn'.
+Đề xuất: Thêm cột full_name_unaccented/name_unaccented và dùng TextNormalizer.likeContains.
+Nguồn: StudentRepository.java, SchoolClassRepository.java
+STU-04   Thấp   Kiểm tra trùng mã không bỏ qua bản ghi đã xóa mềm
+Hiện trạng: checkStudentCodeAvailable/checkClassCodeAvailable đếm cả deleted_at IS NOT NULL nên mã của bản ghi đã xóa không dùng lại được; lỗi trả CONFLICT chung chung.
+Đề xuất: Quyết định chính sách (tái sử dụng hay giữ vĩnh viễn) và trả mã lỗi riêng STUDENT_CODE_EXISTS / CLASS_CODE_EXISTS.
+Nguồn: StudentRepository.java, SchoolClassRepository.java
+F10. Giáo viên
+Đánh giá:  Cần sửa    Mục đích: Hồ sơ giáo viên, chuyên môn, trạng thái giảng dạy, phân công lớp.
+Luồng thực tế
+Tạo giáo viên qua luồng nhân sự với chức danh TEACHER + hồ sơ (chuyên môn ≥ 1, hợp đồng CO_HUU/THINH_GIANG).
+Danh sách/lọc theo phòng, chuyên môn, trạng thái; che liên hệ nếu thiếu employee.view_detail.
+Sửa hồ sơ với khóa lạc quan (version); đổi chuyên môn gây lệch môn của lớp đang dạy trả SPECIALTY_MISMATCH, đòi confirm = true.
+Điều kiện nhận lớp: DANG_DAY + có chức danh TEACHER + chuyên môn khớp môn học của lớp; giáo viên xem 'Lớp của tôi' và sinh viên trong lớp.
+Điểm làm tốt
+Khóa lạc quan và cơ chế xác nhận khi thay đổi gây lệch; lịch sử TEACHER_CREATED/UPDATED có diff trước–sau; danh sách giáo viên khả dụng cho phân công tách riêng (/teachers/assignable).
+Vấn đề phát hiện và đề xuất
+TCH-01   Cao   Trạng thái giảng dạy lệch FE–BE; không có API đổi trạng thái
+Hiện trạng: BE chỉ dùng DANG_DAY và NGHI_VIEC; FE (academic/types, bộ lọc TeachersPage) dùng DANG_DAY/TAM_NGHI/DA_NGHI → lọc 'Đã nghỉ' không trả kết quả. Mã quyền teacher.change_status chỉ có ở FE; BE không có endpoint đổi sang TAM_NGHI, trong khi phân công lớp đòi DANG_DAY → không có cách cho giáo viên tạm nghỉ.
+Đề xuất: Chốt bộ trạng thái (DANG_DAY, TAM_NGHI, NGHI_VIEC) ở BE, thêm PATCH /teachers/{id}/status (quyền + audit + hook lớp), FE dùng đúng mã.
+Nguồn: academic/types.ts, teachers-page.tsx, TeacherRepository.markResigned
+TCH-02   Trung bình   Khớp chuyên môn – môn học bằng so sánh TÊN; FE không xử lý xác nhận
+Hiện trạng: TeacherRepository.teachesSubject/subjectMismatch so specialty.name_unaccented = subject.name_unaccented: môn 'Toán 10' không khớp chuyên môn 'Toán'. FE TeacherEditDialog không xử lý lỗi SPECIALTY_MISMATCH (409 kèm danh sách lớp) và không gửi confirm = true nên không thể xác nhận thay đổi.
+Đề xuất: Liên kết có cấu trúc subject ↔ specialty (subject.specialty_id); FE hiển thị danh sách lớp bị ảnh hưởng và nút 'Vẫn lưu' gửi confirm = true.
+Nguồn: TeacherRepository.java, teachers-page.tsx, GlobalExceptionHandler (People)
+F11. Lớp học
+Đánh giá:  Cần sửa    Mục đích: Vòng đời lớp: tạo → diễn ra → kết thúc/hủy/đóng.
+Luồng thực tế
+Tạo lớp (mã, tên, niên khóa, môn học, ngày bắt đầu/kết thúc) → CHUA_BAT_DAU.
+Trạng thái tự chuyển theo ngày (cron 00:05 giờ VN và làm mới khi đọc): CHUA_BAT_DAU → DANG_DIEN_RA → DA_KET_THUC.
+Phân công giáo viên (assign/reassign, khóa lạc quan theo version), thêm/gỡ sinh viên.
+Hủy: lớp chưa có sinh viên hủy ngay; có sinh viên → chờ duyệt. Đóng lớp: yêu cầu → duyệt/từ chối; mở lại cần class.reopen. Người duyệt: trưởng phòng phụ trách module → Tổng quản lý được ủy quyền → Owner; người yêu cầu không tự duyệt.
+Mọi thay đổi trạng thái ghi class_status_log / class_close_event.
+Điểm làm tốt
+Khóa lạc quan, chống tự duyệt, lịch sử trạng thái và sự kiện đóng lớp đầy đủ; kiểm tra lớp có thể sửa/gán theo trạng thái.
+Vấn đề phát hiện và đề xuất
+CLS-01   Cao   Trạng thái lớp lệch FE–BE; trường trạng thái khi tạo bị bỏ qua
+Hiện trạng: BE: CHUA_BAT_DAU, DANG_DIEN_RA, DA_KET_THUC, DA_HUY. FE dùng DANG_HOAT_DONG/TAM_DUNG (nhãn, bộ lọc, màu badge); chọn lọc 'Đang hoạt động' → SchoolClassRepository.normalizeStatus ném VALIDATION_ERROR (400); lớp CHUA_BAT_DAU/DANG_DIEN_RA hiển thị mã thô. Form tạo lớp cho chọn 'Tạm dừng' nhưng SchoolClassService.create truyền null nên luôn CHUA_BAT_DAU (và ánh xạ 'inactive' → DA_HUY sẽ nguy hiểm nếu được dùng).
+Đề xuất: Dùng đúng 4 trạng thái của BE; bỏ trường trạng thái khỏi form/DTO tạo lớp; sinh type FE từ OpenAPI; test E2E danh sách + lọc.
+Nguồn: classes-page.tsx, academic/types.ts, SchoolClassRepository.java, SchoolClassService.create
+CLS-02   Cao   Yêu cầu hủy/đóng lớp: thiếu thông báo và không có danh sách chờ duyệt
+Hiện trạng: requestClose không thông báo cho người duyệt; approveClose/rejectClose không báo người yêu cầu (hủy lớp thì có). BE không có API liệt kê lớp có close_state/cancel_state = PENDING (list không có tham số lọc), FE cũng không đưa vào 'Việc chờ tôi duyệt'. Trưởng phòng chỉ biết nếu tự mở từng lớp.
+Đề xuất: Gửi notification cho policy.classManagers khi tạo yêu cầu và cho người yêu cầu khi có quyết định; thêm GET /classes/approvals?state=PENDING và đưa vào hộp duyệt hợp nhất.
+Nguồn: ClassStatusService.java, approvals-page.tsx
+CLS-03   Trung bình   Hủy/đóng lớp không xử lý buổi học và sinh viên liên quan
+Hiện trạng: Hủy lớp (DA_HUY) hoặc đóng lớp không hủy buổi học tương lai ở ScheduleService, không báo giáo viên/sinh viên; sinh viên vẫn nằm trong lớp (và theo STU-01 không gỡ được).
+Đề xuất: Phát sự kiện ClassStatusChanged → Schedule hủy buổi tương lai, → Notification; xác định số phận enrollment.
+Nguồn: ClassStatusService.java, ScheduleService.java
+CLS-04   Trung bình   Lớp không thuộc phòng ban nào; 'phòng phụ trách lớp' có ba định nghĩa
+Hiện trạng: Phạm vi DEPARTMENT của class.view suy từ phòng của giáo viên hoặc người tạo (inDepartments): lớp chưa có giáo viên do người ngoài phòng tạo nằm ngoài tầm nhìn trưởng phòng; giáo viên chuyển phòng làm lớp 'đổi chủ'. Người duyệt lại tính theo module STUDENT_MANAGEMENT của phòng; lịch thì theo phòng trong URL.
+Đề xuất: Thêm department_id vào school_class (phòng phụ trách), dùng thống nhất cho phạm vi xem, người duyệt và lịch.
+Nguồn: SchoolClassRepository.inDepartments, ClassApprovalPolicy.responsibleHeadIds
+F12. Lịch học
+Đánh giá:  Cần sửa    Mục đích: Xếp buổi học theo phòng ban, chống trùng giáo viên/phòng/lớp.
+Luồng thực tế
+Tạo buổi: kiểm tra cửa sổ thời gian → lấy lớp từ People (chặn DA_HUY/DA_KET_THUC) → xác định giáo viên → kiểm tra phòng qua Facility (đang hoạt động, không thiết bị hỏng, đủ sức chứa).
+Cập nhật bản sao lớp ở DB lịch, khóa tài nguyên giáo viên/phòng (bảng lock + FOR UPDATE), kiểm tra trùng giáo viên → phòng → lớp, rồi ghi session.
+Sửa, hủy (status cancelled) và xóa mềm buổi; gợi ý phòng trống theo khung giờ.
+Giáo viên/sinh viên xem /schedules/me (giáo viên theo teacher_id, sinh viên theo các lớp của mình).
+Điểm làm tốt
+Khóa bi quan theo tài nguyên với thứ tự cố định (giáo viên rồi phòng) tránh deadlock; kiểm tra chồng lấn nửa mở đúng; mọi truy vấn có org_id.
+Vấn đề phát hiện và đề xuất
+SCH-01   Cao   Lịch học không đồng bộ với lớp/giáo viên
+Hiện trạng: session lưu teacher_id lúc tạo. Khi lớp đổi giáo viên (assign/reassign), giáo viên nghỉ/chuyển phòng, lớp bị hủy/đóng, các buổi tương lai vẫn mang giáo viên cũ; 'Lịch của tôi' của giáo viên mới trống. ScheduleService.requireClass chỉ chặn DA_HUY/DA_KET_THUC nên vẫn xếp lịch cho lớp đã đóng (CLOSED) vì ClassScheduleInfo không có closeState.
+Đề xuất: Hoặc đọc giáo viên theo lớp tại thời điểm truy vấn, hoặc People phát sự kiện (outbox) để Schedule cập nhật/hủy buổi tương lai; thêm closeState/cancelState vào ClassScheduleInfo và chặn.
+Nguồn: ScheduleService.java, InternalScheduleLookupController.java
+SCH-02   Cao   Phòng học thuộc phòng ban sở hữu nhưng lịch xếp theo phòng ban khác
+Hiện trạng: Facility lưu phòng/thiết bị theo department_id (phòng CSVC) và gợi ý phòng của Schedule chỉ lấy phòng của CHÍNH phòng ban đang xếp lịch. Tài liệu thiết kế (planned-content) ghi phòng học là tài nguyên cấp tổ chức do phòng CSVC quản lý → phòng Đào tạo xếp lịch sẽ thấy danh sách phòng trống rỗng. validateRoom thì nhận bất kỳ phòng nào trong tổ chức, không đối chiếu. Báo sự cố cũng giới hạn thiết bị trong phòng ban của người báo.
+Đề xuất: Chốt mô hình: phòng/thiết bị là tài nguyên tổ chức (bỏ lọc department_id khi đọc cho xếp lịch/báo sự cố, giữ department là 'đơn vị quản lý'), hoặc cho phòng ban 'mượn' phòng; sửa API nội bộ và quyền tương ứng.
+Nguồn: ScheduleService.roomSuggestions/validateRoom, FacilityService.internalRooms, planned-content.ts
+SCH-03   Trung bình   Không xác thực người được chỉ định dạy; thiếu khóa theo lớp
+Hiện trạng: resolveTeacher chấp nhận bất kỳ teacherId do client gửi khi lớp chưa có giáo viên (không kiểm tra là giáo viên đang dạy, đúng chuyên môn); không chặn buổi trong quá khứ hoặc thời lượng bất thường; chỉ khóa tài nguyên giáo viên/phòng, không khóa lớp nên hai buổi cùng lớp với hai giáo viên khác nhau có thể trùng.
+Đề xuất: Gọi People xác thực giáo viên (DANG_DAY, đúng chuyên môn) hoặc luôn dùng giáo viên của lớp; thêm khóa class; ràng buộc thời lượng/giờ làm việc.
+Nguồn: ScheduleService.resolveTeacher/lockResources
+SCH-04   Trung bình   Sự cố/bảo trì phát sinh sau khi xếp lịch không ảnh hưởng buổi học
+Hiện trạng: Chỉ kiểm tra phòng hỏng/bảo trì ở thời điểm tạo/sửa buổi. Thiết bị báo hỏng sau đó không gắn cờ, không liệt kê buổi bị ảnh hưởng (mới nằm trong planned-content), không gợi ý đổi phòng.
+Đề xuất: Khi có sự cố mở: truy vấn buổi tương lai dùng phòng đó → thông báo người quản lý lịch + gợi ý phòng thay thế.
+Nguồn: ScheduleService.validateRoom, FacilityService.reportIssue
+SCH-05   Thấp   Chức năng còn thiếu theo thiết kế (điểm danh, đổi lịch, lịch lặp)
+Hiện trạng: Có quyền và menu (trạng thái api-missing) nhưng chưa có API; người dùng thấy màn hình giữ chỗ.
+Đề xuất: Lên Sprint riêng; ẩn menu cho đến khi có API.
+Nguồn: nav.ts, app.tsx (BackendDependencyPage)
+F13. Cơ sở vật chất & sự cố
+Đánh giá:  Ổn có lưu ý    Mục đích: Quản lý phòng học, thiết bị và sự cố.
+Luồng thực tế
+CRUD phòng (không xóa nếu còn thiết bị chưa thanh lý) và thiết bị theo phòng ban; mọi thay đổi trạng thái thiết bị ghi equipment_status_log.
+Báo sự cố: tạo incident_report (open) và đặt thiết bị 'broken'.
+Xử lý xong: incident resolved, thiết bị về in_use.
+Schedule đọc phòng qua API nội bộ (/internal/rooms) để chặn phòng bảo trì/hỏng/thiếu chỗ.
+Điểm làm tốt
+Quyền kiểm theo mã + phạm vi + module (có chế độ chỉ đọc); soft delete; API nội bộ có khóa dịch vụ và so sánh hằng thời gian (MessageDigest.isEqual).
+Vấn đề phát hiện và đề xuất
+FAC-01   Trung bình   Xử lý sự cố đặt thiết bị về in_use bất kể trạng thái trước và sự cố khác
+Hiện trạng: resolveIssue luôn đặt equipment.status = 'in_use' (TODO Phần 7). Thiết bị đang bảo trì/trong kho hoặc còn sự cố mở khác sẽ bị coi là dùng được → phòng lại được xếp lịch.
+Đề xuất: Chỉ trả về trạng thái trước khi hỏng (lấy từ equipment_status_log) khi không còn sự cố mở nào cho thiết bị đó.
+Nguồn: FacilityService.resolveIssue
+FAC-02   Thấp   Trạng thái sự cố in_progress/unresolved không có API; thiếu người phụ trách
+Hiện trạng: Chỉ có báo (open) và xử lý xong (resolved); FE có bộ lọc 4 trạng thái nhưng hai trạng thái còn lại không bao giờ xuất hiện; không có người nhận việc, mức độ nghiêm trọng; không thông báo cho CSVC khi có sự cố mới.
+Đề xuất: Thêm PATCH status, người phụ trách, mức độ; gửi thông báo tới nhân sự CSVC khi có sự cố.
+Nguồn: FacilityService.java, facility-issues-page.tsx
+F14. Thông báo & nhật ký
+Đánh giá:  Ổn có lưu ý    Mục đích: Thông báo trong ứng dụng thay email và nhật ký thao tác.
+Luồng thực tế
+NotificationService ghi bản ghi cho từng người nhận (loại, tiêu đề, nội dung, đối tượng liên quan); FE hiển thị danh sách, đánh dấu đã đọc/tất cả, liên kết tới màn hình tương ứng.
+PeopleAuditService ghi people_audit_log (hành động, người thực hiện, đối tượng, chi tiết JSON); Identity ghi audit_log cho vòng đời tổ chức/module.
+SUPER_ADMIN đọc nhật ký hệ thống; chủ tổ chức chưa có màn hình nhật ký riêng.
+Điểm làm tốt
+Audit được ghi cùng transaction ở các thao tác quan trọng; audit lỗi không làm hỏng request đã xong ở interceptor ủy quyền (đúng ý đồ).
+Vấn đề phát hiện và đề xuất
+CC-06   Trung bình   Chủ tổ chức không đọc được nhật ký tổ chức
+Hiện trạng: people_audit_log ghi rất đầy đủ (chức danh, nhân sự, ủy quyền, chuyển phòng…) nhưng không có API đọc; FE /to-chuc/nhat-ky là trang giữ chỗ. AuditLogService (Identity) bắt mọi Exception và trả danh sách rỗng nên lỗi schema bị che.
+Đề xuất: Thêm GET /audit-logs trong People (lọc theo hành động/đối tượng/ngày, quyền org.audit.view); bỏ try/catch nuốt lỗi.
+Nguồn: PeopleAuditService.java, AuditLogService.java, app.tsx
+4. Vấn đề xuyên suốt nhiều luồng
+CC-01   Cao   Gọi Identity quá nhiều: hiệu năng và độ sẵn sàng
+Hiện trạng: EffectivePermissionsService.resolve() gọi IdentityClient 3 lần (danh mục quyền, scope, bundle) mỗi lần; MemberRepository.require() gọi resolve cho từng thành viên nên danh sách phòng 30 người ≈ 90+ HTTP; FE useEmployeeDirectory tải thành viên mọi phòng + 30 hồ sơ chi tiết; ResignationApprovalPolicy duyệt tất cả thành viên và resolve từng người. Mỗi request ghi ở People/Schedule/Facility còn gọi Identity kiểm tra module (không cache). Identity chậm/ngừng = toàn hệ thống chậm/ngừng.
+Đề xuất: Cache danh mục quyền/bundle/module (Caffeine, TTL 30–60s, invalidate khi đổi); endpoint batch; trong danh sách không resolve từng dòng; đưa active modules vào JWT hoặc sự kiện; thêm circuit breaker/timeout/retry (Resilience4j).
+Nguồn: EffectivePermissionsService.java, MemberRepository.java, OrganizationModuleGuard.java
+CC-02   Cao   Bảo mật liên dịch vụ dựa trên bí mật dùng chung
+Hiện trạng: Cả 4 service dùng chung một khóa HS256 (lộ một service là ký được token giả), một INTERNAL_API_KEY tĩnh cho /internal/**, chỉ kiểm issuer (không audience). CORS mặc định cho *.vercel.app. Gateway chưa được cung cấp nên không xác minh được /internal/** có bị chặn ra ngoài.
+Đề xuất: Chuyển RS256/JWKS (chỉ Identity giữ private key), thêm audience; chặn /internal/** ở gateway và mạng nội bộ (mTLS hoặc service token ngắn hạn); xoay khóa định kỳ; giới hạn CORS theo domain chính thức.
+Nguồn: SecurityConfig.java (4 service), CorsConfig.java
+CC-03   Trung bình   Nhất quán dữ liệu giữa các service dựa vào gọi đồng bộ
+Hiện trạng: Không có outbox/sự kiện: Schedule giữ bản sao lớp chỉ cập nhật khi tạo buổi; saga People↔Identity chỉ có ở tạo nhân sự; thay đổi ở People (giáo viên, lớp, nghỉ việc) không đến Schedule/Facility (SCH-01, HR-01, RES-01). Username/email nhân sự bị nhân đôi ở department_member và Identity.
+Đề xuất: Transactional outbox + message broker (RabbitMQ/Kafka) hoặc ít nhất event nội bộ có retry; xác định nguồn sự thật cho từng thực thể.
+Nguồn: ScheduleService.ensureClassMirror, AccountCompensationService
+CC-04   Trung bình   Sơ đồ URL không thống nhất; hợp đồng FE–BE viết tay
+Hiện trạng: Có /api/v1/..., /api/subjects, /api/delegations, /api/departments/{id}/schedules nhưng /departments, /classes, /teachers, /positions không có tiền tố; controller thật không có /api (FE dựa vào rewrite ở gateway/Vercel). Cùng /departments/** do People, Schedule, Facility chia sẻ qua tiền tố khác nhau. DTO/trạng thái FE viết tay nên lệch (CLS-01, TCH-01, MOD-01).
+Đề xuất: Chuẩn hóa /api/v1/{service}/..., xuất OpenAPI từ mỗi service và sinh type FE; thêm contract test trong CI.
+Nguồn: http.ts, *Api.ts ở FE, các Controller
+CC-05   Trung bình   Mã nguồn lặp giữa 4 service
+Hiện trạng: ApiResponse ×4, GlobalExceptionHandler ×4, InternalApiFilter ×4, PasswordChangeRequiredFilter ×3, OrganizationModuleGuard ×3, Actor ×3 (đã khác nhau), ErrorCode ×4 (dải mã số chồng nhau). Lớp rỗng: IdentityService, PeopleService, IPeopleService, PeopleController, FacilityController, I*Respository (sai chính tả), IScheduleService. PasswordChangeRequiredFilter của People/Schedule/Facility truyền Set.of() nên chặn mọi đường dẫn với token mustChangePassword.
+Đề xuất: Tách module mems-common (security, exception, dto, client); xóa lớp rỗng; thống nhất ErrorCode theo dải/prefix.
+Nguồn: backend/*/src/main/java
+CC-07   Thấp   Phản hồi thành công không dùng envelope ApiResponse
+Hiện trạng: Lỗi trả {success, code, message, data} nhưng thành công trả DTO trần (trừ /auth/test). FE đã tương thích nên chỉ cần ghi tài liệu.
+Đề xuất: Ghi rõ trong docs/api.md hoặc thống nhất envelope ở mọi nơi.
+Nguồn: ApiResponse.java, Controllers
+CC-08   Thấp   Token lưu trong localStorage
+Hiện trạng: FE lưu access/refresh token ở localStorage (đã ghi chú rủi ro XSS); refresh token sống 7 ngày, không gắn thiết bị.
+Đề xuất: Cân nhắc refresh token trong cookie HttpOnly + SameSite khi cùng domain; CSP nghiêm ngặt; tiếp tục không dùng dangerouslySetInnerHTML.
+Nguồn: token-storage.ts
+5. Bảng đối chiếu lệch giữa Frontend và Backend
+Các điểm dưới đây dễ gây lỗi thấy ngay khi chạy tích hợp; nên khóa bằng contract test.
+Chủ đề
+Frontend
+Backend
+Mã
+Trạng thái lớp
+DANG_HOAT_DONG, TAM_DUNG (nhãn, bộ lọc, badge)
+CHUA_BAT_DAU, DANG_DIEN_RA, DA_KET_THUC, DA_HUY; lọc sai giá trị → 400
+CLS-01
+Trạng thái tạo lớp
+Form chọn active/inactive
+Bỏ qua, luôn CHUA_BAT_DAU
+CLS-01
+Trạng thái giáo viên
+DANG_DAY, TAM_NGHI, DA_NGHI
+DANG_DAY, NGHI_VIEC; không có API đổi
+TCH-01
+Module phòng ban
+7 mã (gồm TEACHER_, CLASS_, ROOM_, EQUIPMENT_)
+Chỉ chấp nhận 3 mã có trong PermissionCatalog
+MOD-01
+Mã quyền
+Nhiều mã không có trong catalog
+PermissionCatalog là nguồn duy nhất
+RBAC-07
+Mã nhân viên giáo viên
+Bắt buộc nhập
+Tự sinh nếu trống
+HR-03
+Xác nhận lệch chuyên môn
+Không gửi confirm = true, không hiện danh sách lớp
+409 SPECIALTY_MISMATCH + confirm
+TCH-02
+Role
+ORG_ADMIN, ACADEMIC_STAFF, FACILITY_STAFF
+ORG_OWNER/OWNER/MANAGER/STAFF/TEACHER/STUDENT
+AUTH-06
+Tiền tố URL
+/api/... cho một số, không tiền tố cho số khác
+Controller không có /api
+CC-04
+Hộp việc chờ duyệt
+Điều chuyển + nghỉ việc (theo từng phòng)
+Không có inbox tổng hợp, không có danh sách lớp chờ duyệt
+RES-03, CLS-02
+6. Bảng tổng hợp toàn bộ vấn đề
+Mã
+Mức độ
+Vấn đề
+Luồng
+AUTH-01
+Nghiêm trọng
+Mật khẩu cửa hậu 123456 cho tài khoản quản trị
+Xác thực & phiên
+AUTH-02
+Cao
+Không giới hạn đăng nhập sai
+Xác thực & phiên
+CC-01
+Cao
+Gọi Identity quá nhiều: hiệu năng và độ sẵn sàng
+Xuyên suốt
+CC-02
+Cao
+Bảo mật liên dịch vụ dựa trên bí mật dùng chung
+Xuyên suốt
+CLS-01
+Cao
+Trạng thái lớp lệch FE–BE; trường trạng thái khi tạo bị bỏ qua
+Lớp học
+CLS-02
+Cao
+Yêu cầu hủy/đóng lớp: thiếu thông báo và không có danh sách chờ duyệt
+Lớp học
+HR-01
+Cao
+Gỡ nhân sự bỏ qua quy trình offboarding
+Nhân sự
+MOD-01
+Cao
+Mã module FE – BE – danh mục quyền không khớp
+Module của tổ chức
+RBAC-01
+Cao
+Sửa chức danh dùng scope/phòng ban lấy từ request, không đối chiếu dữ liệu hiện tại
+Phòng ban, chức danh, phân quyền
+RBAC-02
+Cao
+Logic nghiệp vụ gắn cứng vào TÊN chức danh
+Phòng ban, chức danh, phân quyền
+SCH-01
+Cao
+Lịch học không đồng bộ với lớp/giáo viên
+Lịch học
+SCH-02
+Cao
+Phòng học thuộc phòng ban sở hữu nhưng lịch xếp theo phòng ban khác
+Lịch học
+STU-01
+Cao
+Khóa chết: sinh viên không thể vào lớp mới sau khi lớp cũ kết thúc
+Sinh viên
+TCH-01
+Cao
+Trạng thái giảng dạy lệch FE–BE; không có API đổi trạng thái
+Giáo viên
+AUTH-03
+Trung bình
+Refresh token: không phát hiện dùng lại; reset mật khẩu không thu hồi phiên
+Xác thực & phiên
+AUTH-04
+Trung bình
+Thiếu quên/đặt lại mật khẩu; trang đăng ký tổ chức chưa có ở FE
+Xác thực & phiên
+AUTH-05
+Trung bình
+Chủ tổ chức duy nhất, không có chuyển giao
+Đăng ký & duyệt tổ chức
+AUTH-06
+Trung bình
+Tên vai trò không thống nhất (ORG_OWNER / OWNER / ORG_ADMIN…)
+Đăng ký & duyệt tổ chức
+AUTH-07
+Trung bình
+[Cần xác minh] status tổ chức: enum PENDING vs so sánh 'pending'
+Đăng ký & duyệt tổ chức
+AUTH-08
+Trung bình
+Duyệt/từ chối/tạm ngưng tổ chức không ghi người thực hiện và lý do
+Đăng ký & duyệt tổ chức
+AUTH-10
+Trung bình
+Đổi vai trò/trạng thái ở Identity không đồng bộ với People
+Xác thực & phiên
+AUTH-11
+Trung bình
+Đăng nhập phụ thuộc cứng vào PeopleService
+Xác thực & phiên
+CC-03
+Trung bình
+Nhất quán dữ liệu giữa các service dựa vào gọi đồng bộ
+Xuyên suốt
+CC-04
+Trung bình
+Sơ đồ URL không thống nhất; hợp đồng FE–BE viết tay
+Xuyên suốt
+CC-05
+Trung bình
+Mã nguồn lặp giữa 4 service
+Xuyên suốt
+CC-06
+Trung bình
+Chủ tổ chức không đọc được nhật ký tổ chức
+Thông báo & nhật ký
+CLS-03
+Trung bình
+Hủy/đóng lớp không xử lý buổi học và sinh viên liên quan
+Lớp học
+CLS-04
+Trung bình
+Lớp không thuộc phòng ban nào; 'phòng phụ trách lớp' có ba định nghĩa
+Lớp học
+DEL-01
+Trung bình
+Audit 'dùng quyền ủy quyền' bỏ sót các luồng duyệt chính
+Tổng quản lý & ủy quyền
+DEL-02
+Trung bình
+Ủy quyền không bị thu hồi khi Tổng quản lý nghỉ việc/bị gỡ
+Tổng quản lý & ủy quyền
+FAC-01
+Trung bình
+Xử lý sự cố đặt thiết bị về in_use bất kể trạng thái trước và sự cố khác
+Cơ sở vật chất & sự cố
+HR-02
+Trung bình
+Mật khẩu tạm hiển thị cho người thao tác, không qua email
+Nhân sự
+HR-04
+Trung bình
+Đổi/gỡ chức danh giáo viên không xét lớp đang phụ trách
+Nhân sự
+RBAC-03
+Trung bình
+Quyền cấp tổ chức bị lọc theo module của phòng ban người nắm giữ
+Phòng ban, chức danh, phân quyền
+RBAC-04
+Trung bình
+Tạo/nhân bản chức danh không mang loại hồ sơ (profileType)
+Phòng ban, chức danh, phân quyền
+RBAC-05
+Trung bình
+Quyền trong JWT là ảnh chụp 15 phút; hai mức kiểm tra không đồng đều
+Phòng ban, chức danh, phân quyền
+RES-01
+Trung bình
+Gọi Identity trong transaction duyệt nghỉ việc, không bù trừ
+Nghỉ việc
+RES-02
+Trung bình
+Cơ chế leo thang 'cấp 1 không khả dụng' không xác định được
+Nghỉ việc
+RES-03
+Trung bình
+Không có hộp duyệt tổng hợp; hộp 'Việc chờ tôi duyệt' thiếu đóng/hủy lớp
+Nghỉ việc
+RES-04
+Trung bình
+[Nghiệp vụ] Nghỉ việc hiệu lực ngay khi duyệt, không có ngày nghỉ thực tế
+Nghỉ việc
+SCH-03
+Trung bình
+Không xác thực người được chỉ định dạy; thiếu khóa theo lớp
+Lịch học
+SCH-04
+Trung bình
+Sự cố/bảo trì phát sinh sau khi xếp lịch không ảnh hưởng buổi học
+Lịch học
+STU-02
+Trung bình
+Đình chỉ/tạm dừng/xóa sinh viên không vô hiệu tài khoản đăng nhập
+Sinh viên
+TCH-02
+Trung bình
+Khớp chuyên môn – môn học bằng so sánh TÊN; FE không xử lý xác nhận
+Giáo viên
+TRF-01
+Trung bình
+Yêu cầu điều chuyển có thể treo vĩnh viễn
+Điều chuyển phòng ban
+TRF-02
+Trung bình
+Không chặn một người duyệt nhiều bước / tự duyệt
+Điều chuyển phòng ban
+TRF-03
+Trung bình
+Sau chuyển phòng nhân sự không còn chức danh nào
+Điều chuyển phòng ban
+AUTH-09
+Thấp
+Chính sách mật khẩu không đồng nhất
+Xác thực & phiên
+CC-07
+Thấp
+Phản hồi thành công không dùng envelope ApiResponse
+Xuyên suốt
+CC-08
+Thấp
+Token lưu trong localStorage
+Xuyên suốt
+DEL-03
+Thấp
+Filter đồng bộ ủy quyền có thể làm mất quyền chức vụ
+Tổng quản lý & ủy quyền
+DEL-04
+Thấp
+Vòng đời ủy quyền thiếu trạng thái hết hạn và chống chồng lấn
+Tổng quản lý & ủy quyền
+FAC-02
+Thấp
+Trạng thái sự cố in_progress/unresolved không có API; thiếu người phụ trách
+Cơ sở vật chất & sự cố
+HR-03
+Thấp
+Mã nhân viên: FE yêu cầu nhập nhưng BE tự sinh; có thể trùng khi tạo đồng thời
+Nhân sự
+MOD-02
+Thấp
+Chính sách fail-open/fail-closed không nhất quán
+Module của tổ chức
+MOD-03
+Thấp
+[Cần xác minh] Kiểm tra workflow chờ trước khi tắt module gần như là mã chết
+Module của tổ chức
+RBAC-06
+Thấp
+Role MANAGER/STAFF còn sót dù quyền theo chức danh
+Phòng ban, chức danh, phân quyền
+RBAC-07
+Thấp
+Mã quyền ở FE không có trong danh mục BE
+Phòng ban, chức danh, phân quyền
+RES-05
+Thấp
+Thông báo dùng userId thay vì tên
+Nghỉ việc
+SCH-05
+Thấp
+Chức năng còn thiếu theo thiết kế (điểm danh, đổi lịch, lịch lặp)
+Lịch học
+STU-03
+Thấp
+Tìm kiếm sinh viên/lớp không bỏ dấu (QC-07)
+Sinh viên
+STU-04
+Thấp
+Kiểm tra trùng mã không bỏ qua bản ghi đã xóa mềm
+Sinh viên
+TRF-04
+Thấp
+Truy vấn hộp duyệt N+1
+Điều chuyển phòng ban
+7. Lộ trình xử lý đề xuất
+Giai đoạn
+Mã vấn đề
+Mục tiêu
+P0 – làm ngay (trước demo/go-live)
+AUTH-01, AUTH-02, AUTH-07 (xác minh), RBAC-01, STU-01, CLS-01, TCH-01, MOD-01, SCH-02, CC-02
+Chặn lỗ hổng và các lỗi làm hỏng luồng chính.
+P1 – sprint kế tiếp
+HR-01, DEL-02, RBAC-02, RBAC-03, RBAC-04, CLS-02, CLS-03, CLS-04, SCH-01, RES-01, RES-03, TRF-01, TRF-02, TRF-03, TCH-02, STU-02, AUTH-03, AUTH-04, AUTH-08, CC-01
+Hợp nhất offboarding, đồng bộ giữa service, hộp duyệt, hiệu năng.
+P2 – cải tiến
+Các mục mức Trung bình/Thấp còn lại: RES-02, RES-04, DEL-01, MOD-02/03, FAC-01/02, SCH-03/04/05, CC-03..CC-08, AUTH-05/06/09/10/11
+Chuẩn hóa kiến trúc, tài liệu, trải nghiệm.
+
+Hướng thay đổi kiến trúc đáng cân nhắc
+Một OffboardingService duy nhất cho gỡ/nghỉ việc/chuyển phòng: đổi trạng thái, thu hồi chức danh + ủy quyền, hook lớp, hủy yêu cầu chờ, gọi Identity qua outbox.
+Transactional outbox + broker để People phát sự kiện (ClassTeacherChanged, ClassStatusChanged, MemberOffboarded) cho Schedule/Notification.
+Mã hệ thống cho chức danh đặc biệt (system_code/is_head) thay cho so sánh tên.
+Bảng enrollment thay cho class_student 1–1; department_id cho lớp.
+Cache danh mục quyền/module có TTL + invalidation; đưa active modules hoặc authz_version vào JWT.
+Module mems-common cho security/exception/dto/client; OpenAPI → type FE tự sinh; contract test trong CI.
+Mail worker + luồng quên/đặt lại mật khẩu bằng link một lần.
+8. Câu hỏi cần BA/PO chốt
+Một sinh viên được học một hay nhiều lớp cùng lúc? Trung tâm (CENTER) và trường (SCHOOL) có khác nhau không?
+Phòng học/thiết bị là tài nguyên cấp tổ chức (dùng chung) hay thuộc từng phòng ban? Phòng ban nào được xếp lịch vào phòng của CSVC?
+Lớp thuộc phòng ban nào (phòng phụ trách)? Trưởng phòng duyệt đóng/hủy lớp là trưởng phòng nào?
+Nghỉ việc có ngày hiệu lực/bàn giao không? Giáo viên đang dạy lớp thì xử lý ra sao?
+Giáo viên chuyển phòng có giữ lớp đang dạy và chức danh không? Chức danh ở phòng mới do ai/khi nào gán?
+Khi trưởng phòng vắng/nghỉ, ai thay thế duyệt điều chuyển? Hạn duyệt tối đa là bao lâu và quá hạn thì làm gì?
+'Cấp 1 không khả dụng' trong luật leo thang nghỉ việc được xác định thế nào (nghỉ phép, quá hạn, thủ công)?
+Sinh viên bị đình chỉ có còn đăng nhập được không? Username sinh viên là email hay mã sinh viên?
+Có cho phép nhiều Chủ tổ chức hoặc chuyển giao quyền chủ không?
+Khớp chuyên môn giáo viên – môn học theo tên hay theo liên kết cấu trúc (môn có cấp lớp như 'Toán 10')?

@@ -18,6 +18,8 @@ vi.mock('@/features/workflows/api', async (importOriginal) => {
       inbox: vi.fn(),
       mine: vi.fn(),
       createMine: vi.fn(),
+      decide: vi.fn(),
+      cancel: vi.fn(),
       transferDepartments: vi.fn(),
     },
   }
@@ -29,6 +31,7 @@ const resignation: ResignationRequest = {
   username: 'nhanvien',
   fullName: 'Nhân Viên',
   departmentId: 'dept-1',
+  departmentName: 'Tổ Toán – Tin',
   reason: 'Chuyển nơi ở nên xin nghỉ việc.',
   status: 'PENDING',
   requestedBy: 'user-staff',
@@ -51,6 +54,7 @@ const pendingTransfer: TransferRequest = {
   toDepartmentName: 'Tổ Ngữ văn',
   reason: 'Nguyện vọng chuyển chuyên môn.',
   status: 'PENDING',
+  requestedBy: 'user-staff',
   requestedByName: 'Nhân Viên',
   requestedAt: '2026-11-14T02:00:00Z',
   appliedAt: null,
@@ -69,6 +73,8 @@ beforeEach(() => {
   vi.mocked(transferWorkflowApi.inbox).mockResolvedValue([])
   vi.mocked(transferWorkflowApi.mine).mockResolvedValue([pendingTransfer])
   vi.mocked(transferWorkflowApi.createMine).mockReset()
+  vi.mocked(transferWorkflowApi.decide).mockReset()
+  vi.mocked(transferWorkflowApi.cancel).mockReset()
   vi.mocked(transferWorkflowApi.transferDepartments).mockResolvedValue([
     { id: 'dept-1', name: 'Tổ Toán – Tin' },
     { id: 'dept-2', name: 'Tổ Ngữ văn' },
@@ -155,5 +161,93 @@ describe('MyRequestsPage — tự phục vụ nghỉ việc/điều chuyển', (
 
     expect(await screen.findByText('Chưa thuộc phòng ban')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Gửi yêu cầu nghỉ việc/ })).not.toBeInTheDocument()
+  })
+
+  it('hiển thị tiến độ 4 bước của yêu cầu điều chuyển của chính mình', async () => {
+    renderPage(<MyRequestsPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Điều chuyển/ }))
+
+    expect(await screen.findByText('Tổ Toán – Tin → Tổ Ngữ văn')).toBeInTheDocument()
+    expect(screen.getByText(/Trưởng phòng cũ/)).toBeInTheDocument()
+    expect(screen.getByText(/Trưởng phòng mới/)).toBeInTheDocument()
+    expect(screen.getByText(/Nhân sự/)).toBeInTheDocument()
+    expect(screen.getByText(/Nhân viên xác nhận/)).toBeInTheDocument()
+    // Chưa tới bước EMPLOYEE thì không có nút xác nhận chuyển.
+    expect(screen.queryByRole('button', { name: 'Xác nhận chuyển' })).not.toBeInTheDocument()
+  })
+
+  it('nhân sự xác nhận bước EMPLOYEE khi backend trả đúng bước', async () => {
+    vi.mocked(transferWorkflowApi.mine).mockResolvedValue([
+      {
+        ...pendingTransfer,
+        steps: pendingTransfer.steps.map((step) =>
+          step.step === 'EMPLOYEE' ? { ...step } : { ...step, decision: 'APPROVED' as const },
+        ),
+        actionableSteps: ['EMPLOYEE'],
+      },
+    ])
+    vi.mocked(transferWorkflowApi.decide).mockResolvedValue(pendingTransfer)
+
+    renderPage(<MyRequestsPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Điều chuyển/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Xác nhận chuyển' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Tôi đồng ý')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận' }))
+
+    await waitFor(() =>
+      expect(transferWorkflowApi.decide).toHaveBeenCalledWith('tr-1', 'EMPLOYEE', 'approve', {
+        note: 'Tôi đồng ý',
+      }),
+    )
+  })
+
+  it('từ chối bước EMPLOYEE gửi quyết định reject', async () => {
+    vi.mocked(transferWorkflowApi.mine).mockResolvedValue([
+      { ...pendingTransfer, steps: pendingTransfer.steps, actionableSteps: ['EMPLOYEE'] },
+    ])
+    vi.mocked(transferWorkflowApi.decide).mockResolvedValue(pendingTransfer)
+
+    renderPage(<MyRequestsPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Điều chuyển/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Từ chối' }))
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Từ chối' }),
+    )
+
+    await waitFor(() =>
+      expect(transferWorkflowApi.decide).toHaveBeenCalledWith('tr-1', 'EMPLOYEE', 'reject', {
+        note: undefined,
+      }),
+    )
+  })
+
+  it('người tạo huỷ được yêu cầu; nhân sự không huỷ thay yêu cầu do HR tạo', async () => {
+    vi.mocked(transferWorkflowApi.cancel).mockResolvedValue({
+      ...pendingTransfer,
+      status: 'CANCELLED',
+    })
+
+    renderPage(<MyRequestsPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Điều chuyển/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Huỷ yêu cầu' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Huỷ yêu cầu' }))
+
+    await waitFor(() => expect(transferWorkflowApi.cancel).toHaveBeenCalledWith('tr-1', undefined))
+  })
+
+  it('ẩn nút huỷ khi yêu cầu do người khác tạo', async () => {
+    vi.mocked(transferWorkflowApi.mine).mockResolvedValue([
+      { ...pendingTransfer, requestedBy: 'user-hr' },
+    ])
+
+    renderPage(<MyRequestsPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Điều chuyển/ }))
+
+    expect(await screen.findByText('Tổ Toán – Tin → Tổ Ngữ văn')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Huỷ yêu cầu' })).not.toBeInTheDocument()
   })
 })

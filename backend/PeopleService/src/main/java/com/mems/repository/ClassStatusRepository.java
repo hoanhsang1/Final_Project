@@ -173,11 +173,19 @@ public class ClassStatusRepository {
     }
 
     public void insertCloseEvent(String classId, String orgId, String action, String actorId, String reason) {
+        // Các bước trong cùng một mili-giây sẽ trùng created_at; cộng dồn để giữ đúng thứ tự sự kiện.
+        Timestamp last = jdbc.query("""
+            SELECT MAX(created_at) FROM class_close_event WHERE class_id = ? AND org_id = ?
+            """, rs -> rs.next() ? rs.getTimestamp(1) : null, classId, orgId);
+        Instant at = Instant.now();
+        if (last != null && !at.isAfter(last.toInstant())) {
+            at = last.toInstant().plusMillis(1);
+        }
         jdbc.update("""
             INSERT INTO class_close_event(id, class_id, org_id, action, actor_id, reason, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """, UUID.randomUUID().toString(), classId, orgId, action, actorId, reason,
-            Timestamp.from(Instant.now()));
+            Timestamp.from(at));
     }
 
     public List<ClassCloseEventResponse> closeEvents(String classId, String orgId) {

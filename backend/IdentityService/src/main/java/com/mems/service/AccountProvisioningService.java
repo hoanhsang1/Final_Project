@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 
@@ -47,11 +49,22 @@ public class AccountProvisioningService {
         int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
             encoder.encode(password),id,orgId);
         if(updated!=1) throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
+        revokeSessions(id);
         return Map.of("temporaryPassword",password);
     }
     @Transactional
     public void disable(String id,String orgId) {
         jdbc.update("UPDATE account SET status='disabled' WHERE id=? AND org_id=?",id,orgId);
+        revokeSessions(id);
+    }
+    private void revokeSessions(String accountId) {
+        jdbc.update("UPDATE refresh_token SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL",
+            Timestamp.from(Instant.now()),accountId);
+    }
+
+    @Transactional
+    public void enable(String id,String orgId) {
+        jdbc.update("UPDATE account SET status='active' WHERE id=? AND org_id=?",id,orgId);
     }
 
     @Transactional

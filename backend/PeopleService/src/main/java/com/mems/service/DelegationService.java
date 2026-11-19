@@ -11,6 +11,7 @@ import com.mems.exception.ErrorCode;
 import com.mems.repository.DelegationRepository;
 import com.mems.repository.GeneralManagerRepository;
 import com.mems.security.Actor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +51,13 @@ public class DelegationService {
     public List<DelegationResponse> list(boolean activeOnly) {
         requireOwner();
         return delegations.list(actor.orgId(), activeOnly);
+    }
+
+    /** DEL-04: đánh dấu ủy quyền hết hạn mỗi ngày (mọi tổ chức, idempotent). */
+    @Scheduled(cron = "0 15 0 * * *", zone = "Asia/Ho_Chi_Minh")
+    @Transactional
+    public void expireDelegations() {
+        delegations.markExpired();
     }
 
     /** Quyền đang được ủy quyền cho chính mình — mọi tài khoản trong tổ chức. */

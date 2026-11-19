@@ -53,7 +53,7 @@ const students: Student[] = [
     dateOfBirth: null,
     email: null,
     phone: null,
-    status: 'active',
+    status: 'DANG_DIEN_RA',
     classId: 'class-1',
     classCode: 'LH-10A1',
     className: 'Lớp 10A1',

@@ -28,6 +28,13 @@ public record TransferResponse(
     List<TransferStepResponse> steps,
     List<String> actionableSteps
 ) {
+    public TransferResponse withSteps(List<TransferStepResponse> steps) {
+        return new TransferResponse(id, userId, username, fullName,
+            fromDepartmentId, fromDepartmentName, toDepartmentId, toDepartmentName,
+            reason, status, requestedBy, requestedByName, requestedAt, appliedAt, appliedBy,
+            steps, actionableSteps);
+    }
+
     public TransferResponse withActionableSteps(List<String> steps) {
         return new TransferResponse(id, userId, username, fullName,
             fromDepartmentId, fromDepartmentName, toDepartmentId, toDepartmentName,

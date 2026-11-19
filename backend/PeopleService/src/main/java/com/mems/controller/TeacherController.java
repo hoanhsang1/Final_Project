@@ -69,4 +69,12 @@ public class TeacherController {
                                         @Valid @RequestBody TeacherUpdateRequest request) {
         return service.update(staffId, request);
     }
+
+    /** Đổi trạng thái giảng dạy — quyền riêng, không dùng employee.edit. */
+    @PutMapping("/{staffId}/teaching-status")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('teacher.change_status')")
+    public TeacherDetailResponse changeTeachingStatus(@PathVariable String staffId,
+                                                      @Valid @RequestBody TeacherStatusRequest request) {
+        return service.changeTeachingStatus(staffId, request);
+    }
 }
