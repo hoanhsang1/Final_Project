@@ -58,8 +58,8 @@ class AccountServiceTest {
         verify(encoder).encode(password.capture());
         String temporaryPassword = password.getValue();
 
-        assertThat(temporaryPassword).hasSizeGreaterThanOrEqualTo(8);
-        assertThat(temporaryPassword).contains("A1!");
+        assertThat(temporaryPassword).hasSizeGreaterThanOrEqualTo(20);
+        assertThat(temporaryPassword).matches("[A-Za-z0-9_-]+");
         assertThat(created.get("temporaryPassword")).isEqualTo(temporaryPassword);
         assertThat(created.get("id")).isEqualTo("acct-1");
 
@@ -104,6 +104,70 @@ class AccountServiceTest {
         verifyNoInteractions(jdbc);
     }
 
+    @Test
+    @DisplayName("Create rejects legacy roles that are no longer issued")
+    void createRejectsLegacyRole() {
+        assertThatThrownBy(() -> service.createAccount(Map.of("email", EMAIL, "role", "ORG_ADMIN")))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ROLE_NOT_ASSIGNABLE));
+
+        verifyNoInteractions(jdbc);
+    }
+
+    // ------------------------------------------------------------- update role
+
+    @Test
+    @DisplayName("Update role refuses OWNER and legacy roles from the platform console")
+    void updateRoleRejectsOrganizationOwnedRoles() {
+        assertThatThrownBy(() -> service.updateRole("acct-1", "OWNER"))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ROLE_NOT_ASSIGNABLE));
+        assertThatThrownBy(() -> service.updateRole("acct-1", "ACADEMIC_STAFF"))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ROLE_NOT_ASSIGNABLE));
+
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    @DisplayName("Update role cannot flip an employee account into a self-service role")
+    void updateRoleRejectsCrossClassChange() {
+        when(jdbc.queryForList(contains("SELECT id FROM role WHERE code"),
+            eq(Long.class), eq("STUDENT"))).thenReturn(List.of(6L));
+        when(jdbc.queryForObject(contains("COUNT(*) FROM account WHERE id"),
+            eq(Integer.class), eq("acct-1"))).thenReturn(1);
+        when(jdbc.queryForList(contains("FROM account_role ar"),
+            eq(String.class), eq("acct-1"))).thenReturn(List.of("STAFF"));
+
+        assertThatThrownBy(() -> service.updateRole("acct-1", "STUDENT"))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ROLE_NOT_ASSIGNABLE));
+
+        verify(jdbc, never()).update(startsWith("DELETE FROM account_role"), (Object[]) any());
+    }
+
+    @Test
+    @DisplayName("Update role within the employee class succeeds and revokes sessions")
+    void updateRoleSameClassRevokesSessions() {
+        when(jdbc.queryForList(contains("SELECT id FROM role WHERE code"),
+            eq(Long.class), eq("MANAGER"))).thenReturn(List.of(9L));
+        when(jdbc.queryForObject(contains("COUNT(*) FROM account WHERE id"),
+            eq(Integer.class), eq("acct-1"))).thenReturn(1);
+        when(jdbc.queryForList(contains("FROM account_role ar"),
+            eq(String.class), eq("acct-1"))).thenReturn(List.of("STAFF"));
+        when(jdbc.update(anyString(), (Object[]) any())).thenReturn(1);
+
+        service.updateRole("acct-1", "manager");
+
+        verify(jdbc).update("DELETE FROM account_role WHERE account_id = ?", "acct-1");
+        verify(jdbc).update("INSERT INTO account_role (account_id, role_id) VALUES (?, ?)", "acct-1", 9L);
+        verify(jdbc).update(startsWith("UPDATE refresh_token SET revoked_at"), any(), eq("acct-1"));
+    }
+
     // ----------------------------------------------------------------- reset
 
     @Test
@@ -115,7 +179,8 @@ class AccountServiceTest {
 
         String temporaryPassword = result.get("temporaryPassword");
         assertThat(temporaryPassword).isNotNull();
-        assertThat(temporaryPassword).hasSizeGreaterThanOrEqualTo(8);
+        assertThat(temporaryPassword).hasSizeGreaterThanOrEqualTo(20);
+        assertThat(temporaryPassword).matches("[A-Za-z0-9_-]+");
 
         verify(jdbc).update(startsWith("UPDATE account SET password_hash"), anyString(), eq("acct-1"));
     }

@@ -3,7 +3,9 @@ package com.mems.controller;
 import com.mems.dto.ResignationCreateRequest;
 import com.mems.dto.ResignationDecisionRequest;
 import com.mems.dto.ResignationResponse;
+import com.mems.security.DelegatedAction;
 import com.mems.security.RequirePermission;
+import com.mems.service.ResignationApprovalPolicy;
 import com.mems.service.ResignationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +47,8 @@ public class ResignationController {
     // escalation: HR holder, then department head, then delegated GM, then owner). A coarse
     // permission pre-check here would block every level except the HR holder.
     @PostMapping("/{requestId}/approve")
+    @DelegatedAction(permission = ResignationApprovalPolicy.APPROVE_PERMISSION,
+        resourceType = "RESIGNATION_REQUEST", resourceId = "requestId")
     public ResignationResponse approve(@PathVariable String departmentId, @PathVariable String requestId,
                                        @Valid @RequestBody(required = false) ResignationDecisionRequest request) {
         return service.approve(departmentId, requestId,
@@ -52,6 +56,8 @@ public class ResignationController {
     }
 
     @PostMapping("/{requestId}/reject")
+    @DelegatedAction(permission = ResignationApprovalPolicy.APPROVE_PERMISSION,
+        resourceType = "RESIGNATION_REQUEST", resourceId = "requestId")
     public ResignationResponse reject(@PathVariable String departmentId, @PathVariable String requestId,
                                       @Valid @RequestBody(required = false) ResignationDecisionRequest request) {
         return service.reject(departmentId, requestId,

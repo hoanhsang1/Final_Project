@@ -143,4 +143,42 @@ class MembershipPolicyTest {
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("FORBIDDEN"));
     }
+
+    @Test
+    @DisplayName("Nhãn MANAGER cũng được gán chức danh khi đủ quyền (RBAC-06)")
+    void managerRoleMemberCanReceivePositions() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("manager-user-id");
+        when(actor.owner()).thenReturn(false);
+        when(effectivePermissions.resolve("org-1", "manager-user-id", "dept-1"))
+            .thenReturn(new EffectivePermissionsService.EffectivePermissions(
+                Set.of("employee.assign_position"), Map.of()));
+        when(effectivePermissions.expandPositions("org-1", Set.of("pos-staff")))
+            .thenReturn(Set.of());
+
+        policy.check("dept-1", "MANAGER", Set.of("pos-staff"));
+    }
+
+    @Test
+    @DisplayName("Không phải Owner không được quản lý thành viên OWNER")
+    void nonOwnerCannotManageOwnerMembership() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.owner()).thenReturn(false);
+        when(actor.forbidden(anyString()))
+            .thenReturn(new AppException(ErrorCode.FORBIDDEN, "Only the organization owner"));
+
+        assertThatThrownBy(() -> policy.check("dept-1", "OWNER", Set.of("pos-staff")))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    @DisplayName("Nhãn thành viên không hợp lệ → VALIDATION_ERROR")
+    void invalidMembershipLabelRejected() {
+        when(actor.orgId()).thenReturn("org-1");
+
+        assertThatThrownBy(() -> policy.check("dept-1", "STUDENT", Set.of("pos-staff")))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("VALIDATION_ERROR"));
+    }
 }

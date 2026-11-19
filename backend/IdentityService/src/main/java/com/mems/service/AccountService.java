@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
@@ -17,6 +18,7 @@ public class AccountService {
 
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
+    private final SecureRandom random = new SecureRandom();
 
     public AccountService(JdbcTemplate jdbc, PasswordEncoder passwordEncoder) {
         this.jdbc = jdbc;
@@ -146,9 +148,13 @@ public class AccountService {
         if (role == null || role.isBlank()) {
             throw new AppException(ErrorCode.ROLE_REQUIRED);
         }
-        if ("SUPER_ADMIN".equalsIgnoreCase(role)) {
-            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE);
+        // Owner và role legacy do tổ chức/People quản lý, không cấp từ console nền tảng.
+        String normalizedRole = RoleCatalog.normalize(role);
+        if (!RoleCatalog.PLATFORM_CREATABLE.contains(normalizedRole)) {
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE,
+                "Role " + normalizedRole + " is not assignable from the platform console");
         }
+        role = normalizedRole;
 
         Integer existingEmail = jdbc.queryForObject(
             "SELECT COUNT(*) FROM account WHERE email = ?", Integer.class, email
@@ -201,6 +207,10 @@ public class AccountService {
         if (rows == 0) {
             throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
+        // Khoá/vô hiệu hoá phải cắt mọi phiên refresh đang mở.
+        if (!"active".equalsIgnoreCase(status)) {
+            revokeSessions(accountId);
+        }
     }
 
     @Transactional
@@ -208,13 +218,15 @@ public class AccountService {
         if (role == null || role.isBlank()) {
             throw new AppException(ErrorCode.ROLE_REQUIRED);
         }
-        if ("SUPER_ADMIN".equalsIgnoreCase(role)) {
-            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE);
+        String target = RoleCatalog.normalize(role);
+        if (!RoleCatalog.PLATFORM_CREATABLE.contains(target)) {
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE,
+                "Role " + target + " is managed by the organization (PeopleService)");
         }
 
-        List<Long> roleIds = jdbc.queryForList("SELECT id FROM role WHERE code = ?", Long.class, role);
+        List<Long> roleIds = jdbc.queryForList("SELECT id FROM role WHERE code = ?", Long.class, target);
         if (roleIds.isEmpty()) {
-            throw new AppException(ErrorCode.INVALID_ROLE, "Invalid role: " + role);
+            throw new AppException(ErrorCode.INVALID_ROLE, "Invalid role: " + target);
         }
         Long roleId = roleIds.get(0);
 
@@ -223,8 +235,20 @@ public class AccountService {
             throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
         }
 
+        // Employee và self-service có nguồn quyền khác nhau; đổi chéo lớp do People quyết định.
+        List<String> current = jdbc.queryForList("""
+            SELECT r.code FROM account_role ar JOIN role r ON r.id = ar.role_id
+            WHERE ar.account_id = ? ORDER BY r.code
+            """, String.class, accountId);
+        if (!current.isEmpty() && !RoleCatalog.sameAccessClass(current.get(0), target)) {
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE,
+                "Role changes between employee and self-service accounts are managed by the organization");
+        }
+
         jdbc.update("DELETE FROM account_role WHERE account_id = ?", accountId);
         jdbc.update("INSERT INTO account_role (account_id, role_id) VALUES (?, ?)", accountId, roleId);
+        // Quyền trong token cũ phụ thuộc role; thu hồi phiên để buộc đăng nhập lại.
+        revokeSessions(accountId);
     }
 
     @Transactional
@@ -255,8 +279,11 @@ public class AccountService {
             Timestamp.from(Instant.now()), accountId);
     }
 
+    /** HR-02: 144 bit ngẫu nhiên, đủ dài cho chính sách mật khẩu (12 ký tự) và không đoán được. */
     private String generateTemporaryPassword() {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 10) + "A1!";
+        byte[] bytes = new byte[18];
+        random.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
 

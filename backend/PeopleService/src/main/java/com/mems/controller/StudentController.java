@@ -7,6 +7,7 @@ import com.mems.dto.StudentResponse;
 import com.mems.dto.StudentUpdateRequest;
 import com.mems.service.StudentService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,7 +59,9 @@ public class StudentController {
     @PostMapping("/{id}/account")
     @PreAuthorize("hasRole('OWNER') or hasAuthority('student.create_account')")
     public ResponseEntity<StudentAccountResponse> createAccount(@PathVariable String id) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.createAccount(id));
+        // HR-02: mật khẩu tạm trong body ⇒ cấm cache.
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .headers(noStore()).body(service.createAccount(id));
     }
 
     @PostMapping
@@ -79,6 +82,13 @@ public class StudentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.delete(id);
+    }
+
+    private HttpHeaders noStore() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.setPragma("no-cache");
+        return headers;
     }
 }
 

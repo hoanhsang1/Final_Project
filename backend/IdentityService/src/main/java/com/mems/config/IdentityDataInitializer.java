@@ -1,8 +1,10 @@
 package com.mems.config;
 
 import com.mems.service.PermissionCatalog;
+import com.mems.service.RoleCatalog;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
+@Order(0)
 public class IdentityDataInitializer implements ApplicationRunner {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
@@ -30,7 +33,7 @@ public class IdentityDataInitializer implements ApplicationRunner {
             INSERT INTO role(code,name,scope,description) VALUES ('SUPER_ADMIN','System administrator','platform','Approves organizations and manages platform')
             ON DUPLICATE KEY UPDATE name=VALUES(name), scope=VALUES(scope)
             """);
-        for (String role : new String[]{"OWNER", "MANAGER", "STAFF", "TEACHER", "STUDENT"}) {
+        for (String role : RoleCatalog.REQUIRED_ORGANIZATION_ROLES) {
             jdbc.update("""
                 INSERT INTO role(code,name,scope,description) VALUES (?,?,'organization',?)
                 ON DUPLICATE KEY UPDATE name=VALUES(name)

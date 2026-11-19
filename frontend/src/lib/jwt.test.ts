@@ -65,6 +65,11 @@ describe('claimsToSession', () => {
     expect(session?.modules).toEqual([])
   })
 
+  it('giữ cờ permissionsStale và mặc định là false', () => {
+    expect(claimsToSession({ userId: 'u1', permissionsStale: true })?.permissionsStale).toBe(true)
+    expect(claimsToSession({ userId: 'u1' })?.permissionsStale).toBe(false)
+  })
+
   it('trả null khi không có định danh người dùng', () => {
     expect(claimsToSession({ username: 'x' })).toBeNull()
   })

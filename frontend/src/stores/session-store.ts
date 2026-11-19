@@ -125,6 +125,8 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
           permissions,
           permissionScopes: scopes ?? state.session.permissionScopes,
           delegatedPermissions: delegatedPermissions ?? state.session.delegatedPermissions,
+          // Vừa lấy lại trực tiếp từ People: quyền hiện tại đã được xác minh.
+          permissionsStale: false,
         },
       }
     })

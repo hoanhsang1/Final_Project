@@ -234,7 +234,101 @@ class EffectivePermissionsServiceTest {
 
         assertThat(effective.permissions()).containsExactly("employee.view");
         assertThat(effective.delegatedPermissions()).containsExactly("employee.view");
+        assertThat(effective.delegationSources()).containsEntry("employee.view", "delegation-1");
         assertThat(effective.scopes().get("employee.view")).containsExactly("ORGANIZATION");
+    }
+
+    @Test
+    @DisplayName("DEL-03: quyền vừa từ chức vụ vừa từ ủy quyền KHÔNG bị đánh dấu delegated")
+    void permissionFromPositionAndDelegationIsNotMarkedDelegated() {
+        when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
+            .thenReturn(List.of());
+        when(assignments.active("user-1", "org-1")).thenReturn(List.of(
+            new AssignmentRepository.ActiveAssignment("pos-hr", "ORGANIZATION", null)));
+        when(positions.permissions("pos-hr")).thenReturn(Set.of("employee.view"));
+        doAnswer(invocation -> {
+            RowCallbackHandler handler = invocation.getArgument(1);
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getString("permission_code")).thenReturn("employee.view");
+            when(rs.getString("id")).thenReturn("delegation-1");
+            handler.processRow(rs);
+            return null;
+        }).when(jdbc).query(contains("JOIN delegation_permission"),
+            any(RowCallbackHandler.class), eq("org-1"), eq("user-1"),
+            any(Timestamp.class), any(Timestamp.class));
+
+        var effective = service.resolve("org-1", "user-1", "dept-1");
+
+        assertThat(effective.permissions()).containsExactly("employee.view");
+        assertThat(effective.delegatedPermissions()).isEmpty();
+        assertThat(effective.delegationSources()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DEL-03: thu hồi ủy quyền vẫn giữ quyền đến từ chức vụ")
+    void revokingDelegationKeepsPositionPermission() {
+        when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
+            .thenReturn(List.of());
+        when(assignments.active("user-1", "org-1")).thenReturn(List.of(
+            new AssignmentRepository.ActiveAssignment("pos-hr", "ORGANIZATION", null)));
+        when(positions.permissions("pos-hr")).thenReturn(Set.of("employee.view"));
+        java.util.concurrent.atomic.AtomicInteger call = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(invocation -> {
+            if (call.getAndIncrement() == 0) {
+                RowCallbackHandler handler = invocation.getArgument(1);
+                ResultSet rs = mock(ResultSet.class);
+                when(rs.getString("permission_code")).thenReturn("employee.view");
+                when(rs.getString("id")).thenReturn("delegation-1");
+                handler.processRow(rs);
+            }
+            return null;
+        }).when(jdbc).query(contains("JOIN delegation_permission"),
+            any(RowCallbackHandler.class), eq("org-1"), eq("user-1"),
+            any(Timestamp.class), any(Timestamp.class));
+
+        var withDelegation = service.resolve("org-1", "user-1", "dept-1");
+        var afterRevoke = service.resolve("org-1", "user-1", "dept-1");
+
+        assertThat(withDelegation.delegatedPermissions()).isEmpty();
+        assertThat(afterRevoke.permissions()).containsExactly("employee.view");
+        assertThat(afterRevoke.delegatedPermissions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DEL-03: hai ủy quyền cùng cấp một quyền — chọn nguồn ổn định, thu hồi một vẫn còn")
+    void twoDelegationsForSamePermissionKeepStableSource() {
+        when(jdbc.queryForList(anyString(), eq(String.class), eq("dept-1"), eq("org-1")))
+            .thenReturn(List.of());
+        when(assignments.active("gm-1", "org-1")).thenReturn(List.of());
+        java.util.concurrent.atomic.AtomicInteger call = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(invocation -> {
+            RowCallbackHandler handler = invocation.getArgument(1);
+            if (call.getAndIncrement() == 0) {
+                ResultSet first = mock(ResultSet.class);
+                when(first.getString("permission_code")).thenReturn("employee.view");
+                when(first.getString("id")).thenReturn("delegation-1");
+                handler.processRow(first);
+                ResultSet second = mock(ResultSet.class);
+                when(second.getString("permission_code")).thenReturn("employee.view");
+                when(second.getString("id")).thenReturn("delegation-2");
+                handler.processRow(second);
+            } else {
+                ResultSet remaining = mock(ResultSet.class);
+                when(remaining.getString("permission_code")).thenReturn("employee.view");
+                when(remaining.getString("id")).thenReturn("delegation-2");
+                handler.processRow(remaining);
+            }
+            return null;
+        }).when(jdbc).query(contains("JOIN delegation_permission"),
+            any(RowCallbackHandler.class), eq("org-1"), eq("gm-1"),
+            any(Timestamp.class), any(Timestamp.class));
+
+        var both = service.resolve("org-1", "gm-1", "dept-1");
+        var afterOneRevoked = service.resolve("org-1", "gm-1", "dept-1");
+
+        assertThat(both.delegationSources()).containsEntry("employee.view", "delegation-1");
+        assertThat(afterOneRevoked.permissions()).contains("employee.view");
+        assertThat(afterOneRevoked.delegationSources()).containsEntry("employee.view", "delegation-2");
     }
 
     @Test
@@ -262,6 +356,19 @@ class EffectivePermissionsServiceTest {
 
         assertThat(effective.permissions()).doesNotContain("schedule.manage");
         assertThat(effective.delegatedPermissions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("activeMember: chỉ thành viên ACTIVE của đúng tổ chức mới được xác minh")
+    void activeMemberChecksOrganizationMembership() {
+        when(jdbc.queryForObject(contains("FROM department_member"),
+            eq(Integer.class), eq("user-1"), eq("org-1"))).thenReturn(1);
+        when(jdbc.queryForObject(contains("FROM department_member"),
+            eq(Integer.class), eq("user-1"), eq("org-2"))).thenReturn(0);
+
+        assertThat(service.activeMember("org-1", "user-1")).isTrue();
+        assertThat(service.activeMember("org-2", "user-1")).isFalse();
+        assertThat(service.activeMember(null, "user-1")).isFalse();
     }
 
     @Test

@@ -21,6 +21,11 @@ public class AccountProvisioningService {
     public AccountProvisioningService(JdbcTemplate jdbc,PasswordEncoder encoder) { this.jdbc=jdbc;this.encoder=encoder; }
     @Transactional(timeout=15)
     public Map<String,String> create(ProvisionAccountRequest request) {
+        // Provisioning do People gọi: chỉ nhận role không phải Owner/legacy.
+        String role = RoleCatalog.normalize(request.role());
+        if (!RoleCatalog.PLATFORM_CREATABLE.contains(role))
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE,
+                "Role " + role + " cannot be provisioned through PeopleService");
         Integer organizations=jdbc.queryForObject("SELECT COUNT(*) FROM organization WHERE id=? AND status='active'",
             Integer.class,request.orgId());
         if(organizations==null || organizations!=1)
@@ -38,7 +43,7 @@ public class AccountProvisioningService {
             """,request.userId(),request.orgId(),request.username().trim(),request.email().trim(),
             encoder.encode(request.temporaryPassword()),request.appointedBy());
         int assigned=jdbc.update("INSERT INTO account_role(account_id,role_id) SELECT ?,id FROM role WHERE code=?",
-            request.userId(),request.role());
+            request.userId(),role);
         if(assigned!=1) throw new IllegalStateException("Department roles have not been seeded");
         return Map.of("userId",request.userId());
     }

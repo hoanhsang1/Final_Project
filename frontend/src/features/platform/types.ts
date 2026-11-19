@@ -130,9 +130,13 @@ export const ACCOUNT_STATUS_LABELS: Record<string, string> = {
 
 export const ACCOUNT_ROLE_LABELS: Record<string, string> = {
   OWNER: 'Chủ tổ chức',
+  ORG_OWNER: 'Chủ tổ chức (cũ)',
   MANAGER: 'Quản lý',
   STAFF: 'Nhân viên',
-  ACADEMIC_STAFF: 'Giáo vụ',
   STUDENT: 'Sinh viên',
+  TEACHER: 'Giáo viên (cũ)',
+  ORG_ADMIN: 'Quản trị tổ chức (cũ)',
+  ACADEMIC_STAFF: 'Giáo vụ (cũ)',
+  FACILITY_STAFF: 'Cơ sở vật chất (cũ)',
   SUPER_ADMIN: 'Quản trị hệ thống',
 }

@@ -73,21 +73,17 @@ public class OrganizationRegistrationService implements IOrganizationRegistratio
             }
         });
 
-        // 3. Lay role ORG_OWNER
-        var roleIds = jdbc.queryForList(
-            "SELECT id FROM role WHERE code = ? AND scope = ?",
-            Long.class,
-            "ORG_OWNER",
-            "organization"
-        );
-
-        if (roleIds.isEmpty()) {
-            throw new IllegalStateException(
-                "Role ORG_OWNER has not been configured"
-            );
-        }
-
-        Long ownerRoleId = roleIds.get(0);
+        // 3. Lay role chu to chuc: OWNER la chuan, ORG_OWNER chi la alias tuong thich.
+        Long ownerRoleId = jdbc.queryForList(
+                "SELECT id FROM role WHERE code = ? AND scope = 'organization'",
+                Long.class, RoleCatalog.OWNER)
+            .stream().findFirst()
+            .orElseGet(() -> jdbc.queryForList(
+                "SELECT id FROM role WHERE code = ? AND scope = 'organization'",
+                Long.class, RoleCatalog.OWNER_ALIAS)
+                .stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                    "Role " + RoleCatalog.OWNER + " has not been configured")));
 
 
         // 4. Tao ID

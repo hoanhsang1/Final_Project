@@ -23,17 +23,28 @@ public class EffectivePermissionsService {
     /**
      * Quyền hiệu lực + phạm vi + tập con đến từ ủy quyền (nguồn DELEGATED).
      * Tách riêng để JWT/audit đánh dấu được quyền nào không đến từ chức vụ.
+     *
+     * <p>{@code delegatedPermissions} chỉ chứa quyền <em>độc quyền</em> ủy quyền;
+     * {@code delegationSources} ánh xạ các quyền đó tới lần ủy quyền đã cấp để
+     * audit đúng nguồn (DEL-01/DEL-03).</p>
      */
     public record EffectivePermissions(Set<String> permissions, Map<String, Set<String>> scopes,
-                                       Set<String> delegatedPermissions) {
+                                       Set<String> delegatedPermissions,
+                                       Map<String, String> delegationSources) {
         public EffectivePermissions(Set<String> permissions, Map<String, Set<String>> scopes) {
-            this(permissions, scopes, Set.of());
+            this(permissions, scopes, Set.of(), Map.of());
+        }
+
+        public EffectivePermissions(Set<String> permissions, Map<String, Set<String>> scopes,
+                                    Set<String> delegatedPermissions) {
+            this(permissions, scopes, delegatedPermissions, Map.of());
         }
 
         public EffectivePermissions {
             permissions = permissions == null ? Set.of() : permissions;
             scopes = scopes == null ? Map.of() : scopes;
             delegatedPermissions = delegatedPermissions == null ? Set.of() : delegatedPermissions;
+            delegationSources = delegationSources == null ? Map.of() : delegationSources;
         }
     }
 
@@ -140,6 +151,21 @@ public class EffectivePermissionsService {
         return grants;
     }
 
+    /**
+     * Tài khoản còn là thành viên ACTIVE của tổ chức?
+     *
+     * <p>Filter dùng để fail-closed khi tính lại quyền mỗi request: tài khoản đã
+     * bị vô hiệu hoá/gỡ khỏi tổ chức không được giữ quyền từ token cũ.</p>
+     */
+    public boolean activeMember(String orgId, String userId) {
+        if (orgId == null || userId == null) return false;
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM department_member
+            WHERE user_id=? AND org_id=? AND status='ACTIVE'
+            """, Integer.class, userId, orgId);
+        return count != null && count > 0;
+    }
+
     /** Quyền hiệu lực có phạm vi của một nhân viên. */
     public EffectivePermissions resolve(String orgId, String userId, String departmentId) {
         if (userId == null || orgId == null) {
@@ -195,14 +221,22 @@ public class EffectivePermissionsService {
         }
 
         // Quyền ủy quyền chỉ hỗ trợ phạm vi ORGANIZATION (TODO Phần 6 nếu mở rộng).
-        for (String permission : activeDelegationGrants(orgId, userId).keySet()) {
+        // Chỉ đánh dấu delegated khi quyền KHÔNG đến từ chức vụ: thu hồi ủy quyền
+        // không được làm mất quyền chức danh (DEL-03).
+        Map<String, String> sources = new TreeMap<>();
+        Set<String> positionPermissions = new TreeSet<>(effective);
+        for (Map.Entry<String, String> grant : activeDelegationGrants(orgId, userId).entrySet()) {
+            String permission = grant.getKey();
             Set<String> allowed = allowedScopes.get(permission);
             if (allowed != null && !allowed.contains("ORGANIZATION")) continue;
             effective.add(permission);
-            delegated.add(permission);
             scopes.computeIfAbsent(permission, key -> new TreeSet<>()).add("ORGANIZATION");
+            if (!positionPermissions.contains(permission)) {
+                delegated.add(permission);
+                sources.put(permission, grant.getValue());
+            }
         }
-        return new EffectivePermissions(effective, scopes, delegated);
+        return new EffectivePermissions(effective, scopes, delegated, sources);
     }
 
     public EffectivePermissions resolve(String orgId, String userId) {

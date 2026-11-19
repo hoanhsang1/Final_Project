@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,6 +53,7 @@ class AccountControllerTest {
                                 {"email":"new.person@example.com","role":"STAFF"}
                                 """))
                 .andExpect(status().isCreated())
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.temporaryPassword").value("Temp@12345"))
                 .andExpect(jsonPath("$.username").value("new.person"));
     }
@@ -66,6 +68,7 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.temporaryPassword").value("Reset@98765"));
     }
 }

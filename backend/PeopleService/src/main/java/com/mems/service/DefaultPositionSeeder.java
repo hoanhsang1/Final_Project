@@ -75,7 +75,8 @@ public class DefaultPositionSeeder {
             "DEPARTMENT", Set.of("employee.view", "department.view",
                 "class.view", "class.approve_close", "class.reopen",
                 "class.self_view", "schedule.view", "schedule.self_view"), Set.of()),
-        // Must contain the teacher position's permissions so a MANAGER can assign it (MembershipPolicy).
+        // Must contain the teacher position's permissions so a holder of
+        // employee.assign_position can assign it (permission subset check).
         new DefaultPosition("Nhân sự phòng ban", null, "Quản lý nhân sự trong phòng ban", "GENERAL",
             "DEPARTMENT", Set.of(
                 "employee.view", "employee.create", "employee.edit", "employee.delete",

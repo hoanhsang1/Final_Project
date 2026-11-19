@@ -3,6 +3,7 @@ package com.mems.controller;
 import com.mems.dto.TransferCreateRequest;
 import com.mems.dto.TransferDecisionRequest;
 import com.mems.dto.TransferResponse;
+import com.mems.security.DelegatedAction;
 import com.mems.security.RequirePermission;
 import com.mems.service.TransferService;
 import jakarta.validation.Valid;
@@ -50,12 +51,16 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/steps/{step}/approve")
+    @DelegatedAction(permission = "employee.approve_transfer",
+        resourceType = "TRANSFER_STEP", resourceId = "id")
     public TransferResponse approve(@PathVariable String id, @PathVariable String step,
                                     @Valid @RequestBody(required = false) TransferDecisionRequest request) {
         return service.decide(id, step, true, request == null ? null : request.note());
     }
 
     @PostMapping("/{id}/steps/{step}/reject")
+    @DelegatedAction(permission = "employee.approve_transfer",
+        resourceType = "TRANSFER_STEP", resourceId = "id")
     public TransferResponse reject(@PathVariable String id, @PathVariable String step,
                                    @Valid @RequestBody(required = false) TransferDecisionRequest request) {
         return service.decide(id, step, false, request == null ? null : request.note());

@@ -11,12 +11,12 @@ import java.util.List;
 public class PositionController {
     private final PositionService service;
     public PositionController(PositionService service) { this.service=service; }
-    @GetMapping({"/permissions", "/permissions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    @GetMapping({"/permissions", "/permissions/"}) @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('position.view','position.manage')")
     public List<PermissionResponse> permissions() { return service.permissions(); }
     @GetMapping({"/permission-bundles", "/permission-bundles/"})
-    @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('position.view','position.manage')")
     public List<PermissionBundleResponse> bundles() { return service.bundles(); }
-    @GetMapping({"/positions", "/positions/"}) @PreAuthorize("hasAnyRole('OWNER','MANAGER','STAFF')")
+    @GetMapping({"/positions", "/positions/"}) @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('position.view','position.manage')")
     public List<PositionResponse> list() { return service.list(); }
     @PostMapping({"/positions", "/positions/"}) @PreAuthorize("hasRole('OWNER') or hasAuthority('position.manage')")
     public ResponseEntity<PositionResponse> create(@Valid @RequestBody PositionRequest request) {

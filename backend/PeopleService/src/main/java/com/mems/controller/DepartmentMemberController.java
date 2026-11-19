@@ -27,7 +27,8 @@ public class DepartmentMemberController {
     @PostMapping @RequirePermission(value="employee.create", department="departmentId")
     public ResponseEntity<CreatedMemberResponse> create(@PathVariable String departmentId,@Valid @RequestBody MemberRequest request) {
         var result=service.create(departmentId,request);
-        return ResponseEntity.created(java.net.URI.create("/departments/"+departmentId+"/members/"+result.member().userId())).body(result);
+        return ResponseEntity.created(java.net.URI.create("/departments/"+departmentId+"/members/"+result.member().userId()))
+            .headers(noStore()).body(result);
     }
     @PutMapping("/{userId}/positions")
     @RequirePermission(value="employee.assign_position", department="departmentId")
@@ -35,10 +36,18 @@ public class DepartmentMemberController {
             @Valid @RequestBody MemberPositionsRequest request) { return service.updatePositions(departmentId,userId,request); }
     @PostMapping("/{userId}/reset-password")
     @RequirePermission(value="employee.reset_password", department="departmentId")
-    public ResetPasswordResponse resetPassword(@PathVariable String departmentId,@PathVariable String userId) {
-        return service.resetPassword(departmentId,userId);
+    public ResponseEntity<ResetPasswordResponse> resetPassword(@PathVariable String departmentId,@PathVariable String userId) {
+        return ResponseEntity.ok().headers(noStore()).body(service.resetPassword(departmentId,userId));
     }
     @DeleteMapping("/{userId}") @RequirePermission(value="employee.delete", department="departmentId")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String departmentId,@PathVariable String userId) { service.remove(departmentId,userId); }
+
+    /** HR-02: response chứa mật khẩu tạm không được cache ở trình duyệt/proxy. */
+    private HttpHeaders noStore() {
+        HttpHeaders headers=new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.setPragma("no-cache");
+        return headers;
+    }
 }
