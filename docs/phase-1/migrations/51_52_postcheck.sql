@@ -95,15 +95,42 @@ WHERE table_schema = DATABASE()
   AND constraint_name IN ('fk_class_subject_class','fk_school_class_curriculum',
                           'fk_csh_class','chk_class_subject_primary','chk_csh_subject_change');
 
--- 5b) Số cột phải đúng Revision-3: history 16, specialty_subject 5.
+-- 5b) Số cột phải đúng Revision-5: history 19, specialty_subject 5.
 SELECT 'class_subject_history' AS t, COUNT(*) AS cols,
-       (COUNT(*) = 16) AS cols_ok
+       (COUNT(*) = 19) AS cols_ok
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
 UNION ALL
 SELECT 'specialty_subject', COUNT(*), (COUNT(*) = 5)
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
+
+-- 5b.1) Cột Revision-5 phải tồn tại đúng nullability (0 dòng = đúng).
+SELECT e.column_name, c.is_nullable AS actual_nullable, e.expect_nullable
+FROM (
+            SELECT 'old_teacher_name' AS column_name, 'YES' AS expect_nullable
+  UNION ALL SELECT 'request_fingerprint', 'NO'
+  UNION ALL SELECT 'changed_by_name', 'YES'
+) e
+LEFT JOIN information_schema.columns c
+  ON c.table_schema = DATABASE() AND c.table_name = 'class_subject_history'
+ AND c.column_name = e.column_name
+WHERE c.column_name IS NULL OR c.is_nullable <> e.expect_nullable;
+
+-- 5b.2) D-04: subject phải có UNIQUE (org_id, code) (0 dòng = đúng).
+SELECT 'subject_uq_org_code_missing' AS issue
+FROM (SELECT 1 AS one) x
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM (
+    SELECT index_name, non_unique,
+           GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'subject'
+    GROUP BY index_name, non_unique
+  ) i
+  WHERE i.non_unique = 0 AND i.cols = 'org_id,code'
+);
 
 -- 5c) PK + UNIQUE phải đúng cột/thứ tự (0 dòng = đúng).
 SELECT x.table_name, x.index_name, x.cols, e.expect AS expected_cols

@@ -1,4 +1,12 @@
 import { PERM } from '@/lib/permissions'
+import type {
+  ClassSubject,
+  ClassSubjectHistory,
+  Curriculum,
+  CurriculumSubject,
+  Subject,
+  TeacherSubject,
+} from '@/features/academic/types'
 
 export type OrgStatus = 'pending' | 'active' | 'rejected' | 'suspended'
 export type OrgType = 'SCHOOL' | 'CENTER'
@@ -1089,3 +1097,514 @@ export const mockAuditLogs: MockAuditLog[] = [
     description: null,
   },
 ]
+
+// ============================================================================
+// Phase 1 — Academic Setup Mock Fixtures (D-01 to D-15)
+// ============================================================================
+
+export const OTHER_ORG_ID = '22222222-2222-4222-8222-222222222222'
+
+export interface MockSubject extends Subject {
+  orgId: string
+}
+
+export const mockSubjects: MockSubject[] = [
+  {
+    id: 'sub-toan',
+    code: 'TOAN',
+    name: 'Toán học',
+    description: 'Chương trình toán chuẩn THPT',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  {
+    id: 'sub-ly',
+    code: 'LY',
+    name: 'Vật lý',
+    description: 'Vật lý đại cương và nâng cao',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  {
+    id: 'sub-hoa',
+    code: 'HOA',
+    name: 'Hóa học',
+    description: 'Hóa học cơ bản và thực hành',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  {
+    id: 'sub-tin',
+    code: 'TIN',
+    name: 'Tin học',
+    description: 'Lập trình và thuật toán',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  // D-04: Môn học code = null (hợp lệ trong cùng tổ chức)
+  {
+    id: 'sub-van',
+    code: null,
+    name: 'Ngữ văn',
+    description: 'Văn học Việt Nam và thế giới',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  // D-04: Thêm một môn khác cũng có code = null trong cùng tổ chức
+  {
+    id: 'sub-anh',
+    code: null,
+    name: 'Tiếng Anh',
+    description: 'Giao tiếp và ngữ pháp tiếng Anh',
+    active: true,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+  // Môn đã ngừng hoạt động (inactive)
+  {
+    id: 'sub-gdcd',
+    code: 'GDCD',
+    name: 'Giáo dục công dân',
+    description: 'Môn đã ngừng dùng',
+    active: false,
+    orgId: DEMO_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+  // Dữ liệu thuộc tổ chức khác (để test cách ly tổ chức)
+  {
+    id: 'sub-other-toan',
+    code: 'TOAN',
+    name: 'Toán học (Org 2)',
+    description: 'Môn toán của tổ chức 2',
+    active: true,
+    orgId: OTHER_ORG_ID,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Curricula Mock Fixtures (D-02, D-03, D-07, D-12)
+// ----------------------------------------------------------------------------
+
+export const mockCurricula: Curriculum[] = [
+  {
+    id: 'c0000000-0000-4000-8000-000000000001',
+    orgId: DEMO_ORG_ID,
+    code: 'CT-K10-2026',
+    name: 'Chương trình Khối 10 – 2026',
+    description: 'Khung chương trình chuẩn Khối 10 áp dụng từ năm học 2026-2027',
+    gradeLevel: 'K10',
+    majorCode: 'THPT-CHUNG',
+    isActive: true,
+    version: 1,
+    subjectCount: 3,
+    createdAt: '2026-08-10T00:00:00Z',
+    updatedAt: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000002',
+    orgId: DEMO_ORG_ID,
+    code: 'CT-K11-2026',
+    name: 'Chương trình Khối 11 – 2026',
+    description: 'Khung chương trình chuẩn Khối 11',
+    gradeLevel: 'K11',
+    majorCode: 'THPT-CHUNG',
+    isActive: true,
+    version: 2,
+    subjectCount: 2,
+    createdAt: '2026-08-11T00:00:00Z',
+    updatedAt: null,
+  },
+  {
+    id: 'c0000000-0000-4000-8000-000000000003',
+    orgId: DEMO_ORG_ID,
+    code: 'CT-CU',
+    name: 'Chương trình niên khóa cũ',
+    description: 'Chương trình đã ngừng sử dụng',
+    gradeLevel: 'K12',
+    majorCode: null,
+    isActive: false,
+    version: 0,
+    subjectCount: 1,
+    createdAt: '2025-08-01T00:00:00Z',
+    updatedAt: '2026-08-01T00:00:00Z',
+  },
+  // Thuộc tổ chức khác
+  {
+    id: 'c0000000-0000-4000-8000-000000000099',
+    orgId: OTHER_ORG_ID,
+    code: 'CT-OTHER',
+    name: 'Chương trình trường khác',
+    description: null,
+    gradeLevel: 'K10',
+    majorCode: null,
+    isActive: true,
+    version: 0,
+    subjectCount: 1,
+    createdAt: '2026-08-01T00:00:00Z',
+    updatedAt: null,
+  },
+]
+
+export const mockCurriculumSubjects: CurriculumSubject[] = [
+  // CT-K10-2026:
+  // 1. Toán: không có tiên quyết
+  {
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    subjectId: 'sub-toan',
+    subjectCode: 'TOAN',
+    subjectName: 'Toán học',
+    sequenceNo: 1,
+    requiredSessions: 60,
+    sessionMinutes: 45,
+    theoryHours: 45,
+    practiceHours: 15,
+    isRequired: true,
+    notes: 'Toán học cơ sở',
+    prerequisiteSubjectIds: [],
+    prerequisites: [],
+  },
+  // 2. Vật lý: tiên quyết là Toán
+  {
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    subjectId: 'sub-ly',
+    subjectCode: 'LY',
+    subjectName: 'Vật lý',
+    sequenceNo: 2,
+    requiredSessions: 45,
+    sessionMinutes: 45,
+    theoryHours: 30,
+    practiceHours: 15,
+    isRequired: true,
+    notes: 'Cơ học và nhiệt học',
+    prerequisiteSubjectIds: ['sub-toan'],
+    prerequisites: [{ subjectId: 'sub-toan', subjectCode: 'TOAN', subjectName: 'Toán học' }],
+  },
+  // 3. Tin học: D-07 nhiều tiên quyết (Toán VÀ Vật lý)
+  {
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    subjectId: 'sub-tin',
+    subjectCode: 'TIN',
+    subjectName: 'Tin học',
+    sequenceNo: 3,
+    requiredSessions: 30,
+    sessionMinutes: 90,
+    theoryHours: 0,
+    practiceHours: 30,
+    isRequired: false,
+    notes: 'Thực hành phòng máy',
+    prerequisiteSubjectIds: ['sub-toan', 'sub-ly'],
+    prerequisites: [
+      { subjectId: 'sub-toan', subjectCode: 'TOAN', subjectName: 'Toán học' },
+      { subjectId: 'sub-ly', subjectCode: 'LY', subjectName: 'Vật lý' },
+    ],
+  },
+  // CT-K11-2026:
+  {
+    curriculumId: 'c0000000-0000-4000-8000-000000000002',
+    subjectId: 'sub-hoa',
+    subjectCode: 'HOA',
+    subjectName: 'Hóa học',
+    sequenceNo: 1,
+    requiredSessions: 45,
+    sessionMinutes: 45,
+    theoryHours: 30,
+    practiceHours: 15,
+    isRequired: true,
+    notes: null,
+    prerequisiteSubjectIds: [],
+    prerequisites: [],
+  },
+  {
+    curriculumId: 'c0000000-0000-4000-8000-000000000002',
+    subjectId: 'sub-tin',
+    subjectCode: 'TIN',
+    subjectName: 'Tin học',
+    sequenceNo: 2,
+    requiredSessions: 30,
+    sessionMinutes: 90,
+    theoryHours: 10,
+    practiceHours: 20,
+    isRequired: true,
+    notes: null,
+    prerequisiteSubjectIds: [],
+    prerequisites: [],
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Specialty Subjects Mock Fixtures (D-06)
+// ----------------------------------------------------------------------------
+
+export interface MockSpecialtySubject {
+  specialtyId: string
+  subjectIds: string[]
+  orgId: string
+}
+
+export const mockSpecialtySubjects: MockSpecialtySubject[] = [
+  { specialtyId: 'spec-toan', subjectIds: ['sub-toan', 'sub-tin'], orgId: DEMO_ORG_ID },
+  { specialtyId: 'spec-ly', subjectIds: ['sub-ly'], orgId: DEMO_ORG_ID },
+  { specialtyId: 'spec-tin', subjectIds: ['sub-tin'], orgId: DEMO_ORG_ID },
+  { specialtyId: 'spec-van', subjectIds: ['sub-van'], orgId: DEMO_ORG_ID },
+  { specialtyId: 'spec-anh', subjectIds: ['sub-anh'], orgId: DEMO_ORG_ID },
+]
+
+// ----------------------------------------------------------------------------
+// Teacher Subjects Mock Fixtures (D-06, D-06a)
+// D-06a: status chỉ là APPROVED hoặc REVOKED (không có PENDING)
+// ----------------------------------------------------------------------------
+
+export interface MockTeacherSubjectProfile {
+  userId: string
+  version: number // staff_profile.version
+  orgId: string
+  items: TeacherSubject[]
+}
+
+export const mockTeacherSubjectProfiles: MockTeacherSubjectProfile[] = [
+  {
+    userId: 'acc-academic-2', // Ngô Thanh Vũ
+    version: 16,
+    orgId: DEMO_ORG_ID,
+    items: [
+      {
+        subjectId: 'sub-toan',
+        subjectCode: 'TOAN',
+        subjectName: 'Toán học',
+        status: 'APPROVED',
+        source: 'SPECIALTY',
+        createdAt: '2026-08-15T00:00:00Z',
+      },
+      {
+        subjectId: 'sub-tin',
+        subjectCode: 'TIN',
+        subjectName: 'Tin học',
+        status: 'APPROVED',
+        source: 'SPECIALTY',
+        createdAt: '2026-08-15T00:00:00Z',
+      },
+      {
+        subjectId: 'sub-ly',
+        subjectCode: 'LY',
+        subjectName: 'Vật lý',
+        status: 'APPROVED',
+        source: 'MANUAL',
+        createdAt: '2026-09-01T00:00:00Z',
+      },
+    ],
+  },
+  {
+    userId: 'acc-academic-1', // Nguyễn Thu Trang
+    version: 4,
+    orgId: DEMO_ORG_ID,
+    items: [
+      {
+        subjectId: 'sub-van',
+        subjectCode: null,
+        subjectName: 'Ngữ văn',
+        status: 'APPROVED',
+        source: 'SPECIALTY',
+        createdAt: '2026-08-15T00:00:00Z',
+      },
+    ],
+  },
+]
+
+// ----------------------------------------------------------------------------
+// Class & Class Subject Mock Fixtures (D-01, D-08, D-09, D-15)
+// ----------------------------------------------------------------------------
+
+export interface MockAcademicClass {
+  id: string
+  orgId: string
+  classCode: string
+  name: string
+  status: 'CHUA_BAT_DAU' | 'DANG_DIEN_RA' | 'DA_KET_THUC' | 'DA_HUY' | 'CLOSED'
+  version: number
+  subjectId: string | null // legacy primary subject pointer (D-15)
+  teacherId: string | null // legacy teacher pointer
+  curriculumId: string | null
+}
+
+export const mockAcademicClasses: MockAcademicClass[] = [
+  {
+    id: 'cls-c001',
+    orgId: DEMO_ORG_ID,
+    classCode: '10A1',
+    name: 'Lớp 10A1 Chuẩn',
+    status: 'CHUA_BAT_DAU',
+    version: 1,
+    subjectId: 'sub-toan',
+    teacherId: 'acc-academic-2',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+  },
+  {
+    id: 'cls-c002',
+    orgId: DEMO_ORG_ID,
+    classCode: '10A2',
+    name: 'Lớp 10A2 Nâng cao',
+    status: 'DANG_DIEN_RA',
+    version: 4,
+    subjectId: 'sub-toan',
+    teacherId: 'acc-academic-2',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+  },
+  {
+    id: 'cls-c003',
+    orgId: DEMO_ORG_ID,
+    classCode: '12C1',
+    name: 'Lớp 12C1 Tốt nghiệp',
+    status: 'DA_KET_THUC',
+    version: 10,
+    subjectId: 'sub-toan',
+    teacherId: 'acc-academic-2',
+    curriculumId: null,
+  },
+  // Lớp legacy không có bản ghi class_subject nào (để test fallback D-09 & D-15)
+  {
+    id: 'cls-legacy-01',
+    orgId: DEMO_ORG_ID,
+    classCode: 'LEGACY-10',
+    name: 'Lớp Legacy Chưa Chuyển Đổi',
+    status: 'CHUA_BAT_DAU',
+    version: 1,
+    subjectId: 'sub-toan',
+    teacherId: 'acc-academic-2',
+    curriculumId: null,
+  },
+]
+
+export const mockClassSubjects: ClassSubject[] = [
+  // Lớp cls-c001 (CHUA_BAT_DAU):
+  {
+    classId: 'cls-c001',
+    subjectId: 'sub-toan',
+    subjectCode: 'TOAN',
+    subjectName: 'Toán học',
+    source: 'CURRICULUM',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    requiredSessions: 60,
+    plannedSessions: 60,
+    sessionMinutes: 45,
+    teacherId: 'acc-academic-2',
+    teacherName: 'Ngô Thanh Vũ',
+    isPrimary: true, // D-15: dòng primary khớp school_class.subject_id
+    status: 'PLANNED',
+  },
+  {
+    classId: 'cls-c001',
+    subjectId: 'sub-ly',
+    subjectCode: 'LY',
+    subjectName: 'Vật lý',
+    source: 'CURRICULUM',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    requiredSessions: 45,
+    plannedSessions: 45,
+    sessionMinutes: 45,
+    teacherId: null, // D-09: teacherId null -> "Chưa phân công", KHÔNG fallback
+    teacherName: null,
+    isPrimary: false,
+    status: 'PLANNED',
+  },
+  {
+    classId: 'cls-c001',
+    subjectId: 'sub-tin',
+    subjectCode: 'TIN',
+    subjectName: 'Tin học',
+    source: 'CURRICULUM',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    requiredSessions: 30,
+    plannedSessions: 30,
+    sessionMinutes: 90,
+    teacherId: null,
+    teacherName: null,
+    isPrimary: false,
+    status: 'PLANNED',
+  },
+
+  // Lớp cls-c002 (DANG_DIEN_RA):
+  {
+    classId: 'cls-c002',
+    subjectId: 'sub-toan',
+    subjectCode: 'TOAN',
+    subjectName: 'Toán học',
+    source: 'CURRICULUM',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    requiredSessions: 60,
+    plannedSessions: 60,
+    sessionMinutes: 45,
+    teacherId: 'acc-academic-2',
+    teacherName: 'Ngô Thanh Vũ',
+    isPrimary: true,
+    status: 'IN_PROGRESS',
+  },
+  {
+    classId: 'cls-c002',
+    subjectId: 'sub-ly',
+    subjectCode: 'LY',
+    subjectName: 'Vật lý',
+    source: 'CURRICULUM',
+    curriculumId: 'c0000000-0000-4000-8000-000000000001',
+    requiredSessions: 45,
+    plannedSessions: 45,
+    sessionMinutes: 45,
+    teacherId: null, // teacherId null, KHÔNG fallback
+    teacherName: null,
+    isPrimary: false,
+    status: 'IN_PROGRESS',
+  },
+
+  // Lớp cls-c003 (DA_KET_THUC):
+  {
+    classId: 'cls-c003',
+    subjectId: 'sub-toan',
+    subjectCode: 'TOAN',
+    subjectName: 'Toán học',
+    source: 'LEGACY',
+    curriculumId: null,
+    requiredSessions: 60,
+    plannedSessions: 60,
+    sessionMinutes: 45,
+    teacherId: 'acc-academic-2',
+    teacherName: 'Ngô Thanh Vũ',
+    isPrimary: true,
+    status: 'COMPLETED',
+  },
+]
+
+export const mockClassSubjectHistory: ClassSubjectHistory[] = [
+  {
+    id: 'hist-001',
+    classId: 'cls-c002',
+    oldSubjectId: 'sub-van',
+    oldSubjectCode: null,
+    oldSubjectName: 'Ngữ văn',
+    oldTeacherId: 'acc-academic-1',
+    oldTeacherName: 'Nguyễn Thu Trang',
+    oldSource: 'LEGACY',
+    newSubjectId: 'sub-toan',
+    newSubjectCode: 'TOAN',
+    newSubjectName: 'Toán học',
+    newSource: 'CURRICULUM',
+    reason: 'Điều chỉnh môn học chính của lớp theo định hướng chuyên môn mới.',
+    operationId: '0f5f7c1e-0d5a-4a6e-9d3b-2f3c1a9b7e10',
+    changedBy: 'acc-owner-1',
+    changedByName: 'sample_owner',
+    changedAt: '2026-09-05T08:30:00Z',
+  },
+]
+

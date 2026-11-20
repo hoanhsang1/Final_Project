@@ -42,10 +42,13 @@ Cột default bổ sung — **tuỳ chọn** (D-03 đã chốt: nguồn chính l
 **Mã môn (D-04 = CONFIRMED):**
 
 - `code` **không bắt buộc**; bản ghi cũ giữ `NULL` hợp lệ.
-- Nếu có giá trị, mã **duy nhất theo tổ chức** — nhưng migration 42 hiện chỉ tạo
+- Nếu có giá trị, mã **duy nhất theo tổ chức** — migration 42 hiện chỉ tạo
   `ADD INDEX uq_subject_org_code (org_id, code)` (index thường, **không unique**).
-- Phải chạy pre-check trùng (§6.1) trước khi đổi thành UNIQUE:
-  `ALTER TABLE subject DROP INDEX uq_subject_org_code, ADD UNIQUE KEY uq_subject_org_code (org_id, code);`
+- Migration 52 **bật UNIQUE** (quyết định 2026-11-20). Trước khi ALTER, 52 tự kiểm tra nhóm
+  `code` trùng trong cùng org; nếu > 0 → `SIGNAL` và dừng, không tự sửa dữ liệu. ALTER idempotent:
+  - Nếu index `uq_subject_org_code` đang là non-unique → `DROP INDEX` + `ADD UNIQUE KEY (org_id, code)`.
+  - Nếu index chưa tồn tại → tạo UNIQUE trực tiếp.
+  - Nếu đã là UNIQUE đúng cột → bỏ qua.
 - MySQL cho phép nhiều `NULL` trong UNIQUE ⇒ bản ghi chưa có mã vẫn hợp lệ.
 - **Không** thêm `NOT NULL`; **không** đổi form FE thành bắt buộc.
 - Collation `utf8mb4_unicode_ci` khiến UNIQUE so sánh không phân biệt hoa/thường — hành vi này
@@ -352,6 +355,7 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   old_subject_code varchar(50) DEFAULT NULL,
   old_subject_name varchar(200) DEFAULT NULL,
   old_teacher_id  char(36) DEFAULT NULL,
+  old_teacher_name varchar(200) DEFAULT NULL,
   old_source      varchar(20) DEFAULT NULL,
   new_subject_id  char(36) NOT NULL,
   new_subject_code varchar(50) DEFAULT NULL,
@@ -359,7 +363,9 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   new_source      varchar(20) NOT NULL,
   reason          varchar(500) NOT NULL,
   operation_id    varchar(64) NOT NULL,
+  request_fingerprint char(64) NOT NULL,
   changed_by      char(36) NOT NULL,
+  changed_by_name varchar(200) DEFAULT NULL,
   changed_at      datetime(3) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_csh_operation (org_id, operation_id),
@@ -377,12 +383,30 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
 ```
 
 Ghi chú: `old_subject_code`, `old_subject_name`, `new_subject_code`, `new_subject_name`,
-`old_teacher_id`, `old_source`, `new_source` là **snapshot** tại thời điểm đổi — môn đổi tên/ngừng
-hoặc giáo viên nghỉ vẫn hiển thị đúng lịch sử. `new_subject_name`, `new_source`, `reason`,
-`operation_id` NOT NULL vì đổi môn chính bắt buộc có môn mới, có nguồn và có lý do/khóa idempotency.
-`old_subject_*`/`old_source` NULL chỉ khi lớp chưa có môn chính. UNIQUE `(org_id, operation_id)` là
-idempotency thật sự (không còn NULL): cùng khóa + cùng payload trả kết quả cũ, payload khác → 409.
-`reason` ≤ 500 ký tự do kiểu `varchar(500)` + validation `REASON_TOO_LONG`.
+`old_teacher_id`, `old_teacher_name`, `old_source`, `new_source`, `changed_by_name` là **snapshot**
+tại thời điểm đổi — môn đổi tên/ngừng, giáo viên nghỉ hoặc người thực hiện đổi tên vẫn hiển thị
+đúng lịch sử. Không JOIN `subject`/`staff_profile`/tài khoản để lấy tên hiện tại khi đọc history.
+`old_teacher_name`/`changed_by_name` cho phép NULL nếu tại thời điểm ghi không có nguồn tên; không
+tạo FK bắt buộc tới bảng tài khoản/nhân sự chỉ để lưu tên.
+
+`new_subject_name`, `new_source`, `reason`, `operation_id`, `request_fingerprint` NOT NULL vì đổi
+môn chính bắt buộc có môn mới, có nguồn, có lý do và có khóa idempotency. `old_subject_*`/`old_source`
+NULL chỉ khi lớp chưa có môn chính. UNIQUE `(org_id, operation_id)` là idempotency thật sự (không
+còn NULL): cùng khóa + **cùng fingerprint** trả kết quả cũ, fingerprint khác → 409
+`CLASS_SUBJECT_OPERATION_CONFLICT`.
+
+`request_fingerprint` là SHA-256 (hex thường, 64 ký tự) của payload chuẩn hoá gồm `subjectId`,
+`reason`, `plannedSessions`, `sessionMinutes`. Quy tắc chuẩn hoá (thống nhất client/server, không
+phụ thuộc thứ tự key JSON):
+
+1. Chuỗi JSON canonical theo thứ tự key cố định: `subjectId`, `reason`, `plannedSessions`,
+   `sessionMinutes`.
+2. `null` biểu diễn là `null`; chuỗi giữ nguyên Unicode NFC, không trim; số nguyên biểu diễn thập
+   phân không dấu `+`, không số 0 thừa; số thực (nếu có) dùng dạng thập phân tối giản.
+3. Băm UTF-8 của chuỗi canonical bằng SHA-256, hex lowercase.
+
+`reason` ≤ 500 ký tự do kiểu `varchar(500)` + validation `PRIMARY_REASON_TOO_LONG` (3054). Mã
+`REASON_TOO_LONG` (3018) giữ nguyên cho các luồng huỷ/đóng lớp hiện có (giới hạn 1000).
 
 **Hệ quả với `DELETE /classes/{id}` (đã có trong source, `class.delete`):** FK
 `fk_csh_class … ON DELETE RESTRICT` khiến xoá cứng một lớp **đã có lịch sử đổi môn** bị DB từ chối.
@@ -574,10 +598,11 @@ USE mems_people_db;
 --    subject_id mà chưa có dòng khớp + chưa có primary; 5b set is_primary qua bảng
 --    tạm (tránh MySQL 1093); 5c CALL assert_no_duplicate_primary → dừng nếu >1 primary/lớp
 -- 5) class_subject_history (mục 3.3.1) — tạo SAU class_subject
--- 6) D-04 (đã chốt): code optional + UNIQUE khi có giá trị, khối COMMENTED:
---    ALTER TABLE subject DROP INDEX uq_subject_org_code,
---      ADD UNIQUE KEY uq_subject_org_code (org_id, code);
---    Chỉ chạy sau khi mục 6.1 báo 0 nhóm trùng. KHÔNG thêm NOT NULL.
+-- 6) D-04 (đã chốt 2026-11-20): code optional + UNIQUE (org_id, code) được BẬT trong 52.
+--    Trước khi ALTER, 52 tự kiểm tra nhóm code trùng trong cùng org; nếu > 0 → SIGNAL và
+--    dừng migration (dữ liệu phải xử lý tay; không tự xoá/gộp/sửa mã).
+--    ALTER idempotent: chỉ DROP/ADD index khi index hiện tại chưa đúng; nhiều NULL hợp lệ.
+--    KHÔNG thêm NOT NULL cho subject.code.
 ```
 
 **Pre-check bắt buộc trước khi chạy 52** (chi tiết SQL ở mục 6):

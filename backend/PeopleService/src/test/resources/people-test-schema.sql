@@ -77,9 +77,9 @@ CREATE TABLE IF NOT EXISTS specialty (
 );
 -- H2 PARITY NOTE (D-04): uq_subject_org_code is UNIQUE here because the service
 -- contract (409 on duplicate code) and the D-04 target require it. MySQL staging
--- only has a NON-unique index from migration 42 until the D-04 UNIQUE ALTER in 52
--- (currently commented) runs after its pre-check. Do not weaken this fixture:
--- tests would stop proving the intended contract. Verify D-04 on MySQL staging.
+-- has a NON-unique index from migration 42; migration 52 step 7 now replaces it
+-- with UNIQUE after a duplicate self-check (Revision 5, 2026-11-20). Do not
+-- weaken this fixture: tests prove the intended contract. Verify on MySQL staging.
 CREATE TABLE IF NOT EXISTS subject (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  code VARCHAR(50), description VARCHAR(500),
@@ -88,11 +88,12 @@ CREATE TABLE IF NOT EXISTS subject (
  updated_by VARCHAR(36), updated_at TIMESTAMP,
  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)
 );
--- Phase 1 Revision 3: curriculum templates (migration 51 logical schema).
+-- Phase 1 (Revision 5): curriculum/class-subject schema (migrations 51/52).
 -- H2 PARITY LIMITATION: secondary indexes of 51/52 (idx_curriculum_subject_subject,
 -- idx_class_subject_*, idx_teacher_subject_*, idx_csh_*, idx_specialty_subject_*) are
 -- omitted here; they do not change query semantics in H2. The MySQL migration audits
--- them on staging. Constraint/column semantics below mirror 51/52.
+-- them on staging. `request_fingerprint` is VARCHAR(64) here vs CHAR(64) in MySQL;
+-- both enforce 64 chars for the hex SHA-256. Constraint/column semantics mirror 51/52.
 CREATE TABLE IF NOT EXISTS curriculum (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  code VARCHAR(50) NOT NULL, name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
@@ -207,10 +208,11 @@ CREATE TABLE IF NOT EXISTS class_subject (
 CREATE TABLE IF NOT EXISTS class_subject_history (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, class_id VARCHAR(36) NOT NULL,
  old_subject_id VARCHAR(36), old_subject_code VARCHAR(50), old_subject_name VARCHAR(200),
- old_teacher_id VARCHAR(36), old_source VARCHAR(20),
+ old_teacher_id VARCHAR(36), old_teacher_name VARCHAR(200), old_source VARCHAR(20),
  new_subject_id VARCHAR(36) NOT NULL, new_subject_code VARCHAR(50), new_subject_name VARCHAR(200) NOT NULL,
  new_source VARCHAR(20) NOT NULL, reason VARCHAR(500) NOT NULL, operation_id VARCHAR(64) NOT NULL,
- changed_by VARCHAR(36) NOT NULL, changed_at TIMESTAMP NOT NULL,
+ request_fingerprint VARCHAR(64) NOT NULL,
+ changed_by VARCHAR(36) NOT NULL, changed_by_name VARCHAR(200), changed_at TIMESTAMP NOT NULL,
  UNIQUE(org_id,operation_id),
  FOREIGN KEY(class_id,org_id) REFERENCES school_class(id,org_id),
  CONSTRAINT chk_csh_subject_change CHECK(old_subject_id IS NULL OR old_subject_id <> new_subject_id),

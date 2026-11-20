@@ -32,6 +32,8 @@ import { MyRequestsPage } from '@/features/workflows/pages/my-requests-page'
 import { TeachersPage } from '@/features/academic/pages/teachers-page'
 import { StudentsPage } from '@/features/academic/pages/students-page'
 import { SubjectsPage } from '@/features/academic/pages/subjects-page'
+import { CurriculaPage } from '@/features/academic/pages/curricula-page'
+import { CurriculumDetailPage } from '@/features/academic/pages/curriculum-detail-page'
 import { ClassesPage } from '@/features/academic/pages/classes-page'
 import { MyClassesPage } from '@/features/academic/pages/my-classes-page'
 import { StudentPortalPage } from '@/features/academic/pages/student-portal-page'
@@ -292,6 +294,26 @@ export function App() {
               <WorkspaceGuard workspaceId="academic">
                 <PermissionGuard anyOf={[PERM.subjectView, PERM.subjectManage]}>
                   <SubjectsPage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/chuong-trinh-dao-tao"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard anyOf={[PERM.curriculumView, PERM.curriculumManage]}>
+                  <CurriculaPage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/chuong-trinh-dao-tao/:id"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard anyOf={[PERM.curriculumView, PERM.curriculumManage]}>
+                  <CurriculumDetailPage />
                 </PermissionGuard>
               </WorkspaceGuard>
             }

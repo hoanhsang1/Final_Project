@@ -326,7 +326,7 @@ Index `(org_id, class_id, changed_at)`. `changed_at` là **thời điểm hiệu
   5. Audit `CLASS_CURRICULUM_APPLIED`.
 - **Không làm:** không đụng dòng `source=LEGACY`/`MANUAL` trừ khi người dùng chọn thay thế
   (`keepManualSubjects=false`).
-- **Thay thế:** lớp đã bắt đầu → 409 `CLASS_SUBJECT_LOCKED`; curriculum inactive → 400
+- **Thay thế:** lớp đã bắt đầu → 409 `CLASS_NOT_EDITABLE` (2205; không có `CLASS_SUBJECT_LOCKED`); curriculum inactive → 400
   `CURRICULUM_INACTIVE`; version lệch → 409 `DATA_CHANGED`.
 
 ### 4.5. BR-CUR-F05 — Gán/bỏ môn thủ công cho lớp
@@ -352,8 +352,10 @@ Index `(org_id, class_id, changed_at)`. `changed_at` là **thời điểm hiệu
    `expectedVersion` (**bắt buộc**) khớp `school_class.version`.
 2. Kiểm môn mới tồn tại, **active**, cùng org.
 3. Xác định dòng primary hiện tại (hoặc suy ra từ `school_class.subject_id` nếu lớp chưa có dòng).
-4. Insert `class_subject_history` (snapshot cũ/mới + `old_teacher_id` + `old_source`/`new_source`
-   + actor + lý do + `operation_id`).
+4. Insert `class_subject_history` (snapshot cũ/mới + `old_teacher_id` + **`old_teacher_name`** +
+   `old_source`/`new_source` + `changed_by` + **`changed_by_name`** + lý do + `operation_id`
+   + **`request_fingerprint`**) — **cùng transaction**; tên người/giáo viên là snapshot lúc đổi,
+   không join sống khi đọc lại.
 5. Cập nhật `school_class.subject_id = newSubjectId`, `version = version + 1`.
 6. Đồng bộ `class_subject`:
    - Nếu `(class_id, newSubjectId)` đã tồn tại → **tái dùng** dòng đó: `is_primary = 1`; **không**
@@ -369,14 +371,17 @@ môn mới, không xoá history.
 **Trường bắt buộc:** `subjectId`, `reason` (≤ 500 ký tự), `expectedVersion`, `operationId`;
 `changedBy` lấy từ JWT, không nhận từ body.
 
-**Idempotency:** cùng `operationId` + cùng payload chuẩn hoá → trả kết quả thành công cũ, **không**
-tạo history mới; cùng `operationId` + payload khác → 409. Transaction lỗi ở bất kỳ bước nào →
+**Idempotency (F-BLK-01):** cùng `operationId` + **cùng `request_fingerprint`** → trả kết quả thành
+công cũ, **không** tạo history mới; cùng `operationId` + fingerprint khác → 409. Fingerprint =
+SHA-256 (UTF-8, 64 hex lowercase) của payload chuẩn hoá cố định thứ tự
+`subjectId|reason|plannedSessions|sessionMinutes` (NFC, không trim); ghi
+`class_subject_history.request_fingerprint` cùng transaction. Transaction lỗi ở bất kỳ bước nào →
 rollback toàn bộ, không để history một phần.
 
 **Thất bại:** trạng thái không cho phép → 409 `CLASS_NOT_EDITABLE`; môn inactive → 400
-`SUBJECT_INACTIVE`; trùng dòng primary (đua) / `operationId` tái dùng payload khác → 409
-`CLASS_SUBJECT_OPERATION_CONFLICT`; version lệch → 409 version conflict; thiếu trường bắt buộc hoặc
-`reason` > 500 → 400.
+`SUBJECT_INACTIVE`; trùng dòng primary (đua) / `operationId` tái dùng fingerprint khác → 409
+`CLASS_SUBJECT_OPERATION_CONFLICT`; version lệch → 409 `DATA_CHANGED`; thiếu trường bắt buộc → 400
+`VALIDATION_ERROR`; `reason` > 500 → 400 `PRIMARY_REASON_TOO_LONG` (3054).
 
 Điều chỉnh sâu hơn giữa kỳ (đổi nhiều môn, hoàn tác) là tính năng tương lai, ngoài Phase 1.
 
@@ -385,12 +390,12 @@ rollback toàn bộ, không để history một phần.
 | Luồng | Actor | Điều kiện đầu vào | Thành công | Thất bại |
 |---|---|---|---|---|
 | F01 Tạo curriculum | OWNER / `curriculum.manage` | code+name hợp lệ, chưa trùng, module bật | 201, `is_active=true`, `version=0`, audit | 409 trùng; 400 DTO; 403 |
-| F02 Thêm môn | `curriculum.manage` | curriculum active, subject active/org, chưa trùng, sequence trống, tiên quyết hợp lệ | 201, version tăng, audit | 404/409/400 tương ứng |
-| F03 Sửa/xoá môn template | `curriculum.manage` | curriculum tồn tại, version khớp | 200/204, version tăng, audit | 404, 409 `DATA_CHANGED` |
-| F04 Áp curriculum | `class.edit` + `curriculum.view` | lớp `CHUA_BAT_DAU`, curriculum active/org, version khớp | 200, tạo/cập nhật `class_subject`, version lớp tăng | 409 `CLASS_SUBJECT_LOCKED`/`DATA_CHANGED`; 400 |
+| F02 Thêm môn | `curriculum.manage` | curriculum active, subject active/org, chưa trùng, sequence trống, tiên quyết hợp lệ, `expectedVersion` bắt buộc | 201, version tăng, audit | 404/409/400 tương ứng |
+| F03 Sửa/xoá môn template | `curriculum.manage` | curriculum tồn tại, `expectedVersion` bắt buộc & khớp | 200/204, version tăng, audit | 404, 409 `DATA_CHANGED` |
+| F04 Áp curriculum | `class.edit` + `curriculum.view` | lớp `CHUA_BAT_DAU`, curriculum active/org, version khớp | 200, tạo/cập nhật `class_subject`, version lớp tăng | 409 `CLASS_NOT_EDITABLE`/`DATA_CHANGED`; 400 |
 | F05 Gán/bỏ môn thủ công | `class.edit` | lớp `CHUA_BAT_DAU`, subject active | 201/200, `source=MANUAL` | 409 trùng/không editable; 400 |
 | F06 Đổi môn chính khi đang học | `class.edit` | lớp `CHUA_BAT_DAU`/`DANG_DIEN_RA`, subject active/org, version khớp | 200, history + `school_class.subject_id` + primary đồng bộ, version tăng | 409 `CLASS_NOT_EDITABLE`/`DATA_CHANGED`; 400 `SUBJECT_INACTIVE` |
-| F07 Áp curriculum khi đang học | — | **không cho** (snapshot) | — | 409 `CLASS_SUBJECT_LOCKED` |
+| F07 Áp curriculum khi đang học | — | **không cho** (snapshot) | — | 409 `CLASS_NOT_EDITABLE` |
 
 ---
 
@@ -425,7 +430,9 @@ rollback toàn bộ, không để history một phần.
 | BR-CUR-25 | Nếu môn mới đã có trong `class_subject` của lớp, tái dùng dòng đó (chỉ đặt `is_primary=1`), không tạo dòng thứ hai |
 | BR-CUR-26 | Không xoá cứng lớp đã có `class_subject_history`; `DELETE /classes/{id}` trả 409 `CONFLICT`, không CASCADE/xoá lịch sử (D-08/D-15) |
 | BR-CUR-27 | Fallback `school_class.teacher_id` **chỉ** khi lớp chưa có bản ghi `class_subject` tương ứng; bản ghi tồn tại mà `teacher_id = NULL` nghĩa là chưa phân công (D-09) |
-| BR-CUR-28 | Request đổi môn chính bắt buộc `reason`, `expectedVersion`, `operationId`; cùng `operationId` + cùng payload trả kết quả cũ, payload khác trả 409 (D-08) |
+| BR-CUR-28 | Request đổi môn chính bắt buộc `reason`, `expectedVersion`, `operationId`; cùng `operationId` + cùng `request_fingerprint` trả kết quả cũ, fingerprint khác trả 409; fingerprint ghi cùng history (F-BLK-01) |
+| BR-CUR-29 | History lưu snapshot `old_teacher_name`/`changed_by_name` lúc đổi; không join sống (F-MAJ-05) |
+| BR-CUR-30 | Thêm/sửa/xoá curriculum-subject bắt buộc `expectedVersion` khoá theo `curriculum.version` (F-MAJ-07) |
 
 ---
 
@@ -546,8 +553,8 @@ Sau (một transaction):
   `CURRICULUM_SUBJECT_NOT_FOUND`, không ghi cạnh.
 - AC-CUR-04: Áp curriculum cho lớp `CHUA_BAT_DAU` tạo đúng các dòng `class_subject` snapshot.
 - AC-CUR-05: Sửa curriculum sau khi áp dụng **không** đổi `class_subject` của lớp.
-- AC-CUR-06: Áp curriculum cho lớp `DANG_DIEN_RA` bị chặn 409 `CLASS_SUBJECT_LOCKED`; **nhưng**
-  đổi môn chính trên lớp đó vẫn thành công (F06).
+- AC-CUR-06: Áp curriculum cho lớp `DANG_DIEN_RA` bị chặn 409 `CLASS_NOT_EDITABLE` (dùng mã 2205;
+  không có `CLASS_SUBJECT_LOCKED`); **nhưng** đổi môn chính trên lớp đó vẫn thành công (F06).
 - AC-CUR-07: Lớp legacy có `subject_id` vẫn trả danh sách môn qua API mới (`source=LEGACY`,
   `isPrimary=true`).
 - AC-CUR-08: Xoá môn khỏi lớp chỉ thành công khi lớp `CHUA_BAT_DAU`; dòng `is_primary = 1` hiện tại
@@ -557,6 +564,11 @@ Sau (một transaction):
 - AC-CUR-11: Đổi môn chính sinh đúng một dòng `class_subject_history`; `school_class.subject_id`
   và dòng `is_primary` cùng cập nhật trong một transaction.
 - AC-CUR-12: Đổi môn chính không chép giáo viên cũ; dòng môn mới `teacher_id = NULL`.
+- AC-CUR-13: History lưu `request_fingerprint` SHA-256 64 hex; cùng `operationId` + cùng fingerprint
+  trả kết quả cũ; khác fingerprint → 409 (F-BLK-01).
+- AC-CUR-14: History trả `oldTeacherName`/`changedByName` snapshot lúc đổi (F-MAJ-05).
+- AC-CUR-15: Curriculum-subject thiếu `expectedVersion` → 400; lệch → 409 `DATA_CHANGED` (F-MAJ-07).
+- AC-CUR-16: Áp curriculum thiếu `curriculum.view` (dù có `class.edit`) → 403 (F-MAJ-02).
 
 ---
 

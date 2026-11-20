@@ -4,6 +4,12 @@
 > Nguồn nghiệp vụ: D-01…D-15 (đã chốt). Không có quyết định nghiệp vụ mới trong tài liệu này.
 > Phạm vi: chỉ thiết kế UI/UX. Không có React code trong tài liệu này.
 
+> **F-MAJ-06 (chốt 2026-11-20) — từ vựng hợp đồng backend là chuẩn:** `ACTIVE` (không
+> `IN_PROGRESS`), `theorySessions`/`practiceSessions` (không `theoryHours`/`practiceHours`),
+> `sequenceNo`, `required` (không `isRequired`), `note` (không `notes`), `active` (không
+> `isActive`), `programCode` (không `majorCode`). Tài liệu này đã sửa theo; FE WIP chưa commit
+> (types/fixtures/mock) phải được người dùng cập nhật — tài liệu không sửa React.
+
 ---
 
 ## Mục lục
@@ -239,7 +245,7 @@ PageContainer
 | Tham số | Loại | Mô tả |
 |---|---|---|
 | `q` | text | Tìm theo `code` và `name` (debounce 300ms) |
-| `isActive` | select | `true` / `false` / (rỗng = tất cả) |
+| `active` | select | `true` / `false` / (rỗng = tất cả) |
 | `page` | number | 1-based (backend Curriculum dùng 1-based) |
 | `size` | number | Mặc định 20 |
 
@@ -270,7 +276,7 @@ Sau khi sửa thành công: invalidate query, hiển thị toast "Đã cập nh�
 
 | Thao tác | Endpoint | Trạng thái |
 |---|---|---|
-| Danh sách | `GET /api/curricula?q=&isActive=&page=&size=` | ⚠️ Đề xuất – chưa implement |
+| Danh sách | `GET /api/curricula?q=&active=&page=&size=` | ⚠️ Đề xuất – chưa implement |
 | Tạo | `POST /api/curricula` | ⚠️ Đề xuất – chưa implement |
 | Cập nhật | `PUT /api/curricula/{id}` | ⚠️ Đề xuất – chưa implement |
 | Đổi trạng thái | `PATCH /api/curricula/{id}/status` | ⚠️ Đề xuất – chưa implement |
@@ -306,16 +312,16 @@ PageContainer
 |---|---|---|
 | STT | `sequenceNo` | Luôn hiện |
 | Môn học | `subjectName` + `subjectCode` (badge phụ) | Luôn hiện |
-| Bắt buộc | `isRequired` → Badge "Bắt buộc" / "Tuỳ chọn" | Ẩn dưới `sm` |
+| Bắt buộc | `required` → Badge "Bắt buộc" / "Tuỳ chọn" | Ẩn dưới `sm` |
 | Số buổi | `requiredSessions` | Luôn hiện |
-| Lý thuyết | `theoryHours` | Ẩn dưới `md` |
-| Thực hành | `practiceHours` | Ẩn dưới `md` |
+| Lý thuyết | `theorySessions` | Ẩn dưới `md` |
+| Thực hành | `practiceSessions` | Ẩn dưới `md` |
 | Thời lượng (phút) | `sessionMinutes` | Ẩn dưới `lg` |
 | Tiên quyết | Danh sách tên môn tiên quyết dưới dạng badges (rỗng = "—") | Ẩn dưới `lg` |
-| Ghi chú | `notes` (truncate) | Ẩn dưới `lg` |
+| Ghi chú | `note` (truncate) | Ẩn dưới `lg` |
 | Thao tác | Nút Sửa / Xóa (chỉ khi có quyền) | Luôn hiện |
 
-> **D-03:** Không ép `theoryHours + practiceHours = requiredSessions`. Chỉ validate `>= 0`.  
+> **D-03:** Không ép `theorySessions + practiceSessions = requiredSessions`. Chỉ validate `>= 0`.  
 > **D-07:** Tiên quyết là mảng 0..n. Phase 1 chỉ cảnh báo, không chặn.
 
 #### Thêm môn vào Curriculum (Dialog)
@@ -575,7 +581,7 @@ Dialog: Áp dụng Chương trình đào tạo
 ```
 
 **Lỗi:**
-- `CLASS_SUBJECT_LOCKED` → "Chỉ có thể áp dụng CTĐT khi lớp chưa bắt đầu."
+- `CLASS_NOT_EDITABLE` → "Chỉ có thể áp dụng CTĐT khi lớp chưa bắt đầu." (không có `CLASS_SUBJECT_LOCKED`)
 - `CURRICULUM_INACTIVE` → "CTĐT đã ngừng hoạt động."
 - `DATA_CHANGED` → "Dữ liệu đã thay đổi. Vui lòng tải lại."
 
@@ -599,7 +605,7 @@ Dialog: Áp dụng Chương trình đào tạo
 | Thêm môn thủ công | `POST /api/classes/{classId}/subjects` | ⚠️ Đề xuất |
 | Xóa môn | `DELETE /api/classes/{classId}/subjects/{subjectId}` | ⚠️ Đề xuất |
 | Danh sách GV assignable | `GET /api/teachers/assignable?subjectId=` | ✅ Đã có (mở rộng) |
-| Danh sách curriculum | `GET /api/curricula?isActive=true` | ⚠️ Đề xuất |
+| Danh sách curriculum | `GET /api/curricula?active=true` | ⚠️ Đề xuất |
 
 ---
 
@@ -655,7 +661,7 @@ Dialog: Đổi môn học chính
 | `CLASS_SUBJECT_OPERATION_CONFLICT` (409) | Alert: "Thao tác xung đột. Vui lòng thử lại sau." |
 | `CLASS_NOT_EDITABLE` (409) | Alert: "Lớp học này không thể thay đổi môn chính." |
 | `SUBJECT_INACTIVE` (400) | Alert: "Môn học mới đã ngừng hoạt động." |
-| `REASON_TOO_LONG` (400) | Lỗi inline field: "Lý do không được vượt quá 500 ký tự." |
+| `PRIMARY_REASON_TOO_LONG` (400) | Lỗi inline field: "Lý do không được vượt quá 500 ký tự." |
 | `VALIDATION_ERROR` (400) | Lỗi inline theo field |
 
 **Thành công:** đóng dialog → invalidate query class subjects + class detail → toast "Đã đổi môn chính thành công."
@@ -912,7 +918,7 @@ Người dùng
 | `name` | text | ✅ | 1 | 200 | "Tên CTĐT là bắt buộc" / "Tên CTĐT đã tồn tại" (409) |
 | `description` | textarea | ❌ | — | 1000 | "Mô tả không được vượt 1000 ký tự" |
 | `gradeLevel` | text | ❌ | — | 50 | — |
-| `majorCode` | text | ❌ | — | 50 | — |
+| `programCode` | text | ❌ | — | 50 | — |
 
 ### Curriculum Subject Form
 
@@ -922,13 +928,13 @@ Người dùng
 | `sequenceNo` | number | ✅ | 1 | — | "STT phải ≥ 1" / "STT đã được sử dụng" (409) |
 | `requiredSessions` | number | ✅ | 1 | 1000 | "Số buổi phải từ 1-1000" |
 | `sessionMinutes` | number | ✅ | 1 | 600 | "Thời lượng phải từ 1-600 phút" |
-| `theoryHours` | number | ❌ | 0 | — | "Giờ lý thuyết không được âm" |
-| `practiceHours` | number | ❌ | 0 | — | "Giờ thực hành không được âm" |
-| `isRequired` | boolean | ❌ | — | — | — |
-| `notes` | textarea | ❌ | — | 500 | "Ghi chú không được vượt 500 ký tự" |
+| `theorySessions` | number | ❌ | 0 | — | "Số buổi lý thuyết không được âm" |
+| `practiceSessions` | number | ❌ | 0 | — | "Số buổi thực hành không được âm" |
+| `required` | boolean | ❌ | — | — | — |
+| `note` | textarea | ❌ | — | 500 | "Ghi chú không được vượt 500 ký tự" |
 | `prerequisiteSubjectIds` | multi-select | ❌ | 0 | 50 | "Tối đa 50 tiên quyết" / "Tiên quyết tạo vòng lặp" |
 
-> **D-03:** Không validate `theoryHours + practiceHours = requiredSessions`. Chỉ validate `>= 0`.
+> **D-03:** Không validate `theorySessions + practiceSessions = requiredSessions`. Chỉ validate `>= 0`.
 
 ### Primary Subject Change Form
 
@@ -1113,7 +1119,7 @@ Danh sách phụ thuộc backend cần thiết trước khi FE implement. FE **k
 
 | # | Vấn đề | Tác động | Đề xuất |
 |---|---|---|---|
-| I-01 | `reason` có bắt buộc khi lớp `CHUA_BAT_DAU` không? API contract §4.8 nói bắt buộc (không phân biệt trạng thái) | Form UX: nếu không bắt buộc → `required=false` cho `CHUA_BAT_DAU` | **Giả định: bắt buộc mọi trường hợp** (theo §4.8 và BR-SUB-22). Confirm với backend. |
+| I-01 | `reason` có bắt buộc khi lớp `CHUA_BAT_DAU` không? | Form UX cần `required` | **Đã chốt (F-BLK-01, 2026-11-20): bắt buộc mọi trạng thái đổi môn chính**; `reason` 1..500, > 500 → `PRIMARY_REASON_TOO_LONG` (3054). |
 | I-02 | Route cho Teacher Detail: drawer trong TeachersPage hay trang riêng `/dao-tao/giao-vien/:staffId`? | Ảnh hưởng routing và UX navigation | Đề xuất: trang riêng để có URL shareable; nhưng cần confirm với bạn. |
 | I-03 | `GET /api/classes/:id/subject-history` phân trang 0-based hay 1-based? | Frontend pagination logic | Từ api-contract.md: **0-based** (khác với Curriculum là 1-based). Đã phản ánh ở Screen 9. |
 | I-04 | Curriculum list: `GET /api/curricula` có trả số môn (`subjectCount`) không? | Cột "Số môn" trong Screen 2 | Nếu không có trong response → ẩn cột này. Cần confirm API shape. |
@@ -1176,7 +1182,9 @@ Thứ tự đề xuất cho FE, sau khi backend đã sẵn sàng (xem §11):
 - [ ] Combobox thêm môn chỉ hiển thị môn active chưa có trong curriculum.
 - [ ] Validation: `sequenceNo` unique trong curriculum → 409 `CURRICULUM_SEQUENCE_DUPLICATE`.
 - [ ] `requiredSessions` ≥ 1 ≤ 1000; `sessionMinutes` ≥ 1 ≤ 600.
-- [ ] Không validate `theoryHours + practiceHours = requiredSessions` (D-03).
+- [ ] Không validate `theorySessions + practiceSessions = requiredSessions` (D-03).
+- [ ] Dùng `required`/`theorySessions`/`practiceSessions`/`note`/`sequenceNo` (F-MAJ-06).
+- [ ] Gửi `expectedVersion` = `curriculum.version` cho thêm/sửa/xoá (F-MAJ-07).
 - [ ] Xóa môn: ConfirmDialog; không xóa môn tiên quyết của môn khác mà không cảnh báo.
 
 ### Screen 4 – Curriculum Prerequisite

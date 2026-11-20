@@ -128,6 +128,7 @@ const ACADEMIC_PREFIXES = [
   'student.delete',
   'student.view',
   'subject.',
+  'curriculum.',
   'schedule.',
   'facility.',
   'teacher.',
@@ -354,6 +355,15 @@ export const WORKSPACES: Workspace[] = [
             to: '/dao-tao/mon-hoc',
             icon: Library,
             permissions: [PERM.subjectView, PERM.subjectManage],
+            status: 'ready',
+          },
+          {
+            id: 'curricula',
+            label: 'Chương trình đào tạo',
+            to: '/dao-tao/chuong-trinh-dao-tao',
+            icon: FileBadge,
+            permissions: [PERM.curriculumView, PERM.curriculumManage],
+            modules: ['STUDENT_MANAGEMENT'],
             status: 'ready',
           },
           {

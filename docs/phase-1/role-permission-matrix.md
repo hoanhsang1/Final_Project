@@ -106,6 +106,13 @@ Quyền dùng cho thao tác khác ở Phase 1 (tối thiểu, không thêm mã):
 của tổ chức. Trưởng phòng (chức danh DEPARTMENT) không xem danh mục môn trừ khi được cấp một
 chức danh ORGANIZATION; không mở `allowedScopes` sang DEPARTMENT ở Phase 1 (D-05).
 
+**F-MAJ-03 (chốt 2026-11-20) — chỉ OWNER hoặc `subject.view`/`subject.manage` scope ORGANIZATION.**
+`GET /subjects` **không** kế thừa quyền đọc từ `class.view`, `class.create`, `student.view`,
+`class.assign_teacher`, `class.teacher.reassign`; **không** tự mở rộng cho chức danh
+trưởng phòng (DEPARTMENT). Đây là **thay đổi hành vi** so với chuỗi quyền đọc cũ (rộng hơn):
+người trước đây xem được danh mục nhờ `class.view` nay nhận 403 cho tới khi được cấp `subject.view`.
+Backend phải sửa `@PreAuthorize` tương ứng khi triển khai (tài liệu không sửa Java).
+
 ### 4.2. Ai được tạo/sửa/ngừng môn?
 
 **Chốt:** OWNER hoặc `subject.manage` (ORGANIZATION), thường gán cho chức danh **Giáo vụ**
@@ -122,6 +129,11 @@ hợp đồng quyền duy nhất cho nhóm endpoint curriculum (khớp `api-cont
 
 **Chốt:** `class.edit` (hiện có, ORGANIZATION) cho Phase 1. `class.subject.manage` chỉ là đề xuất
 kỹ thuật cho giai đoạn sau; không dùng ở Phase 1.
+
+**F-MAJ-02 (chốt 2026-11-20):** riêng thao tác **áp curriculum** (`PUT /classes/{id}/curriculum`)
+bắt buộc **đồng thời** `class.edit` **và** `curriculum.view` trên đúng scope ORGANIZATION
+(quyền ghi lớp + quyền đọc định nghĩa chương trình). Thiếu một trong hai → 403 `FORBIDDEN`.
+Các thao tác thêm/sửa/xoá môn lớp thủ công vẫn chỉ cần `class.edit`.
 
 ### 4.5. Ai được quản lý chuyên môn giáo viên?
 
@@ -175,7 +187,8 @@ Ký hiệu: ✅ được phép · ❌ không · ◐ chỉ trong phòng ban.
 | Tạo/sửa/ngừng môn | ✅ | ✅ `subject.manage` | ❌ | ❌ | ❌ |
 | Xem curriculum | ✅ | ✅ `curriculum.view` | ❌ | ❌ | ❌ |
 | Tạo/sửa curriculum | ✅ | ✅ `curriculum.manage` | ❌ | ❌ | ❌ |
-| Áp curriculum / gán môn cho lớp | ✅ | ✅ `class.edit` | ❌ (class.edit ORG) | ❌ | ❌ |
+| Áp curriculum cho lớp (cần cả `class.edit` + `curriculum.view`) | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Gán/bỏ môn thủ công cho lớp | ✅ | ✅ `class.edit` | ❌ (class.edit ORG) | ❌ | ❌ |
 | Đổi môn chính của lớp (kể cả `DANG_DIEN_RA`) | ✅ | ✅ `class.edit` | ❌ (class.edit ORGANIZATION) | ❌ | ❌ |
 | Xem lịch sử đổi môn chính | ✅ | ✅ `class.view` | ◐ `class.view` | ❌ | ❌ |
 | Sửa/xoá lịch sử đổi môn | ❌ (không có API) | ❌ | ❌ | ❌ | ❌ |
@@ -197,7 +210,7 @@ Lưu ý:
 
 | Chức danh mẫu | `scope` | `profile_type` | Quyền/bundle gán | Kết quả hiệu lực |
 |---|---|---|---|---|
-| `Giáo vụ đào tạo` | ORGANIZATION | GENERAL | bundle `ACADEMIC_MANAGEMENT` + `curriculum.view/manage` + `subject.view/manage` | Quản lý học sinh/lớp, môn và curriculum; áp curriculum nhờ `class.edit` |
+| `Giáo vụ đào tạo` | ORGANIZATION | GENERAL | bundle `ACADEMIC_MANAGEMENT` + `curriculum.view/manage` + `subject.view/manage` | Quản lý học sinh/lớp, môn và curriculum; áp curriculum nhờ `class.edit` **và** `curriculum.view` |
 | `Trưởng phòng đào tạo` | DEPARTMENT | GENERAL | bundle `HR_MANAGEMENT` + `class.view` | `employee.view/edit` trong phòng; xem lớp phòng mình; **không** tạo/sửa môn |
 | `Giáo viên` | DEPARTMENT | TEACHER | `class.self_view`, `schedule.self_view` | Chỉ xem lớp/lịch của mình; không quản lý môn |
 | `Tổng quản lý được uỷ quyền` | ORGANIZATION | GENERAL | delegation `subject.manage` (30 ngày) | Dùng được `subject.manage` đến hết hạn, sau đó 403 |
@@ -262,6 +275,13 @@ khi triển khai (D-14); tài liệu chỉ mô tả hợp đồng.
   `class.view`/`subject.view` nhận 403 (D-08/D-15).
 - AC-RBAC-11: `GET /classes/{id}/subject-history` cần `class.view`; không có endpoint sửa/xoá
   history cho bất kỳ vai trò nào (kể cả OWNER).
+- AC-RBAC-12: `GET /subjects` chỉ cho OWNER/`subject.view`/`subject.manage` ORGANIZATION; người
+  chỉ có `class.view`, `class.create`, `student.view`, `class.assign_teacher`,
+  `class.teacher.reassign` nhận 403 (F-MAJ-03).
+- AC-RBAC-13: Áp curriculum thiếu `curriculum.view` (dù có `class.edit`) nhận 403; thiếu
+  `class.edit` cũng 403 (F-MAJ-02).
+- AC-RBAC-14: Không có mã quyền `class.subject.primary`/`class.subject.lock`; đổi môn chính dùng
+  `class.edit` (F-MAJ-04).
 
 ---
 
@@ -269,6 +289,11 @@ khi triển khai (D-14); tài liệu chỉ mô tả hợp đồng.
 
 `D-05`, `D-06`, `D-06a`, `D-08`, `D-10`, `D-14`, `D-15` **đã chốt**. Các điểm kỹ thuật không thay
 đổi quyết định:
+
+**Chốt bổ sung 2026-11-20:** F-MAJ-02 (áp curriculum cần `class.edit` + `curriculum.view`);
+F-MAJ-03 (READ subject chỉ OWNER/`subject.view`/`subject.manage` ORGANIZATION, bỏ kế thừa
+`class.*`/`student.view` — thay đổi hành vi); F-MAJ-04 (không thêm mã quyền cho đổi môn chính).
+Không thêm mã quyền mới; mọi thay đổi áp ở `@PreAuthorize` khi người dùng triển khai.
 
 1. Mã lỗi khi gán `curriculum.manage` cho chức danh DEPARTMENT: dùng `FORBIDDEN` hiện có hay mã
    riêng? (đề xuất dùng `FORBIDDEN`, không thêm mã).

@@ -20,6 +20,11 @@
 Gateway hiện **chỉ** có route `/api/subjects/**`; không có `/subjects` trần. Các route mới cần
 được thêm vào `APIGateway/src/main/resources/application.yml` (người dùng tự làm).
 
+Ghi chú phạm vi gateway (chốt 2026-11-20): route `/api/curricula/**` (và các route lớp–môn mới
+`/api/classes/{id}/subjects*`, `/api/classes/{id}/subject-history`) **thuộc WP1.6 (Gateway wiring)**,
+không thuộc WP1 này. Cho tới khi WP1.6 thêm route, FE gọi các path này qua gateway sẽ nhận 404 —
+đây là việc triển khai, không phải thay đổi hợp đồng API.
+
 ### 1.2. Định dạng response
 
 - **Thành công:** trả **raw DTO** (theo `SubjectController`, `SchoolClassController`).
@@ -27,7 +32,7 @@ Gateway hiện **chỉ** có route `/api/subjects/**`; không có `/subjects` tr
   ```json
   { "success": false, "code": "SUBJECT_NOT_FOUND", "message": "Subject not found", "data": null }
   ```
-- Danh sách **có phân trang** dùng dạng `{ "items": [...], "total": 0, "page": 1, "size": 20 }`, `page` **1-based** (theo `SchoolClassRepository.list`). Áp cho lớp, curriculum; **không** áp cho `GET /subjects` (xem §1.4).
+- Danh sách **có phân trang** dùng dạng `{ "items": [...], "total": 0, "page": 1, "size": 20 }`, `page` **1-based** (theo `SchoolClassRepository.list`). Áp cho lớp, curriculum; **không** áp cho `GET /subjects` (xem §1.4). Ngoại lệ: `GET /classes/{id}/subject-history` (endpoint mới) dùng **0-based** (§4.9) — khác biệt được ghi rõ để FE không nhầm; muốn thống nhất một kiểu phải là quyết định riêng.
 - `orgId` luôn lấy từ JWT, **không** nhận từ client.
 - Thời gian ISO-8601 (`Instant`).
 
@@ -69,8 +74,10 @@ phân trang, đó là quyết định riêng (breaking change) kèm cập nhật
 | GET | `/subjects/check-code` | `/api/subjects/check-code` | `P(subject.manage)` | **Đề xuất** |
 | GET | `/subjects/{id}/usage` | `/api/subjects/{id}/usage` | `P(subject.view)` | **Đề xuất** |
 
-(*) READ hiện tại = `OWNER` hoặc một trong `subject.view`, `subject.manage`, `class.view`,
-`class.create`, `student.view`, `class.assign_teacher`, `class.teacher.reassign`.
+(*) READ (chốt 2026-11-20, D-05): `OWNER` hoặc `subject.view` / `subject.manage` với scope
+**ORGANIZATION**. **Không** kế thừa quyền đọc từ `class.view`, `class.create`, `student.view`,
+`class.assign_teacher`, `class.teacher.reassign`; quyền scope DEPARTMENT không đủ.
+Đây là **thay đổi hành vi** so với READ chain cũ (rộng hơn) — phải cập nhật test/consumer.
 
 ### 2.2. GET `/subjects`
 
@@ -80,7 +87,7 @@ Query:
 |---|---|---|---|
 | `q` | string | null | Tìm theo tên; đề xuất tìm cả `code` |
 | `includeInactive` | boolean | false | Chỉ có hiệu lực với OWNER/`subject.manage` |
-| `isActive` | boolean | null | **Đề xuất (không bắt buộc)**: lọc true/false |
+| `active` | boolean | null | **Đề xuất (không bắt buộc)**: lọc true/false. Dùng đúng tên `active` (không `isActive`) theo F-MAJ-06 |
 
 **Không có `page`/`size`** (D-13 = A, đã chốt).
 
@@ -255,7 +262,7 @@ Dùng trước khi ngừng môn. 404 `SUBJECT_NOT_FOUND`.
 
 ### 3.3. GET `/curricula`
 
-Query: `q`, `isActive`, `page` (1-based), `size` (≤100).
+Query: `q`, `active` (không `isActive` — F-MAJ-06), `page` (1-based), `size` (≤100).
 
 Response: `{items:[CurriculumSummary], total, page, size}` với `CurriculumSummary` bỏ `subjects`.
 
@@ -301,6 +308,7 @@ Response: `{items:[CurriculumSummary], total, page, size}` với `CurriculumSumm
 ```json
 {
   "subjectId": "99999999-9999-4999-8999-999999999003",
+  "expectedVersion": 4,
   "sequenceNo": 3,
   "requiredSessions": 30,
   "theorySessions": 0,
@@ -315,13 +323,15 @@ Response: `{items:[CurriculumSummary], total, page, size}` với `CurriculumSumm
 }
 ```
 
+- `expectedVersion` **bắt buộc** (F-MAJ-07, chốt 2026-11-20): là `curriculum.version` hiện tại.
 - 201 + `CurriculumSubjectResponse`.
 - 400: `SUBJECT_INACTIVE` (môn đã ngừng), `SUBJECT_PREREQUISITE_CYCLE` (chu trình hoặc tự tiên
   quyết, kèm `path`), `PREREQUISITE_DUPLICATE` (mảng có phần tử trùng),
   `PREREQUISITE_IDS_TOO_MANY` (> 50), `VALIDATION_ERROR`/`SESSION_COUNT_INVALID`…
 - 404: `SUBJECT_NOT_FOUND` (môn không có/khác org), `CURRICULUM_SUBJECT_NOT_FOUND` (tiên quyết
   không thuộc curriculum này).
-- 409: `CURRICULUM_SUBJECT_DUPLICATE`, `CURRICULUM_SEQUENCE_DUPLICATE`.
+- 409: `CURRICULUM_SUBJECT_DUPLICATE`, `CURRICULUM_SEQUENCE_DUPLICATE`, **`DATA_CHANGED`**
+  (`expectedVersion` lệch).
 - **Tiên quyết (D-07):**
   - `prerequisiteSubjectIds` là mảng **0..n**; mỗi phần tử phải là môn **đã có trong cùng
     curriculum**, khác `subjectId`, không trùng nhau.
@@ -333,17 +343,25 @@ Response: `{items:[CurriculumSummary], total, page, size}` với `CurriculumSumm
 
 ### 3.8. PUT `/curricula/{id}/subjects/{subjectId}`
 
-Body như trên **không** có `subjectId`; có thể có `version` của curriculum.
+Body như §3.7 **không** có `subjectId`. `expectedVersion` **bắt buộc** (F-MAJ-07, chốt
+2026-11-20): là `curriculum.version` hiện tại; lệch → 409 `DATA_CHANGED`. Dòng curriculum-subject
+và `curriculum.version` được cập nhật trong **cùng transaction** (không ghi đè im lặng).
 Nếu `prerequisiteSubjectIds` được gửi, **thay toàn bộ** tập tiên quyết của môn (xoá cạnh cũ,
 ghi cạnh mới) trong cùng transaction.
 
-- 200 + `CurriculumSubjectResponse`; 404 `CURRICULUM_SUBJECT_NOT_FOUND`; 409 `DATA_CHANGED`.
+- 200 + `CurriculumSubjectResponse`; 404 `CURRICULUM_NOT_FOUND`/`CURRICULUM_SUBJECT_NOT_FOUND`;
+  409 `DATA_CHANGED` (`expectedVersion` lệch), `CURRICULUM_SUBJECT_DUPLICATE`/`CURRICULUM_SEQUENCE_DUPLICATE`.
 - 400/404 tiên quyết như §3.7.
+- Version khoá nằm ở **parent** `curriculum`; `curriculum_subject` **không** thêm cột `version`
+  riêng (F-MAJ-07).
 
 ### 3.9. DELETE `/curricula/{id}/subjects/{subjectId}`
 
-- 204 hoặc 200 + `{ "removed": true, "version": 4 }`.
-- Service gỡ các cạnh tiên quyết liên quan trước khi xoá dòng.
+Request bắt buộc `expectedVersion` (query hoặc body, cùng ngữ nghĩa §3.8) là `curriculum.version`
+hiện tại (F-MAJ-07, chốt 2026-11-20); lệch → 409 `DATA_CHANGED`.
+
+- 204 hoặc 200 + `{ "removed": true, "version": 5 }` (version đã tăng).
+- Service gỡ các cạnh tiên quyết liên quan **và** tăng `curriculum.version` trong cùng transaction.
 - Nếu còn môn khác phụ thuộc và chưa xác nhận → 409 `CONFLICT` (FK RESTRICT bảo vệ).
 - Không chặn bởi lớp đã snapshot.
 
@@ -361,6 +379,7 @@ Sao chép toàn bộ môn **và** cạnh tiên quyết (map subject id sang bả
 
 > Đề xuất. Đọc: `class.view` (+ `subject.view`). Ghi: `class.edit` (phương án tối thiểu) hoặc
 > ⚙`class.subject.manage`. Không thêm mã quyền mới cho đổi môn chính ở Phase 1.
+> **Áp curriculum (F04) bắt buộc đồng thời `class.edit` + `curriculum.view`** (chốt 2026-11-20).
 > Mọi thao tác ghi đều kiểm trạng thái lớp và tăng `school_class.version`.
 > Module guard `STUDENT_MANAGEMENT` (D-10).
 >
@@ -372,7 +391,7 @@ Sao chép toàn bộ môn **và** cạnh tiên quyết (map subject id sang bả
 | Method | Service path | Gateway path | Quyền |
 |---|---|---|---|
 | GET | `/classes/{classId}/subjects` | `/api/classes/{classId}/subjects` | `class.view` |
-| PUT | `/classes/{classId}/curriculum` | `/api/classes/{classId}/curriculum` | `class.edit` |
+| PUT | `/classes/{classId}/curriculum` | `/api/classes/{classId}/curriculum` | `class.edit` **+** `curriculum.view` |
 | POST | `/classes/{classId}/subjects` | `/api/classes/{classId}/subjects` | `class.edit` |
 | PUT | `/classes/{classId}/subjects/{subjectId}` | `/api/classes/{classId}/subjects/{subjectId}` | `class.edit` |
 | DELETE | `/classes/{classId}/subjects/{subjectId}` | `/api/classes/{classId}/subjects/{subjectId}` | `class.edit` |
@@ -429,13 +448,16 @@ Lỗi: 404 `CLASS_NOT_FOUND`; 403; 400 `MODULE_NOT_ENABLED`.
 }
 ```
 
-- Điều kiện: lớp `CHUA_BAT_DAU`; curriculum active cùng org.
+- Điều kiện: lớp `CHUA_BAT_DAU`; curriculum active cùng org; caller có **đồng thời** `class.edit`
+  **và** `curriculum.view` (F-MAJ-02, chốt 2026-11-20) trên đúng scope ORGANIZATION.
 - `confirmReplace=true` bắt buộc nếu lớp đã có dòng `CURRICULUM` khác; nếu thiếu → 409 `CONFLICT`
   (dùng mã sẵn có, không thêm mã mới), message nêu rõ cần xác nhận thay thế.
 - `keepManualSubjects=true` giữ dòng `MANUAL`; false xoá (cần xác nhận).
 - 200 + response như 4.2 (version mới).
-- 409: `CLASS_NOT_EDITABLE`, `DATA_CHANGED`, `CLASS_SUBJECT_LOCKED`, `CONFLICT` (thiếu `confirmReplace`).
-- 400: `CURRICULUM_NOT_FOUND`, `CURRICULUM_INACTIVE`.
+- 409: `CLASS_NOT_EDITABLE` (gồm cả trường hợp lớp đã khoá/không còn sửa được — thay cho
+  `CLASS_SUBJECT_LOCKED` không tồn tại trong `ErrorCode`), `DATA_CHANGED`, `CONFLICT`
+  (thiếu `confirmReplace`).
+- 404: `CURRICULUM_NOT_FOUND` (không tồn tại/khác org). 400: `CURRICULUM_INACTIVE`.
 
 ### 4.4. POST `/classes/{classId}/subjects` (thêm thủ công)
 
@@ -451,9 +473,9 @@ Lỗi: 404 `CLASS_NOT_FOUND`; 403; 400 `MODULE_NOT_ENABLED`.
 ```
 
 - 201 + response 4.2.
-- 409 `CLASS_SUBJECT_EXISTS`, `CLASS_NOT_EDITABLE`, `DATA_CHANGED`.
-- 400 `SUBJECT_NOT_FOUND`/`SUBJECT_INACTIVE`, `TEACHER_NOT_FOUND`, `SUBJECT_MISMATCH`
-  (nếu gán `teacherId` mà không có chuyên môn).
+- 409 `CLASS_SUBJECT_EXISTS`, `CLASS_NOT_EDITABLE`, `DATA_CHANGED`, `SUBJECT_MISMATCH`
+  (nếu gán `teacherId` mà giáo viên không có chuyên môn — F-MED-03, chốt 2026-11-20).
+- 404 `SUBJECT_NOT_FOUND`, `TEACHER_NOT_FOUND` (F-MED-02). 400 `SUBJECT_INACTIVE`.
 - **Không** bắt buộc `teacherId`; nếu có, phải `DANG_DAY` + có `teacher_subject APPROVED`.
 
 ### 4.5. PUT `/classes/{classId}/subjects/{subjectId}`
@@ -472,15 +494,17 @@ Body:
 ```
 
 - 200 + response 4.2.
-- 409 `CLASS_NOT_EDITABLE`, `DATA_CHANGED`, `CLASS_SUBJECT_LOCKED`.
-- 400 `SUBJECT_MISMATCH`, `TEACHER_NOT_AVAILABLE`.
+- 409 `CLASS_NOT_EDITABLE`, `DATA_CHANGED`, `SUBJECT_MISMATCH` (giáo viên không có chuyên môn —
+  F-MED-03).
+- 409 `TEACHER_NOT_AVAILABLE` (giáo viên nghỉ việc); 404 `TEACHER_NOT_FOUND`/`SUBJECT_NOT_FOUND` (F-MED-02).
 
 ### 4.6. DELETE `/classes/{classId}/subjects/{subjectId}`
 
 - Chỉ lớp `CHUA_BAT_DAU`.
 - 200 + response 4.2 (version mới) hoặc 204.
-- 409 `CLASS_NOT_EDITABLE`, `CLASS_SUBJECT_LOCKED` nếu đã có buổi học (Phase 2 sẽ kiểm qua
-  Schedule; Phase 1 dùng trạng thái lớp).
+- 409 `CLASS_NOT_EDITABLE` khi lớp đã khoá/không còn sửa được (dùng mã 2205 có sẵn; **không**
+  dùng `CLASS_SUBJECT_LOCKED` — mã này không có trong `ErrorCode`). Phase 2 sẽ siết thêm qua
+  Schedule; Phase 1 dựa trên trạng thái lớp.
 - **Không xoá `school_class.subject_id`.** D-15 **đã chốt**: không cho xoá dòng
   `class_subject.is_primary = 1` (và dòng `LEGACY` khớp `school_class.subject_id`) qua endpoint này
   → 409 `CLASS_SUBJECT_LEGACY_PROTECTED`. Muốn đổi môn chính dùng §4.8 (hoặc `PUT /classes/{classId}`
@@ -488,27 +512,33 @@ Body:
 
 ### 4.7. PUT `/classes/{classId}` — đổi `subjectId` không được vòng qua history
 
-Endpoint lớp hiện có (`SchoolClassController`) nhận `subjectId` trong body. D-15 yêu cầu:
+Endpoint lớp hiện có (`SchoolClassController`) nhận `subjectId` trong body
+(`SchoolClassUpdateRequest`: `name`, `academicYear`, `subjectId?`, `startDate`, `endDate`,
+`version` **bắt buộc**). F-MAJ-04 (chốt 2026-11-20) giữ endpoint, quy định:
 
-- Nếu `subjectId` **không đổi** → hành vi hiện tại giữ nguyên.
+- Nếu `subjectId` **không đổi** (hoặc không gửi) → hành vi hiện tại giữ nguyên: request/response
+  không đổi, chỉ `name`/`academicYear`/ngày + `version`.
 - Nếu `subjectId` **thay đổi** → service **không** được chỉ `UPDATE school_class.subject_id`.
   Nó phải chạy **cùng luồng** với §4.8 (khoá lớp, ghi `class_subject_history`, đồng bộ
   `class_subject`), trong cùng transaction. Khi đó request **bắt buộc** có thêm:
-  `reason` (≤ 500), `operationId`, và `version` (dùng làm `expectedVersion`, phải khớp
-  `school_class.version`). Thiếu → 400; lệch version → 409; trùng `operationId` +
-  payload khác → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`. `changedBy` lấy từ JWT.
+  - `reason` (1..500),
+  - `operationId` (UUID client sinh).
 
-  > **Lưu ý mã lỗi version (đã đối chiếu code HEAD `bfa9b53`):** `PUT /classes/{id}` hiện trả
-  > `STATUS_CHANGED` (2207, 409) khi `repository.update` trả 0 dòng; `assignTeacher` trả
-  > `DATA_CHANGED` (2212, 409). Thiết kế §4.8 dùng `DATA_CHANGED`. WP5 phải chốt một mã thống
-  > nhất; **không** tự đổi hành vi endpoint cũ nếu người dùng chưa duyệt (xem
-  > `wp1-readiness-report.md` §3.1).
+  `version` hiện có **được dùng làm `expectedVersion`** (không thêm field trùng tên
+  `expectedVersion`); phải khớp `school_class.version`. Thiếu `reason`/`operationId` → 400
+  `VALIDATION_ERROR`; lệch version → **409 `DATA_CHANGED` (2212)**
+  (đã đối chiếu `ErrorCode`; mã này đã dùng cho `assignTeacher`). Cùng `operationId` + fingerprint
+  khác → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`. `changedBy` lấy từ JWT.
+
+  > **Hành vi endpoint cũ (không đổi nếu người dùng chưa duyệt):** nhánh cập nhật thường vẫn trả
+  > `STATUS_CHANGED` (2207) khi `repository.update` trả 0 dòng như hiện tại; **chỉ nhánh đổi
+  > `subjectId`** dùng `DATA_CHANGED` (2212). Hai nhánh không trộn mã lỗi.
 - Nếu lớp đã `DA_KET_THUC/DA_HUY/CLOSED` → 409 `CLASS_NOT_EDITABLE` như hiện tại, không ghi history.
 - Response giữ nguyên `ClassResponse` hiện có (không thêm hợp đồng mới).
 
-> Hệ quả bắt buộc khi code: `SchoolClassService.update` không được gọi thẳng
-> `repository.save()` với `subjectId` mới; phải đi qua `PrimarySubjectChangeService` (tên do người
-> dùng đặt) để tránh hai đường ghi lệch nhau.
+> **Không có đường vòng:** mọi đường ghi `school_class.subject_id` (kể cả endpoint này) phải qua
+> luồng history; `SchoolClassService.update` không được gọi thẳng `repository.save()` với
+> `subjectId` mới.
 
 ### 4.8. PUT `/classes/{classId}/subjects/primary` (mới — D-08/D-15)
 
@@ -528,7 +558,7 @@ Request:
 | Trường | Bắt buộc | Ghi chú |
 |---|---|---|
 | `subjectId` | **Có** | Môn mới; phải tồn tại, **active**, cùng org |
-| `reason` | **Có** | 1..500 ký tự; thiếu → 400 `VALIDATION_ERROR`, > 500 → 400 `REASON_TOO_LONG` |
+| `reason` | **Có** | 1..500 ký tự; thiếu → 400 `VALIDATION_ERROR`, > 500 → 400 **`PRIMARY_REASON_TOO_LONG` (3054)** |
 | `expectedVersion` | **Có** | Phải khớp `school_class.version`; lệch → 409 `DATA_CHANGED` |
 | `operationId` | **Có** | UUID do client sinh, lưu vĩnh viễn trong history; UNIQUE `(org_id, operation_id)` |
 | `plannedSessions`, `sessionMinutes` | Không | Chỉ dùng khi **tạo mới** dòng `class_subject`; bỏ qua nếu dòng đã tồn tại |
@@ -540,15 +570,18 @@ Request:
 
 **Ngữ nghĩa (một transaction):**
 
-0. Tra `operation_id`: nếu đã tồn tại trong `(org_id, operation_id)` → so payload chuẩn hoá. Giống →
-   trả **kết quả cũ** (200, cùng `historyId`), **không** mở transaction mới. Khác → 409
+0. Tra `operation_id`: nếu đã tồn tại trong `(org_id, operation_id)` → so **fingerprint đã lưu**
+   (`request_fingerprint`) với fingerprint tính từ payload hiện tại. Giống → trả **kết quả cũ**
+   (200, cùng `historyId`), **không** mở transaction mới, không thêm history. Khác → 409
    `CLASS_SUBJECT_OPERATION_CONFLICT`.
 1. Khoá `school_class` (`SELECT … FOR UPDATE`).
 2. Kiểm trạng thái + `expectedVersion` (bắt buộc) khớp `school_class.version`.
-3. Ghi `class_subject_history` (snapshot môn cũ + mã/tên + `old_source`, `old_teacher_id`, môn mới
-   + mã/tên + `new_source`, `changed_by`, `changed_at`, `reason`, `operationId`). Lớp **legacy chưa
-   có** dòng `class_subject`: `old_subject_id` = `school_class.subject_id`; mã/tên đọc từ `subject`
-   **tại thời điểm đổi**; `old_teacher_id` = `school_class.teacher_id`; `old_source='LEGACY'`.
+3. Ghi `class_subject_history` (snapshot môn cũ + mã/tên + `old_source`, `old_teacher_id`,
+   **`old_teacher_name`**, môn mới + mã/tên + `new_source`, `changed_by`, **`changed_by_name`**,
+   `changed_at`, `reason`, `operationId`, **`request_fingerprint`**) trong **cùng transaction**.
+   Lớp **legacy chưa có** dòng `class_subject`: `old_subject_id` = `school_class.subject_id`;
+   mã/tên đọc từ `subject` **tại thời điểm đổi**; `old_teacher_name` đọc từ hồ sơ giáo viên
+   **tại thời điểm đổi** (không join sống khi đọc lại); `old_source='LEGACY'`.
    Dòng mới tạo có `new_source='MANUAL'`; dòng tái dùng giữ `source` hiện có. Không tạo history rỗng.
 4. `school_class.subject_id = subjectId`; `version + 1`.
 5. `class_subject`:
@@ -573,12 +606,14 @@ Response `200`:
     "oldSubjectCode": "TOAN10",
     "oldSubjectName": "Toán 10",
     "oldTeacherId": "22222222-2222-4222-8222-222222222005",
+    "oldTeacherName": "Nguyễn Văn A",
     "oldSource": "CURRICULUM",
     "newSubjectId": "99999999-9999-4999-8999-999999999002",
     "newSubjectCode": "LY10",
     "newSubjectName": "Vật lý 10",
     "newSource": "CURRICULUM",
     "changedBy": "11111111-1111-4111-8111-111111111111",
+    "changedByName": "Trần Thị B",
     "changedAt": "2026-11-20T09:15:00Z",
     "reason": "Điều chỉnh chuyên môn giữa kỳ",
     "operationId": "6a0f0f1e-7a34-4b43-9b5f-1c5c1f7a9c11"
@@ -594,7 +629,7 @@ Response `200`:
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | Thiếu `subjectId`/`reason`/`expectedVersion`/`operationId`; `operationId` sai định dạng |
-| 400 | `REASON_TOO_LONG` | `reason` > 500 ký tự |
+| 400 | `PRIMARY_REASON_TOO_LONG` (3054) | `reason` > 500 ký tự (`REASON_TOO_LONG` 3018 vẫn giữ nguyên cho luồng kết thúc/huỷ lớp, giới hạn 1000) |
 | 400 | `SUBJECT_INACTIVE` | Môn đã ngừng |
 | 403 | `FORBIDDEN` | Thiếu `class.edit` |
 | 404 | `CLASS_NOT_FOUND` / `SUBJECT_NOT_FOUND` | Lớp khác org/không tồn tại; môn không tồn tại hoặc khác org |
@@ -603,18 +638,30 @@ Response `200`:
 | 409 | `DATA_CHANGED` | `expectedVersion` lệch `school_class.version` (xung đột cập nhật đồng thời) |
 | 400 | `MODULE_NOT_ENABLED` | Module tắt |
 
-**Idempotency:**
+**Idempotency (F-BLK-01, chốt 2026-11-20):**
 
-- Cùng `operationId` + **cùng payload chuẩn hoá** (`subjectId`, `reason`, `plannedSessions`,
-  `sessionMinutes`) → trả **200** với kết quả cũ (cùng `historyId`), **không** tạo history mới.
-- Cùng `operationId` + payload **khác** → **409** `CLASS_SUBJECT_OPERATION_CONFLICT`.
+- `request_fingerprint` = **SHA-256 (UTF-8) → 64 ký tự hex lowercase**, lưu ở cột
+  `class_subject_history.request_fingerprint CHAR(64) NOT NULL` **trong cùng transaction** với history.
+- Payload chuẩn hoá gồm **đúng 4 trường**, theo **thứ tự cố định**:
+  `subjectId`, `reason`, `plannedSessions`, `sessionMinutes`. Không phụ thuộc thứ tự key JSON.
+- Chuẩn hoá: chuỗi áp **NFC**, **không trim**, **không** đổi hoa/thường; `null` mã hoá cố định;
+  số nguyên dạng thập phân chuẩn (không dấu `+`, không `1.0`); UUID dạng lowercase chuẩn.
+  Ví dụ chuỗi để băm: `subjectId=<uuid>|reason=<nfc>|plannedSessions=<n|null>|sessionMinutes=<n|null>`
+  (không có khoảng trắng thừa; `|` không xuất hiện trong UUID/số nên không nhập nhằng).
+- Cùng `operationId` + **cùng fingerprint** → trả **200** với kết quả cũ (cùng `historyId`),
+  **không** tạo history mới.
+- Cùng `operationId` + **fingerprint khác** → **409** `CLASS_SUBJECT_OPERATION_CONFLICT`.
 - Transaction lỗi ở bất kỳ bước nào → rollback toàn bộ; **không** để history một phần, không để
   `school_class.subject_id` lệch primary.
 - Retry sau khi transaction đã thành công → trả kết quả cũ, **không** sinh bản ghi thứ hai.
+- `plannedSessions`/`sessionMinutes`: **không đổi ngữ nghĩa**; khi bỏ trống dùng `null` trong
+  fingerprint (khác với giá trị mặc định — service áp default **sau** khi tính fingerprint).
 
 ### 4.9. GET `/classes/{classId}/subject-history`
 
 Query: `page` (mặc định 0), `size` (mặc định 20, tối đa 100). Sắp xếp `changed_at DESC`.
+Phân trang **0-based** cho endpoint mới này (khác curriculum 1-based ở §1.2 — ghi rõ để FE
+không nhầm; xem `validation-and-error-cases.md`).
 
 ```json
 {
@@ -626,12 +673,14 @@ Query: `page` (mặc định 0), `size` (mặc định 20, tối đa 100). Sắp
       "oldSubjectCode": "TOAN10",
       "oldSubjectName": "Toán 10",
       "oldTeacherId": "22222222-2222-4222-8222-222222222005",
+      "oldTeacherName": "Nguyễn Văn A",
       "oldSource": "CURRICULUM",
       "newSubjectId": "99999999-9999-4999-8999-999999999002",
       "newSubjectCode": "LY10",
       "newSubjectName": "Vật lý 10",
       "newSource": "CURRICULUM",
       "changedBy": "11111111-1111-4111-8111-111111111111",
+      "changedByName": "Trần Thị B",
       "changedAt": "2026-11-20T09:15:00Z",
       "reason": "Điều chỉnh chuyên môn giữa kỳ",
       "operationId": "6a0f0f1e-7a34-4b43-9b5f-1c5c1f7a9c11"
@@ -644,7 +693,10 @@ Query: `page` (mặc định 0), `size` (mặc định 20, tối đa 100). Sắp
 ```
 
 - Chỉ đọc; **không** có endpoint sửa/xoá history ở Phase 1.
-- Trả snapshot đã lưu, **không** join lại `subject`/`staff_profile` để lấy tên hiện tại.
+- Trả **snapshot đã lưu** (`oldSubjectName`, `oldTeacherName`, `changedByName` được ghi lúc đổi),
+  **không** join lại `subject`/`staff_profile` để lấy tên hiện tại (F-MAJ-05). Tên snapshot
+  **bất biến**, nullable nếu lúc đổi không xác định được.
+- `request_fingerprint` **không** trả ra API (chỉ phục vụ idempotency).
 - 404 `CLASS_NOT_FOUND`; 403 `FORBIDDEN`; 400 `MODULE_NOT_ENABLED`.
 
 ### 4.10. `DELETE /classes/{classId}` (đã có) khi lớp đã có history
@@ -711,7 +763,7 @@ Query: `page` (mặc định 0), `size` (mặc định 20, tối đa 100). Sắp
 ```
 
 - 201 + item với `status=APPROVED`.
-- 409 `TEACHER_SUBJECT_EXISTS`; 400 `SUBJECT_NOT_FOUND`/`SUBJECT_INACTIVE`;
+- 409 `TEACHER_SUBJECT_EXISTS`; 404 `SUBJECT_NOT_FOUND` (F-MED-02); 400 `SUBJECT_INACTIVE`;
   409 `TEACHER_NOT_AVAILABLE` (nghỉ việc).
 - Không tạo `PENDING`.
 
@@ -751,7 +803,7 @@ GET:
 { "specialtyId": "8888…0001", "subjectIds": ["9999…9001", "9999…9004"] }
 ```
 
-PUT: `{ "subjectIds": [...] }` thay toàn bộ. 400 `SUBJECT_NOT_FOUND`; 400 `SUBJECT_INACTIVE`
+PUT: `{ "subjectIds": [...] }` thay toàn bộ. 404 `SUBJECT_NOT_FOUND` (F-MED-02); 400 `SUBJECT_INACTIVE`
 nếu môn inactive.
 
 ---
@@ -793,7 +845,7 @@ Lỗi: `401`/`403` nếu thiếu/sai key; 404 nếu lớp/org không khớp.
 | 200 | OK |
 | 201 | Created (POST) |
 | 204 | No Content (nếu dùng cho DELETE) |
-| 400 | `VALIDATION_ERROR`, `INVALID_KEY`, `NAME_REQUIRED`, `CODE_REQUIRED` (curriculum), `REASON_TOO_LONG`, `SUBJECT_INACTIVE`, `CURRICULUM_INACTIVE`, `SUBJECT_PREREQUISITE_CYCLE`, `PREREQUISITE_DUPLICATE`, `PREREQUISITE_IDS_TOO_MANY`, `SESSION_COUNT_INVALID`. `THEORY_PRACTICE_MISMATCH` chỉ là quy tắc kỹ thuật **tuỳ chọn** — D-03 không bắt buộc tổng LT+TH |
+| 400 | `VALIDATION_ERROR`, `INVALID_KEY`, `NAME_REQUIRED`, `CODE_REQUIRED` (curriculum), `PRIMARY_REASON_TOO_LONG` (3054, reason > 500 ở đổi môn chính), `REASON_TOO_LONG` (3018, giữ nguyên cho kết thúc/huỷ lớp, ≤ 1000), `SUBJECT_INACTIVE`, `CURRICULUM_INACTIVE`, `SUBJECT_PREREQUISITE_CYCLE`, `PREREQUISITE_DUPLICATE`, `PREREQUISITE_IDS_TOO_MANY`, `SESSION_COUNT_INVALID`, `MODULE_NOT_ENABLED`. `THEORY_PRACTICE_MISMATCH` chỉ là quy tắc kỹ thuật **tuỳ chọn** — D-03 không bắt buộc tổng LT+TH |
 | 401 | `UNAUTHENTICATED` |
 | 403 | `FORBIDDEN`. `SELF_APPROVAL_NOT_ALLOWED` (2209) thuộc luồng đóng lớp, **không** dùng cho chuyên môn |
 | 404 | `SUBJECT_NOT_FOUND`, `CLASS_NOT_FOUND`, `CURRICULUM_NOT_FOUND`, `CURRICULUM_SUBJECT_NOT_FOUND` (gồm tiên quyết ngoài curriculum), `TEACHER_NOT_FOUND`, `TEACHER_SUBJECT_NOT_FOUND` |
@@ -820,8 +872,12 @@ Chi tiết từng mã: `validation-and-error-cases.md`.
 | Trường `prerequisiteSubjectIds` thay `prerequisiteSubjectId` | Chỉ ảnh hưởng FE mới (endpoint mới) | Theo hợp đồng dưới đây |
 | Không có `termNo` | Chỉ ảnh hưởng FE mới | Theo hợp đồng dưới đây |
 | Thêm `isPrimary` vào `GET /classes/{id}/subjects` | Không phá (field mới) | FE cũ bỏ qua |
-| `PUT /classes/{id}` đổi `subjectId` nay ghi history | Không đổi request/response | Hành vi mới đúng D-15; FE không cần sửa |
+| `PUT /classes/{id}` đổi `subjectId` nay ghi history | **Có điều kiện**: chỉ khi `subjectId` **thay đổi** mới bắt buộc thêm `reason`/`operationId` và trả 409 `DATA_CHANGED` khi lệch `version` | Request không đổi `subjectId` giữ nguyên; FE đổi môn chính nên dùng §4.8 hoặc bổ sung 2 field |
 | Endpoint mới `PUT .../subjects/primary`, `GET .../subject-history` | Thuần bổ sung | FE dùng khi cần |
+| `GET /classes/{id}/subject-history` thêm `oldTeacherName`, `changedByName` | Thuần bổ sung (snapshot) | FE hiển thị cột tên; null-safe |
+| Curriculum-subject POST/PUT/DELETE bắt buộc `expectedVersion` | **Breaking cho FE WIP**: request không có version sẽ 400 | FE mới gửi `expectedVersion` = `curriculum.version` |
+| READ `GET /subjects` chỉ OWNER/`subject.view`/`subject.manage` (ORGANIZATION) | **Thay đổi hành vi** cho người chỉ có `class.view`/`student.view` | Cấp `subject.view` cho chức danh cần xem; test lại |
+| Áp curriculum cần thêm `curriculum.view` | Thiếu → 403 dù có `class.edit` | Cấp `curriculum.view` (đã chốt D-14) |
 | Lớp `DANG_DIEN_RA` đổi môn chính **được phép** (trước đây chặn) | Nới điều kiện, không phá | FE có thể bỏ disable nút nếu đã khoá |
 
 ---
@@ -840,6 +896,30 @@ Chi tiết từng mã: `validation-and-error-cases.md`.
   transaction.
 - `reason`, `expectedVersion`, `operationId` là **bắt buộc** ở §4.8; `operationId` lưu **vĩnh viễn**
   ở Phase 1 (không job dọn).
+
+**Chốt bổ sung 2026-11-20 (giải findings WP1):**
+
+- **F-BLK-01:** `class_subject_history.request_fingerprint CHAR(64) NOT NULL`; cùng `operationId`
+  + cùng fingerprint → trả kết quả cũ; khác fingerprint → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`.
+  Quy tắc chuẩn hoá ở §4.8.
+- **F-MAJ-01:** `PRIMARY_REASON_TOO_LONG (3054)` cho `reason` > 500 ở đổi môn chính;
+  `REASON_TOO_LONG (3018)` **giữ nguyên** (≤ 1000) cho kết thúc/huỷ lớp.
+- **F-MAJ-02:** áp curriculum cần **đồng thời** `class.edit` + `curriculum.view`.
+- **F-MAJ-03:** READ `GET /subjects` chỉ `OWNER` hoặc `subject.view`/`subject.manage` scope
+  ORGANIZATION; **không** kế thừa từ `class.*`/`student.view`; đây là thay đổi hành vi.
+- **F-MAJ-04:** giữ `PUT /classes/{classId}`; đổi `subjectId` bắt buộc `reason` + `operationId`
+  (dùng `version` sẵn có làm `expectedVersion`), đi cùng luồng history; lệch version → 409
+  `DATA_CHANGED (2212)`.
+- **F-MAJ-05:** snapshot `old_teacher_name`, `changed_by_name` lưu lúc đổi, không join sống.
+- **F-MAJ-06:** hợp đồng backend là **chuẩn**: `ACTIVE`, `theorySessions`, `practiceSessions`,
+  `sequenceNo`, `required`, `note`; chỉ **một** tên mỗi field, không alias. FE WIP phải sửa theo.
+- **F-MAJ-07:** `expectedVersion` bắt buộc cho thêm/sửa/xoá curriculum-subject; khoá ở parent
+  `curriculum.version`, không thêm version cho `curriculum_subject`.
+- **F-MED-02/03:** `*_NOT_FOUND` → 404; `SUBJECT_MISMATCH` → 409.
+- **F-MED-05:** bật UNIQUE `subject(org_id, code)` qua migration 52 khi không còn trùng; nhiều
+  `NULL` được phép; không xoá/gộp mã cũ.
+- `CLASS_SUBJECT_LOCKED` **không** được dùng (không có trong `ErrorCode`); điều kiện khoá → dùng
+  `CLASS_NOT_EDITABLE (2205)`.
 
 Câu hỏi kỹ thuật còn lại:
 

@@ -90,6 +90,12 @@ Như trên + `version` `@NotNull @PositiveOrZero` (`VERSION_REQUIRED` 3020, `VER
 | `prerequisiteSubjectIds` | `@Size(max=50)`, nullable/rỗng; mỗi phần tử `@NotBlank @Size(max=36)`; **không chứa `subjectId`**, không trùng phần tử (service kiểm) | `PREREQUISITE_IDS_TOO_MANY` (3052 đề xuất), `PREREQUISITE_DUPLICATE` (3053 đề xuất), `ID_TOO_LONG`, `SUBJECT_PREREQUISITE_CYCLE` (tự tiên quyết coi là chu trình `[A,A]`) |
 | `required` | Boolean, mặc định true | — |
 | `note` | `@Size(max=500)` | `NOTE_TOO_LONG` (3019) |
+| `expectedVersion` | `@NotNull @PositiveOrZero` cho **POST/PUT/DELETE** (F-MAJ-07) | `VERSION_REQUIRED`, `VERSION_INVALID`; lệch → 409 `DATA_CHANGED` |
+
+> **Từ vựng chuẩn (F-MAJ-06, chốt 2026-11-20):** dùng `required` (không `isRequired`), `active`
+> (không `isActive` cho field response/body), `theorySessions`/`practiceSessions` (không
+> `theoryHours`/`practiceHours`), `sequenceNo`, `note` (không `notes`), và trạng thái lớp–môn
+> `ACTIVE` (không `IN_PROGRESS`). Chỉ **một** tên mỗi khái niệm, không alias.
 
 Kiểm ở service (không chỉ bean validation):
 
@@ -115,6 +121,9 @@ Kiểm ở service (không chỉ bean validation):
 | `version` | `@NotNull @PositiveOrZero` | `VERSION_REQUIRED`, `VERSION_INVALID` |
 | `confirmReplace` | boolean, mặc định false | — |
 | `keepManualSubjects` | boolean, mặc định true | — |
+
+> Quyền: áp curriculum bắt buộc **đồng thời** `class.edit` + `curriculum.view` (F-MAJ-02);
+> thiếu một trong hai → 403 `FORBIDDEN`. Curriculum phải active cùng org.
 
 ### 3.5. `ClassSubjectRequest` (thêm/sửa)
 
@@ -167,6 +176,7 @@ Kiểm ở service (không chỉ bean validation):
 | `CODE_TOO_LONG` | 3004 | 400 | Mã quá dài |
 | `DESCRIPTION_TOO_LONG` | 3005 | 400 | Mô tả quá dài |
 | `NOTE_TOO_LONG` | 3019 | 400 | Ghi chú quá dài |
+| `REASON_TOO_LONG` | 3018 | 400 | `reason` khi **kết thúc/huỷ lớp** > 1000 ký tự (**giữ nguyên**; không dùng cho đổi môn chính) |
 | `VERSION_REQUIRED` | 3020 | 400 | Thiếu version |
 | `VERSION_INVALID` | 3021 | 400 | Version âm |
 | `ID_TOO_LONG` | 3025 | 400 | ID quá 36 ký tự |
@@ -187,7 +197,7 @@ Kiểm ở service (không chỉ bean validation):
 | `SUBJECT_PREREQUISITE_CYCLE` | 2229 | 400 | Tiên quyết tạo chu trình |
 | `CLASS_SUBJECT_EXISTS` | 2230 | 409 | Lớp đã có môn |
 | `CLASS_SUBJECT_NOT_FOUND` | 2231 | 404 | Lớp không có môn |
-| `CLASS_SUBJECT_LOCKED` | 2232 | 409 | Lớp đã bắt đầu, không sửa danh sách môn |
+| ~~`CLASS_SUBJECT_LOCKED`~~ | ~~2232~~ | — | **Không dùng** — `ErrorCode` không có mã này; điều kiện khoá dùng `CLASS_NOT_EDITABLE` (2205) |
 | `CLASS_SUBJECT_LEGACY_PROTECTED` | 2239 | 409 | Không xoá dòng `LEGACY` trùng `school_class.subject_id` (D-15 đã chốt) |
 | `CLASS_SUBJECT_OPERATION_CONFLICT` | 2240 | 409 | Đổi môn chính vi phạm bất biến một-primary (đua/UNIQUE `primary_class_id`) hoặc `operationId` trùng nhưng khác nội dung |
 | `TEACHER_SUBJECT_EXISTS` | 2233 | 409 | Giáo viên đã có môn |
@@ -206,16 +216,17 @@ Kiểm ở service (không chỉ bean validation):
 | `CURRICULUM_ID_REQUIRED` | 3051 | 400 | Thiếu `curriculumId` |
 | `PREREQUISITE_IDS_TOO_MANY` | 3052 | 400 | `prerequisiteSubjectIds` quá 50 phần tử |
 | `PREREQUISITE_DUPLICATE` | 3053 | 400 | `prerequisiteSubjectIds` có phần tử trùng |
-| `REASON_TOO_LONG` | 3054 | 400 | `reason` khi đổi môn chính > 500 ký tự |
+| `PRIMARY_REASON_TOO_LONG` | 3054 | 400 | `reason` khi đổi môn chính > 500 ký tự (khác `REASON_TOO_LONG` 3018 hiện có) |
 
 > Phase 2 nếu bật duyệt chuyên môn: **không** tái dùng `SELF_APPROVAL_NOT_ALLOWED` (mã 2209 gắn
 > nghĩa đóng lớp); phải tạo mã riêng cho chuyên môn hoặc dùng `FORBIDDEN`. Phase 1 không có luồng này.
 
 > Số 223x/304x chỉ là đề xuất; người dùng kiểm tra không trùng trước khi thêm vào
 > `ErrorCode.java`. Không tự sửa enum.
-> **Đã đối chiếu HEAD `cdd03b8`:** 22xx đang dùng đến `2221`, nên 2222–2240 trống; 30xx đang dùng
+> **Đã đối chiếu HEAD `bfa9b53`:** 22xx đang dùng đến `2221`, nên 2222–2240 trống; 30xx đang dùng
 > đến `3042`, nên 3043–3054 trống. (`2220 CANCEL_STATE_CHANGED`, `2221 CLASS_APPROVER_NOT_ALLOWED`;
-> `2240 CLASS_SUBJECT_OPERATION_CONFLICT` và `3054 REASON_TOO_LONG` là mã **mới** cho D-08/D-15.)
+> `2240 CLASS_SUBJECT_OPERATION_CONFLICT`, `3054 PRIMARY_REASON_TOO_LONG` là mã **mới** cho
+> D-08/D-15. `REASON_TOO_LONG` **đã có ở 3018** — không tạo bản trùng.)
 >
 > **Phase 1 (D-06a đã chốt = không duyệt):** `TEACHER_SUBJECT_NOT_PENDING` **không** dùng.
 > `SELF_APPROVAL_NOT_ALLOWED` (2209) **đã tồn tại** nhưng thuộc luồng đóng lớp, không dùng cho chuyên môn.
@@ -239,7 +250,7 @@ Kiểm ở service (không chỉ bean validation):
 | E-10 | Thêm môn trùng `sequenceNo` | 409 | `CURRICULUM_SEQUENCE_DUPLICATE` | `{sequenceNo}` | TC-CUR-007 |
 | E-11 | Tiên quyết A→B→A | 400 | `SUBJECT_PREREQUISITE_CYCLE` | `{path:[A,B,A]}` | TC-CUR-009 |
 | E-12 | Tổng buổi ≠ LT+TH — **chỉ khi tổ chức bật quy tắc kỹ thuật tuỳ chọn** (D-03 không bắt buộc) | 400 | `THEORY_PRACTICE_MISMATCH` | — | TC-CUR-008 (tuỳ chọn) |
-| E-13 | Áp curriculum cho lớp đang học | 409 | `CLASS_SUBJECT_LOCKED` (hoặc `CLASS_NOT_EDITABLE`) | — | TC-CLS-005 |
+| E-13 | Áp curriculum cho lớp đang học | 409 | `CLASS_NOT_EDITABLE` (dùng mã 2205; không có `CLASS_SUBJECT_LOCKED`) | — | TC-CLS-005 |
 | E-14 | Áp curriculum khi version lệch | 409 | `DATA_CHANGED` | `{currentVersion}` | TC-CLS-006 |
 | E-15 | Thêm môn đã có vào lớp | 409 | `CLASS_SUBJECT_EXISTS` | — | TC-CLS-010 |
 | E-16 | Gán giáo viên không chuyên môn cho môn lớp | 409 | `SUBJECT_MISMATCH` | — | TC-CLS-014 |
@@ -261,7 +272,7 @@ Kiểm ở service (không chỉ bean validation):
 | E-32 | Đổi môn chính sang môn org khác | 404 | `SUBJECT_NOT_FOUND` | — | TC-CLS-033 |
 | E-33 | `expectedVersion` lệch khi đổi môn chính | 409 | `DATA_CHANGED` | `{currentVersion}` | TC-CLS-031 |
 | E-34 | Hai request đổi primary đồng thời → UNIQUE `primary_class_id` | 409 | `CLASS_SUBJECT_OPERATION_CONFLICT` | — | TC-CLS-032 |
-| E-35 | `reason` 501 ký tự | 400 | `REASON_TOO_LONG` | — | TC-CLS-027 |
+| E-35 | `reason` 501 ký tự khi đổi môn chính | 400 | `PRIMARY_REASON_TOO_LONG` (3054) | — | TC-CLS-027 |
 | E-36 | Xoá dòng primary qua `DELETE /classes/{id}/subjects/{subjectId}` | 409 | `CLASS_SUBJECT_LEGACY_PROTECTED` | — | TC-CLS-025 |
 | E-37 | Ghi history lỗi (DB) → rollback cả `school_class`/`class_subject` | 500 | `UNCATEGORIZED_EXCEPTION` | — | TC-CLS-030 |
 | E-38 | `PUT /classes/{id}` đổi `subjectId` nhưng bỏ qua history (giả lập code sai) | 200 | Có dòng `class_subject_history` + primary đồng bộ | — | TC-CLS-035 |
@@ -270,6 +281,10 @@ Kiểm ở service (không chỉ bean validation):
 | E-41 | Cùng `operationId` nhưng payload chuẩn hoá khác | 409 | `CLASS_SUBJECT_OPERATION_CONFLICT` | — | TC-CLS-042 |
 | E-42 | Retry cùng `operationId` + cùng payload sau khi thành công | 200 | Kết quả cũ, cùng `historyId` | — | TC-CLS-043 |
 | E-43 | `PUT /classes/{id}` đổi `subjectId` nhưng thiếu `reason`/`operationId`/`version` | 400 | `VALIDATION_ERROR` | `{fields:[…]}` | TC-CLS-044 |
+| E-44 | History lưu `request_fingerprint` đúng SHA-256 64 hex, cùng transaction | 200 | — | — | TC-CLS-045 |
+| E-45 | History trả `oldTeacherName`/`changedByName` snapshot (không join sống) | 200 | — | — | TC-CLS-046 |
+| E-46 | Curriculum-subject POST/PUT/DELETE thiếu `expectedVersion` | 400 | `VALIDATION_ERROR` | `{fields:[…]}` | TC-CUR-024 |
+| E-47 | Curriculum-subject `expectedVersion` lệch `curriculum.version` | 409 | `DATA_CHANGED` | `{currentVersion}` | TC-CUR-025 |
 
 Ví dụ body:
 
@@ -322,7 +337,7 @@ không đọc-rồi-ghi không khoá khi thao tác làm thay đổi nhiều dòn
 | Hai request thêm cùng cạnh tiên quyết | PK `(curriculum_id, subject_id, prerequisite_subject_id)` | `PREREQUISITE_DUPLICATE` (hoặc `CONFLICT` nếu không map constraint) |
 | Hai request gán cùng môn cho giáo viên | PK `(user_id, subject_id)` | `TEACHER_SUBJECT_EXISTS` |
 | Hai request đổi primary cùng lớp | UNIQUE `(primary_class_id)` + khoá `school_class` | `CLASS_SUBJECT_OPERATION_CONFLICT` hoặc `DATA_CHANGED` |
-| Hai request cùng `operationId` | UNIQUE `(org_id, operation_id)` | Trả kết quả cũ (idempotent), không tạo history thứ hai |
+| Hai request cùng `operationId` | UNIQUE `(org_id, operation_id)` + so `request_fingerprint` | Cùng fingerprint → trả kết quả cũ (idempotent); khác fingerprint → `CLASS_SUBJECT_OPERATION_CONFLICT` |
 
 Hiện `DataIntegrityViolationException` trả chung `CONFLICT`; đề xuất map theo tên constraint
 giống `SubjectRepository.duplicateSubject` để trả mã cụ thể.
@@ -331,7 +346,7 @@ giống `SubjectRepository.duplicateSubject` để trả mã cụ thể.
 
 - Lớp tự chuyển `CHUA_BAT_DAU → DANG_DIEN_RA` bởi `@Scheduled`: thao tác sửa `class_subject`
   phải kiểm lại trạng thái **sau khi khoá**; nếu không còn `CHUA_BAT_DAU` → 409
-  `CLASS_SUBJECT_LOCKED`. Riêng đổi môn chính vẫn hợp lệ ở `DANG_DIEN_RA`; phải kiểm lại trạng
+  `CLASS_NOT_EDITABLE` (2205). Riêng đổi môn chính vẫn hợp lệ ở `DANG_DIEN_RA`; phải kiểm lại trạng
   thái sau khoá để chắc lớp chưa chuyển `DA_KET_THUC`.
 - Đổi môn chính phải ghi history và cập nhật `school_class`/`class_subject` **trong một transaction**;
   nếu bước sau fail, history cũng rollback (không có "history mồ côi").
@@ -348,10 +363,11 @@ giống `SubjectRepository.duplicateSubject` để trả mã cụ thể.
 | `POST/PUT /subjects` | DTO + trùng mã/tên + org |
 | `PATCH /subjects/{id}/status` | body boolean; tồn tại; org |
 | `POST/PUT /curricula` | DTO + trùng code/tên + version |
-| `POST /curricula/{id}/subjects` | DTO + subject active/org + trùng cặp/thứ tự + mảng tiên quyết (tồn tại trong curriculum, không tự trỏ, không trùng, không chu trình) |
-| `PUT /classes/{id}/curriculum` | lớp `CHUA_BAT_DAU` + curriculum active/org + version + confirm |
+| `POST/PUT/DELETE /curricula/{id}/subjects` | DTO + `expectedVersion` bắt buộc (F-MAJ-07) + subject active/org + trùng cặp/thứ tự + mảng tiên quyết (tồn tại trong curriculum, không tự trỏ, không trùng, không chu trình) |
+| `PUT /classes/{id}/curriculum` | lớp `CHUA_BAT_DAU` + curriculum active/org + version + confirm + **đồng thời** `class.edit` & `curriculum.view` (F-MAJ-02) |
 | `POST/PUT /classes/{id}/subjects` | lớp `CHUA_BAT_DAU` + subject active/org + teacher chuyên môn + version |
-| `PUT /classes/{id}/subjects/primary` | lớp `CHUA_BAT_DAU`/`DANG_DIEN_RA` + subject active/org + `reason` ≤ 500 + `expectedVersion` + `operationId` (idempotent) |
+| `PUT /classes/{id}/subjects/primary` | lớp `CHUA_BAT_DAU`/`DANG_DIEN_RA` + subject active/org + `reason` ≤ 500 (`PRIMARY_REASON_TOO_LONG`) + `expectedVersion` + `operationId` (so `request_fingerprint`) |
+| `PUT /classes/{id}` có đổi `subjectId` | như primary + `version` (= `expectedVersion`); không đổi `subjectId` giữ hợp đồng cũ |
 | `GET /classes/{id}/subject-history` | `page`/`size` hợp lệ; lớp cùng org |
 | `POST/PUT/DELETE /teachers/{id}/subjects` | teacher tồn tại/org + subject active/org + version (`staff_profile.version`); Phase 1 không có bước duyệt |
 | Internal | key + `orgId` khớp dữ liệu |
@@ -383,12 +399,23 @@ giống `SubjectRepository.duplicateSubject` để trả mã cụ thể.
 - AC-VAL-16: `DELETE /classes/{id}` khi lớp đã có history trả 409 `CONFLICT` (không phải 500 do FK).
 - AC-VAL-17: Đổi môn chính thiếu `reason`/`expectedVersion`/`operationId` trả 400 `VALIDATION_ERROR`,
   không ghi history.
-- AC-VAL-18: Cùng `operationId` + payload khác trả 409; cùng `operationId` + cùng payload trả kết quả
-  cũ, không sinh history thứ hai.
+- AC-VAL-18: Cùng `operationId` + **fingerprint khác** trả 409; cùng fingerprint trả kết quả cũ,
+  không sinh history thứ hai. `request_fingerprint` là SHA-256 64 hex lowercase, ghi cùng
+  transaction với history.
 - AC-VAL-19: `PUT /classes/{id}` đổi `subjectId` nhưng thiếu `reason`/`operationId`/`version` trả 400;
   có đủ thì đi qua luồng history, không bypass.
 - AC-VAL-20: `school_class.subject_id = NULL` → không có primary; `subject_id != NULL` → đúng một
   primary khớp `subject_id`; DB UNIQUE chỉ chặn trường hợp nhiều hơn một.
+- AC-VAL-21: `GET /subjects` chỉ cho `OWNER`/`subject.view`/`subject.manage` scope ORGANIZATION;
+  người chỉ có `class.view`/`student.view`/`class.assign_teacher` nhận 403 (F-MAJ-03) — thay đổi
+  hành vi phải có test hồi quy.
+- AC-VAL-22: Áp curriculum thiếu `curriculum.view` (dù có `class.edit`) trả 403 (F-MAJ-02).
+- AC-VAL-23: Thêm/sửa/xoá curriculum-subject thiếu `expectedVersion` trả 400; lệch trả 409
+  `DATA_CHANGED`, không ghi đè (F-MAJ-07).
+- AC-VAL-24: History trả `oldTeacherName`/`changedByName` là snapshot lúc đổi; đổi tên hồ sơ sau đó
+  không làm thay đổi history đã ghi (F-MAJ-05).
+- AC-VAL-25: `reason` > 500 ở đổi môn chính trả `PRIMARY_REASON_TOO_LONG` (3054); luồng kết thúc/huỷ
+  lớp vẫn dùng `REASON_TOO_LONG` (3018, ≤ 1000).
 
 ---
 
@@ -404,8 +431,23 @@ tài liệu này:
 - D-15: `CLASS_SUBJECT_LEGACY_PROTECTED` thuộc Phase 1.
 - D-08/D-15: đổi môn chính khi `DANG_DIEN_RA` hợp lệ nhưng bắt buộc ghi history; `reason`,
   `expectedVersion`, `operationId` là **bắt buộc**; mã mới `CLASS_SUBJECT_OPERATION_CONFLICT` (2240)
-  và `REASON_TOO_LONG` (3054); thiếu trường bắt buộc dùng `VALIDATION_ERROR` hiện có.
+  và `PRIMARY_REASON_TOO_LONG` (3054); thiếu trường bắt buộc dùng `VALIDATION_ERROR` hiện có.
 - D-09: fallback `school_class.teacher_id` **chỉ** khi lớp chưa có bản ghi `class_subject` tương ứng.
+
+**Chốt bổ sung 2026-11-20 (giải findings WP1):**
+
+- F-BLK-01: fingerprint SHA-256 64 hex lưu cùng history; cùng `operationId` + cùng fingerprint →
+  trả kết quả cũ; khác → 409.
+- F-MAJ-01: `PRIMARY_REASON_TOO_LONG` (3054) cho đổi môn chính; `REASON_TOO_LONG` (3018) giữ nguyên.
+- F-MAJ-02/03: áp curriculum cần `class.edit` + `curriculum.view`; READ subject chỉ
+  OWNER/`subject.view`/`subject.manage` ORGANIZATION (không kế thừa `class.*`).
+- F-MAJ-04: `PUT /classes/{id}` đổi `subjectId` dùng `version` làm `expectedVersion`, 409
+  `DATA_CHANGED` (2212) khi lệch.
+- F-MAJ-05: snapshot `old_teacher_name`, `changed_by_name`.
+- F-MAJ-06: từ vựng chuẩn `ACTIVE`/`theorySessions`/`practiceSessions`/`sequenceNo`/`required`/`note`.
+- F-MAJ-07: `expectedVersion` bắt buộc cho curriculum-subject, khoá ở parent.
+- F-MED-02/03: `*_NOT_FOUND` → 404; `SUBJECT_MISMATCH` → 409.
+- F-MED-05: bật UNIQUE `subject(org_id, code)` qua 52 khi không còn trùng; NULL nhiều bản ghi hợp lệ.
 
 Câu hỏi kỹ thuật còn lại:
 

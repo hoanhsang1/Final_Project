@@ -1,11 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { classesApi, studentsApi, subjectsApi, teachersApi } from '@/features/academic/api'
+import {
+  classSubjectsApi,
+  classesApi,
+  curriculaApi,
+  specialtySubjectsApi,
+  studentsApi,
+  subjectsApi,
+  teacherSubjectsApi,
+  teachersApi,
+} from '@/features/academic/api'
 import type {
+  ApplyCurriculumRequest,
   ClassInput,
+  ClassSubjectCreateRequest,
+  ClassSubjectUpdateRequest,
   ClassUpdateInput,
+  CurriculumCreateRequest,
+  CurriculumSubjectCreateRequest,
+  CurriculumSubjectUpdateRequest,
+  CurriculumUpdateRequest,
+  PrimarySubjectChangeRequest,
+  SpecialtySubjectUpdateRequest,
   StudentInput,
+  SubjectCreateRequest,
   SubjectInput,
+  SubjectUpdateRequest,
+  TeacherSubjectCreateRequest,
+  TeacherSubjectUpdateRequest,
   TeacherUpdateInput,
 } from '@/features/academic/types'
 
@@ -25,6 +47,15 @@ export const academicKeys = {
   classLogs: (id: string) => ['classes', id, 'status-logs'] as const,
   classEvents: (id: string) => ['classes', id, 'close-events'] as const,
   subjects: (params: unknown) => ['subjects', params] as const,
+  subjectUsage: (id: string) => ['subjects', id, 'usage'] as const,
+  curricula: (params: unknown) => ['curricula', params] as const,
+  curriculum: (id: string) => ['curricula', id] as const,
+  curriculumSubjects: (id: string) => ['curricula', id, 'subjects'] as const,
+  classSubjects: (classId: string) => ['classes', classId, 'subjects'] as const,
+  classSubjectHistory: (classId: string, params: unknown) =>
+    ['classes', classId, 'subject-history', params] as const,
+  teacherSubjects: (staffId: string) => ['teachers', staffId, 'subjects'] as const,
+  specialtySubjects: (specialtyId: string) => ['specialties', specialtyId, 'subjects'] as const,
 }
 
 export function useTeachers(params: {
@@ -315,14 +346,15 @@ export function useSubjectMutations() {
     await queryClient.invalidateQueries({ queryKey: ['subjects'] })
     // Lớp đang hiển thị tên môn — làm mới để đồng bộ khi môn đổi tên/ngừng dùng.
     await queryClient.invalidateQueries({ queryKey: ['classes'] })
+    await queryClient.invalidateQueries({ queryKey: ['curricula'] })
   }
   return {
     create: useMutation({
-      mutationFn: (input: SubjectInput) => subjectsApi.create(input),
+      mutationFn: (input: SubjectCreateRequest | SubjectInput) => subjectsApi.create(input),
       onSuccess: invalidate,
     }),
     update: useMutation({
-      mutationFn: ({ id, input }: { id: string; input: SubjectInput }) =>
+      mutationFn: ({ id, input }: { id: string; input: SubjectUpdateRequest | SubjectInput }) =>
         subjectsApi.update(id, input),
       onSuccess: invalidate,
     }),
@@ -332,4 +364,215 @@ export function useSubjectMutations() {
       onSuccess: invalidate,
     }),
   }
+}
+
+export function useSubjectUsage(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: academicKeys.subjectUsage(id ?? ''),
+    queryFn: () => subjectsApi.usage(id!),
+    enabled: Boolean(id) && enabled,
+  })
+}
+
+// ============================================================================
+// Phase 1 — Curriculum Hooks (Screen 2, 3, 4)
+// ============================================================================
+
+export function useCurricula(
+  params: { q?: string; isActive?: boolean; page?: number; size?: number } = {},
+) {
+  return useQuery({
+    queryKey: academicKeys.curricula(params),
+    queryFn: () => curriculaApi.list(params),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useCurriculum(id: string | undefined) {
+  return useQuery({
+    queryKey: academicKeys.curriculum(id ?? ''),
+    queryFn: () => curriculaApi.byId(id!),
+    enabled: Boolean(id),
+  })
+}
+
+export function useCurriculumSubjects(curriculumId: string | undefined) {
+  return useQuery({
+    queryKey: academicKeys.curriculumSubjects(curriculumId ?? ''),
+    queryFn: () => curriculaApi.subjects(curriculumId!),
+    enabled: Boolean(curriculumId),
+  })
+}
+
+export function useCurriculumMutations() {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['curricula'] })
+  }
+  return {
+    create: useMutation({
+      mutationFn: (input: CurriculumCreateRequest) => curriculaApi.create(input),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: CurriculumUpdateRequest }) =>
+        curriculaApi.update(id, input),
+      onSuccess: async (_, variables) => {
+        await invalidate()
+        await queryClient.invalidateQueries({ queryKey: academicKeys.curriculum(variables.id) })
+      },
+    }),
+    setActive: useMutation({
+      mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+        curriculaApi.setActive(id, active),
+      onSuccess: async (_, variables) => {
+        await invalidate()
+        await queryClient.invalidateQueries({ queryKey: academicKeys.curriculum(variables.id) })
+      },
+    }),
+  }
+}
+
+export function useCurriculumSubjectMutations(curriculumId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: academicKeys.curriculumSubjects(curriculumId) })
+    await queryClient.invalidateQueries({ queryKey: academicKeys.curriculum(curriculumId) })
+    await queryClient.invalidateQueries({ queryKey: ['curricula'] })
+  }
+  return {
+    addSubject: useMutation({
+      mutationFn: (input: CurriculumSubjectCreateRequest) =>
+        curriculaApi.addSubject(curriculumId, input),
+      onSuccess: invalidate,
+    }),
+    updateSubject: useMutation({
+      mutationFn: ({
+        subjectId,
+        input,
+      }: {
+        subjectId: string
+        input: CurriculumSubjectUpdateRequest
+      }) => curriculaApi.updateSubject(curriculumId, subjectId, input),
+      onSuccess: invalidate,
+    }),
+    removeSubject: useMutation({
+      mutationFn: (subjectId: string) => curriculaApi.removeSubject(curriculumId, subjectId),
+      onSuccess: invalidate,
+    }),
+  }
+}
+
+// ============================================================================
+// Phase 1 — Class Subject Hooks (Screen 7, 8, 9)
+// ============================================================================
+
+export function useClassSubjects(classId: string | undefined) {
+  return useQuery({
+    queryKey: academicKeys.classSubjects(classId ?? ''),
+    queryFn: () => classSubjectsApi.list(classId!),
+    enabled: Boolean(classId),
+  })
+}
+
+export function useClassSubjectHistory(
+  classId: string | undefined,
+  params: { page?: number; size?: number } = {},
+) {
+  return useQuery({
+    queryKey: academicKeys.classSubjectHistory(classId ?? '', params),
+    queryFn: () => classSubjectsApi.history(classId!, params),
+    enabled: Boolean(classId),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useClassSubjectMutations(classId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: academicKeys.classSubjects(classId) })
+    await queryClient.invalidateQueries({ queryKey: academicKeys.class(classId) })
+    await queryClient.invalidateQueries({ queryKey: ['classes'] })
+  }
+  return {
+    applyCurriculum: useMutation({
+      mutationFn: (input: ApplyCurriculumRequest) =>
+        classSubjectsApi.applyCurriculum(classId, input),
+      onSuccess: invalidate,
+    }),
+    addSubject: useMutation({
+      mutationFn: (input: ClassSubjectCreateRequest) => classSubjectsApi.addSubject(classId, input),
+      onSuccess: invalidate,
+    }),
+    updateSubject: useMutation({
+      mutationFn: ({ subjectId, input }: { subjectId: string; input: ClassSubjectUpdateRequest }) =>
+        classSubjectsApi.updateSubject(classId, subjectId, input),
+      onSuccess: invalidate,
+    }),
+    removeSubject: useMutation({
+      mutationFn: (subjectId: string) => classSubjectsApi.removeSubject(classId, subjectId),
+      onSuccess: invalidate,
+    }),
+    changePrimarySubject: useMutation({
+      mutationFn: (input: PrimarySubjectChangeRequest) =>
+        classSubjectsApi.changePrimarySubject(classId, input),
+      onSuccess: async () => {
+        await invalidate()
+        await queryClient.invalidateQueries({
+          queryKey: ['classes', classId, 'subject-history'],
+        })
+      },
+    }),
+  }
+}
+
+// ============================================================================
+// Phase 1 — Teacher Subject & Specialty Subject Hooks (Screen 5, 6)
+// ============================================================================
+
+export function useTeacherSubjects(staffId: string | undefined) {
+  return useQuery({
+    queryKey: academicKeys.teacherSubjects(staffId ?? ''),
+    queryFn: () => teacherSubjectsApi.list(staffId!),
+    enabled: Boolean(staffId),
+  })
+}
+
+export function useTeacherSubjectMutations(staffId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: academicKeys.teacherSubjects(staffId) })
+    await queryClient.invalidateQueries({ queryKey: academicKeys.teacher(staffId) })
+  }
+  return {
+    addSubject: useMutation({
+      mutationFn: (input: TeacherSubjectCreateRequest) =>
+        teacherSubjectsApi.addSubject(staffId, input),
+      onSuccess: invalidate,
+    }),
+    replaceSubjects: useMutation({
+      mutationFn: (input: TeacherSubjectUpdateRequest) =>
+        teacherSubjectsApi.replaceSubjects(staffId, input),
+      onSuccess: invalidate,
+    }),
+  }
+}
+
+export function useSpecialtySubjects(specialtyId: string | undefined) {
+  return useQuery({
+    queryKey: academicKeys.specialtySubjects(specialtyId ?? ''),
+    queryFn: () => specialtySubjectsApi.getSubjects(specialtyId!),
+    enabled: Boolean(specialtyId),
+  })
+}
+
+export function useSpecialtySubjectMutations(specialtyId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: SpecialtySubjectUpdateRequest) =>
+      specialtySubjectsApi.updateSubjects(specialtyId, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: academicKeys.specialtySubjects(specialtyId) })
+    },
+  })
 }

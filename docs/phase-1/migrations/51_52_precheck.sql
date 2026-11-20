@@ -418,9 +418,10 @@ FROM information_schema.check_constraints
 WHERE constraint_schema = DATABASE() AND constraint_name = 'chk_teacher_subject_status';
 
 -- 0h) Hai bảng phụ của 52: nếu đã tồn tại, 52 sẽ audit đầy đủ và ABORT khi lệch.
---     Kỳ vọng: history có FK class kiểu RESTRICT/RESTRICT (không CASCADE);
+--     Kỳ vọng: history có 19 cột và FK class kiểu RESTRICT/RESTRICT (không CASCADE);
 --     specialty_subject có specialty CASCADE/RESTRICT và subject RESTRICT/RESTRICT.
---     0h column_count = 0 => bảng chưa tồn tại (52 sẽ CREATE).
+--     0h column_count = 0 => bảng chưa tồn tại (52 sẽ CREATE). 16 cột = bảng
+--     Revision-3 cũ, phải xử lý tay trước khi chạy 52.
 SELECT 'class_subject_history' AS table_name,
        (SELECT COUNT(*) FROM information_schema.columns
          WHERE table_schema = DATABASE() AND table_name = 'class_subject_history') AS column_count
@@ -428,6 +429,21 @@ UNION ALL
 SELECT 'specialty_subject',
        (SELECT COUNT(*) FROM information_schema.columns
          WHERE table_schema = DATABASE() AND table_name = 'specialty_subject');
+
+-- 0h.1) Cột Revision-5 còn thiếu trên class_subject_history (kỳ vọng: 0 dòng).
+SELECT e.column_name AS missing_column
+FROM (
+  SELECT 'old_teacher_name' AS column_name
+  UNION ALL SELECT 'request_fingerprint'
+  UNION ALL SELECT 'changed_by_name'
+) e
+WHERE EXISTS (
+  SELECT 1 FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'class_subject_history')
+  AND NOT EXISTS (
+  SELECT 1 FROM information_schema.columns c
+  WHERE c.table_schema = DATABASE() AND c.table_name = 'class_subject_history'
+    AND c.column_name = e.column_name);
 
 SELECT table_name, constraint_name, update_rule, delete_rule
 FROM information_schema.referential_constraints
@@ -492,7 +508,7 @@ FROM (
 ) t
 ORDER BY t.priv;
 
--- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE)
+-- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE; 52 tự guard)
 SELECT org_id, code, COUNT(*) AS n
 FROM subject
 WHERE code IS NOT NULL
@@ -503,7 +519,8 @@ HAVING COUNT(*) > 1;
 SELECT table_name, index_name, non_unique, seq_in_index, column_name
 FROM information_schema.statistics
 WHERE table_schema = DATABASE()
-  AND index_name IN ('uq_school_class_id_org','uq_class_subject_primary','uq_csh_operation')
+  AND index_name IN ('uq_school_class_id_org','uq_class_subject_primary','uq_csh_operation',
+                     'uq_subject_org_code')
 ORDER BY table_name, index_name, seq_in_index;
 
 SELECT table_name, constraint_name, constraint_type

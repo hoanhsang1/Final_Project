@@ -8,12 +8,17 @@
 --
 -- EXISTING class_subject:
 --   This script creates the table in full when it does not exist. If it already
---   exists, it is accepted ONLY when it already matches the Revision-3 schema
---   (all columns and their attributes, indexes, FKs + referential actions,
---   CHECKs, generated column, PK). Otherwise the script ABORTS with SIGNAL — it
+--   exists, it is accepted ONLY when it already matches the current schema
+--   (Revision 5: 19-column history with snapshot names + request_fingerprint,
+--   plus all columns/attributes, indexes, FKs + referential actions, CHECKs,
+--   generated column, PK). Otherwise the script ABORTS with SIGNAL — it
 --   never auto-upgrades an unknown old table and never rewrites an
 --   already-applied migration file. The same rule applies to pre-existing
 --   teacher_subject, class_subject_history and specialty_subject.
+--
+-- D-04 (Revision 5): the UNIQUE (org_id, code) on subject is ACTIVE in step 7.
+--   It self-checks duplicate groups first and SIGNALs instead of guessing;
+--   it never rewrites existing subject codes.
 --
 -- ABORT / PARTIAL BACKFILL (see ROLLBACK.md §2):
 --   MySQL DDL causes implicit commits and this script is not wrapped in one
@@ -576,10 +581,12 @@ BEGIN
 END$
 
 -- ---------------------------------------------------------------------------
--- Abort if an existing class_subject_history is not the Revision-3 schema.
+-- Abort if an existing class_subject_history is not the Revision-5 schema.
 -- History is append-only audit data: a same-name table with ON DELETE CASCADE
 -- (or any other structural drift) must never be accepted, because it would let
 -- history rows disappear with a class. Never auto-ALTER; SIGNAL instead.
+-- Revision 5 (2026-11-20) adds old_teacher_name, request_fingerprint and
+-- changed_by_name; an older 16-column table must be handled manually.
 -- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema$
 CREATE PROCEDURE mems_m52_assert_history_schema()
@@ -606,13 +613,14 @@ BEGIN
       LEAVE h_check;
     END IF;
 
-    -- Columns: exact set of 16.
+    -- Columns: exact set of 19.
     SELECT COUNT(*),
            COALESCE(SUM(column_name IN (
              'id','org_id','class_id','old_subject_id','old_subject_code',
-             'old_subject_name','old_teacher_id','old_source','new_subject_id',
-             'new_subject_code','new_subject_name','new_source','reason',
-             'operation_id','changed_by','changed_at')), 0)
+             'old_subject_name','old_teacher_id','old_teacher_name','old_source',
+             'new_subject_id','new_subject_code','new_subject_name','new_source','reason',
+             'operation_id','request_fingerprint','changed_by','changed_by_name',
+             'changed_at')), 0)
     INTO v_total_cols, v_cols
     FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'class_subject_history';
@@ -631,6 +639,7 @@ BEGIN
         UNION ALL SELECT 'old_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'old_subject_name','varchar(200)','YES',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'old_teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_teacher_name','varchar(200)','YES',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'old_source','varchar(20)','YES',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'new_subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'new_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
@@ -638,7 +647,9 @@ BEGIN
         UNION ALL SELECT 'new_source','varchar(20)','NO',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'reason','varchar(500)','NO',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'operation_id','varchar(64)','NO',NULL,64,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'request_fingerprint','char(64)','NO',NULL,64,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'changed_by','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'changed_by_name','varchar(200)','YES',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
         UNION ALL SELECT 'changed_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
       ) e
       LEFT JOIN information_schema.columns c
@@ -773,14 +784,14 @@ BEGIN
         AND tc.constraint_type = 'CHECK'
     ) z;
 
-    IF v_total_cols <> 16 OR v_cols <> 16 OR v_attr_bad <> 0
+    IF v_total_cols <> 19 OR v_cols <> 19 OR v_attr_bad <> 0
        OR v_idx_ok <> 4 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
        OR v_pk <> 1
        OR v_fk_total <> 1 OR v_fk_ok <> 1 OR v_fk_schema_bad <> 0
        OR v_fk_rule_bad <> 0
        OR v_chk_total <> 3 OR v_chk_ok <> 3 THEN
       SELECT 'class_subject_history_schema_mismatch' AS issue,
-             v_total_cols AS total_cols_16, v_cols AS named_cols_16,
+             v_total_cols AS total_cols_19, v_cols AS named_cols_19,
              v_attr_bad AS attr_mismatch_0,
              v_idx_ok AS idx_ok_4, v_idx_prefix AS idx_prefix_0,
              v_idx_extra AS idx_extra_0, v_pk AS pk_1,
@@ -788,7 +799,7 @@ BEGIN
              v_fk_schema_bad AS fk_schema_0, v_fk_rule_bad AS fk_rule_0,
              v_chk_total AS chk_3, v_chk_ok AS chk_ok_3;
       SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'M52 ABORT: existing class_subject_history is not Revision-3; history must not cascade';
+        SET MESSAGE_TEXT = 'M52 ABORT: existing class_subject_history is not Revision-5; history must not cascade';
     END IF;
   END h_check;
 END$
@@ -1161,7 +1172,8 @@ DROP TEMPORARY TABLE IF EXISTS tmp_m52_has_primary;
 -- 5c) Dừng nếu còn >1 primary/lớp (UNIQUE không thể tạo an toàn).
 CALL mems_m52_assert_no_duplicate_primary();
 
--- 6) class_subject_history (append-only, D-08/D-15)
+-- 6) class_subject_history (append-only, D-08/D-15; Revision 5 adds snapshot
+--    names and request_fingerprint for idempotency)
 CREATE TABLE IF NOT EXISTS class_subject_history (
   id               char(36) NOT NULL,
   org_id           char(36) NOT NULL,
@@ -1170,6 +1182,7 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   old_subject_code varchar(50) DEFAULT NULL,
   old_subject_name varchar(200) DEFAULT NULL,
   old_teacher_id   char(36) DEFAULT NULL,
+  old_teacher_name varchar(200) DEFAULT NULL,
   old_source       varchar(20) DEFAULT NULL,
   new_subject_id   char(36) NOT NULL,
   new_subject_code varchar(50) DEFAULT NULL,
@@ -1177,7 +1190,9 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   new_source       varchar(20) NOT NULL,
   reason           varchar(500) NOT NULL,
   operation_id     varchar(64) NOT NULL,
+  request_fingerprint char(64) NOT NULL,
   changed_by       char(36) NOT NULL,
+  changed_by_name  varchar(200) DEFAULT NULL,
   changed_at       datetime(3) NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_csh_operation (org_id, operation_id),
@@ -1193,10 +1208,59 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
     new_source IN ('LEGACY','CURRICULUM','MANUAL'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 7) D-04 — UNIQUE (org_id, code) cho subject, CHỈ sau khi precheck = 0 dòng trùng.
---    Để tránh chạy nhầm khi dữ liệu còn trùng, khối này COMMENTED.
--- ALTER TABLE subject DROP INDEX uq_subject_org_code,
---   ADD UNIQUE KEY uq_subject_org_code (org_id, code);
+-- 7) D-04 (chốt 2026-11-20) — UNIQUE (org_id, code) cho subject.
+--    Guard: nếu còn nhóm code trùng trong cùng org ⇒ SIGNAL, không tự sửa dữ liệu.
+--    ALTER idempotent: chỉ drop index cũ khi nó chưa phải UNIQUE đúng cột.
+DELIMITER $
+DROP PROCEDURE IF EXISTS mems_m52_apply_subject_code_unique$
+CREATE PROCEDURE mems_m52_apply_subject_code_unique()
+BEGIN
+  DECLARE v_dups INT DEFAULT 0;
+  DECLARE v_ok INT DEFAULT 0;
+  DECLARE v_old_idx INT DEFAULT 0;
+
+  SELECT COUNT(*) INTO v_dups
+  FROM (
+    SELECT org_id, code
+    FROM subject
+    WHERE code IS NOT NULL
+    GROUP BY org_id, code
+    HAVING COUNT(*) > 1
+  ) d;
+
+  IF v_dups > 0 THEN
+    SELECT 'subject_code_duplicates' AS issue, v_dups AS duplicate_groups;
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'M52 ABORT: duplicate subject.code in organization; resolve manually before D-04 UNIQUE';
+  END IF;
+
+  SELECT COUNT(*) INTO v_ok
+  FROM (
+    SELECT index_name, non_unique,
+           GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'subject'
+    GROUP BY index_name, non_unique
+  ) i
+  WHERE i.non_unique = 0 AND i.cols = 'org_id,code';
+
+  IF v_ok = 0 THEN
+    SELECT COUNT(*) INTO v_old_idx
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'subject'
+      AND index_name = 'uq_subject_org_code';
+
+    IF v_old_idx > 0 THEN
+      ALTER TABLE subject DROP INDEX uq_subject_org_code;
+    END IF;
+
+    ALTER TABLE subject ADD UNIQUE KEY uq_subject_org_code (org_id, code);
+  END IF;
+END$
+DELIMITER ;
+
+CALL mems_m52_apply_subject_code_unique();
+DROP PROCEDURE IF EXISTS mems_m52_apply_subject_code_unique;
 
 DROP PROCEDURE IF EXISTS mems_m52_assert_database;
 DROP PROCEDURE IF EXISTS mems_m52_assert_class_subject_schema;
