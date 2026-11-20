@@ -34,8 +34,7 @@ import java.util.stream.Collectors;
  *  1. Không trùng lịch giáo viên.
  *  2. Không trùng lịch phòng.
  *  3. Không trùng lịch lớp.
- *  4. Giáo viên phải đủ điều kiện dạy môn (nguồn chuẩn D-06: teacher_subject.status='APPROVED',
- *     fallback: teacher_specialty để tương thích ngược).
+ *  4. Giáo viên phải đủ điều kiện dạy môn (nguồn chuẩn D-06: teacher_subject.status='APPROVED').
  *  5. Phòng phải active, không có thiết bị hỏng, đủ sức chứa.
  */
 @Service

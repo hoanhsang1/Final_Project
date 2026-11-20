@@ -75,20 +75,17 @@ public class TeacherRepository {
     public boolean teachesSubject(String userId, String orgId, String subjectId) {
         Integer count = jdbc.queryForObject("""
             SELECT COUNT(*)
-            FROM teacher_specialty ts
-            JOIN specialty s ON s.id=ts.specialty_id AND s.org_id=ts.org_id AND s.is_active=TRUE
-            JOIN subject sub ON sub.id=? AND sub.org_id=ts.org_id AND sub.is_active=TRUE
-            WHERE ts.user_id=? AND ts.org_id=? AND s.name_unaccented=sub.name_unaccented
-            """, Integer.class, subjectId, userId, orgId);
+            FROM teacher_subject ts
+            JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+            WHERE ts.user_id=? AND ts.org_id=? AND ts.subject_id=? AND ts.status='APPROVED'
+            """, Integer.class, userId, orgId, subjectId);
         return count != null && count > 0;
     }
 
     /**
      * Danh sách giáo viên đang dạy (DANG_DAY) trong org, đủ điều kiện dạy subjectId.
-     * Hỗ trợ 2 nguồn dữ liệu:
-     * 1. Nguồn chuẩn theo D-06: bảng `teacher_subject` với status = 'APPROVED'.
-     * 2. Fallback sang `teacher_specialty` (specialty.name_unaccented = subject.name_unaccented)
-     *    nếu chưa có phân công trong `teacher_subject` (tương thích ngược với hệ thống hiện tại).
+     * Nguồn dữ liệu chuẩn theo D-06: bảng `teacher_subject` với status = 'APPROVED'.
+     * Loại bỏ hoàn toàn fallback tên chuyên môn để tránh sai phân quyền nghiệp vụ.
      * Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
      */
     public List<EligibleTeacherInfo> eligibleForSubject(String orgId, String subjectId) {
@@ -98,28 +95,19 @@ public class TeacherRepository {
             JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
             JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
             WHERE sp.org_id=?
+              AND sp.status='ACTIVE'
               AND tp.teaching_status='DANG_DAY'
-              AND (
-                EXISTS (
-                  SELECT 1 FROM teacher_subject ts
-                  JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
-                  WHERE ts.user_id=sp.user_id AND ts.org_id=sp.org_id
-                    AND ts.subject_id=? AND ts.status='APPROVED'
-                )
-                OR
-                EXISTS (
-                  SELECT 1 FROM teacher_specialty ts2
-                  JOIN specialty s ON s.id=ts2.specialty_id AND s.org_id=ts2.org_id AND s.is_active=TRUE
-                  JOIN subject sub2 ON sub2.id=? AND sub2.org_id=ts2.org_id AND sub2.is_active=TRUE
-                  WHERE ts2.user_id=sp.user_id AND ts2.org_id=sp.org_id
-                    AND s.name_unaccented=sub2.name_unaccented
-                )
+              AND EXISTS (
+                SELECT 1 FROM teacher_subject ts
+                JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+                WHERE ts.user_id=sp.user_id AND ts.org_id=sp.org_id
+                  AND ts.subject_id=? AND ts.status='APPROVED'
               )
             ORDER BY sp.full_name
             """,
             (rs, n) -> new EligibleTeacherInfo(
                 rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
-            orgId, subjectId, subjectId);
+            orgId, subjectId);
     }
 
     public boolean hasProfile(String userId, String orgId) {
