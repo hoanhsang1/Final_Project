@@ -127,11 +127,15 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   3. `SubjectController`: thêm module guard (D-10), `GET /subjects/check-code`,
      `GET /subjects/{id}/usage`. **Không** thêm `page`/`size` (D-13 = A).
   4. `ErrorCode`: thêm `SUBJECT_CODE_EXISTS`, `SUBJECT_INACTIVE`.
-  5. Map `DuplicateKeyException` theo tên constraint (code vs name).
+  5. Map `DuplicateKeyException` theo **tên index** (`uq_subject_org_code` vs tên) — không dựa
+     chuỗi message; nếu không khớp tên đã biết thì trả `CONFLICT` chung (F-LOW-04).
   6. Audit giữ nguyên; bổ sung `classesUsingSubject` ở status (đã có).
   7. (F-MAJ-03) `GET /subjects` chỉ `OWNER` hoặc `subject.view`/`subject.manage` scope
      ORGANIZATION; **bỏ** kế thừa từ `class.view`/`student.view`/`class.create`/
      `class.assign_teacher`/`class.teacher.reassign`; cập nhật `@PreAuthorize` + test hồi quy.
+  8. (F-LOW-03) `SubjectStatusRequest` đang dùng key `ACTIVE_REQUIRED` không có trong `ErrorCode`
+     (rơi về `INVALID_KEY`): đổi sang key có thật hoặc thêm `ACTIVE_REQUIRED` vào enum + handler
+     map đúng; test lại `PATCH /subjects/{id}/status` thiếu field.
 - **File thật:**
   - `backend/PeopleService/src/main/java/com/mems/controller/SubjectController.java`
   - `.../repository/SubjectRepository.java`

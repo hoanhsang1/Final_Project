@@ -1,7 +1,8 @@
 # Phase 1 — Validation & Error Cases
 
 > Tài liệu thiết kế. Mã lỗi **đã có** trích từ
-> `backend/PeopleService/src/main/java/com/mems/exception/ErrorCode.java` tại HEAD `cdd03b8`.
+> `backend/PeopleService/src/main/java/com/mems/exception/ErrorCode.java` (mốc rà soát 2026-11-20,
+> branch `fixFlowCreateEmployee`; không ghi cứng commit hash để tránh lỗi thời).
 > Mã **đề xuất** (223x, 304x) chưa tồn tại; người dùng tự thêm vào enum khi triển khai.
 > **Trạng thái quyết định:** `D-01`…`D-15` **đã được người dùng chốt** (xem sổ quyết định trong
 > `subject-business-requirements.md`). Tài liệu không sửa source hay database.
@@ -223,8 +224,8 @@ Kiểm ở service (không chỉ bean validation):
 
 > Số 223x/304x chỉ là đề xuất; người dùng kiểm tra không trùng trước khi thêm vào
 > `ErrorCode.java`. Không tự sửa enum.
-> **Đã đối chiếu HEAD `bfa9b53`:** 22xx đang dùng đến `2221`, nên 2222–2240 trống; 30xx đang dùng
-> đến `3042`, nên 3043–3054 trống. (`2220 CANCEL_STATE_CHANGED`, `2221 CLASS_APPROVER_NOT_ALLOWED`;
+> **Đã đối chiếu `ErrorCode.java` (mốc 2026-11-20):** 22xx đang dùng đến `2221`, nên 2222–2240
+> trống; 30xx đang dùng đến `3042`, nên 3043–3054 trống. (`2220 CANCEL_STATE_CHANGED`, `2221 CLASS_APPROVER_NOT_ALLOWED`;
 > `2240 CLASS_SUBJECT_OPERATION_CONFLICT`, `3054 PRIMARY_REASON_TOO_LONG` là mã **mới** cho
 > D-08/D-15. `REASON_TOO_LONG` **đã có ở 3018** — không tạo bản trùng.)
 >
@@ -297,8 +298,9 @@ Ví dụ body:
 }
 ```
 
-> `ApiResponse.failure(code, message)` hiện chỉ có 2 tham số (data = null). Muốn trả `data`,
-> dùng overload 3 tham số — người dùng tự thêm ở handler/service nếu cần.
+> `ApiResponse.failure` **đã có** cả 2 overload: `failure(code, message)` (data = null) và
+> `failure(code, message, data)` (`ApiResponse.java`). Trả kèm `data` thì gọi overload 3 tham số;
+> **không** cần sửa lớp này (F-MED-06).
 
 ---
 

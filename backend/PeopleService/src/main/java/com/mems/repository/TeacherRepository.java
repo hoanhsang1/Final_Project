@@ -3,6 +3,7 @@ package com.mems.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.dto.ClassMismatch;
+import com.mems.dto.EligibleTeacherInfo;
 import com.mems.dto.SpecialtyResponse;
 import com.mems.dto.TeacherAssignableItem;
 import com.mems.dto.TeacherClassResponse;
@@ -80,6 +81,29 @@ public class TeacherRepository {
             WHERE ts.user_id=? AND ts.org_id=? AND s.name_unaccented=sub.name_unaccented
             """, Integer.class, subjectId, userId, orgId);
         return count != null && count > 0;
+    }
+
+    /**
+     * Danh sách giáo viên đang dạy (DANG_DAY) trong org, đủ điều kiện dạy subjectId.
+     * Điều kiện: teacher_specialty → specialty.name_unaccented = subject.name_unaccented.
+     * Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
+     */
+    public List<EligibleTeacherInfo> eligibleForSubject(String orgId, String subjectId) {
+        return jdbc.query("""
+            SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
+            FROM teacher_specialty ts
+            JOIN specialty s ON s.id=ts.specialty_id AND s.org_id=ts.org_id AND s.is_active=TRUE
+            JOIN subject sub ON sub.id=? AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+            JOIN staff_profile sp ON sp.user_id=ts.user_id AND sp.org_id=ts.org_id
+            JOIN teacher_profile tp ON tp.user_id=ts.user_id AND tp.org_id=ts.org_id
+            JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
+            WHERE ts.org_id=? AND s.name_unaccented=sub.name_unaccented
+              AND tp.teaching_status='DANG_DAY'
+            ORDER BY sp.full_name
+            """,
+            (rs, n) -> new EligibleTeacherInfo(
+                rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
+            subjectId, orgId);
     }
 
     public boolean hasProfile(String userId, String orgId) {

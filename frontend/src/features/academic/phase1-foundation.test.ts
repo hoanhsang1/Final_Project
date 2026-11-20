@@ -4,9 +4,9 @@
  *
  * Chạy với: npm test -- --run
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
-import { PERM, PERMISSION_GROUPS, ALL_PERMISSION_META } from '@/lib/permissions'
+import { PERM, ALL_PERMISSION_META } from '@/lib/permissions'
 import { classSubjectsApi, curriculaApi, specialtySubjectsApi, subjectsApi, teacherSubjectsApi } from '@/features/academic/api'
 import {
   mockClassSubjectHistory,
@@ -175,7 +175,7 @@ describe('Mock fixtures – data integrity', () => {
 
     it('No teacher subject items have status PENDING', () => {
       const hasPending = mockTeacherSubjectProfiles.some((p) =>
-        p.items.some((item) => item.status === 'PENDING'),
+        p.items.some((item) => (item.status as string) === 'PENDING'),
       )
       expect(hasPending).toBe(false)
     })

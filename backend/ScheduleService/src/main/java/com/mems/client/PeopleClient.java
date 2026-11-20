@@ -49,4 +49,17 @@ public class PeopleClient {
             throw new AppException(ErrorCode.PEOPLE_UNAVAILABLE);
         }
     }
+
+    /** Danh sách giáo viên đủ điều kiện dạy subjectId trong org. */
+    public List<EligibleTeacherInfo> eligibleTeachers(String orgId, String subjectId) {
+        try {
+            var response = http.exchange(
+                "/internal/teachers/eligible?orgId={orgId}&subjectId={subjectId}",
+                HttpMethod.GET, null, new ParameterizedTypeReference<List<EligibleTeacherInfo>>() {},
+                orgId, subjectId);
+            return response.getBody() == null ? List.of() : response.getBody();
+        } catch (RestClientException ex) {
+            throw new AppException(ErrorCode.PEOPLE_UNAVAILABLE);
+        }
+    }
 }

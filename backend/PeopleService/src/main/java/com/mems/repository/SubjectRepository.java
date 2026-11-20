@@ -1,6 +1,7 @@
 package com.mems.repository;
 
 import com.mems.dto.SubjectResponse;
+import com.mems.dto.SubjectUsageResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import com.mems.service.TextNormalizer;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -30,9 +32,9 @@ public class SubjectRepository {
         String term = TextNormalizer.likeContains(q);
         StringBuilder sql = new StringBuilder(SELECT_COLUMNS).append("WHERE org_id=? ");
         if (!includeInactive) sql.append("AND is_active=TRUE ");
-        if (term != null) sql.append("AND name_unaccented LIKE ? ESCAPE '!' ");
+        if (term != null) sql.append("AND (name_unaccented LIKE ? ESCAPE '!' OR code LIKE ? ESCAPE '!') ");
         sql.append("ORDER BY is_active DESC, name");
-        Object[] params = term == null ? new Object[]{orgId} : new Object[]{orgId, term};
+        Object[] params = term == null ? new Object[]{orgId} : new Object[]{orgId, term, term};
         return jdbc.query(sql.toString(), (rs, n) -> map(rs), params);
     }
 
@@ -101,6 +103,29 @@ public class SubjectRepository {
         return require(id, orgId);
     }
 
+    public Optional<SubjectResponse> findByCode(String orgId, String code) {
+        if (code == null || code.isBlank()) return Optional.empty();
+        List<SubjectResponse> rows = jdbc.query(
+            SELECT_COLUMNS + "WHERE org_id=? AND code=?",
+            (rs, n) -> map(rs), orgId, code.trim());
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    public SubjectUsageResponse getUsage(String id, String orgId) {
+        require(id, orgId);
+        List<SubjectUsageResponse.SubjectClassUsageItem> classes = jdbc.query("""
+            SELECT id, class_code, name, status FROM school_class
+            WHERE subject_id=? AND org_id=? AND deleted_at IS NULL
+            ORDER BY name
+            """, (rs, n) -> new SubjectUsageResponse.SubjectClassUsageItem(
+                rs.getString("id"),
+                rs.getString("class_code"),
+                rs.getString("name"),
+                rs.getString("status")
+            ), id, orgId);
+        return new SubjectUsageResponse(id, classes.size(), classes);
+    }
+
     /** Số lớp đang tham chiếu môn học — dùng cho báo cáo trước khi ngừng hoạt động. */
     public int classUsage(String subjectId, String orgId) {
         Integer count = jdbc.queryForObject(
@@ -119,7 +144,7 @@ public class SubjectRepository {
     private AppException duplicateSubject(DuplicateKeyException cause) {
         String message = cause.getMostSpecificCause().getMessage();
         if (message != null && message.toLowerCase().contains("uq_subject_org_code")) {
-            return new AppException(ErrorCode.CONFLICT, "Mã môn học đã tồn tại trong tổ chức");
+            return new AppException(ErrorCode.SUBJECT_CODE_EXISTS, "Mã môn học đã tồn tại trong tổ chức");
         }
         return new AppException(ErrorCode.CONFLICT, "Tên môn học đã tồn tại trong tổ chức");
     }

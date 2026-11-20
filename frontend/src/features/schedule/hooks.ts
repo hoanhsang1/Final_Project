@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { schedulesApi } from '@/features/schedule/api'
-import type { ScheduleInput } from '@/features/schedule/types'
+import type { AutoScheduleRequest, ScheduleInput } from '@/features/schedule/types'
 
 export const scheduleKeys = {
   list: (departmentId: string, params: unknown) =>
@@ -9,6 +9,7 @@ export const scheduleKeys = {
   mine: (params: unknown) => ['schedules', 'me', params] as const,
   roomSuggestions: (departmentId: string, params: unknown) =>
     ['schedules', departmentId, 'room-suggestions', params] as const,
+  autoGenerate: (departmentId: string) => ['schedules', departmentId, 'auto-generate'] as const,
 }
 
 export function useSchedules(
@@ -67,4 +68,15 @@ export function useScheduleMutations(departmentId: string | null) {
       onSuccess: invalidate,
     }),
   }
+}
+
+export function useAutoSchedule(departmentId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: AutoScheduleRequest) =>
+      schedulesApi.autoGenerate(departmentId!, request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    },
+  })
 }

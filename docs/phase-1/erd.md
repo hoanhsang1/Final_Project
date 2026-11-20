@@ -178,7 +178,7 @@ Bảng nối `curriculum_subject_prerequisite` có **hai** quan hệ cha tới c
 | `curriculum_subject` | `(curriculum_id, subject_id)` | `(curriculum_id, sequence_no)`, **`(curriculum_id, subject_id, org_id)`** (bắt buộc cho FK của bảng nối) | `(subject_id, org_id)` |
 | `curriculum_subject_prerequisite` | `(curriculum_id, subject_id, prerequisite_subject_id)` | — (PK đã chặn cạnh trùng) | `(org_id, prerequisite_subject_id)`, `(org_id, subject_id)` |
 | `class_subject` | `(class_id, subject_id)` | **`(primary_class_id)`** — tối đa một primary/lớp | `(org_id, subject_id)`, `(teacher_id, org_id)`, `(curriculum_id, org_id)`, `(class_id, org_id)` (cho FK tổ hợp) |
-| `class_subject_history` | `id` | `(org_id, operation_id)` — idempotency, cả hai NOT NULL; `request_fingerprint` NOT NULL (so khớp payload) | `(org_id, class_id, changed_at)`, `(org_id, new_subject_id)` |
+| `class_subject_history` | `id` | `uq_csh_operation (org_id, operation_id)` — idempotency, cả hai NOT NULL; `request_fingerprint` NOT NULL (so khớp payload) | `idx_csh_class_time (org_id, class_id, changed_at)`, `idx_csh_new_subject (org_id, new_subject_id)` |
 | `specialty_subject` | `(specialty_id, subject_id)` | — | `(org_id, subject_id)` |
 | `teacher_subject` | `(user_id, subject_id)` | — | `(org_id, subject_id, status)`, `(org_id, user_id)` |
 | `school_class` (đổi) | `id` | **`(id, org_id)` — bắt buộc thêm**, `(org_id, class_code)` | — |

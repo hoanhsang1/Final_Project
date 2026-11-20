@@ -88,6 +88,7 @@ public enum ErrorCode {
         "Class cancel request is not pending or was already decided"),
     CLASS_APPROVER_NOT_ALLOWED(2221, HttpStatus.FORBIDDEN,
         "Only the head of the department responsible for class management can approve"),
+    SUBJECT_CODE_EXISTS(2222, HttpStatus.CONFLICT, "Subject code already exists in organization"),
 
     // Ủy quyền / Tổng quản lý (quy tắc 3, 7)
     DELEGATION_NOT_FOUND(2401, HttpStatus.NOT_FOUND, "Delegation not found"),

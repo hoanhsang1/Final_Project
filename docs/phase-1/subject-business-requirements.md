@@ -265,7 +265,8 @@ Curriculum sửa tại chỗ với optimistic `version`; lớp giữ snapshot. K
    3. Cập nhật `school_class.subject_id = newSubjectId`, tăng `version` lớp.
    4. Đồng bộ `class_subject`: nếu **môn mới đã có** trong danh sách môn của lớp → **tái dùng** dòng
       đó (đặt `is_primary = 1`); ngược lại tạo dòng mới (`source = MANUAL`, `planned_sessions`/
-      `session_minutes` theo yêu cầu hoặc default của môn). Bỏ `is_primary` của dòng cũ.
+      `session_minutes` = giá trị yêu cầu, không gửi thì `NULL` — `subject` không có default). Bỏ
+      `is_primary` của dòng cũ.
 5. **Không xoá dòng cũ:** dòng `class_subject` của môn cũ được giữ (không còn `is_primary`), không
    xoá history. API thường **không cho xoá** dòng primary hiện tại hoặc dòng `LEGACY` khớp
    `school_class.subject_id` (409 `CLASS_SUBJECT_LEGACY_PROTECTED`).
@@ -356,8 +357,8 @@ Thất bại · Quyền.
 - **Tham số hiện tại:** `q` (tên), `includeInactive` (chỉ có hiệu lực với OWNER/`subject.manage`).
 - **Hợp đồng đã chốt (D-13 = A):** trả **mảng** `[SubjectResponse]`, **không phân trang**,
   không nhận `page`/`size`.
-- **Đề xuất bổ sung (không bắt buộc):** `isActive` (true/false), `q` tìm cả `name_unaccented`
-  và `code`; `sort=name|code|createdAt`.
+- **Đề xuất bổ sung (không bắt buộc):** `active` (true/false — không dùng `isActive`, F-MAJ-06),
+  `q` tìm cả `name_unaccented` và `code`; `sort=name|code|createdAt`.
 - **Sắp xếp hiện tại:** `is_active DESC, name ASC`.
 - **Thất bại:** tham số sai kiểu → `400 VALIDATION_ERROR`.
 - **Quyền:** `READ`.

@@ -39,6 +39,7 @@ import { MyClassesPage } from '@/features/academic/pages/my-classes-page'
 import { StudentPortalPage } from '@/features/academic/pages/student-portal-page'
 import { SchedulePage } from '@/features/schedule/pages/schedule-page'
 import { MySchedulePage } from '@/features/schedule/pages/my-schedule-page'
+import { AutoSchedulePage } from '@/features/schedule/pages/auto-schedule-page'
 import { FacilityPage } from '@/features/facility/pages/facility-page'
 import { FacilityIssuesPage } from '@/features/facility/pages/facility-issues-page'
 import { BackendDependencyPage } from '@/routes/backend-dependency-page'
@@ -344,6 +345,16 @@ export function App() {
               <WorkspaceGuard workspaceId="academic">
                 <PermissionGuard permission={PERM.scheduleView}>
                   <SchedulePage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/tu-dong-xep-lich"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard permission={PERM.scheduleCreate}>
+                  <AutoSchedulePage />
                 </PermissionGuard>
               </WorkspaceGuard>
             }

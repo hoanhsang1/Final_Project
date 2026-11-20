@@ -17,7 +17,10 @@
 | PeopleService (service gọi trực tiếp) | không `/api` |
 | Internal (service-to-service) | `/internal/...`, header `X-Internal-Api-Key` |
 
-Gateway hiện **chỉ** có route `/api/subjects/**`; không có `/subjects` trần. Các route mới cần
+Gateway hiện route `PeopleService` cho `/api/subjects/**`, `/api/classes/**`, `/api/teachers/**`,
+`/api/specialties/**`, `/api/transfer-requests/**`, `/api/notifications/**`,
+`/api/delegations/**`, `/api/general-manager/**`, `/api/audit-logs/**` (và các path không tiền tố
+`/api` như `/classes/**`, `/teachers/**`). **Chưa có** route `/api/curricula/**`; route mới phải
 được thêm vào `APIGateway/src/main/resources/application.yml` (người dùng tự làm).
 
 Ghi chú phạm vi gateway (chốt 2026-11-20): route `/api/curricula/**` (và các route lớp–môn mới
@@ -586,8 +589,9 @@ Request:
 4. `school_class.subject_id = subjectId`; `version + 1`.
 5. `class_subject`:
    - môn mới **đã có** trong lớp → chỉ `is_primary = 1` (giữ `teacher_id`, sessions hiện có);
-   - chưa có → insert `source='MANUAL'`, `is_primary=1`, `teacher_id=NULL`, sessions theo request
-     hoặc default của môn;
+   - chưa có → insert `source='MANUAL'`, `is_primary=1`, `teacher_id=NULL`, `plannedSessions`/
+     `sessionMinutes` = giá trị gửi lên, **không gửi thì để `NULL`** (cột nullable; `subject`
+     không có giá trị mặc định — không tự bịa default);
    - dòng primary cũ → `is_primary = 0` (**không xoá**).
 6. Audit `CLASS_PRIMARY_SUBJECT_CHANGED`.
 
