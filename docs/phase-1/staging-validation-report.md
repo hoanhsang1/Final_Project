@@ -1,8 +1,12 @@
 # Staging Validation Report — WP1 Migration 51/52
 
-> **Ngày:** 2026-11-20 · **Nhánh:** `fixFlowCreateEmployee` · **HEAD:** `4d7cac9`
+> **Ngày:** 2026-11-20 · **Nhánh:** `fixFlowCreateEmployee`
+> **HEAD khi audit gốc:** `4d7cac9` · **HEAD lúc bắt đầu Revision 4:** `ccd73fe`
+> **HEAD lúc kết thúc Revision 4:** `7c52b52` (commit bên ngoài phiên; xem §1)
 > **Phạm vi:** đánh giá an toàn để trình người dùng duyệt; **không** chạy Migration 51/52.
-> **Kết quả gate: `BLOCKED`** — xem §12.
+> **Gate audit gốc: `BLOCKED`** — giữ nguyên làm mốc; Revision 4 đã sửa F-01…F-06 trong source và
+> gate nội bộ chuyển thành **`READY FOR FINAL STATIC REVIEW`** (§14). Staging vẫn **chưa được xác
+> thực**, nên không có `APPROVED`.
 
 ---
 
@@ -16,6 +20,17 @@
 | `git status --short` (sau khi chạy Maven) | *(rỗng — không file tracked nào bị sửa)* |
 
 Branch và HEAD khớp yêu cầu; không có thay đổi bất thường. Không có thao tác git ghi nào được thực hiện.
+
+**Sai lệch HEAD ghi nhận ở Revision 4:** khi bắt đầu Revision 4, HEAD thực tế là
+`ccd73fe09afbd3b01b36798138255929cd94ba2a`, không phải `4d7cac9…`. `git merge-base --is-ancestor
+4d7cac9 HEAD` trả **true** và `git show --stat HEAD` cho thấy `ccd73fe` chỉ thêm chính file báo cáo
+này (+341 dòng). Đây là commit con đi tiếp (forward-only) của HEAD kỳ vọng; **không** reset/switch.
+
+Trong phiên Revision 4, HEAD lại tiến thêm một commit **bên ngoài phiên** (tác giả `hoanhsang1`,
+cùng message `fix flox class managment`): `7c52b52b6929a7c7bf7d389c55cee94b2753c201`, chứa
+`docs/phase-1/frontend-audit-report.md` (file mới, không thuộc phạm vi WP1) và một phần sửa F-01
+trong `51_52_precheck.sql`. `git merge-base --is-ancestor ccd73fe HEAD` trả **true** (forward-only).
+Revision 4 **không tạo commit nào**; toàn bộ thay đổi còn lại nằm ở working tree (8 file, xem §14.7).
 
 ---
 
@@ -130,6 +145,10 @@ Không phát hiện lệch logic; nhưng đây không phải bằng chứng dữ
 | 12 | Rollback dependency | Partial rollback 4 bước đúng thứ tự (`ROLLBACK.md:101-117`) |
 
 ### 8.2. Findings
+
+> **Trạng thái sau Revision 4:** F-01…F-06 đã được xử lý trong source (docs/SQL draft); mỗi mục dưới
+> đây giữ nguyên nội dung audit gốc làm mốc lịch sử. Bằng chứng và trạng thái mới ở §14 và
+> `revision-4-fix-report.md`.
 
 #### F-01 — BLOCKER (idempotency/recovery): chuẩn hoá CHECK thiếu bỏ backslash
 
@@ -267,6 +286,9 @@ CHECK, FK composite).
 | R-06 | 2 test H2 fail do time-bomb (ngoài WP1) | Low (không chặn gate nhưng cần biết) |
 | R-07 | F-05/F-06: hành vi xoá curriculum và index sót sau rollback | Low |
 
+**Sau Revision 4:** R-01, R-03, R-04, R-05, R-07 đã được xử lý trong source (xác minh static — §14).
+R-02 (chưa xác thực staging) và R-06 (2 test time-bomb ngoài WP1) **vẫn còn**.
+
 ---
 
 ## 11. Evidence — lệnh & truy vấn
@@ -306,12 +328,17 @@ Lệnh **không** chạy: mọi kết nối `mysql`, `mysqldump`, migration, rol
 | Migration chạy | **Không** (đúng yêu cầu) |
 | H2/Maven | 319 test, 317 pass, 2 fail (time-bomb ngoài WP1) |
 | Static review | 12 mục đạt; 1 blocker (F-01), 1 major (F-02), 4 mục medium/low |
+| Revision 4 (sau sửa) | 7 vị trí chuẩn hoá CHECK + 4 vị trí generated expression có `CHAR(92)`; 3 audit bảng curriculum; gate nội bộ `READY FOR FINAL STATIC REVIEW` (§14) |
 
 ---
 
 ## 12. Final gate
 
-### `BLOCKED`
+> **Lưu ý Revision 4:** mục này giữ nguyên kết quả audit gốc (`BLOCKED`). Sau Revision 4, các finding
+> trong phạm vi đã được sửa và gate nội bộ là **`READY FOR FINAL STATIC REVIEW`** (§14.8). Staging
+> vẫn **chưa xác thực** nên không có `APPROVED`.
+
+### `BLOCKED` (audit gốc)
 
 Không đủ điều kiện `READY FOR USER APPROVAL` vì:
 
@@ -328,10 +355,13 @@ Không đủ điều kiện `READY FOR USER APPROVAL` vì:
 
 ## 13. Recommended next actions
 
-1. **Sửa F-01** (ngoài phạm vi task này, cần người dùng duyệt): thêm bỏ backslash vào 5 chuỗi chuẩn
-   hoá CHECK; thêm test case `TC-LEG-042` cho `CHECK_CLAUSE` có string literal.
-2. **Sửa F-02**: thêm audit cho 3 bảng của 51 hoặc gate pre-check.
-3. **Sửa F-03**: thống nhất ngữ nghĩa `SKIP_DATA_PRECHECK_NO_TABLE` (chỉ bỏ PART B, vẫn chạy 52).
+1. ~~**Sửa F-01**~~ — **đã làm ở Revision 4**: bỏ `CHAR(92)` (+ tab/LF/CR) ở **7** vị trí chuẩn hoá
+   CHECK và **4** vị trí generated expression (xem §14.2). Việc thêm test case `TC-LEG-042` vẫn
+   nên làm khi có MySQL thật.
+2. ~~**Sửa F-02**~~ — **đã làm ở Revision 4**: 3 procedure audit + `assert_database` trong 51, gọi
+   trước mọi DDL (§14.3).
+3. ~~**Sửa F-03**~~ — **đã làm ở Revision 4**: header/footer thống nhất nghĩa `SKIP_DATA_PRECHECK_NO_TABLE`
+   (chỉ bỏ PART B, 52 vẫn chạy) (§14.4).
 4. **Cung cấp/xác nhận môi trường staging** và cơ chế truy cập read-only an toàn (không đưa
    credential vào chat): khi đó chạy đúng thứ tự §11.2.
 5. Trên staging: xác nhận `VERSION() ≥ 8.0.16`, `SHOW GRANTS` có `CREATE ROUTINE` +
@@ -339,3 +369,97 @@ Không đủ điều kiện `READY FOR USER APPROVAL` vì:
    thử rerun 52 trên bảng đã tạo để xác nhận F-01.
 6. Quyết định xử lý 2 test time-bomb (`OutboxEventRepositoryTest`, `DelegationExpiryTest`) ở task
    riêng — không sửa trong WP1.
+
+---
+
+## 14. Revision 4 — xử lý F-01…F-06 (2026-11-20)
+
+> Phạm vi: chỉ docs + SQL migration draft. **Không** chạy migration/rollback/DDL/DML, **không** kết
+> nối DB, **không** sửa Java/React/.env, **không** commit/push. Báo cáo chi tiết theo từng finding:
+> `docs/phase-1/revision-4-fix-report.md`.
+
+### 14.1. Bảng trạng thái
+
+| Finding | Mức | Trước | Xử lý (file) | Sau |
+|---|---|---|---|---|
+| F-01 | BLOCKER | chuẩn hoá không bỏ `\` | thêm `CHAR(92)` + tab/LF/CR vào **7** vị trí so khớp CHECK và **4** vị trí generated expression (`51_52_precheck.sql`, `52_people_class_subject.sql`, `51_people_curriculum.sql`); thêm chẩn đoán raw/norm ở `51_52_postcheck.sql` §5e | **FIXED (static)** |
+| F-02 | MAJOR | 51 không audit bảng cùng tên | 3 procedure audit + `mems_m51_assert_database`, gọi trước mọi DDL (`51_people_curriculum.sql`) | **FIXED (static)** |
+| F-03 | MEDIUM | header data-precheck mâu thuẫn footer | mapping verdict 4 nhánh, giống nhau ở 2 file | **FIXED** |
+| F-04 | MEDIUM | schema hard-code + quyền chưa kiểm | `mems_m51/m52_assert_database` + §0j (schema/version/12 quyền, chỉ đọc) + header quyền 51/52 | **FIXED (static); quyền = UNVERIFIED** |
+| F-05 | LOW | xoá curriculum có thể gặp 1451 | comment tại `curriculum_subject_prerequisite` + `database-schema.md` §3.2.1 | **FIXED (doc)** |
+| F-06 | LOW | rollback §8 thiếu index của 51 | bổ sung 3 dòng bảng + cách drop index `(org_id)` còn sót (`ROLLBACK.md`) | **FIXED (doc)** |
+
+### 14.2. F-01 — bằng chứng (static + mô phỏng offline)
+
+Chuỗi chuẩn hoá dùng chung: bỏ backtick → `_utf8mb4` → space → `'` → `(` → `)` → tab → LF → CR →
+`CHAR(92)`.
+
+- **7 vị trí so khớp CHECK**: precheck 0b + 0e2; 52 (`class_subject`, `teacher_subject`,
+  `class_subject_history`); 51 (audit `curriculum_subject`, audit `curriculum_subject_prerequisite`).
+- **4 vị trí generated expression**: precheck 0b `cs_gen`, 0f (2 biểu thức), 52 `class_subject`.
+- **1 chẩn đoán**: postcheck §5e in `raw_clause` + `norm` cho 5 bảng WP1 (không phải gate).
+- Mô phỏng offline bằng Node (**không phải MySQL**): `(_utf8mb4\'PLANNED\',…)` (dạng escaped của
+  `information_schema`) và `(_utf8mb4'PLANNED',…)` (dạng SHOW CREATE/dump) đều cho
+  `statusinplanned,active,completed,cancelled`; CHECK nhiều dòng (LF) cho đúng chuỗi
+  `required_sessions>0…`; generated expression cho `casewhenis_primary=1thenclass_idend`. Tất cả PASS.
+- **Ba kịch bản**: (a) lần đầu, bảng vắng → audit `LEAVE`, `CREATE`; (b) precheck trên bảng đã tồn
+  tại → `ok_chk` đủ, không còn `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE` sai; (c) rerun 52 sau ABORT →
+  audit qua, không còn `SIGNAL` sai.
+- **Không nới điều kiện**: expected string giữ nguyên; `v_chk_total` vẫn chặn CHECK thừa/thiếu;
+  `LIKE '%PENDING%'` giữ nguyên.
+
+### 14.3. F-02 — audit 3 bảng curriculum
+
+Trước mọi DDL, 51 gọi lần lượt: `mems_m51_assert_database`, `mems_m51_assert_curriculum_schema`,
+`mems_m51_assert_curriculum_subject_schema`, `mems_m51_assert_csp_schema`. Mỗi audit: bảng vắng →
+bỏ qua (được CREATE bên dưới); tồn tại → kiểm tập cột + thuộc tính (type/length/null/default/
+collation/generated), PK, unique/secondary index (whitelist chính xác, gồm index hỗ trợ FK do InnoDB
+tự tạo), FK mapping + `ON UPDATE/ON DELETE`, CHECK (chuẩn hoá như F-01). Lệch ⇒ in chẩn đoán rồi
+`SIGNAL SQLSTATE '45000'`; **không** auto-ALTER. `CREATE TABLE IF NOT EXISTS` không còn là bước kiểm
+tương thích duy nhất.
+
+### 14.4. F-03 — thống nhất verdict → hành động
+
+| Verdict 0b | Hành động (precheck footer = data-precheck header) |
+|---|---|
+| `DATA_PRECHECK_READY` | chạy PART B, rồi 52 |
+| `SKIP_DATA_PRECHECK_NO_TABLE` | **chỉ** bỏ PART B; **52 vẫn chạy** (tạo bảng đầy đủ) |
+| `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE` | dừng; không PART B, không 52; xử lý tay |
+| Bất kỳ `BLOCK_MIGRATION` từ PART B | dừng trước 52; phải sửa hết |
+
+### 14.5. F-04 — schema guard + quyền
+
+- 51/52 có `mems_m51_assert_database` / `mems_m52_assert_database`: `DATABASE() IS NULL` hoặc khác
+  `mems_people_db` ⇒ `SIGNAL 45000`.
+- `51_52_precheck.sql` §0j: `SELECT DATABASE(), VERSION(), CURRENT_USER()` + bảng 12 quyền lấy từ
+  `information_schema.user_privileges` / `schema_privileges` (chỉ đọc; GRANTEE dựng từ
+  `CURRENT_USER()`). Ghi rõ quyền qua ROLE có thể không hiện → đối chiếu `SHOW GRANTS`.
+- Header 51/52 liệt kê quyền cần và cảnh báo thiếu `CREATE TEMPORARY TABLES` sẽ fail ở 5b **sau khi**
+  5a đã commit DML.
+- **Trạng thái quyền trên môi trường đích: UNVERIFIED** (không kết nối DB trong phiên này).
+
+### 14.6. F-05 / F-06 — vận hành
+
+- F-05: comment trong DDL `curriculum_subject_prerequisite` + `database-schema.md` §3.2.1 nêu rõ
+  CASCADE của `fk_csp_subject` có thể gặp `fk_csp_prerequisite` RESTRICT giữa chừng (MySQL 1451);
+  nghiệp vụ là `is_active = 0`; hard delete phải xoá cạnh prerequisite của curriculum đó trước,
+  trong cùng transaction.
+- F-06: `ROLLBACK.md` §8 thêm index do FK của 51 sinh ra (`curriculum_subject`, `csp`, `school_class`)
+  và cách drop index `(org_id)` còn lại sau bước 7.7; query liệt kê index bổ sung `school_class`.
+
+### 14.7. Kiểm tra sau sửa (static)
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `git diff --check` | pass (chỉ warning LF→CRLF của Git) |
+| Delimiter/procedure balance | 51: 7 `CREATE PROCEDURE` / 7 `END$` / 1 `DELIMITER $`; 52: 7/7/1 |
+| File thay đổi (working tree) | `database-schema.md`, `51_52_precheck.sql`, `51_52_precheck_data.sql`, `51_52_postcheck.sql`, `51_people_curriculum.sql`, `52_people_class_subject.sql`, `ROLLBACK.md`, `staging-validation-report.md` |
+| Ngoài phạm vi | không có Java/React/.env; `frontend-audit-report.md` đến từ commit ngoài phiên, không sửa |
+| MySQL runtime | **NOT EXECUTED** — không có môi trường độc lập được xác nhận |
+
+### 14.8. Gate hiện tại
+
+**`READY FOR FINAL STATIC REVIEW`** — cho các finding trong phạm vi F-01…F-06, với bằng chứng static
+ở trên. **Không** phải `APPROVED`: staging chưa được xác thực, quyền DB và hành vi MySQL
+(CHECK_CLAUSE thực tế, generated column, index hỗ trợ FK) vẫn **UNVERIFIED** cho tới khi chạy trên
+môi trường độc lập.

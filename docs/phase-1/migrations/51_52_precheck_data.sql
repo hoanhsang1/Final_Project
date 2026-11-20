@@ -2,7 +2,7 @@
 -- DRAFT ONLY — READ-ONLY PRE-CHECK (PART B: DATA). DO NOT RUN ON PRODUCTION.
 -- Target: MySQL 8.0.16+, mems_people_db.
 --
--- RUN ONLY IF `51_52_precheck.sql` query 0b returned
+-- RUN PART B ONLY IF `51_52_precheck.sql` query 0b returned
 --   next_step = 'DATA_PRECHECK_READY', which requires ALL of:
 --   * class_subject exists with exactly 20 Revision-3 columns and matching
 --     attributes (type/length/precision/scale, NULL, DEFAULT, collation,
@@ -10,9 +10,18 @@
 --   * PK (class_id, subject_id); 5 index groups (+ at most 2 InnoDB FK-support
 --     indexes); 4 FKs with exact mappings AND ON UPDATE/ON DELETE rules;
 --   * 5 CHECKs with exact expressions; primary_class_id STORED GENERATED.
--- Any other verdict (BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE, or
--- SKIP_DATA_PRECHECK_NO_TABLE when the table does not exist) => STOP: do not
--- run PART B and do not run 52.
+--
+-- Verdict -> action (identical mapping to the footer of 51_52_precheck.sql):
+--   DATA_PRECHECK_READY                 -> run PART B below.
+--   SKIP_DATA_PRECHECK_NO_TABLE         -> class_subject absent (clean/first
+--                                          run). SKIP PART B ONLY; 52 is still
+--                                          the next step and creates the table
+--                                          with its full Revision-3 schema.
+--   BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE -> STOP: do not run PART B, do not run
+--                                          52; fix/drop the old table manually.
+--   any BLOCK_MIGRATION row from PART B -> STOP before 52; every such row must
+--                                          be fixed. Recording it is NOT
+--                                          resolution.
 -- PART B uses only gated class_subject columns (class_id, subject_id, org_id,
 -- is_primary, teacher_id) plus baseline school_class/subject/staff_profile
 -- columns, so it never runs against a table the gate did not validate.

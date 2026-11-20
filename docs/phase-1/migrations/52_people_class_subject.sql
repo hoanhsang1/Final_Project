@@ -21,10 +21,33 @@
 --   REMAIN. 5a/5b are exact-match and idempotent, so after fixing the cause you
 --   must re-run the pre-check, verify data, then re-run 52 and the post-check.
 --   Do not delete backfilled rows manually without proving their origin.
+--
+-- PRIVILEGES (UNVERIFIED until checked on the target — see 51_52_precheck.sql §0j):
+--   audit procedures : CREATE ROUTINE, ALTER ROUTINE, EXECUTE
+--   step 5b temp table: CREATE TEMPORARY TABLES
+--   DDL (tables/indexes/FKs): CREATE, ALTER, INDEX, REFERENCES
+--   backfill DML     : SELECT, INSERT, UPDATE
+--   Missing CREATE TEMPORARY TABLES fails at 5b AFTER 5a's DML has committed
+--   (DDL is implicit-commit), so verify with SHOW GRANTS before running.
 -- =============================================================================
 USE mems_people_db;
 
 DELIMITER $
+
+-- ---------------------------------------------------------------------------
+-- F-04: pin the schema. `USE mems_people_db` above selects it, but an account
+-- without access would fail there with an unclear error; this guard makes
+-- "wrong schema" abort immediately, before any audit or DDL runs.
+-- Privileges are NOT verified here (see 51_52_precheck.sql §0j).
+-- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS mems_m52_assert_database$
+CREATE PROCEDURE mems_m52_assert_database()
+BEGIN
+  IF DATABASE() IS NULL OR NOT (DATABASE() <=> 'mems_people_db') THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'M52 ABORT: current schema is not mems_people_db; run USE mems_people_db first';
+  END IF;
+END$
 
 -- ---------------------------------------------------------------------------
 -- Abort if an existing class_subject is not the Revision-3 schema.
@@ -40,7 +63,9 @@ DELIMITER $
 --     index of its own.
 --   * 4 FKs with exact source->target column mappings (same schema) and exact
 --     ON UPDATE / ON DELETE rules
---   * 5 CHECKs with exact normalised expressions
+--   * 5 CHECKs with exact normalised expressions. Normalisation removes the
+--     backslash (CHAR(92)) MySQL 8.0.16+ puts inside CHECK_CLAUSE literals, so
+--     escaped information_schema output and unescaped SHOW CREATE output match
 --   * primary_class_id = STORED GENERATED with exact CASE expression
 -- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
 -- ---------------------------------------------------------------------------
@@ -260,9 +285,14 @@ BEGIN
       FROM information_schema.table_constraints tc
       JOIN (
         SELECT constraint_schema, constraint_name,
-               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               -- MySQL 8.0.16+ returns CHECK literals escaped: (_utf8mb4\'X\',...).
+               -- Removing CHAR(92) (plus tab/LF/CR) makes the comparison
+               -- independent of that display form; expected strings unchanged.
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 REPLACE(REPLACE(REPLACE(
                  check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
-                 '(', ''), ')', '')) AS norm
+                 '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+                 CHAR(92), '')) AS norm
         FROM information_schema.check_constraints
         WHERE constraint_schema = DATABASE()
       ) cc
@@ -278,9 +308,11 @@ BEGIN
     WHERE table_schema = DATABASE() AND table_name = 'class_subject'
       AND column_name = 'primary_class_id'
       AND extra LIKE '%GENERATED%' AND extra LIKE '%STORED%'
-      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            REPLACE(REPLACE(
             generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
-            '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend';
+            '''', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+            CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend';
 
     IF v_total_cols <> 20 OR v_cols <> 20 OR v_attr_bad <> 0
        OR v_idx_ok <> 5 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
@@ -497,9 +529,14 @@ BEGIN
       FROM information_schema.table_constraints tc
       JOIN (
         SELECT constraint_schema, constraint_name,
-               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               -- MySQL 8.0.16+ returns CHECK literals escaped: (_utf8mb4\'X\',...).
+               -- Removing CHAR(92) (plus tab/LF/CR) makes the comparison
+               -- independent of that display form; expected strings unchanged.
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 REPLACE(REPLACE(REPLACE(
                  check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
-                 '(', ''), ')', '')) AS norm
+                 '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+                 CHAR(92), '')) AS norm
         FROM information_schema.check_constraints
         WHERE constraint_schema = DATABASE()
       ) cc
@@ -719,9 +756,14 @@ BEGIN
       FROM information_schema.table_constraints tc
       JOIN (
         SELECT constraint_schema, constraint_name,
-               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               -- MySQL 8.0.16+ returns CHECK literals escaped: (_utf8mb4\'X\',...).
+               -- Removing CHAR(92) (plus tab/LF/CR) makes the comparison
+               -- independent of that display form; expected strings unchanged.
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 REPLACE(REPLACE(REPLACE(
                  check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
-                 '(', ''), ')', '')) AS norm
+                 '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+                 CHAR(92), '')) AS norm
         FROM information_schema.check_constraints
         WHERE constraint_schema = DATABASE()
       ) cc
@@ -981,6 +1023,9 @@ END$
 
 DELIMITER ;
 
+-- 0) Schema guard first: wrong/absent schema aborts before any DDL.
+CALL mems_m52_assert_database();
+
 -- 1) Existing tables must already match Revision 3 / D-06a, else abort.
 --    Absent table => create below; present+matching => continue; present+wrong => SIGNAL.
 CALL mems_m52_assert_class_subject_schema();
@@ -1153,6 +1198,7 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
 -- ALTER TABLE subject DROP INDEX uq_subject_org_code,
 --   ADD UNIQUE KEY uq_subject_org_code (org_id, code);
 
+DROP PROCEDURE IF EXISTS mems_m52_assert_database;
 DROP PROCEDURE IF EXISTS mems_m52_assert_class_subject_schema;
 DROP PROCEDURE IF EXISTS mems_m52_assert_teacher_subject_schema;
 DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema;

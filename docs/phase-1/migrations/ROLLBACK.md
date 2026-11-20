@@ -158,6 +158,18 @@ này **không** có trong DDL và **không** tự mất khi drop FK:
 | `teacher_subject` | `(user_id, org_id)`, `(subject_id, org_id)` | `fk_teacher_subject_teacher`, `fk_teacher_subject_subject` |
 | `class_subject_history` | `(class_id, org_id)` | `fk_csh_class` |
 | `specialty_subject` | `(specialty_id, org_id)`, `(subject_id, org_id)` | 2 FK của bảng |
+| `curriculum_subject` | `(curriculum_id, org_id)` — FK `fk_curriculum_subject_curriculum`; `(subject_id, org_id)` **đã có sẵn** dưới tên `idx_curriculum_subject_subject` nên InnoDB không tạo thêm | `fk_curriculum_subject_curriculum` |
+| `curriculum_subject_prerequisite` | `(curriculum_id, subject_id, org_id)`, `(curriculum_id, prerequisite_subject_id, org_id)` — KHÔNG dùng được `idx_csp_subject`/`idx_csp_prereq` (chúng bắt đầu bằng `org_id`) | `fk_csp_subject`, `fk_csp_prerequisite` |
+| `school_class` (cột mới của 51) | `(curriculum_id, org_id)` | `fk_school_class_curriculum` |
+
+**F-06 — index `school_class` sau bước 7.7:** `ALTER TABLE school_class DROP COLUMN curriculum_id`
+chỉ xoá cột khỏi index composite; index mang tên FK **vẫn còn** dạng `(org_id)` (một cột) và phải
+drop tay nếu muốn sạch tuyệt đối:
+
+```sql
+-- nếu SHOW INDEX còn index 1 cột (org_id) mang tên fk_school_class_curriculum:
+ALTER TABLE school_class DROP INDEX fk_school_class_curriculum;
+```
 
 Sau rollback, liệt kê index còn lại:
 
@@ -166,8 +178,8 @@ SELECT table_name, index_name, non_unique,
        GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
 FROM information_schema.statistics
 WHERE table_schema = 'mems_people_db'
-  AND table_name IN ('class_subject','teacher_subject',
-                     'class_subject_history','specialty_subject')
+  AND table_name IN ('class_subject','teacher_subject','class_subject_history',
+                     'specialty_subject','school_class')
 GROUP BY table_name, index_name, non_unique
 ORDER BY table_name, index_name;
 ```

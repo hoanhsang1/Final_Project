@@ -165,6 +165,26 @@ WHERE rc.constraint_schema = DATABASE()
           AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT'))
 ORDER BY rc.table_name, rc.constraint_name;
 
+-- 5e) Chẩn đoán CHECK_CLAUSE (F-01): in raw + normalized để xác nhận chuẩn hoá
+--     bỏ được backslash của MySQL 8.0.16+ (_utf8mb4\'X\'). CHỈ ĐỌC, không phải
+--     gate. `norm` phải khớp biểu thức kỳ vọng dù raw có `\'` hay không.
+--     information_schema.check_constraints không có table_name -> join table_constraints.
+SELECT tc.table_name, tc.constraint_name, cc.check_clause AS raw_clause,
+       LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         REPLACE(REPLACE(REPLACE(
+         cc.check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+         '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+         CHAR(92), '')) AS norm
+FROM information_schema.table_constraints tc
+JOIN information_schema.check_constraints cc
+  ON cc.constraint_schema = tc.constraint_schema
+ AND cc.constraint_name = tc.constraint_name
+WHERE tc.table_schema = DATABASE()
+  AND tc.constraint_type = 'CHECK'
+  AND tc.table_name IN ('class_subject','teacher_subject','class_subject_history',
+                        'curriculum_subject','curriculum_subject_prerequisite')
+ORDER BY tc.table_name, tc.constraint_name;
+
 -- 6) History phải rỗng ngay sau migration (không backfill hồi tố)
 SELECT COUNT(*) AS history_rows_after_migration FROM class_subject_history;
 

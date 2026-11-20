@@ -41,8 +41,11 @@ ORDER BY table_name, ordinal_position;
 --     => bad_extra > 0 => BLOCKED.
 --
 --     So khớp CHECK/cột sinh bằng cách chuẩn hoá check_clause/generation_expression:
---     bỏ backtick, tiền tố _utf8mb4, khoảng trắng, dấu nháy, ngoặc và backslash,
---     rồi so sánh nguyên văn với biểu thức kỳ vọng (lowercase).
+--     bỏ backtick, tiền tố _utf8mb4, khoảng trắng (space/tab/LF/CR), dấu nháy,
+--     ngoặc và backslash (CHAR(92)), rồi so sánh nguyên văn với biểu thức kỳ vọng
+--     (lowercase). Bắt buộc bỏ CHAR(92): MySQL 8 (8.0.16+) trả literal trong
+--     CHECK_CLAUSE dạng (_utf8mb4\'PLANNED\',...) — khác SHOW CREATE/dump vốn in
+--     _utf8mb4'PLANNED'. Nhờ vậy cùng một biểu thức khớp dù hiển thị có escape hay không.
 WITH cs_cols AS (
   SELECT COUNT(*) AS total_cols,
          COALESCE(SUM(column_name IN (
@@ -392,12 +395,16 @@ ORDER BY tc.constraint_name;
 -- 0f) Generated column primary_class_id: phải là STORED GENERATED và đúng biểu thức
 --     `CASE WHEN is_primary = 1 THEN class_id END`. 0 dòng => thiếu/sai/sai loại.
 SELECT column_name, extra, generation_expression,
-       LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+       LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         REPLACE(REPLACE(
          generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
-         '''', ''), CHAR(92), '')) AS normalized_expression,
-       (LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         '''', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+         CHAR(92), '')) AS normalized_expression,
+       (LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+          REPLACE(REPLACE(
           generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
-          '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend') AS expression_ok
+          '''', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+          CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend') AS expression_ok
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'class_subject'
   AND column_name = 'primary_class_id'
@@ -427,6 +434,63 @@ FROM information_schema.referential_constraints
 WHERE constraint_schema = DATABASE()
   AND table_name IN ('class_subject_history', 'specialty_subject')
 ORDER BY table_name, constraint_name;
+
+-- 0i) Ba bảng curriculum của 51 (F-02): nếu đã tồn tại, 51 tự audit Revision 3
+--     và ABORT khi lệch cột/index/FK/CHECK. column_count = 0 => chưa tồn tại
+--     (51 sẽ CREATE đầy đủ). Đây là chẩn đoán, không phải gate.
+SELECT 'curriculum' AS table_name,
+       (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'curriculum') AS column_count
+UNION ALL
+SELECT 'curriculum_subject',
+       (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'curriculum_subject')
+UNION ALL
+SELECT 'curriculum_subject_prerequisite',
+       (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'curriculum_subject_prerequisite');
+
+SELECT table_name, constraint_name, constraint_type
+FROM information_schema.table_constraints
+WHERE table_schema = DATABASE()
+  AND table_name IN ('curriculum','curriculum_subject','curriculum_subject_prerequisite')
+ORDER BY table_name, constraint_type, constraint_name;
+
+-- 0j) Schema đích + quyền (F-04). CHỈ ĐỌC; kết quả mang tính tham khảo
+--     (UNVERIFIED cho tới khi chạy trên môi trường đích). 51/52 đều hard-code
+--     mems_people_db và có assert_database() riêng, nhưng kiểm trước để tránh
+--     fail giữa chừng: thiếu CREATE TEMPORARY TABLES sẽ làm 52 fail ở 5b SAU khi
+--     5a đã commit DML; thiếu CREATE/ALTER ROUTINE làm 51/52 fail ngay bước tạo
+--     procedure. Quyền đến từ ROLE có thể không hiện trong các view này —
+--     đối chiếu thêm bằng SHOW GRANTS FOR CURRENT_USER().
+SELECT DATABASE() AS current_schema, VERSION() AS server_version,
+       CURRENT_USER() AS current_user;
+
+SELECT t.priv AS required_priv, t.scope AS grant_scope,
+       (SELECT COUNT(*) FROM information_schema.user_privileges up
+         WHERE up.grantee = CONCAT(QUOTE(SUBSTRING_INDEX(CURRENT_USER(),'@',1)), '@',
+                                   QUOTE(SUBSTRING_INDEX(CURRENT_USER(),'@',-1)))
+           AND up.privilege_type = t.priv) AS user_grant,
+       (SELECT COUNT(*) FROM information_schema.schema_privileges sp
+         WHERE sp.table_schema = DATABASE()
+           AND sp.grantee = CONCAT(QUOTE(SUBSTRING_INDEX(CURRENT_USER(),'@',1)), '@',
+                                   QUOTE(SUBSTRING_INDEX(CURRENT_USER(),'@',-1)))
+           AND sp.privilege_type = t.priv) AS schema_grant
+FROM (
+            SELECT 'CREATE' AS priv,                 'schema' AS scope
+  UNION ALL SELECT 'ALTER',                          'schema'
+  UNION ALL SELECT 'DROP',                           'schema'
+  UNION ALL SELECT 'INDEX',                          'schema'
+  UNION ALL SELECT 'REFERENCES',                     'schema'
+  UNION ALL SELECT 'CREATE ROUTINE',                 'schema'
+  UNION ALL SELECT 'ALTER ROUTINE',                  'schema'
+  UNION ALL SELECT 'EXECUTE',                        'schema'
+  UNION ALL SELECT 'CREATE TEMPORARY TABLES',        'schema'
+  UNION ALL SELECT 'SELECT',                         'table'
+  UNION ALL SELECT 'INSERT',                         'table'
+  UNION ALL SELECT 'UPDATE',                         'table'
+) t
+ORDER BY t.priv;
 
 -- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE)
 SELECT org_id, code, COUNT(*) AS n
@@ -474,10 +538,15 @@ WHERE c.teacher_id IS NOT NULL
   AND sp.user_id IS NULL;
 
 -- =============================================================================
--- BƯỚC TIẾP THEO:
+-- BƯỚC TIẾP THEO (verdict 0b -> hành động; khớp header của 51_52_precheck_data.sql):
 --   next_step = 'DATA_PRECHECK_READY'            -> chạy 51_52_precheck_data.sql
---   next_step = 'SKIP_DATA_PRECHECK_NO_TABLE'    -> không có class_subject, bỏ qua PART B
+--                                                   (PART B), rồi mới chạy 52.
+--   next_step = 'SKIP_DATA_PRECHECK_NO_TABLE'    -> KHÔNG có class_subject (lần
+--       chạy đầu trên schema trắng). CHỈ bỏ qua PART B; 52 VẪN là bước tiếp theo
+--       và tạo bảng đầy đủ (52 tự audit lại schema sau khi tạo). SKIP KHÔNG chặn 52.
 --   next_step = 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
 --       -> KHÔNG chạy 52. Bảng cũ thiếu cột Revision 3; xử lý tay (drop/tạo lại
 --          hoặc forward-fix có kiểm chứng) rồi chạy lại pre-check.
+--   PART B (nếu chạy) trả bất kỳ dòng BLOCK_MIGRATION nào
+--       -> DỪNG trước 52; phải sửa hết các dòng đó (ghi nhận KHÔNG phải là xử lý).
 -- =============================================================================

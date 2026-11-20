@@ -229,6 +229,12 @@ CREATE TABLE IF NOT EXISTS curriculum_subject_prerequisite (
 - **Xoá môn khỏi template:** FK `fk_csp_subject` CASCADE xoá các cạnh mà môn đó là **dependent**;
   FK `fk_csp_prerequisite` RESTRICT chặn xoá nếu môn đó đang là tiên quyết của môn khác → service
   phải gỡ các cạnh đó trước hoặc trả 409 `CONFLICT`.
+- **Xoá cả curriculum (hard delete):** InnoDB không bảo đảm thứ tự xoá khi CASCADE lan từ
+  `curriculum` → `curriculum_subject`, nên có thể gặp MySQL **1451** vì `fk_csp_prerequisite`
+  (RESTRICT) kiểm trước khi các cạnh prerequisite kịp bị CASCADE xoá. Đường nghiệp vụ là
+  `is_active = 0` (BR-CUR-17). Nếu buộc phải hard delete, xoá toàn bộ
+  `curriculum_subject_prerequisite` của curriculum đó **trước** `curriculum_subject`/`curriculum`
+  trong cùng transaction (xem `migrations/51_people_curriculum.sql` mục 3).
 - **Không dùng `ON DELETE SET NULL`** cho FK tổ hợp: sẽ set cả `org_id` = NULL (vi phạm NOT NULL)
   và không biểu diễn đúng việc gỡ quan hệ.
 - Khi clone curriculum, phải **map lại** các cạnh tiên quyết sang môn tương ứng của bản clone;
@@ -506,6 +512,14 @@ END$
 
 DELIMITER ;
 
+-- 0) Schema guard + audit bảng cùng tên (F-02). Bảng vắng => tạo bên dưới;
+--    tồn tại + đúng Revision 3 => tiếp tục; lệch => SIGNAL 45000, KHÔNG auto-ALTER.
+--    CREATE TABLE IF NOT EXISTS KHÔNG hàm ý tương thích.
+CALL mems_m51_assert_database();
+CALL mems_m51_assert_curriculum_schema();
+CALL mems_m51_assert_curriculum_subject_schema();
+CALL mems_m51_assert_csp_schema();
+
 -- 1) curriculum (bảng mới) — dùng CREATE TABLE IF NOT EXISTS như mục 3.1
 -- 2) curriculum_subject (bảng mới) — mục 3.2 (kèm UNIQUE (curriculum_id, subject_id, org_id))
 -- 3) curriculum_subject_prerequisite (bảng mới) — mục 3.2.1, tạo SAU curriculum_subject
@@ -517,10 +531,19 @@ CALL mems_m51_add_fk('school_class', 'fk_school_class_curriculum',
 --    Không thể fail vì id đã là PK; vẫn kiểm tồn tại để idempotent.
 CALL mems_m51_add_unique('school_class', 'uq_school_class_id_org', 'id, org_id');
 
+DROP PROCEDURE IF EXISTS mems_m51_assert_database;
+DROP PROCEDURE IF EXISTS mems_m51_assert_curriculum_schema;
+DROP PROCEDURE IF EXISTS mems_m51_assert_curriculum_subject_schema;
+DROP PROCEDURE IF EXISTS mems_m51_assert_csp_schema;
 DROP PROCEDURE IF EXISTS mems_m51_add_col;
 DROP PROCEDURE IF EXISTS mems_m51_add_fk;
 DROP PROCEDURE IF EXISTS mems_m51_add_unique;
 ```
+
+> **Ghi chú:** đoạn trên là bản rút gọn; helper `mems_m51_add_col` trong file thật nhận thêm tham
+> số kiểu/thuộc tính để audit chứ không chỉ thêm cột. Audit 3 bảng curriculum kiểm đủ: tập cột +
+> thuộc tính, PK/unique/secondary index, FK + referential action, CHECK, generated column; lệch ⇒
+> `SIGNAL SQLSTATE '45000'`. Xem `migrations/51_people_curriculum.sql`.
 
 > **Thứ tự bắt buộc:** migration 51 phải chạy xong (tạo `uq_school_class_id_org`) **trước** migration 52,
 > vì `class_subject` tạo FK `(class_id, org_id) → school_class(id, org_id)`.
@@ -531,7 +554,9 @@ Nội dung (bản đầy đủ ở `docs/phase-1/migrations/52_people_class_subj
 
 ```sql
 USE mems_people_db;
--- 0) Audit bảng cũ trước khi làm gì (C2):
+-- 0) mems_m52_assert_database — DATABASE() phải là mems_people_db, nếu không SIGNAL
+--    ngay (F-04: tránh fail mơ hồ ở USE hoặc DDL giữa chừng).
+--    Audit bảng cũ trước khi làm gì (C2):
 --    mems_m52_assert_class_subject_schema   — đúng 20 cột (không thừa/thiếu), PK
 --      (class_id, subject_id), 5 nhóm index (PRIMARY + 4) đúng cột/thứ tự/UNIQUE,
 --      không index lạ ngoài 2 index hỗ trợ FK, 4 FK đúng cột nguồn→bảng.cột đích,
