@@ -266,6 +266,10 @@ Kiểm ở service (không chỉ bean validation):
 | E-37 | Ghi history lỗi (DB) → rollback cả `school_class`/`class_subject` | 500 | `UNCATEGORIZED_EXCEPTION` | — | TC-CLS-030 |
 | E-38 | `PUT /classes/{id}` đổi `subjectId` nhưng bỏ qua history (giả lập code sai) | 200 | Có dòng `class_subject_history` + primary đồng bộ | — | TC-CLS-035 |
 | E-39 | `DELETE /classes/{id}` khi lớp đã có `class_subject_history` | 409 | `CONFLICT` (2215, message "lớp có lịch sử môn") | — | TC-CLS-037 |
+| E-40 | Đổi môn chính thiếu `reason`/`expectedVersion`/`operationId` | 400 | `VALIDATION_ERROR` | `{fields:[…]}` | TC-CLS-041 |
+| E-41 | Cùng `operationId` nhưng payload chuẩn hoá khác | 409 | `CLASS_SUBJECT_OPERATION_CONFLICT` | — | TC-CLS-042 |
+| E-42 | Retry cùng `operationId` + cùng payload sau khi thành công | 200 | Kết quả cũ, cùng `historyId` | — | TC-CLS-043 |
+| E-43 | `PUT /classes/{id}` đổi `subjectId` nhưng thiếu `reason`/`operationId`/`version` | 400 | `VALIDATION_ERROR` | `{fields:[…]}` | TC-CLS-044 |
 
 Ví dụ body:
 
@@ -293,7 +297,8 @@ Ví dụ body:
 | Sửa/xoá/thêm môn trong curriculum | `curriculum.version` | 409 `DATA_CHANGED` |
 | Áp curriculum / sửa môn lớp | `school_class.version` | 409 `DATA_CHANGED` |
 | Thay chuyên môn giáo viên | **`staff_profile.version`** | 409 `DATA_CHANGED` |
-| Đổi môn chính (`PUT .../subjects/primary`) | `school_class.version` (`expectedVersion` tuỳ chọn) | 409 `DATA_CHANGED` |
+| Đổi môn chính (`PUT .../subjects/primary`) | `school_class.version` (`expectedVersion` **bắt buộc**) | 409 `DATA_CHANGED` |
+| `PUT /classes/{id}` có đổi `subjectId` | `school_class.version` (`version` **bắt buộc** khi đổi) | 409 `DATA_CHANGED` |
 
 Khuyến nghị dùng `UPDATE ... WHERE id=? AND org_id=? AND version=?` và kiểm số dòng = 1;
 không đọc-rồi-ghi không khoá khi thao tác làm thay đổi nhiều dòng (`class_subject`).
@@ -376,6 +381,14 @@ giống `SubjectRepository.duplicateSubject` để trả mã cụ thể.
 - AC-VAL-14: Retry cùng `operationId` không tạo history thứ hai và trả cùng `historyId`.
 - AC-VAL-15: Không có endpoint/HTTP method nào sửa hoặc xoá `class_subject_history` ở Phase 1.
 - AC-VAL-16: `DELETE /classes/{id}` khi lớp đã có history trả 409 `CONFLICT` (không phải 500 do FK).
+- AC-VAL-17: Đổi môn chính thiếu `reason`/`expectedVersion`/`operationId` trả 400 `VALIDATION_ERROR`,
+  không ghi history.
+- AC-VAL-18: Cùng `operationId` + payload khác trả 409; cùng `operationId` + cùng payload trả kết quả
+  cũ, không sinh history thứ hai.
+- AC-VAL-19: `PUT /classes/{id}` đổi `subjectId` nhưng thiếu `reason`/`operationId`/`version` trả 400;
+  có đủ thì đi qua luồng history, không bypass.
+- AC-VAL-20: `school_class.subject_id = NULL` → không có primary; `subject_id != NULL` → đúng một
+  primary khớp `subject_id`; DB UNIQUE chỉ chặn trường hợp nhiều hơn một.
 
 ---
 
@@ -389,15 +402,17 @@ tài liệu này:
 - D-07: nhiều tiên quyết qua mảng; thêm mã `PREREQUISITE_DUPLICATE` / `PREREQUISITE_IDS_TOO_MANY`.
 - D-03: không bắt buộc `theory + practice = required`.
 - D-15: `CLASS_SUBJECT_LEGACY_PROTECTED` thuộc Phase 1.
-- D-08/D-15: đổi môn chính khi `DANG_DIEN_RA` hợp lệ nhưng bắt buộc ghi history; mã mới
-  `CLASS_SUBJECT_OPERATION_CONFLICT` (2240) và `REASON_TOO_LONG` (3054).
+- D-08/D-15: đổi môn chính khi `DANG_DIEN_RA` hợp lệ nhưng bắt buộc ghi history; `reason`,
+  `expectedVersion`, `operationId` là **bắt buộc**; mã mới `CLASS_SUBJECT_OPERATION_CONFLICT` (2240)
+  và `REASON_TOO_LONG` (3054); thiếu trường bắt buộc dùng `VALIDATION_ERROR` hiện có.
+- D-09: fallback `school_class.teacher_id` **chỉ** khi lớp chưa có bản ghi `class_subject` tương ứng.
 
 Câu hỏi kỹ thuật còn lại:
 
-1. Có chấp nhận thêm các mã 2222–2240 và 3043–3054 không? (Đây là đề xuất; người dùng xác nhận
-   trước khi thêm vào enum.)
-2. Có tách `SUBJECT_INACTIVE` khỏi `SUBJECT_NOT_FOUND` không? (Đề xuất: có.)
-3. `sessionMinutes` tối đa 600 có phù hợp thực tế trường không?
-4. Có cần trả `data` chi tiết (danh sách lớp ảnh hưởng) trong lỗi 409 không?
-5. Có cần `@JsonIgnoreProperties(ignoreUnknown=false)` để chặn trường `termNo` còn sót từ FE cũ?
-6. `operationId` giữ bao lâu? Đề xuất: vĩnh viễn ở Phase 1; nếu dọn thì phải giữ ≥ 24h để retry.
+1. Có tách `SUBJECT_INACTIVE` khỏi `SUBJECT_NOT_FOUND` không? (Đề xuất: có.)
+2. `sessionMinutes` tối đa 600 có phù hợp thực tế trường không?
+3. Có cần trả `data` chi tiết (danh sách lớp ảnh hưởng) trong lỗi 409 không?
+4. Có cần `@JsonIgnoreProperties(ignoreUnknown=false)` để chặn trường `termNo` còn sót từ FE cũ?
+
+Đã chốt (không còn mở): mã 2222–2240/3043–3054 được dùng cho thiết kế này; người dùng xác nhận
+khi sửa `ErrorCode.java`. `operationId` lưu **vĩnh viễn** ở Phase 1 (không dọn).

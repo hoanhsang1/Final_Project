@@ -19,7 +19,7 @@
 | Phạm vi tổ chức | Mọi bảng có `org_id char(36) NOT NULL`; FK tổ hợp gồm `org_id` |
 | Xoá | Môn/curriculum dùng `is_active`, không xoá cứng; join table dùng CASCADE/RESTRICT hợp lý |
 | Tên index | `uq_` cho unique, `idx_` cho index thường, `fk_` cho FK (theo phong cách repo) |
-| Migration | Đặt số tiếp theo sau `50_schedule_inbox_impact.sql`: đề xuất `51_people_curriculum.sql`, `52_people_teacher_subject.sql` |
+| Migration | Đặt số tiếp theo sau `50_schedule_inbox_impact.sql`: `51_people_curriculum.sql`, `52_people_class_subject.sql` |
 
 ---
 
@@ -300,6 +300,9 @@ CREATE TABLE IF NOT EXISTS class_subject (
 - **Không** dùng UNIQUE `(class_id, is_primary)` vì sẽ chỉ cho một dòng `is_primary = 0` mỗi lớp.
 - Bất biến "`school_class.subject_id` = môn primary" **không ép được bằng FK** (bảng vòng);
   service bảo đảm trong cùng transaction + kiểm tra định kỳ ở mục 6.3.
+- **UNIQUE trên `primary_class_id` chỉ bảo đảm tối đa một primary/lớp.** Nó **không** bảo đảm
+  "tối thiểu một primary khi `school_class.subject_id != NULL`" và cũng không bảo đảm primary khớp
+  `subject_id`; hai điều này do transaction + application validation (tạo lớp, đổi môn, backfill).
 - H2 (test) không hỗ trợ cú pháp `STORED`; `people-test-schema.sql` khai báo cột thường
   `primary_class_id char(36)` + UNIQUE và test service tự cập nhật cột này cùng `is_primary`
   (xem mục 9.1).
@@ -336,11 +339,13 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   old_subject_code varchar(50) DEFAULT NULL,
   old_subject_name varchar(200) DEFAULT NULL,
   old_teacher_id  char(36) DEFAULT NULL,
+  old_source      varchar(20) DEFAULT NULL,
   new_subject_id  char(36) NOT NULL,
   new_subject_code varchar(50) DEFAULT NULL,
   new_subject_name varchar(200) NOT NULL,
-  reason          varchar(500) DEFAULT NULL,
-  operation_id    varchar(64) DEFAULT NULL,
+  new_source      varchar(20) NOT NULL,
+  reason          varchar(500) NOT NULL,
+  operation_id    varchar(64) NOT NULL,
   changed_by      char(36) NOT NULL,
   changed_at      datetime(3) NOT NULL,
   PRIMARY KEY (id),
@@ -350,15 +355,21 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
   CONSTRAINT fk_csh_class
     FOREIGN KEY (class_id, org_id) REFERENCES school_class (id, org_id) ON DELETE RESTRICT,
   CONSTRAINT chk_csh_subject_change CHECK (
-    old_subject_id IS NULL OR old_subject_id <> new_subject_id)
+    old_subject_id IS NULL OR old_subject_id <> new_subject_id),
+  CONSTRAINT chk_csh_old_source CHECK (
+    old_source IS NULL OR old_source IN ('LEGACY','CURRICULUM','MANUAL')),
+  CONSTRAINT chk_csh_new_source CHECK (
+    new_source IN ('LEGACY','CURRICULUM','MANUAL'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 Ghi chú: `old_subject_code`, `old_subject_name`, `new_subject_code`, `new_subject_name`,
-`old_teacher_id` là **snapshot** tại thời điểm đổi — môn đổi tên/ngừng hoặc giáo viên nghỉ vẫn hiển
-thị đúng lịch sử. `new_subject_name` NOT NULL vì mọi lần đổi đều có môn mới. `old_subject_*` NULL
-chỉ khi lớp chưa có môn chính. UNIQUE `(org_id, operation_id)` cho phép retry an toàn khi client
-gửi cùng `operationId`; MySQL cho phép nhiều NULL nên request không gửi vẫn hợp lệ.
+`old_teacher_id`, `old_source`, `new_source` là **snapshot** tại thời điểm đổi — môn đổi tên/ngừng
+hoặc giáo viên nghỉ vẫn hiển thị đúng lịch sử. `new_subject_name`, `new_source`, `reason`,
+`operation_id` NOT NULL vì đổi môn chính bắt buộc có môn mới, có nguồn và có lý do/khóa idempotency.
+`old_subject_*`/`old_source` NULL chỉ khi lớp chưa có môn chính. UNIQUE `(org_id, operation_id)` là
+idempotency thật sự (không còn NULL): cùng khóa + cùng payload trả kết quả cũ, payload khác → 409.
+`reason` ≤ 500 ký tự do kiểu `varchar(500)` + validation `REASON_TOO_LONG`.
 
 **Hệ quả với `DELETE /classes/{id}` (đã có trong source, `class.delete`):** FK
 `fk_csh_class … ON DELETE RESTRICT` khiến xoá cứng một lớp **đã có lịch sử đổi môn** bị DB từ chối.
@@ -430,6 +441,11 @@ CREATE TABLE IF NOT EXISTS teacher_subject (
 
 ### 4.1. `51_people_curriculum.sql` (draft)
 
+> Bản đầy đủ (idempotent, MySQL 8) ở `docs/phase-1/migrations/51_people_curriculum.sql`. Pre-check
+> ở `migrations/51_52_precheck.sql`, post-check ở `migrations/51_52_postcheck.sql`, rollback ở
+> `migrations/ROLLBACK.md`. File đặt ngoài thư mục migration gốc để tránh bị áp dụng nhầm; người
+> dùng review rồi copy sang `NN_people_*.sql` khi chạy staging.
+
 ```sql
 -- Additive, idempotent. KHÔNG xoá cột/dữ liệu.
 USE mems_people_db;
@@ -462,9 +478,9 @@ BEGIN
   END IF;
 END$
 
-DROP PROCEDURE IF EXISTS mems_m51_add_index$
-CREATE PROCEDURE mems_m51_add_index(IN p_table VARCHAR(64), IN p_index VARCHAR(64),
-                                    IN p_cols VARCHAR(255))
+DROP PROCEDURE IF EXISTS mems_m51_add_unique$
+CREATE PROCEDURE mems_m51_add_unique(IN p_table VARCHAR(64), IN p_index VARCHAR(64),
+                                     IN p_cols VARCHAR(255))
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.statistics
                  WHERE table_schema = DATABASE() AND table_name = p_table
@@ -486,63 +502,67 @@ CALL mems_m51_add_fk('school_class', 'fk_school_class_curriculum',
   'FOREIGN KEY (curriculum_id, org_id) REFERENCES curriculum (id, org_id) ON DELETE RESTRICT');
 -- 5) index bắt buộc cho FK tổ hợp (class_id, org_id) ở migration 52.
 --    Không thể fail vì id đã là PK; vẫn kiểm tồn tại để idempotent.
-CALL mems_m51_add_index('school_class', 'uq_school_class_id_org', 'id, org_id');
+CALL mems_m51_add_unique('school_class', 'uq_school_class_id_org', 'id, org_id');
 
 DROP PROCEDURE IF EXISTS mems_m51_add_col;
 DROP PROCEDURE IF EXISTS mems_m51_add_fk;
-DROP PROCEDURE IF EXISTS mems_m51_add_index;
+DROP PROCEDURE IF EXISTS mems_m51_add_unique;
 ```
 
 > **Thứ tự bắt buộc:** migration 51 phải chạy xong (tạo `uq_school_class_id_org`) **trước** migration 52,
 > vì `class_subject` tạo FK `(class_id, org_id) → school_class(id, org_id)`.
 
-### 4.2. `52_people_teacher_subject.sql` (draft)
+### 4.2. `52_people_class_subject.sql` (draft)
+
+Nội dung (bản đầy đủ ở `docs/phase-1/migrations/52_people_class_subject.sql`):
 
 ```sql
 USE mems_people_db;
+-- 0) Helper procedures: mems_m52_add_col, mems_m52_add_unique,
+--    mems_m52_assert_no_duplicate_primary (SIGNAL 45000) — information_schema-guarded.
 -- 1) specialty_subject (mục 3.4)
 -- 2) teacher_subject (mục 3.5)
--- 3) class_subject (mục 3.3) — gồm is_primary + primary_class_id + uq_class_subject_primary
--- 4) class_subject_history (mục 3.3.1) — tạo SAU class_subject
--- 5) D-04 (đã chốt): code optional + UNIQUE khi có giá trị:
+-- 3) class_subject (mục 3.3) — gồm is_primary + primary_class_id GENERATED STORED
+-- 4) Bù cột is_primary / primary_class_id nếu bảng đã tồn tại từ bản nháp cũ
+-- 5) backfill exact-match (mục 5.3): 5a tạo dòng LEGACY khi lớp có subject_id mà
+--    chưa có dòng khớp + chưa có primary; 5b set is_primary qua bảng tạm (tránh
+--    MySQL 1093); 5c CALL assert_no_duplicate_primary → dừng nếu >1 primary/lớp
+-- 6) CALL mems_m52_add_unique('class_subject','uq_class_subject_primary','primary_class_id')
+--    — UNIQUE chỉ bảo đảm TỐI ĐA một primary; tối thiểu do transaction/app
+-- 7) class_subject_history (mục 3.3.1) — tạo SAU class_subject
+-- 8) D-04 (đã chốt): code optional + UNIQUE khi có giá trị, khối COMMENTED:
 --    ALTER TABLE subject DROP INDEX uq_subject_org_code,
 --      ADD UNIQUE KEY uq_subject_org_code (org_id, code);
 --    Chỉ chạy sau khi mục 6.1 báo 0 nhóm trùng. KHÔNG thêm NOT NULL.
 ```
 
-> **Điều kiện cần kiểm trước khi chạy:** nếu môi trường nào đó **đã** chạy một bản draft 52 cũ
-> (tạo `class_subject` **không** có `is_primary`/`primary_class_id` và **không** có
-> `class_subject_history`), thì không sửa file 52 đã chạy. Khi đó tạo thêm
-> `53_people_class_subject_history.sql` (draft dưới) và chạy sau 52.
-> Trong repo hiện tại **chưa có** migration 51/52 nào, nên đường chuẩn là gộp tất cả vào 52.
+**Pre-check bắt buộc trước khi chạy 52** (chi tiết SQL ở mục 6):
 
-### 4.3. `53_people_class_subject_history.sql` (draft dự phòng)
+1. Trùng `subject.code` trong cùng org (mục 6.1) — trước khi đổi UNIQUE.
+2. `class_subject` đã tồn tại hay chưa; nếu có, có cột `is_primary`/`primary_class_id` chưa.
+3. Trùng khóa `(class_id, subject_id)` (nếu bảng đã có từ bản nháp cũ).
+4. `school_class.subject_id` **không** có dòng `class_subject` khớp chính xác.
+5. Nhiều dòng `class_subject` có thể bị đánh `is_primary` cho cùng một lớp (mập mờ) → báo cáo.
+6. `class_subject.org_id` lệch `school_class.org_id` / `subject.org_id`.
+7. Index/constraint `uq_class_subject_primary`, `uq_csh_operation`, FK đã tồn tại chưa.
+8. `school_class` đã có `uq_school_class_id_org` chưa (do migration 51 tạo).
+9. `class_subject.subject_id` không tồn tại trong `subject` cùng org (FK sẽ fail).
+10. `school_class.subject_id` không tồn tại trong `subject` cùng org (backfill LEGACY sẽ fail FK).
 
-```sql
-USE mems_people_db;
--- Chỉ dùng khi class_subject đã tồn tại từ một bản 52 cũ.
+**Thứ tự trong 52:** tạo `class_subject` **không** kèm UNIQUE primary → backfill exact-match khi
+bảng đang rỗng/khớp → thêm `uq_class_subject_primary` và `class_subject_history`. Nếu backfill phát
+hiện hàng mập mờ, **dừng** và xuất báo cáo manual review, không đoán.
 
-ALTER TABLE class_subject
-  ADD COLUMN is_primary tinyint(1) NOT NULL DEFAULT 0 AFTER teacher_id,
-  ADD COLUMN primary_class_id char(36) GENERATED ALWAYS AS
-      (CASE WHEN is_primary = 1 THEN class_id END) STORED AFTER is_primary,
-  ADD UNIQUE KEY uq_class_subject_primary (primary_class_id),
-  ADD CONSTRAINT chk_class_subject_primary CHECK (is_primary IN (0,1));
+### 4.3. Migration 53 — không tạo trong Revision 3
 
--- Đánh dấu môn chính cho dữ liệu đã có (khớp ID chính xác, D-11)
-UPDATE class_subject cs
-JOIN school_class c ON c.id = cs.class_id AND c.org_id = cs.org_id
-SET cs.is_primary = 1
-WHERE c.subject_id = cs.subject_id;
+Repo hiện tại **chưa có** migration 51/52 nào (đã kiểm tra thư mục gốc: file gần nhất là
+`50_schedule_inbox_impact.sql`), nên **không có bằng chứng** một bản 52 cũ đã chạy ở môi trường nào
+cần nâng cấp. Vì vậy Revision 3 **không** tạo migration 53. Chỉ tạo 53 khi có xác minh (query
+`information_schema` trên môi trường thật) rằng 52 phiên bản cũ đã áp dụng; khi đó **không sửa file
+52 đã chạy** mà viết 53 bù phần thiếu.
 
--- Tạo class_subject_history như mục 3.3.1
-```
-
-> Chạy `UPDATE` trên **sau khi** thêm cột và **trước khi** thêm UNIQUE nếu bảng đã có dữ liệu; với
-> bảng rỗng thứ tự không quan trọng. Luôn chạy kiểm tra mục 6.3b trước/sau.
-
-> DDL đầy đủ của từng bảng nằm ở mục 3; migration chỉ cần copy nguyên văn và bọc kiểm tra tồn tại
-> nếu muốn idempotent. Không đặt `NOT NULL` cho `subject.code` trong cùng migration với UNIQUE.
+> DDL đầy đủ của từng bảng nằm ở mục 3. Không đặt `NOT NULL` cho `subject.code` trong cùng
+> migration với UNIQUE.
 
 ---
 
@@ -611,6 +631,64 @@ WHERE c.subject_id IS NOT NULL
 
 ## 6. Kiểm tra trước/sau migration
 
+### 6.0. Pre-check bắt buộc trước migration 51/52
+
+Chạy **trên staging**, ghi lại kết quả. Bất kỳ truy vấn nào trả dòng đều phải vào **báo cáo manual
+review**; migration **không** tự sửa/đoán.
+
+```sql
+-- a) class_subject / class_subject_history đã tồn tại? cột đã có chưa?
+SELECT table_name, column_name
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name IN ('class_subject','class_subject_history')
+ORDER BY table_name, ordinal_position;
+
+-- b) trùng khóa (class_id, subject_id) nếu bảng class_subject đã tồn tại
+SELECT class_id, subject_id, COUNT(*) AS n
+FROM class_subject GROUP BY class_id, subject_id HAVING COUNT(*) > 1;
+
+-- c) lớp có subject_id nhưng KHÔNG có dòng class_subject khớp chính xác (ứng viên backfill)
+SELECT c.id AS class_id, c.org_id, c.subject_id
+FROM school_class c
+WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM class_subject cs
+    WHERE cs.class_id = c.id AND cs.subject_id = c.subject_id);
+
+-- d) lớp có subject_id nhưng KHÔNG dòng nào khớp; hoặc đã có >1 dòng is_primary (bản nháp cũ)
+SELECT c.id AS class_id, c.subject_id,
+       COALESCE(SUM(cs.subject_id = c.subject_id), 0) AS exact_match_rows,
+       COALESCE(SUM(cs.is_primary = 1), 0)            AS primary_rows
+FROM school_class c
+LEFT JOIN class_subject cs ON cs.class_id = c.id AND cs.org_id = c.org_id
+WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL
+GROUP BY c.id, c.subject_id
+HAVING exact_match_rows = 0 OR primary_rows > 1;
+
+-- e) org lệch giữa class_subject và school_class / subject
+SELECT cs.class_id, cs.subject_id, cs.org_id AS cs_org, c.org_id AS class_org
+FROM class_subject cs JOIN school_class c ON c.id = cs.class_id
+WHERE c.org_id <> cs.org_id;
+
+SELECT cs.class_id, cs.subject_id, cs.org_id AS cs_org, s.org_id AS subject_org
+FROM class_subject cs JOIN subject s ON s.id = cs.subject_id
+WHERE s.org_id <> cs.org_id;
+
+-- f) index/constraint đã tồn tại (idempotency của migration)
+SELECT table_name, index_name FROM information_schema.statistics
+WHERE table_schema = DATABASE()
+  AND index_name IN ('uq_school_class_id_org','uq_class_subject_primary','uq_csh_operation');
+
+SELECT table_name, constraint_name FROM information_schema.table_constraints
+WHERE table_schema = DATABASE()
+  AND constraint_name IN ('fk_class_subject_class','fk_csh_class','chk_class_subject_primary');
+```
+
+Kỳ vọng trước khi chạy 52: (b)=0; (c) là danh sách backfill hợp lệ **chỉ khi** khớp ID chính xác;
+(d) phải được xem xét tay nếu >0 (không có nghĩa là mập mờ — có thể là nhiều môn, nhưng phải xác
+nhận dòng nào khớp `subject_id`); (e)=0; (f) cho biết migration đã chạy một phần.
+
 ### 6.1. Trùng mã môn (trước khi thêm UNIQUE)
 
 ```sql
@@ -678,7 +756,9 @@ WHERE c.subject_id IS NULL OR c.subject_id <> cs.subject_id;
 
 Trước migration, hai truy vấn đầu có thể trả dòng (bảng cũ chưa có `is_primary`); sau bước backfill
 và trước khi thêm `uq_class_subject_primary` phải xử lý tay. Truy vấn "primary lệch" phải **luôn**
-bằng 0 sau mỗi lần đổi môn chính.
+bằng 0 sau mỗi lần đổi môn chính. **UNIQUE `uq_class_subject_primary` chỉ chặn trường hợp >1
+primary**; câu "lớp có `class_subject` nhưng không có primary" **không** bị DB chặn — đây là lý do
+phải chạy truy vấn này định kỳ và bảo đảm bằng transaction/app validation.
 
 ### 6.3b. Sửa dữ liệu primary (idempotent, chỉ khi cần)
 
@@ -767,10 +847,26 @@ Kỳ vọng: 0 dòng cho cả ba truy vấn. Bảng mới ở Phase 1 nên thự
 | `school_class.curriculum_id` | `ALTER TABLE school_class DROP FOREIGN KEY ...; DROP COLUMN` (mất liên kết, không mất dữ liệu lớp) |
 | `uq_school_class_id_org` | `DROP INDEX uq_school_class_id_org` — chỉ làm **sau** khi đã drop FK `class_subject` |
 | Bảng nối tiên quyết | `DROP TABLE curriculum_subject_prerequisite` (chỉ khi chưa dùng); drop trước `curriculum_subject` |
-| `class_subject_history` | Giữ bảng là an toàn nhất. Nếu buộc phải bỏ: drop FK `fk_csh_class` rồi `DROP TABLE`; **không** chuyển dữ liệu history sang nơi khác vì bản chất là audit |
-| `class_subject.is_primary`/`primary_class_id` | `DROP INDEX uq_class_subject_primary; ALTER TABLE ... DROP COLUMN primary_class_id, DROP COLUMN is_primary` — chỉ sau khi đã bỏ mọi code đọc hai cột này |
+| `class_subject_history` | **Giữ bảng là an toàn nhất.** Nếu buộc phải bỏ: export toàn bộ history ra file lưu trữ trước, drop FK `fk_csh_class` rồi `DROP TABLE`; **không** âm thầm xoá lịch sử |
+| `class_subject.is_primary`/`primary_class_id` | `DROP INDEX uq_class_subject_primary; ALTER TABLE ... DROP COLUMN primary_class_id, DROP COLUMN is_primary` — chỉ sau khi đã bỏ mọi code đọc hai cột này; mất thông tin "môn nào là primary" (có thể suy lại từ `school_class.subject_id` khi rollback) |
 | Unique code | `DROP INDEX ... , ADD INDEX` (trở về index thường) — không mất dữ liệu |
-| Backfill | Không cần rollback nếu bảng mới; nếu muốn, `DELETE` theo `source='LEGACY'` (chỉ dòng do backfill tạo) |
+| Backfill | Không cần rollback nếu bảng mới; nếu muốn, `DELETE` **chỉ** dòng do backfill tạo (`source='LEGACY'` và không có history tham chiếu). Dòng `class_subject` do người dùng tạo (`MANUAL`/`CURRICULUM`) **không** xoá |
+
+**Dữ liệu có thể mất khi rollback:**
+
+- `class_subject_history`: nếu drop bảng mà chưa export → mất toàn bộ audit đổi môn (không thể tái
+  tạo chính xác actor/thời điểm/lý do). Đây là tổn thất không thể phục hồi.
+- `class_subject.is_primary`: mất dấu primary, nhưng có thể suy lại từ `school_class.subject_id`
+  nếu dữ liệu còn nhất quán.
+- Backfill `class_subject`: xoá `source='LEGACY'` sẽ mất snapshot môn legacy đã tạo.
+
+**Điều kiện an toàn để rollback:** không còn request đổi môn chính đang chạy; đã export history;
+đã xác nhận `school_class.subject_id` vẫn khớp dòng primary trước khi drop cột; đã drop FK/index
+theo đúng thứ tự ngược.
+
+**Khi nào forward-fix thay vì rollback:** nếu migration đã chạy và **đã phát sinh history** hoặc
+đã có dữ liệu `class_subject` mới, rollback sẽ mất audit/dữ liệu nghiệp vụ. Khi đó viết migration
+bổ sung (forward-fix) để sửa constraint/backfill sai, **không** drop bảng/cột.
 
 Không có thao tác nào xoá cột `subject_id`, `teacher_specialty` hay dữ liệu lớp.
 Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, drop index sau.
@@ -813,31 +909,37 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
 | Cột sinh | `GENERATED ALWAYS AS (...) STORED` | H2 2.x hỗ trợ `GENERATED ALWAYS AS (...)` nhưng **không** có `STORED` | Khai báo cột thường `primary_class_id char(36)`; service set = `class_id` khi `is_primary=1`, `NULL` khi ngược lại. UNIQUE vẫn giữ |
 | CHECK constraint | MySQL 8.0.16+ enforce | H2 enforce | Giữ nguyên |
 | `ON DELETE RESTRICT` trên FK `class_subject_history` | Hỗ trợ | Hỗ trợ | Giữ nguyên |
-| `UNIQUE (org_id, operation_id)` với NULL | Cho phép nhiều NULL | Cho phép nhiều NULL | Giữ nguyên |
-| `ALTER TABLE … AFTER` | Hỗ trợ | Không hỗ trợ | Chỉ nằm trong migration 53 dự phòng (MySQL-only), không đưa vào test schema |
+| `UNIQUE (org_id, operation_id)` với NULL | Cho phép nhiều NULL | Cho phép nhiều NULL | Giữ nguyên; Revision 3 đặt hai cột NOT NULL nên NULL không còn là đường hợp lệ |
+| `ALTER TABLE … AFTER` | Hỗ trợ | Không hỗ trợ | Không dùng `AFTER` trong draft 51/52; đặt cột ở cuối `ALTER TABLE` |
+| Composite FK cần index tiền tố trái | Bắt buộc | Bắt buộc | Test schema phải thêm `UNIQUE(id, org_id)` trên `school_class` |
+| Kiểu `is_primary` | `tinyint(1)` | `BOOLEAN` | Test map `true`/`false`, không so `1`/`0` trực tiếp |
+| Bất biến "tối thiểu một primary" | Transaction + app | Transaction + app | H2 **không** kiểm được; nghiệm thu trên MySQL staging (TC-CLS-047/048) |
 
-> Hệ quả: test H2 **không** chứng minh được ràng buộc "một primary/lớp" ở tầng DB. Test phải kiểm
-> service trả 409 khi cố tạo primary thứ hai **và** có ít nhất một lần kiểm thủ công trên MySQL
-> staging (xem `test-cases.md` TC-CLS-029).
+> Hệ quả: **DB H2 chỉ kiểm được "tối đa một primary"** khi cột `primary_class_id` được service cập
+> nhật đúng; H2 **không** mô phỏng generated column và **không** chứng minh được MySQL generated
+> column. Test H2 phải kiểm service trả 409 khi cố tạo primary thứ hai **và** phải có kiểm thủ công
+> trên MySQL staging (xem `test-cases.md` TC-CLS-048, TC-LEG-018/019). Tài liệu này **không** tuyên
+> bố schema đã được xác minh chỉ dựa trên H2.
 
 ---
 
 ## 10. Việc người dùng cần làm (không thuộc tài liệu này)
 
 > Trạng thái: `D-01`…`D-15` **đã chốt** (xem sổ quyết định `subject-business-requirements.md`).
-> Tài liệu này chỉ mô tả thiết kế; **chưa có migration nào được tạo hay chạy**, schema production
-> không thay đổi.
+> Tài liệu này chỉ mô tả thiết kế; **chưa có migration nào được chạy** trên bất kỳ database nào.
+> Draft 51/52 nằm trong `docs/phase-1/migrations/` — chưa được xác minh trên MySQL.
 
-1. Tạo file migration thật (đề xuất 51/52) từ draft trên; **51 trước 52**. Migration 51 gồm
+1. Tạo file migration thật (đề xuất 51/52) từ draft; **51 trước 52**. Migration 51 gồm
    `curriculum`, `curriculum_subject` (kèm `uq_curriculum_subject_org`), `curriculum_subject_prerequisite`,
    `school_class.curriculum_id`, `uq_school_class_id_org`. Migration 52 gồm `class_subject`
    (kèm `is_primary`, `primary_class_id`, `uq_class_subject_primary`), `class_subject_history`,
-   `teacher_subject`, `specialty_subject`. Nếu `class_subject` đã tồn tại từ bản 52 cũ ở môi trường
-   nào, dùng migration 53 dự phòng (mục 4.3) **sau** 52 cũ và **không** sửa file đã chạy.
+   `teacher_subject`, `specialty_subject`, backfill exact-match. **Không** tạo migration 53 nếu
+   chưa có bằng chứng một bản 52 cũ đã chạy (mục 4.3).
 2. Cập nhật schema test H2 tương ứng để test phản ánh đúng MySQL (composite FK, UNIQUE 3 cột,
-   UNIQUE primary; lưu ý khác biệt cột sinh ở mục 9.1).
-3. Chạy pre-check 6.1 (trùng mã môn), 6.3a (bất biến primary) và 6.5 (cạnh tiên quyết) trên
-   **staging**, không production.
+   UNIQUE primary; lưu ý khác biệt cột sinh ở mục 9.1). H2 **không** thay thế kiểm MySQL staging.
+3. Chạy pre-check 6.0 (tồn tại bảng/cột/index, trùng khóa, lớp thiếu primary, org lệch), 6.1
+   (trùng mã môn), 6.3a (bất biến primary) và 6.5 (cạnh tiên quyết) trên **staging**, không
+   production.
 4. Chỉ chạy production theo quy trình riêng của bạn, có backup và rollback đã kiểm (§7).
 5. Viết code entity/repository/service/controller theo `implementation-roadmap.md` (người dùng tự viết).
    Luồng đổi môn chính **phải** là một `@Transactional` duy nhất (history → `school_class` →

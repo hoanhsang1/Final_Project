@@ -376,7 +376,7 @@ Sao chép toàn bộ môn **và** cạnh tiên quyết (map subject id sang bả
 | POST | `/classes/{classId}/subjects` | `/api/classes/{classId}/subjects` | `class.edit` |
 | PUT | `/classes/{classId}/subjects/{subjectId}` | `/api/classes/{classId}/subjects/{subjectId}` | `class.edit` |
 | DELETE | `/classes/{classId}/subjects/{subjectId}` | `/api/classes/{classId}/subjects/{subjectId}` | `class.edit` |
-| PUT | `/classes/{classId}/subjects/primary` | `/api/classes/{classId}/subjects/primary` | `class.edit` (**mới**, D-08/D-15) |
+| PUT | `/classes/{classId}/subjects/primary` | `/api/classes/{classId}/subjects/primary` | `class.edit` (endpoint **mới**, dùng quyền **đã có**, D-08/D-15) |
 | GET | `/classes/{classId}/subject-history` | `/api/classes/{classId}/subject-history` | `class.view` (**mới**) |
 
 ### 4.2. GET `/classes/{classId}/subjects`
@@ -409,8 +409,9 @@ Sao chép toàn bộ môn **và** cạnh tiên quyết (map subject id sang bả
 }
 ```
 
-`isPrimary` là field **mới** (không phá FE). Đúng một phần tử `isPrimary=true` khi lớp đã có
-`class_subject`.
+`isPrimary` là field **mới** (không phá FE). Khi `school_class.subject_id != NULL` phải có **đúng
+một** phần tử `isPrimary=true` (bảo đảm bởi transaction/app; DB UNIQUE chỉ chặn nhiều hơn một); lớp
+không có môn chính trả **không** phần tử `isPrimary=true`.
 Lớp legacy **chưa có dòng `class_subject` nào**: trả 1 dòng suy từ `school_class.subject_id` với
 `source=LEGACY`, `isPrimary=true`, có `subjectId/subjectName`, `sequenceNo=null`, các trường số
 buổi/giáo viên lấy từ `school_class`. Nếu lớp đã có dòng `class_subject`, **không** trả thêm dòng
@@ -492,7 +493,10 @@ Endpoint lớp hiện có (`SchoolClassController`) nhận `subjectId` trong bod
 - Nếu `subjectId` **không đổi** → hành vi hiện tại giữ nguyên.
 - Nếu `subjectId` **thay đổi** → service **không** được chỉ `UPDATE school_class.subject_id`.
   Nó phải chạy **cùng luồng** với §4.8 (khoá lớp, ghi `class_subject_history`, đồng bộ
-  `class_subject`), trong cùng transaction.
+  `class_subject`), trong cùng transaction. Khi đó request **bắt buộc** có thêm:
+  `reason` (≤ 500), `operationId`, và `version` (dùng làm `expectedVersion`, phải khớp
+  `school_class.version`). Thiếu → 400; lệch version → 409 `DATA_CHANGED`; trùng `operationId` +
+  payload khác → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`. `changedBy` lấy từ JWT.
 - Nếu lớp đã `DA_KET_THUC/DA_HUY/CLOSED` → 409 `CLASS_NOT_EDITABLE` như hiện tại, không ghi history.
 - Response giữ nguyên `ClassResponse` hiện có (không thêm hợp đồng mới).
 
@@ -517,23 +521,29 @@ Request:
 
 | Trường | Bắt buộc | Ghi chú |
 |---|---|---|
-| `subjectId` | Có | Môn mới; phải tồn tại, **active**, cùng org |
-| `reason` | Không | ≤ 500; lưu vào history |
-| `expectedVersion` | Không (đề xuất có) | Nếu có, lệch → 409 `DATA_CHANGED` |
-| `operationId` | Không | UUID do client sinh; retry cùng id trả kết quả cũ (idempotent) |
+| `subjectId` | **Có** | Môn mới; phải tồn tại, **active**, cùng org |
+| `reason` | **Có** | 1..500 ký tự; thiếu → 400 `VALIDATION_ERROR`, > 500 → 400 `REASON_TOO_LONG` |
+| `expectedVersion` | **Có** | Phải khớp `school_class.version`; lệch → 409 `DATA_CHANGED` |
+| `operationId` | **Có** | UUID do client sinh, lưu vĩnh viễn trong history; UNIQUE `(org_id, operation_id)` |
 | `plannedSessions`, `sessionMinutes` | Không | Chỉ dùng khi **tạo mới** dòng `class_subject`; bỏ qua nếu dòng đã tồn tại |
+
+`changedBy` **không** nằm trong request — service lấy từ JWT.
 
 **Điều kiện:** `class.edit` + module `STUDENT_MANAGEMENT`; lớp cùng org; trạng thái
 `CHUA_BAT_DAU` hoặc `DANG_DIEN_RA`; `subjectId` khác môn chính hiện tại.
 
 **Ngữ nghĩa (một transaction):**
 
+0. Tra `operation_id`: nếu đã tồn tại trong `(org_id, operation_id)` → so payload chuẩn hoá. Giống →
+   trả **kết quả cũ** (200, cùng `historyId`), **không** mở transaction mới. Khác → 409
+   `CLASS_SUBJECT_OPERATION_CONFLICT`.
 1. Khoá `school_class` (`SELECT … FOR UPDATE`).
-2. Kiểm trạng thái/version.
-3. Ghi `class_subject_history` (snapshot môn cũ + mã/tên, `old_teacher_id`, môn mới + mã/tên,
-   `changed_by`, `changed_at`, `reason`, `operationId`). Lớp **legacy chưa có** dòng `class_subject`:
-   `old_subject_id` = `school_class.subject_id`; mã/tên đọc từ `subject` **tại thời điểm đổi**;
-   `old_teacher_id` = `school_class.teacher_id`. Không tạo dòng history rỗng.
+2. Kiểm trạng thái + `expectedVersion` (bắt buộc) khớp `school_class.version`.
+3. Ghi `class_subject_history` (snapshot môn cũ + mã/tên + `old_source`, `old_teacher_id`, môn mới
+   + mã/tên + `new_source`, `changed_by`, `changed_at`, `reason`, `operationId`). Lớp **legacy chưa
+   có** dòng `class_subject`: `old_subject_id` = `school_class.subject_id`; mã/tên đọc từ `subject`
+   **tại thời điểm đổi**; `old_teacher_id` = `school_class.teacher_id`; `old_source='LEGACY'`.
+   Dòng mới tạo có `new_source='MANUAL'`; dòng tái dùng giữ `source` hiện có. Không tạo history rỗng.
 4. `school_class.subject_id = subjectId`; `version + 1`.
 5. `class_subject`:
    - môn mới **đã có** trong lớp → chỉ `is_primary = 1` (giữ `teacher_id`, sessions hiện có);
@@ -557,12 +567,15 @@ Response `200`:
     "oldSubjectCode": "TOAN10",
     "oldSubjectName": "Toán 10",
     "oldTeacherId": "22222222-2222-4222-8222-222222222005",
+    "oldSource": "CURRICULUM",
     "newSubjectId": "99999999-9999-4999-8999-999999999002",
     "newSubjectCode": "LY10",
     "newSubjectName": "Vật lý 10",
+    "newSource": "CURRICULUM",
     "changedBy": "11111111-1111-4111-8111-111111111111",
     "changedAt": "2026-11-20T09:15:00Z",
-    "reason": "Điều chỉnh chuyên môn giữa kỳ"
+    "reason": "Điều chỉnh chuyên môn giữa kỳ",
+    "operationId": "6a0f0f1e-7a34-4b43-9b5f-1c5c1f7a9c11"
   },
   "teacherAssigned": false
 }
@@ -574,16 +587,24 @@ Response `200`:
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
-| 400 | `SUBJECT_INACTIVE` / `VALIDATION_ERROR` / `REASON_TOO_LONG` | Môn đã ngừng / body sai / `reason` > 500 |
+| 400 | `VALIDATION_ERROR` | Thiếu `subjectId`/`reason`/`expectedVersion`/`operationId`; `operationId` sai định dạng |
+| 400 | `REASON_TOO_LONG` | `reason` > 500 ký tự |
+| 400 | `SUBJECT_INACTIVE` | Môn đã ngừng |
 | 403 | `FORBIDDEN` | Thiếu `class.edit` |
 | 404 | `CLASS_NOT_FOUND` / `SUBJECT_NOT_FOUND` | Lớp khác org/không tồn tại; môn không tồn tại hoặc khác org |
-| 409 | `CLASS_NOT_EDITABLE` | Lớp đã kết thúc/huỷ/đóng |
-| 409 | `CLASS_SUBJECT_OPERATION_CONFLICT` | `subjectId` trùng môn chính hiện tại mà **không** phải retry cùng `operationId`; hoặc vi phạm UNIQUE `primary_class_id` do đua đồng thời |
-| 409 | `DATA_CHANGED` | `expectedVersion` lệch |
+| 409 | `CLASS_NOT_EDITABLE` | Lớp `DA_KET_THUC`/`DA_HUY`/`CLOSED` |
+| 409 | `CLASS_SUBJECT_OPERATION_CONFLICT` | Cùng `operationId` + payload **khác**; hoặc vi phạm UNIQUE `primary_class_id` do đua đồng thời |
+| 409 | `DATA_CHANGED` | `expectedVersion` lệch `school_class.version` (xung đột cập nhật đồng thời) |
 | 400 | `MODULE_NOT_ENABLED` | Module tắt |
 
-Retry cùng `operationId` (trong 24h hoặc vĩnh viễn — xem câu hỏi §9) trả **200** với cùng
-`historyId`, không tạo bản ghi thứ hai.
+**Idempotency:**
+
+- Cùng `operationId` + **cùng payload chuẩn hoá** (`subjectId`, `reason`, `plannedSessions`,
+  `sessionMinutes`) → trả **200** với kết quả cũ (cùng `historyId`), **không** tạo history mới.
+- Cùng `operationId` + payload **khác** → **409** `CLASS_SUBJECT_OPERATION_CONFLICT`.
+- Transaction lỗi ở bất kỳ bước nào → rollback toàn bộ; **không** để history một phần, không để
+  `school_class.subject_id` lệch primary.
+- Retry sau khi transaction đã thành công → trả kết quả cũ, **không** sinh bản ghi thứ hai.
 
 ### 4.9. GET `/classes/{classId}/subject-history`
 
@@ -599,12 +620,15 @@ Query: `page` (mặc định 0), `size` (mặc định 20, tối đa 100). Sắp
       "oldSubjectCode": "TOAN10",
       "oldSubjectName": "Toán 10",
       "oldTeacherId": "22222222-2222-4222-8222-222222222005",
+      "oldSource": "CURRICULUM",
       "newSubjectId": "99999999-9999-4999-8999-999999999002",
       "newSubjectCode": "LY10",
       "newSubjectName": "Vật lý 10",
+      "newSource": "CURRICULUM",
       "changedBy": "11111111-1111-4111-8111-111111111111",
       "changedAt": "2026-11-20T09:15:00Z",
-      "reason": "Điều chỉnh chuyên môn giữa kỳ"
+      "reason": "Điều chỉnh chuyên môn giữa kỳ",
+      "operationId": "6a0f0f1e-7a34-4b43-9b5f-1c5c1f7a9c11"
     }
   ],
   "total": 1,
@@ -805,8 +829,11 @@ Chi tiết từng mã: `validation-and-error-cases.md`.
 - D-07: nhiều tiên quyết qua mảng `prerequisiteSubjectIds`.
 - D-08: `CHUA_BAT_DAU` đổi tự do; `DANG_DIEN_RA` chỉ đổi **môn chính** kèm history.
 - D-14: `curriculum.view`/`curriculum.manage` (ORGANIZATION, position-based cho giáo vụ).
-- D-15: `is_primary`, một primary/lớp, `class_subject_history`, chặn xoá dòng primary, đồng bộ
-  `school_class.subject_id` trong một transaction.
+- D-15: `is_primary` (DB bảo đảm **tối đa** một primary/lớp; tối thiểu do transaction/app),
+  `class_subject_history`, chặn xoá dòng primary, đồng bộ `school_class.subject_id` trong một
+  transaction.
+- `reason`, `expectedVersion`, `operationId` là **bắt buộc** ở §4.8; `operationId` lưu **vĩnh viễn**
+  ở Phase 1 (không job dọn).
 
 Câu hỏi kỹ thuật còn lại:
 
@@ -815,8 +842,4 @@ Câu hỏi kỹ thuật còn lại:
 3. `PUT /classes/{id}/subjects` thay toàn bộ hay chỉ dùng các endpoint item?
 4. Khi thay curriculum, mặc định `keepManualSubjects=true` — giữ nguyên?
 5. Internal API nào cần mở ngay cho Phase 2 (chỉ thiết kế, chưa code)?
-6. `operationId` ở §4.8 lưu vĩnh viễn hay dọn sau 24h? Đề xuất: giữ vĩnh viễn ở Phase 1 (bảng
-   history nhỏ), dọn bằng job khi cần.
-7. Có trả `expectedVersion` bắt buộc cho `PUT .../subjects/primary` (chặt hơn) hay tuỳ chọn như
-   hợp đồng trên? Đề xuất: tuỳ chọn, vì FE hiện chưa gửi version cho `PUT /classes/{id}`.
-8. `GET /classes/{id}/subject-history` có cần lọc theo khoảng thời gian/actor không?
+6. `GET /classes/{id}/subject-history` có cần lọc theo khoảng thời gian/actor không?

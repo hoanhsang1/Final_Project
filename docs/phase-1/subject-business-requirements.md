@@ -104,14 +104,14 @@ SubjectResponse  (id, code, name, description, active, createdAt, updatedAt)
 | D-06 | Chuyên môn giáo viên lưu theo Subject ID hay Specialty ID? | Cả hai: `specialty_subject` để gán hàng loạt; `teacher_subject` là **nguồn sự thật** theo Subject ID | Thêm 2 bảng; đổi `teachesSubject` |
 | D-06a | Có quy trình duyệt chuyên môn không? | **KHÔNG duyệt ở Phase 1**: mọi dòng gán `APPROVED`; không có API approve/reject, không tạo `PENDING` | Cột `status` giữ cho Phase 2; bỏ endpoint duyệt |
 | D-07 | Môn tiên quyết: một hay nhiều, chặn hay cảnh báo? | **Nhiều tiên quyết** qua bảng nối riêng `curriculum_subject_prerequisite`; Phase 1 **chỉ cảnh báo**; tự trỏ/trùng/chu trình bị chặn | Thêm bảng nối + 2 FK tổ hợp; API mảng `prerequisiteSubjectIds` |
-| D-08 | Đổi curriculum/môn khi lớp đang học? | **`CHUA_BAT_DAU`**: đổi curriculum và danh sách môn trực tiếp. **`DANG_DIEN_RA`**: chỉ được đổi **môn chính**; ghi lịch sử vào `class_subject_history` (snapshot môn cũ/mới, giáo viên cũ, actor, thời điểm); **không** ghi đè toàn bộ curriculum, **không** chép giáo viên cũ sang môn mới. **`DA_KET_THUC`/`DA_HUY`/`CLOSED`**: không dùng thao tác thường; sửa lịch sử cần quy trình riêng (ngoài Phase 1). | `class_subject_history`, API đổi môn chính, test |
-| D-09 | Giáo viên theo từng môn hay một giáo viên chủ nhiệm? | `class_subject.teacher_id` tuỳ chọn; fallback `school_class.teacher_id` **chỉ** cho lớp legacy chưa có dòng `class_subject` | Thêm cột; gán giáo viên theo môn |
+| D-08 | Đổi curriculum/môn khi lớp đang học? | **`CHUA_BAT_DAU`**: đổi curriculum và danh sách môn trực tiếp. **`DANG_DIEN_RA`**: chỉ được đổi **môn chính**; bắt buộc ghi `class_subject_history` với snapshot **môn cũ/mới (ID + mã + tên), giáo viên cũ, nguồn cũ/mới (`old_source`/`new_source`), lý do, người thực hiện, thời điểm, `operation_id`**; **không** ghi đè curriculum hiện tại, **không** chép giáo viên cũ sang môn mới. **`DA_KET_THUC`/`DA_HUY`/`CLOSED`**: không dùng thao tác thường; sửa lịch sử cần quy trình riêng (ngoài Phase 1). | `class_subject_history`, API đổi môn chính, test |
+| D-09 | Giáo viên theo từng môn hay một giáo viên chủ nhiệm? | **Chỉ fallback** sang `school_class.teacher_id` khi lớp **chưa có bản ghi `class_subject` tương ứng**. Nếu bản ghi đã tồn tại mà `teacher_id = NULL` → **không fallback**; hiểu là môn chưa phân công. Không kế thừa giáo viên khi đổi môn chính | Thêm cột; gán giáo viên theo môn |
 | D-10 | Module guard cho môn/curriculum? | Dùng `STUDENT_MANAGEMENT` như Class | Sửa controller (người dùng code) |
 | D-11 | Backfill dữ liệu cũ? | Chỉ backfill khớp **chính xác, không mập mờ**; bản ghi không khớp/bị mập mờ phải báo cáo để xử lý tay, **không đoán** | Script backfill + báo cáo |
 | D-12 | Curriculum sửa tại chỗ hay tạo phiên bản? | Sửa tại chỗ + tăng `version`; lớp giữ snapshot; không bảng `curriculum_version` | Cột `version`, rule |
 | D-13 | `GET /subjects` giữ mảng hay phân trang? | **Giữ mảng** `[SubjectResponse]` — FE khai báo `Subject[]` | Hợp đồng API, FE |
 | D-14 | Quyền Curriculum? | Tạo **`curriculum.view`** và **`curriculum.manage`** riêng; ORGANIZATION scope; cấp cho Giáo vụ qua **chức danh (position-based)**, không tự cấp cho mọi nhân viên | Permission catalog, RBAC, API, test |
-| D-15 | Đồng bộ `school_class.subject_id` legacy với `class_subject`? | Giữ cột. `class_subject.is_primary` đánh dấu môn chính; đúng **một** dòng primary/lớp. Đổi môn chính trong **một transaction**: ghi `class_subject_history` → cập nhật `school_class.subject_id` → đồng bộ `class_subject` (tái dùng dòng đã có, không tạo trùng). API thường **không xoá** dòng primary/legacy hay history. Không chuyển giáo viên cũ sang môn mới. | `class_subject.is_primary`, `class_subject_history`, API, test |
+| D-15 | Đồng bộ `school_class.subject_id` legacy với `class_subject`? | Giữ cột. `class_subject.is_primary` đánh dấu môn chính. **DB chỉ bảo đảm tối đa một primary/lớp**; "tối thiểu một primary khi `school_class.subject_id != NULL`" do **transaction + application validation** bảo đảm. Đổi môn chính trong **một transaction**: ghi `class_subject_history` → cập nhật `school_class.subject_id` → `class_subject.is_primary` (tái dùng dòng đã có, không tạo trùng). API thường **không xoá** dòng primary/legacy hay history. Không chuyển giáo viên cũ sang môn mới. | `class_subject.is_primary`, `class_subject_history`, API, test |
 
 ### 3.1. D-01 — Lớp nhiều môn (CONFIRMED)
 
@@ -180,9 +180,16 @@ Module guard `STUDENT_MANAGEMENT` áp theo D-10.
 | `DA_KET_THUC` / `DA_HUY` / `CLOSED` | Không | Không | Không dùng thao tác thường; sửa lịch sử cần quy trình riêng (ngoài Phase 1) |
 
 - **Lịch sử bắt buộc:** mỗi lần đổi môn chính khi lớp đã hoạt động phải ghi một dòng
-  `class_subject_history` chứa snapshot `old_subject_code`, `old_subject_name`, `new_subject_code`,
-  `new_subject_name`, `old_teacher_id`, `changed_by`, `changed_at`, `reason`. Snapshot **không**
-  join lại bảng `subject` để hiển thị (môn có thể bị đổi tên/ngừng về sau).
+  `class_subject_history` với snapshot **môn cũ/mới** (`old_subject_id/code/name`,
+  `new_subject_id/code/name`), `old_teacher_id`, **`old_source`/`new_source`** (nguồn gốc
+  `LEGACY`/`CURRICULUM`/`MANUAL`), `reason`, `operation_id`, `changed_by`, `changed_at`. Snapshot
+  **không** join lại bảng `subject`/`staff_profile` để hiển thị (môn có thể đổi tên/ngừng, giáo
+  viên có thể nghỉ).
+- **Trường bắt buộc trên request đổi môn chính:** `subjectId`, `reason` (≤ 500 ký tự),
+  `expectedVersion`, `operationId`. `changedBy` lấy từ JWT, **không** nhận từ body.
+- **Idempotency:** cùng `operationId` + cùng payload chuẩn hoá → trả lại kết quả thành công cũ
+  (không tạo history mới); cùng `operationId` nhưng payload khác → 409. `expectedVersion` sai →
+  xung đột phiên bản (409). Transaction lỗi → không để lại history một phần.
 - **Không ghi đè curriculum:** đổi môn chính **không** tự áp lại `curriculum_subject`; các dòng
   `class_subject` khác giữ nguyên.
 - **Không chép giáo viên:** `old_teacher_id` chỉ lưu vào history; dòng môn mới có `teacher_id = NULL`
@@ -191,10 +198,15 @@ Module guard `STUDENT_MANAGEMENT` áp theo D-10.
 
 ### 3.9. D-09 — Giáo viên theo môn (CONFIRMED)
 
-`class_subject.teacher_id` nullable. Fallback `school_class.teacher_id` **chỉ** dùng khi lớp legacy
-chưa có dòng `class_subject` nào và response phải suy một dòng `source=LEGACY`; khi lớp đã có dòng
-`class_subject`, `teacherId` **không** fallback. Gán giáo viên theo môn dùng cùng rule chuyên môn
-(D-06). Một môn/một lớp có tối đa một giáo viên ở Phase 1.
+`class_subject.teacher_id` nullable và là **nguồn sự thật** khi bản ghi `class_subject` tồn tại.
+
+- **Chỉ fallback** sang `school_class.teacher_id` khi lớp **chưa có bản ghi `class_subject`
+  tương ứng** (lớp legacy; response suy một dòng `source=LEGACY`, không ghi DB).
+- Nếu bản ghi `class_subject` **đã tồn tại** nhưng `teacher_id = NULL` → **không fallback**;
+  trạng thái được hiểu là **môn chưa được phân công giáo viên**.
+- Đổi môn chính **không** kế thừa giáo viên cũ sang môn mới.
+- Gán giáo viên theo môn dùng cùng rule chuyên môn (D-06). Một môn/một lớp có tối đa một giáo
+  viên ở Phase 1.
 
 ### 3.10. D-10 — Module guard (CONFIRMED)
 
@@ -235,27 +247,38 @@ Curriculum sửa tại chỗ với optimistic `version`; lớp giữ snapshot. K
 ### 3.15. D-15 — Đồng bộ môn chính legacy + lưu lịch sử (CONFIRMED)
 
 1. **Giữ** `school_class.subject_id` để tương thích ngược; đây là bản sao của **môn chính**.
-2. `class_subject.is_primary` đánh dấu môn chính; mỗi lớp có **đúng một** dòng primary (khi lớp đã
-   có `class_subject`). Bất biến này được ép ở DB, không chỉ ở service.
-3. **Đổi môn chính = một transaction duy nhất**, theo thứ tự:
-   1. Khoá lớp (`SELECT … FOR UPDATE`) và kiểm trạng thái + `version` (nếu có).
-   2. Ghi `class_subject_history` (snapshot môn cũ/mới, giáo viên cũ, actor, thời điểm, lý do).
+2. `class_subject.is_primary` đánh dấu môn chính. **DB chỉ bảo đảm tối đa một primary/lớp**
+   (UNIQUE trên generated column `primary_class_id`). Việc **tối thiểu một primary khi
+   `school_class.subject_id != NULL`** do **transaction + application validation** của luồng tạo
+   lớp, đổi môn và backfill bảo đảm — UNIQUE **không** bảo đảm điều này.
+3. **Bất biến môn chính phải được tài liệu hoá và kiểm thử:**
+   1. `school_class.subject_id IS NOT NULL` → có **đúng một** dòng `class_subject.is_primary = 1`.
+   2. `school_class.subject_id` **bằng** `subject_id` của dòng primary.
+   3. `school_class.subject_id IS NULL` → **không** được tự tạo dòng primary.
+   4. Một lớp **không** có nhiều hơn một primary.
+   5. Thao tác tạo lớp, đổi môn chính và backfill đều phải giữ các bất biến trên.
+4. **Đổi môn chính = một transaction duy nhất**, theo thứ tự:
+   1. Khoá lớp (`SELECT … FOR UPDATE`), kiểm trạng thái và `expectedVersion` với
+      `school_class.version`.
+   2. Ghi `class_subject_history` (snapshot môn cũ/mới, giáo viên cũ, nguồn cũ/mới, actor, thời
+      điểm, lý do, `operation_id`).
    3. Cập nhật `school_class.subject_id = newSubjectId`, tăng `version` lớp.
    4. Đồng bộ `class_subject`: nếu **môn mới đã có** trong danh sách môn của lớp → **tái dùng** dòng
       đó (đặt `is_primary = 1`); ngược lại tạo dòng mới (`source = MANUAL`, `planned_sessions`/
       `session_minutes` theo yêu cầu hoặc default của môn). Bỏ `is_primary` của dòng cũ.
-4. **Không xoá dòng cũ:** dòng `class_subject` của môn cũ được giữ (không còn `is_primary`), không
+5. **Không xoá dòng cũ:** dòng `class_subject` của môn cũ được giữ (không còn `is_primary`), không
    xoá history. API thường **không cho xoá** dòng primary hiện tại hoặc dòng `LEGACY` khớp
    `school_class.subject_id` (409 `CLASS_SUBJECT_LEGACY_PROTECTED`).
-5. **Không chuyển giáo viên:** dòng môn mới có `teacher_id = NULL`; `old_teacher_id` chỉ nằm trong
+6. **Không chuyển giáo viên:** dòng môn mới có `teacher_id = NULL`; `old_teacher_id` chỉ nằm trong
    history. Giáo viên cũ **không** được tự gán cho môn mới.
-6. **Fallback legacy:** nếu lớp chưa có dòng `class_subject` nào và `subject_id` khác NULL →
+7. **Fallback legacy:** nếu lớp chưa có dòng `class_subject` nào và `subject_id` khác NULL →
    `GET /classes/{id}/subjects` trả 1 dòng suy ra `source=LEGACY`, `isPrimary=true` (không ghi DB).
-   Fallback `teacher_id = school_class.teacher_id` **chỉ** áp cho dòng suy ra này.
-7. `PUT /classes/{id}` khi `subjectId` thay đổi **không được** vòng qua quy tắc trên: kể cả lớp
+   Fallback `teacher_id = school_class.teacher_id` **chỉ** áp cho dòng suy ra này (D-09).
+8. `PUT /classes/{id}` khi `subjectId` thay đổi **không được** vòng qua quy tắc trên: kể cả lớp
    legacy chưa có dòng `class_subject`, endpoint này phải gọi cùng luồng đổi môn chính (ghi history
-   với `old_subject_*` lấy từ `school_class`, đồng bộ, atomic) thay vì chỉ set cột.
-8. **Không xoá cứng lớp đã có history:** `DELETE /classes/{id}` trả 409 `CONFLICT` (BR-SUB-21).
+   với `old_subject_*`/`old_source` lấy từ `school_class`, đồng bộ, atomic) thay vì chỉ set cột.
+9. **Không xoá cứng lớp đã có history:** `DELETE /classes/{id}` trả 409 `CONFLICT` (BR-SUB-21),
+   không để FK RESTRICT biến thành 500.
 
 ---
 
@@ -373,10 +396,13 @@ Thất bại · Quyền.
 | BR-SUB-15 | Audit mọi thao tác ghi (create/update/status) | Đã có |
 | BR-SUB-16 | Đổi môn chính khi lớp `DANG_DIEN_RA` **được phép**, nhưng bắt buộc ghi `class_subject_history`; không đổi curriculum, không đổi danh sách môn khác (D-08) | CONFIRMED |
 | BR-SUB-17 | `class_subject_history` là bảng chỉ ghi (append-only); API thường không sửa/xoá bản ghi history | CONFIRMED |
-| BR-SUB-18 | `school_class.subject_id` luôn bằng `class_subject` có `is_primary = 1`; mỗi lớp tối đa một dòng primary (D-15) | CONFIRMED |
+| BR-SUB-18 | `school_class.subject_id` luôn bằng `subject_id` của dòng `class_subject.is_primary = 1`; DB bảo đảm **tối đa** một primary/lớp, còn **tối thiểu** một primary khi `subject_id != NULL` do transaction + application validation (D-15) | CONFIRMED |
 | BR-SUB-19 | Đổi môn chính **không** chép `teacher_id` sang môn mới; `old_teacher_id` chỉ lưu ở history (D-08/D-15) | CONFIRMED |
-| BR-SUB-20 | Đổi môn chính + cập nhật `school_class` + ghi history nằm trong **một transaction**; lỗi bất kỳ bước nào rollback toàn bộ (D-15) | CONFIRMED |
+| BR-SUB-20 | Đổi môn chính + cập nhật `school_class` + ghi history nằm trong **một transaction**; lỗi bất kỳ bước nào rollback toàn bộ; `expectedVersion` phải khớp `school_class.version` (D-15) | CONFIRMED |
 | BR-SUB-21 | Không xoá cứng lớp đã có `class_subject_history`; `DELETE /classes/{id}` trả 409 `CONFLICT`, không xoá/CASCADE lịch sử (D-08/D-15) | CONFIRMED |
+| BR-SUB-22 | Request đổi môn chính bắt buộc `subjectId`, `reason` (≤ 500 ký tự), `expectedVersion`, `operationId`; `changedBy` lấy từ JWT (D-08) | CONFIRMED |
+| BR-SUB-23 | Cùng `operationId` + payload chuẩn hoá giống → trả kết quả cũ, không sinh history mới; cùng `operationId` + payload khác → 409 (D-08) | CONFIRMED |
+| BR-SUB-24 | `class_subject.teacher_id` là nguồn sự thật khi bản ghi tồn tại; fallback `school_class.teacher_id` **chỉ** khi chưa có bản ghi `class_subject` tương ứng (D-09) | CONFIRMED |
 
 ---
 
@@ -443,7 +469,7 @@ Audit ghi `classesUsingSubject = 3` (ví dụ C001, C002, C003). Response trả 
 | Môn bị ngừng nhưng lớp đang dạy | Giữ nguyên; chỉ chặn chọn mới; cảnh báo qua `classesUsingSubject` |
 | `school_class.subject_id` NULL | Không backfill vào `class_subject`; lớp không môn vẫn hợp lệ (legacy) |
 | Lớp đã hoạt động trước khi có tính năng | **Không** tạo history hồi tố (không có dữ liệu nguồn). `class_subject_history` bắt đầu rỗng; lần đổi môn chính đầu tiên mới sinh bản ghi |
-| Dòng `class_subject` hiện có | Migration 52/53 đặt `is_primary = 1` cho dòng khớp `school_class.subject_id`; lớp chưa có dòng nào thì không tạo |
+| Dòng `class_subject` hiện có | Migration 52 đặt `is_primary = 1` **chỉ** cho dòng khớp chính xác `school_class.subject_id`; lớp chưa có dòng nào thì **không** tự tạo. Bản ghi không khớp/mập mờ vào báo cáo manual review, không đoán |
 
 ---
 
@@ -460,9 +486,16 @@ Audit ghi `classesUsingSubject = 3` (ví dụ C001, C002, C003). Response trả 
 - AC-SUB-08: `GET /subjects` trả mảng `[SubjectResponse]` đúng như FE hiện tại mong đợi (D-13 = A);
   không có `page`/`size`/`total` ở Phase 1.
 - AC-SUB-09: Lớp `DANG_DIEN_RA` đổi môn chính thành công, sinh **đúng một** dòng
-  `class_subject_history` với đủ snapshot cũ/mới, `old_teacher_id`, `changed_by`, `changed_at`.
+  `class_subject_history` với đủ snapshot cũ/mới, `old_teacher_id`, `old_source`, `new_source`,
+  `reason`, `operation_id`, `changed_by`, `changed_at`.
 - AC-SUB-10: Sau khi đổi môn chính, `school_class.subject_id` = môn mới và đúng **một** dòng
   `class_subject.is_primary = 1`; các dòng môn khác không đổi.
+- AC-SUB-15: Request thiếu `reason`/`expectedVersion`/`operationId` hoặc `reason` > 500 ký tự nhận
+  `400`; `expectedVersion` cũ nhận `409` xung đột phiên bản; không tạo history.
+- AC-SUB-16: Retry cùng `operationId` + cùng payload trả kết quả cũ và **không** sinh history thứ
+  hai; cùng `operationId` + payload khác trả `409`.
+- AC-SUB-17: Lớp `subject_id = NULL` không có dòng `class_subject.is_primary = 1`; lớp có
+  `subject_id != NULL` luôn có đúng một primary và khớp `subject_id`.
 - AC-SUB-11: Giáo viên của môn cũ **không** xuất hiện trên dòng môn mới (`teacher_id = NULL`);
   `old_teacher_id` chỉ có trong history.
 - AC-SUB-12: Lỗi ở bất kỳ bước nào (history / `school_class` / `class_subject`) rollback toàn bộ,
@@ -484,6 +517,8 @@ Các câu hỏi dưới đây chỉ là chi tiết kỹ thuật, không thay đ�
 3. Môn có cần `credits`/`weight` (tín chỉ/trọng số) không?
 4. Có cần API xoá cứng cho môn chưa từng dùng (không có lớp/session) không?
 5. Có cần xuất Excel/import môn hàng loạt không (ngoài phạm vi Phase 1)?
-6. Có thêm cột `operation_id` (UUID do client sinh) vào `class_subject_history` để chống retry
-   trùng không? Đề xuất: có, UNIQUE `(org_id, operation_id)` — xem `database-schema.md`.
-7. History giữ bao lâu? Đề xuất: giữ vĩnh viễn ở Phase 1 (không job dọn).
+
+**Đã chốt (kỹ thuật, không mở):** `operation_id` (UUID do client sinh) là **bắt buộc** trên request
+đổi môn chính và lưu **vĩnh viễn** ở `class_subject_history` với UNIQUE `(org_id, operation_id)`
+(xem `database-schema.md`). History cũng giữ vĩnh viễn ở Phase 1 — không có job dọn, vì dọn
+`operation_id` sẽ phá idempotency của retry cũ.

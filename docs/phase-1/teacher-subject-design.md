@@ -256,7 +256,7 @@ Hai cách:
 | BR-TCH-15 | Một lớp–một môn có tối đa một giáo viên ở Phase 1 (D-09) |
 | BR-TCH-16 | Đổi môn chính của lớp **không** chép/suy giáo viên cũ sang môn mới; giáo viên mới phải gán riêng (D-08/D-15) |
 | BR-TCH-17 | `class_subject_history.old_teacher_id` chỉ là snapshot; không tạo/gỡ `teacher_subject` |
-| BR-TCH-18 | Fallback `school_class.teacher_id` chỉ áp cho dòng `LEGACY` suy ra khi lớp **chưa có** `class_subject` |
+| BR-TCH-18 | Fallback `school_class.teacher_id` chỉ áp cho dòng `LEGACY` suy ra khi lớp **chưa có bản ghi `class_subject` tương ứng**; bản ghi đã tồn tại mà `teacher_id = NULL` nghĩa là chưa phân công, **không** fallback (D-09) |
 
 ---
 

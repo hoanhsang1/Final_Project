@@ -158,6 +158,16 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-036 | Lớp legacy đổi môn chính lần đầu | lớp chưa có `class_subject`, có `subject_id` | Tạo history với `old_subject_*` từ `school_class`; insert dòng primary mới | IT |
 | TC-CLS-037 | Xoá cứng lớp đã có history | `DELETE /classes/{id}` trên lớp đã đổi môn chính ≥1 lần | 409 `CONFLICT` (không 500 do FK); history còn nguyên | API |
 | TC-CLS-038 | Xoá cứng lớp chưa có history | `DELETE /classes/{id}` lớp chưa đổi môn chính | 204 như hành vi hiện tại | API |
+| TC-CLS-039 | Snapshot `old_source`/`new_source` | đổi môn chính từ dòng `CURRICULUM` sang dòng `MANUAL` đã có | History lưu `old_source=CURRICULUM`, `new_source=MANUAL` (nguồn của dòng thực tế) | IT |
+| TC-CLS-040 | `subject_id = NULL` → không primary | lớp không môn | `class_subject` không có dòng `is_primary=1`; GET subjects trả mảng rỗng | DB |
+| TC-CLS-041 | Thiếu trường bắt buộc | body thiếu `reason`/`expectedVersion`/`operationId` | 400 `VALIDATION_ERROR`, không history | API |
+| TC-CLS-042 | Cùng `operationId` payload khác | retry với `subjectId` khác | 409 `CLASS_SUBJECT_OPERATION_CONFLICT` | API |
+| TC-CLS-043 | Cùng `operationId` payload giống | retry y nguyên sau thành công | 200, cùng `historyId`, **không** thêm history | IT |
+| TC-CLS-044 | `PUT /classes/{id}` thiếu trường khi đổi môn | đổi `subjectId` nhưng thiếu `reason`/`operationId`/`version` | 400 `VALIDATION_ERROR`, không ghi history | API |
+| TC-CLS-045 | Retry sau request thất bại | request đầu fail ở bước `class_subject`; retry cùng `operationId` | Lần đầu rollback sạch; retry thành công tạo đúng **một** history | IT |
+| TC-CLS-046 | Fallback giáo viên theo D-09 | lớp có dòng `class_subject` nhưng `teacher_id=NULL`; `school_class.teacher_id` có GV | Response `teacherId=null` (không fallback); lớp legacy chưa có dòng → fallback | IT |
+| TC-CLS-047 | Rollback khi cập nhật `class_subject` lỗi | giả lập lỗi sau khi đã insert history/update `school_class` | 500; rollback cả ba; không primary thứ hai | IT |
+| TC-CLS-048 | `school_class.subject_id` = primary | sau đổi môn chính | `subject_id` khớp đúng dòng `is_primary=1`; các dòng khác `is_primary=0` | IT |
 
 ---
 
@@ -229,6 +239,11 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-013 | Cạnh trùng bị PK chặn | INSERT cùng `(curriculum_id, subject_id, prerequisite_subject_id)` hai lần | PK từ chối (lỗi ràng buộc) | DB |
 | TC-LEG-014 | Tự tiên quyết bị CHECK chặn | INSERT `subject_id = prerequisite_subject_id` | CHECK từ chối | DB |
 | TC-LEG-015 | UNIQUE 3 cột của `curriculum_subject` | kiểm `information_schema.statistics` | Có `uq_curriculum_subject_org(curriculum_id, subject_id, org_id)` | DB |
+| TC-LEG-016 | Backfill primary exact-match | lớp có `subject_id` và dòng `class_subject` khớp | Chỉ dòng khớp nhận `is_primary=1`; lớp không có dòng nào được tạo dòng `LEGACY` | DB |
+| TC-LEG-017 | Báo cáo backfill không khớp/mập mờ | lớp có `subject_id` nhưng không dòng khớp hoặc >1 primary | Dòng xuất hiện trong query pre-check 6.0(d); migration **không** tự sửa | DB |
+| TC-LEG-018 | MySQL generated column | `INSERT ... (is_primary=1)` | `primary_class_id = class_id`; `is_primary=0` → NULL; không được list `primary_class_id` trong INSERT (errno 3105) | DB |
+| TC-LEG-019 | H2 parity | chạy IT H2 | `primary_class_id` là cột thường, service phải set; ghi rõ H2 **không** chứng minh MySQL generated column | DB |
+| TC-LEG-020 | UNIQUE chỉ chặn >1 primary | INSERT 2 dòng `is_primary=1` cùng lớp trên MySQL | Dòng thứ hai bị UNIQUE từ chối | DB |
 
 ---
 
@@ -254,7 +269,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | AC-TCH-01…09 | TC-TCH-001…020 (TC-TCH-008…011 không thuộc Phase 1) |
 | AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
 | AC-VAL-01…11 | E-01…E-29 |
-| Legacy | TC-LEG-001…015 |
+| AC-VAL-12…20, AC-SUB-15…17 | TC-CLS-021…048, E-30…E-43 |
+| Legacy | TC-LEG-001…020 |
 | Concurrency | TC-CON-001…006 |
 
 ---
@@ -278,7 +294,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 - D-06a → TC-TCH-008…011, TC-RBAC-010 là Phase 2; TC-TCH-019 xác nhận `APPROVED` ngay.
 - D-07 → TC-CUR-009/010/019…024, TC-LEG-011…015, TC-CON-006.
 - D-14 → TC-RBAC-011/012.
-- D-15 → TC-CLS-019.
+- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…020.
+- D-09 → TC-CLS-046 (fallback chỉ khi chưa có bản ghi `class_subject` tương ứng).
 
 Câu hỏi kỹ thuật còn lại:
 

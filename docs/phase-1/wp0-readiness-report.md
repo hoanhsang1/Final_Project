@@ -1,11 +1,12 @@
 # WP0 — Implementation Readiness Audit (Phase 1)
 
-> **Ngày audit:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **HEAD:** `1224cf2` · **Baseline source đã chốt:** `cdd03b8`
-> **Đầu vào:** `docs/phase-1/review-report.md` (`APPROVED — Revision 2`), `docs/phase-1/implementation-roadmap.md`
-> **Tính chất:** READ-ONLY. Không sửa source Java/React, không tạo/sửa migration, không kết nối DB,
-> không chạy SQL thay đổi dữ liệu/schema, không commit/push/merge/đổi branch.
-> **Đầu ra duy nhất:** file này.
-> **Cập nhật:** 2026-11-20 sau khi D-08/D-15 được sửa — xem khối "Cập nhật sau Revision 2" ở §1.
+> **Ngày audit:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **HEAD:** `bfa9b53` · **Baseline source đã chốt:** `cdd03b8`
+> **Đầu vào:** `docs/phase-1/review-report.md` (`READY FOR USER REVIEW — Revision 3`), `docs/phase-1/implementation-roadmap.md`
+> **Tính chất:** READ-ONLY. Không sửa source Java/React, không chạy SQL, không kết nối DB,
+> không commit/push/merge/đổi branch.
+> **Đầu ra:** file này (báo cáo audit WP0).
+> **Cập nhật:** 2026-11-20 — Revision 2 (D-08/D-15) và Revision 3 (D-08/D-09/D-15) — xem khối
+> "Cập nhật sau Revision 3" ở §1.
 
 ## 0. Quy ước trạng thái
 
@@ -22,38 +23,54 @@ Mỗi phát hiện có mã `F-xx`; bảng tổng hợp đầy đủ ở **§14**
 
 ## 1. Tóm tắt điều hành
 
-**Kết luận:** bộ tài liệu Phase 1 đang `APPROVED` (Revision 2, D-08/D-15 đã sửa); source đang đứng
-đúng baseline `cdd03b8`; **toàn bộ tính năng Phase 1 chưa được triển khai** (đúng kỳ vọng — WP0 không
-triển khai). Có thể bắt đầu WP1 sau khi người dùng chốt các điểm ở §11, trong đó quan trọng nhất là
-**truy cập DB để pre-check mã môn trùng** (BLK-01).
+**Kết luận:** bộ tài liệu Phase 1 đang **`READY FOR USER REVIEW` (Revision 3)** — chưa `APPROVED`;
+source đang đứng đúng baseline `cdd03b8`; **toàn bộ tính năng Phase 1 chưa được triển khai** (đúng kỳ
+vọng — WP0 không triển khai). Có thể bắt đầu WP1 sau khi người dùng chốt các điểm ở §11, trong đó
+quan trọng nhất là **truy cập DB để pre-check mã môn trùng** (BLK-01).
 
 > **Cập nhật sau Revision 2 (2026-11-20):** câu hỏi cũ "chặn hay cho đổi môn chính của lớp
 > `DANG_DIEN_RA`" (BLK-04/F-11) **đã được người dùng chốt**: được phép đổi, nhưng phải đi qua luồng
 > ghi lịch sử `class_subject_history` + đồng bộ `school_class.subject_id` trong **một transaction**
-> (D-08/D-15 sửa đổi). F-11 vì vậy **không còn là `CONFLICT`** — hành vi hiện tại của
-> `SchoolClassService` (cho sửa) trở thành điểm xuất phát đúng, chỉ thiếu phần lịch sử/đồng bộ sẽ
-> làm ở WP5.
+> (D-08/D-15). F-11 vì vậy **không còn là `CONFLICT`** — hành vi hiện tại của `SchoolClassService`
+> (cho sửa) trở thành điểm xuất phát đúng, chỉ thiếu phần lịch sử/đồng bộ sẽ làm ở WP5.
+>
+> **Cập nhật sau Revision 3 (2026-11-20):** siết thêm ba điểm so với Revision 2 và điều chỉnh các
+> dòng audit liên quan trong file này:
+> 1. **D-08** — history lưu thêm `old_source`/`new_source`; `reason` và `operation_id` **bắt buộc**
+>    (NOT NULL, `reason` ≤500); `changed_by` lấy từ JWT.
+> 2. **D-09** — fallback `school_class.teacher_id` **theo từng bản ghi**: chỉ khi lớp chưa có dòng
+>    `class_subject` tương ứng; dòng tồn tại với `teacher_id = NULL` là **chưa phân công**.
+> 3. **D-15** — DB chỉ bảo đảm **tối đa một** primary; **tối thiểu một** (khi `subject_id ≠ NULL`) do
+>    transaction + kiểm tra ứng dụng. Không tài liệu nào được nói UNIQUE tự đảm bảo đúng một.
+> 4. `expectedVersion` **bắt buộc** trên mọi thao tác đổi môn chính (`school_class.version` đã tồn
+>    tại nên không cần đổi schema).
+> 5. **Không tạo migration 53** trừ khi có bằng chứng môi trường đã áp một bản 52 cũ; repo hiện tại
+>    dừng ở migration 50.
+> 6. WP1 đã có **draft** migration 51/52 + pre/post-check + rollback + H2 fixture cập nhật (xem
+>    `docs/phase-1/migrations/` và `wp1-readiness-report.md`). Các draft **chưa được chạy**.
 
 | Hạng mục | Kết quả | Trạng thái |
 |---|---|---|
 | Baseline source khớp `cdd03b8` | Không có file ngoài `docs/` khác baseline | `VERIFIED` |
-| Thay đổi trong working tree | Chỉ 10 tài liệu `docs/phase-1/` (từ vòng chốt tài liệu) + 1 file untracked | `VERIFIED` |
+| Thay đổi trong working tree | Tài liệu `docs/phase-1/` + draft `docs/phase-1/migrations/` + H2 fixture (Revision 3); không có source Java/React | `VERIFIED` |
 | Subject hiện tại | Trả mảng, `code` tuỳ chọn — khớp D-13/D-04 | `VERIFIED` |
 | Subject thiếu module guard, check-code, usage; lỗi trùng mã là `CONFLICT` | Lệch hợp đồng đã duyệt | `CONFLICT` |
-| Curriculum / class_subject / teacher_subject / specialty_subject | Không tồn tại trong source | `VERIFIED` (chưa triển khai) |
+| Curriculum / class_subject / teacher_subject / specialty_subject | Không tồn tại trong source Java | `VERIFIED` (chưa triển khai) |
 | Quyền `curriculum.view/manage` | Chưa có trong catalog | `VERIFIED` (chưa triển khai) |
-| Migration 51/52 (và 53 tuỳ môi trường) | Chưa tồn tại; migration 42 chỉ tạo INDEX thường cho `subject.code` | `VERIFIED` |
-| Lớp `DANG_DIEN_RA` đổi được môn chính | Hành vi nay **đúng** chủ ý D-08/D-15 Revision 2; thiếu luồng lịch sử/đồng bộ (WP5) | `VERIFIED` (hiện trạng) |
-| `class_subject_history` / `is_primary` | Chưa tồn tại trong source/DDL | `VERIFIED` (chưa triển khai) |
+| Migration 51/52 | Chỉ có **draft** trong `docs/phase-1/migrations/`; chưa có file ở gốc repo, chưa chạy. Migration 42 chỉ tạo INDEX thường cho `subject.code` | `VERIFIED` |
+| Migration 53 | **Không tạo** — repo dừng ở 50, không có bằng chứng đã áp bản 52 cũ | `VERIFIED` |
+| Lớp `DANG_DIEN_RA` đổi được môn chính | Hành vi nay **đúng** chủ ý D-08/D-15; thiếu luồng lịch sử/đồng bộ (WP5) | `VERIFIED` (hiện trạng) |
+| `class_subject_history` / `is_primary` trong source/DDL gốc | Chưa tồn tại trong source Java/migration gốc; đã có trong draft 52 và H2 fixture | `VERIFIED` (chưa triển khai) |
 | Schema/dữ liệu DB thật | Không có quyền truy cập trong WP0; dump `DB_11_16.sql` cũ hơn migration 31/42 | `NOT VERIFIED` |
-| H2 test schema vs MySQL | `uq_subject_org_code` UNIQUE trên H2 nhưng INDEX trên MySQL; H2 thiếu UNIQUE `(id,org_id)` + CHECK | `CONFLICT` |
+| H2 fixture vs MySQL | Fixture Revision 3 đã có bảng/cột Phase 1; `uq_subject_org_code` vẫn UNIQUE trên H2 trong khi MySQL còn INDEX tới khi 52 chạy; H2 không có cột sinh và không chứng minh được bất biến tối thiểu | `CONFLICT` (chờ MySQL staging) |
 | Gateway route `/api/curricula/**` | Chưa có | `VERIFIED` (chưa triển khai) |
 | Schedule / Facility | Schedule chỉ nhận `subjectName`; Facility không phụ thuộc môn | `VERIFIED` |
 
 **Sẵn sàng cho WP1:** có điều kiện. 2 điều kiện bắt buộc: (1) chạy pre-check mã môn trùng trên DB
 staging; (2) xác nhận trạng thái module `STUDENT_MANAGEMENT` trước khi bật guard cho Subject.
 Điều kiện thứ 3 trước đây (chốt xử lý đổi môn chính của lớp đã bắt đầu) **đã được giải quyết** bởi
-Revision 2 của D-08/D-15; phần còn lại chỉ là chi tiết kỹ thuật ghi ở `review-report.md` §10.
+Revision 2/3 của D-08/D-15; phần còn lại chỉ là chi tiết kỹ thuật ghi ở `review-report.md` §10.
+Draft WP1 đã xong nhưng **chờ người dùng review** (`wp1-readiness-report.md`), **chưa chạy**.
 
 ---
 
@@ -66,16 +83,17 @@ Revision 2 của D-08/D-15; phần còn lại chỉ là chi tiết kỹ thuật 
 | Kiểm tra | Kết quả | Trạng thái |
 |---|---|---|
 | Branch hiện tại | `fixFlowCreateEmployee` | `VERIFIED` |
-| HEAD | `1224cf2` | `VERIFIED` |
-| `cdd03b8` là tổ tiên của HEAD | có (`merge-base --is-ancestor` trả 0) | `VERIFIED` |
-| Source ngoài `docs/` khác baseline | **0 file** (`git diff cdd03b8 HEAD` loại `docs/` = rỗng) | `VERIFIED` |
-| Commit `1224cf2` | Chỉ thay đổi tài liệu trong `docs/` | `VERIFIED` |
-| Thay đổi chưa commit trong working tree | 10 file `docs/phase-1/*.md` (sửa) + `docs/phase-1/review-report.md` (untracked) | `VERIFIED` |
+| HEAD (tại lúc audit Revision 2) | `1224cf2` | `VERIFIED` |
+| HEAD hiện tại (Revision 3) | `bfa9b53` | `VERIFIED` |
+| `cdd03b8` là tổ tiên của HEAD | có | `VERIFIED` |
+| Source Java/React ngoài `docs/` khác baseline | **0 file** (chỉ H2 fixture `people-test-schema.sql` được sửa ở Revision 3) | `VERIFIED` |
+| Thay đổi chưa commit trong working tree | 12 file `docs/phase-1/*.md` (sửa) + `docs/phase-1/migrations/` (untracked) + `docs/phase-1/wp1-readiness-report.md` (untracked) + 1 H2 fixture | `VERIFIED` |
 | Thay đổi source Java/React trong working tree | Không có | `VERIFIED` |
-| Commit/push/merge/đổi branch trong WP0 | Không thực hiện | `VERIFIED` |
+| Commit/push/merge/đổi branch trong WP0/Revision 3 | Không thực hiện | `VERIFIED` |
 
-**Ghi chú:** 10 file tài liệu đang sửa là kết quả vòng chốt tài liệu trước WP0 (đã được người dùng
-duyệt nội dung); `review-report.md` chưa được track. WP0 **không** chỉnh sửa các file này.
+**Ghi chú:** ở thời điểm audit WP0 (Revision 2) working tree chỉ có 10 tài liệu + `review-report.md`;
+Revision 3 bổ sung thêm draft migration, báo cáo WP1 và cập nhật H2 fixture. WP0 **không** chỉnh sửa
+source; các thay đổi H2 fixture/draft migration thuộc phạm vi cho phép của Revision 3 (chưa chạy).
 
 **Ý nghĩa baseline:** mọi kết luận "chưa triển khai" bên dưới là trạng thái tại `cdd03b8`, không phải
 do thay đổi cục bộ.
@@ -112,7 +130,7 @@ do thay đổi cục bộ.
 |---|---|---|---|
 | Module guard | `service/SchoolClassService.java:71,81,91,101,122,148,170,229,239,252` gọi `requireModule/requireModuleReadable` | Mẫu chuẩn để áp cho Subject/Curriculum | `VERIFIED` |
 | Môn của lớp | `SchoolClassService.java:128-135` chỉ nhận **một** `subjectId` qua `nullableActive(...)` | Chưa có nhiều môn | `VERIFIED` |
-| Khả năng sửa lớp | `SchoolClassService.java:281-286` chỉ chặn `DA_KET_THUC`,`DA_HUY`,`CLOSED`; lớp `DANG_DIEN_RA` vẫn sửa được, kể cả `subject_id` | **Khớp D-08/D-15 Revision 2**: `DANG_DIEN_RA` được đổi môn chính; WP5 phải bọc thêm luồng lịch sử + đồng bộ atomic (F-11) | `VERIFIED` (hiện trạng) |
+| Khả năng sửa lớp | `SchoolClassService.java:281-286` chỉ chặn `DA_KET_THUC`,`DA_HUY`,`CLOSED`; lớp `DANG_DIEN_RA` vẫn sửa được, kể cả `subject_id` | **Khớp D-08/D-15**: `DANG_DIEN_RA` được đổi môn chính; WP5 phải bọc thêm luồng lịch sử + đồng bộ atomic (F-11) | `VERIFIED` (hiện trạng) |
 | API lớp | `controller/SchoolClassController.java` có đủ CRUD + workflow hiện có; **không có** endpoint `/{id}/subjects`, `/{id}/curriculum` | Chưa triển khai | `VERIFIED` |
 | Response lớp | `dto/SchoolClassResponse.java` có `subjectId`,`subjectName`,`version`; **không có** `curriculumId` | Field additive sẽ thêm ở WP5 | `VERIFIED` |
 | `GET /classes/{id}/students`, `/me` | `SchoolClassController.java:69,169` tồn tại | Không đổi | `VERIFIED` |
@@ -190,9 +208,10 @@ do thay đổi cục bộ.
 
 | Hạng mục | Bằng chứng | Kết luận | Trạng thái |
 |---|---|---|---|
-| Unique mã môn | `backend/PeopleService/src/test/resources/people-test-schema.sql:84` `CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)` | H2 **chặt hơn** MySQL hiện tại | `CONFLICT` |
-| Bảng lớp | `people-test-schema.sql:108-118` — không có `UNIQUE(id,org_id)`, không CHECK trạng thái, `status DEFAULT 'active'` | Khác DDL MySQL 8 | `VERIFIED` |
-| Bảng mới Phase 1 | Không có `curriculum*`, `class_subject`, `class_subject_history`, `teacher_subject`, `specialty_subject` | WP1 phải bổ sung | `VERIFIED` |
+| Unique mã môn | `people-test-schema.sql` `CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)` | H2 **chặt hơn** MySQL hiện tại (INDEX) → chỉ đồng bộ sau khi 52 chạy | `CONFLICT` |
+| Bảng lớp | Fixture Revision 3 đã thêm `curriculum_id`, `UNIQUE(id, org_id)`, FK `(curriculum_id, org_id)`; vẫn không có CHECK trạng thái | Đủ cho FK tổ hợp; CHECK vẫn lệch MySQL 8 | `VERIFIED` (đã cập nhật, còn lệch CHECK) |
+| Bảng mới Phase 1 | Fixture đã có `curriculum*`, `class_subject`, `class_subject_history`, `teacher_subject`, `specialty_subject` | WP1 fixture xong (draft) | `VERIFIED` (draft) |
+| Cột sinh / bất biến primary | `class_subject.primary_class_id` là cột **thường** + UNIQUE; không có `STORED` | H2 **không** chứng minh ràng buộc DB tối đa-một hay bất biến tối thiểu | `NOT VERIFIED` (chờ MySQL) |
 | Nhiều NULL trong UNIQUE | Chưa có bằng chứng chạy test trên MySQL staging | Cần test TC-SUB-020 thật | `NOT VERIFIED` |
 
 ---
@@ -251,7 +270,7 @@ không có (`CONFLICT` F-08). Trạng thái module đọc từ Identity qua `Ide
 | `/classes/{id}/subjects` | Không có | Đọc snapshot + suy LEGACY | `VERIFIED` (thiếu) |
 | `PUT /classes/{id}/curriculum` | Không có | Áp curriculum cho lớp `CHUA_BAT_DAU` | `VERIFIED` (thiếu) |
 | `/curricula/**` | Không có (Gateway cũng chưa route) | CRUD curriculum | `VERIFIED` (thiếu) |
-| `PUT /classes/{id}` | Cho đổi `subjectId` cả khi `DANG_DIEN_RA` | D-08/D-15 Revision 2: được đổi nhưng **phải uỷ thác** sang `PrimarySubjectChangeService` (ghi history + đồng bộ + `version`) | `VERIFIED` (còn thiếu luồng lịch sử) |
+| `PUT /classes/{id}` | Cho đổi `subjectId` cả khi `DANG_DIEN_RA` | D-08/D-15: được đổi nhưng **phải uỷ thác** sang `PrimarySubjectChangeService` (history + đồng bộ + `version`, bắt buộc `reason`/`operationId`) | `VERIFIED` (còn thiếu luồng lịch sử) |
 | `PUT /classes/{id}/subjects/primary` | Không có | Endpoint mới cho đổi môn chính có lịch sử | `VERIFIED` (thiếu) |
 | `GET /classes/{id}/subject-history` | Không có | Đọc lịch sử (snapshot) | `VERIFIED` (thiếu) |
 
@@ -288,7 +307,7 @@ có rủi ro phá vỡ — trừ khi bật module guard khi module đang tắt (
 | 5 | Nhiều NULL trong UNIQUE `(org_id,code)` | Chưa có test thực tế | MySQL cho phép nhiều NULL | Phải chạy TC-SUB-020 trên MySQL staging | `NOT VERIFIED` |
 | 6 | `ON DELETE` trên FK tổ hợp | Không khai báo trong H2 | Không được dùng `SET NULL` | Nếu viết sai, H2 có thể vẫn nhận | `NOT VERIFIED` |
 | 7 | Tên constraint | H2 dùng đúng `uq_subject_org_code` | MySQL có thể khác nếu migration 42 chưa chạy | `duplicateSubject()` map theo tên constraint có thể rơi vào nhánh "tên trùng" | `NOT VERIFIED` (schema live) |
-| 8 | Cột sinh `primary_class_id ... STORED` (D-15) | H2 `MODE=MySQL` không hỗ trợ → dùng cột thường | MySQL 8 hỗ trợ; UNIQUE trên cột sinh chặn 2 môn chính/lớp | Test H2 xanh **không** chứng minh ràng buộc "một môn chính" tồn tại | `NOT VERIFIED` (chờ MySQL staging) |
+| 8 | Cột sinh `primary_class_id … STORED` (D-15) | H2 `MODE=MySQL` không hỗ trợ → cột thường + service set | MySQL 8 hỗ trợ; UNIQUE trên cột sinh chặn 2 primary/lớp | Test H2 xanh **không** chứng minh ràng buộc "tối đa một primary" hay bất biến tối thiểu | `NOT VERIFIED` (chờ MySQL staging) |
 
 **Kết luận:** H2 chỉ dùng để chạy nhanh logic; **không** đủ chứng minh migration/FK/CHECK. Bắt buộc
 kiểm DDL + hành vi trên MySQL staging (TC-LEG-008 và nhóm TC-SUB).
@@ -309,7 +328,7 @@ kiểm DDL + hành vi trên MySQL staging (TC-LEG-008 và nhóm TC-SUB).
 
 ### 10.2. Thứ tự DDL bắt buộc
 
-**Migration 51** (`51_people_curriculum.sql`):
+**Migration 51** (`51_people_curriculum.sql` — draft trong `docs/phase-1/migrations/`):
 1. `curriculum` — PK `id`, UNIQUE `(id,org_id)`, `(org_id,code)`, `(org_id,name_unaccented)`, cột `version`.
 2. `curriculum_subject` — PK `(curriculum_id, subject_id)`; UNIQUE `(curriculum_id, sequence_no)`;
    **UNIQUE `(curriculum_id, subject_id, org_id)`** (đích FK tổ hợp); FK `(curriculum_id,org_id)`,
@@ -319,26 +338,33 @@ kiểm DDL + hành vi trên MySQL staging (TC-LEG-008 và nhóm TC-SUB).
 4. `school_class.curriculum_id` (nullable) + FK `(curriculum_id,org_id)`.
 5. **`uq_school_class_id_org (id, org_id)`** — bắt buộc trước 52.
 
-**Migration 52** (`52_people_teacher_subject.sql`):
+**Migration 52** (`52_people_class_subject.sql` — draft trong `docs/phase-1/migrations/`):
 1. `specialty_subject` (PK `(specialty_id,subject_id)`, FK tổ hợp).
 2. `teacher_subject` (PK `(user_id,subject_id)`, `status DEFAULT 'APPROVED'`, CHECK 3 giá trị).
 3. `class_subject` (PK `(class_id,subject_id)`; FK `(class_id,org_id)`, `(subject_id,org_id)`,
    `(teacher_id,org_id)`; `source ∈ LEGACY/CURRICULUM/MANUAL`;
    **`is_primary tinyint(1) NOT NULL DEFAULT 0`**, cột sinh `primary_class_id STORED` +
-   `UNIQUE uq_class_subject_primary (primary_class_id)` để bảo đảm mỗi lớp tối đa một môn chính).
-4. **`class_subject_history`** (D-08/D-15 Revision 2) — snapshot môn cũ/mới + giáo viên cũ,
-   `UNIQUE (org_id, operation_id)` chống ghi trùng khi retry, FK `(class_id,org_id)` RESTRICT;
-   các cột snapshot **không** FK tới `subject` để lịch sử không phụ thuộc dữ liệu hiện tại.
-5. Backfill `is_primary = 1` cho dòng `class_subject` khớp `school_class.subject_id`.
-6. Chuyển `uq_subject_org_code` từ INDEX → **UNIQUE** — chỉ sau pre-check §10.1 mục 2.
+   `UNIQUE uq_class_subject_primary (primary_class_id)` → DB bảo đảm **tối đa** một primary/lớp;
+   **tối thiểu** do transaction + app).
+4. **`class_subject_history`** — snapshot môn cũ/mới (`id/code/name`), `old_teacher_id`,
+   `old_source`/`new_source`, `reason NOT NULL` (≤500), `operation_id NOT NULL`,
+   `changed_by`, `changed_at`; `UNIQUE (org_id, operation_id)` chống ghi trùng khi retry;
+   FK `(class_id,org_id)` RESTRICT; snapshot **không** FK tới `subject`/`staff_profile`.
+5. Backfill **exact-match**: chỉ tạo dòng `LEGACY` khi lớp có `subject_id`, chưa có dòng khớp, và
+   chưa có primary; sau đó `is_primary = 1` cho dòng khớp chính xác nếu chưa có primary.
+   Lớp 0 khớp hoặc >1 ứng viên → **không** đoán, đưa vào báo cáo rà soát tay.
+6. `CALL mems_m52_assert_no_duplicate_primary` trước khi thêm UNIQUE.
+7. Chuyển `uq_subject_org_code` từ INDEX → **UNIQUE** — chỉ sau pre-check §10.1 mục 2
+   (khối hiện đang comment trong draft, chờ kết quả pre-check).
 
-**Migration 53** (`53_people_class_subject_history.sql`) — **chỉ dùng khi** một môi trường đã chạy
-bản 52 cũ (chưa có `is_primary`/history). Không sửa file 52 đã chạy; thêm cột sinh + UNIQUE, backfill
-`is_primary`, rồi tạo `class_subject_history`. Môi trường chưa chạy 52 chỉ cần 51 → 52.
+**Migration 53:** **không tạo.** Chỉ tạo khi có bằng chứng một môi trường đã áp một bản 52 cũ
+(chưa có `is_primary`/history) và cần nâng cấp tại chỗ; repo hiện tại dừng ở migration 50 nên mọi
+môi trường chưa có 52 chỉ cần chạy 51 → 52.
 
-**H2:** H2 không hỗ trợ generated column `STORED`; `people-test-schema.sql` dùng cột `is_primary`
-thường + UNIQUE kiểm bởi service, và phải có bảng `class_subject_history` khớp DDL MySQL. Bắt buộc
-đối chiếu DDL trên MySQL staging (xem `database-schema.md` §9.1).
+**H2:** H2 không hỗ trợ generated column `STORED`; fixture dùng cột `primary_class_id` thường +
+UNIQUE và service phải tự set cùng `is_primary`. Fixture **không** chứng minh được bất biến tối
+thiểu (bảng có primary khi `subject_id ≠ NULL`) — phải kiểm trên MySQL staging (xem
+`database-schema.md` §9.1).
 
 ### 10.3. Điểm dễ lỗi trên MySQL
 
@@ -349,8 +375,9 @@ thường + UNIQUE kiểm bởi service, và phải có bảng `class_subject_hi
 | `errno 1062` | `ADD UNIQUE` khi còn dữ liệu trùng | Pre-check + dọn tay trước | `NOT VERIFIED` (dữ liệu) |
 | FK xoá nhầm `org_id` | `ON DELETE SET NULL` trên FK tổ hợp | Chỉ dùng `RESTRICT`/`CASCADE` hợp lý | `VERIFIED` (thiết kế) |
 | Rollback | Không theo thứ tự ngược | Drop bảng mới trước (history trước `class_subject`), cột/index sau | `VERIFIED` (thiết kế) |
-| Backfill `is_primary` bị UNIQUE chặn | Dữ liệu cũ có >1 dòng khớp `school_class.subject_id` | Chạy pre-check §6.3a `database-schema.md` (đếm lớp sai) trước `UPDATE` | `NOT VERIFIED` (dữ liệu) |
+| Backfill `is_primary` bị UNIQUE chặn | Dữ liệu cũ có >1 dòng khớp `school_class.subject_id` | Chỉ exact-match; assert `mems_m52_assert_no_duplicate_primary`; dòng mơ hồ vào báo cáo tay | `NOT VERIFIED` (dữ liệu) |
 | Generated column trong `INSERT ... SELECT` | Liệt kê cột sinh vào INSERT gây lỗi 3105 | Không liệt kê `primary_class_id` trong danh sách cột | `VERIFIED` (thiết kế) |
+| Hiểu sai UNIQUE = "đúng một primary" | UNIQUE trên cột NULL-able chỉ chặn **>1**, không bảo đảm **≥1** | Document + transaction/app giữ `subject_id ↔ primary`; TC-CLS-047 | `VERIFIED` (thiết kế) |
 
 ---
 
@@ -359,10 +386,10 @@ thường + UNIQUE kiểm bởi service, và phải có bảng `class_subject_hi
 | ID | Vấn đề | Ảnh hưởng | Đề xuất xử lý | Cần người dùng quyết? | Trạng thái |
 |---|---|---|---|---|---|
 | BLK-01 | Không có quyền đọc DB staging trong WP0 → chưa biết mã môn trùng, schema live, module state | Không thể xác nhận `ADD UNIQUE` an toàn | Người dùng chạy pre-check §10.1 và gửi kết quả | Có (quyền truy cập) | `NOT VERIFIED` |
-| BLK-02 | Migration 51/52 (và 53 tuỳ môi trường) chưa tồn tại | WP1 chưa thể bắt đầu | AI soạn draft, người dùng review rồi chạy staging | Không (đúng kế hoạch) | `VERIFIED` |
-| BLK-03 | H2 khác MySQL (unique, CHECK, FK, generated column) | Test H2 xanh không đủ bằng chứng | Cập nhật H2 theo migration + chạy MySQL staging | Không | `CONFLICT` |
-| BLK-04 | `PUT /classes/{id}` cho đổi môn chính khi lớp `DANG_DIEN_RA` | Trước Revision 2: phá snapshot D-08 | **ĐÃ CHỐT (Revision 2):** cho phép, nhưng phải đi qua luồng `class_subject_history` + đồng bộ `school_class.subject_id` + `class_subject.is_primary` trong **một transaction**, không chuyển giáo viên, không xoá lịch sử; `PUT /classes/{id}` phải uỷ thác cùng luồng | Không (đã quyết) | `RESOLVED` |
-| BLK-09 | Idempotency/retry đổi môn chính | Gọi lại có thể sinh 2 dòng lịch sử | `operation_id` + UNIQUE `(org_id, operation_id)`; trả lại kết quả cũ | Không (đã ghi hợp đồng) | `VERIFIED` (thiết kế) |
+| BLK-02 | Migration 51/52 chưa tồn tại ở gốc repo | WP1 chưa thể chạy | Draft đã có trong `docs/phase-1/migrations/`; người dùng review rồi chạy staging | Không (đúng kế hoạch) | `READY FOR USER REVIEW` |
+| BLK-03 | H2 khác MySQL (unique, CHECK, FK, generated column) | Test H2 xanh không đủ bằng chứng | Fixture đã cập nhật; vẫn phải chạy MySQL staging | Không | `CONFLICT` |
+| BLK-04 | `PUT /classes/{id}` cho đổi môn chính khi lớp `DANG_DIEN_RA` | Trước Revision 2: phá snapshot D-08 | **ĐÃ CHỐT (Revision 2/3):** cho phép, nhưng phải đi qua `class_subject_history` + đồng bộ `school_class.subject_id` + `class_subject.is_primary` trong **một transaction**, không chuyển giáo viên, không xoá lịch sử; `PUT /classes/{id}` bắt buộc `reason`/`operationId`/`version` và uỷ thác cùng luồng | Không (đã quyết) | `RESOLVED` |
+| BLK-09 | Idempotency/retry đổi môn chính | Gọi lại có thể sinh 2 dòng lịch sử | `operation_id` bắt buộc + UNIQUE `(org_id, operation_id)`; cùng payload → kết quả cũ, khác payload → 409 | Không (đã ghi hợp đồng) | `VERIFIED` (thiết kế) |
 | BLK-05 | Bật module guard cho Subject có thể 403 hàng loạt | Ảnh hưởng tổ chức đang tắt module | Kiểm module state trước; bật cùng lúc với WP2 sau xác nhận | Có (dữ liệu) | `NOT VERIFIED` |
 | BLK-06 | `curriculum.*` chưa có trong catalog → gán chức danh bị `UNKNOWN_PERMISSION` | Chặn cấu hình quyền | Deploy catalog trước, rồi gán | Không (thứ tự) | `VERIFIED` |
 | BLK-07 | Gateway thiếu `/api/curricula/**` | FE không gọi được curriculum qua gateway | Thêm route khi làm WP4/Stage 2 | Không | `VERIFIED` |
@@ -376,14 +403,15 @@ chỉ áp cho bước cuối của 52 (chuyển UNIQUE) và cho việc bật mod
 ## 12. Thứ tự triển khai đề xuất
 
 ```text
-WP0 (xong) → chạy pre-check BLK-01 (BLK-04 đã chốt ở Revision 2)
-WP1  Migration 51 → 52 (+53 nếu môi trường đã chạy 52 cũ) + cập nhật H2 test schema + pre-check/backfill
+WP0 (xong) → chạy pre-check BLK-01 (BLK-04 đã chốt ở Revision 2/3)
+WP1  Review draft migration 51 → 52 (không có 53) + H2 fixture + pre/post-check + rollback,
+     người dùng chạy staging
 WP2  Subject: module guard, check-code, usage, SUBJECT_CODE_EXISTS, SUBJECT_INACTIVE
      (có thể chạy song song WP1 sau khi có cột/index; guard chỉ bật sau BLK-05)
 WP3  Teacher–Subject: catalog ánh xạ chuyên môn, API, đổi teachesSubject/subjectMismatch, assignable?subjectId
 WP4  Curriculum: catalog quyền mới (BLK-06) → CRUD + tiên quyết + version + Gateway route
-WP5  Class–Subject: snapshot, áp curriculum, giáo viên theo môn, bảo vệ dòng LEGACY,
-     đổi môn chính có lịch sử (D-08/D-15 Revision 2: history + is_primary + atomic sync)
+WP5  Class–Subject: snapshot, áp curriculum, giáo viên theo môn, bảo vệ dòng primary/LEGACY,
+     PrimarySubjectChangeService (history + is_primary + atomic sync + idempotency)
 WP6  Internal API/outbox hook (chỉ khi chuẩn bị Phase 2)
 WP7  Test + E2E trên MySQL staging; báo cáo trung thực phần chưa kiểm được
 WP8  Handoff FE + cập nhật docs nếu quyết định đổi
@@ -409,10 +437,10 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 
 | # | File | Hành động | Giai đoạn | Người thực hiện |
 |---|---|---|---|---|
-| 1 | `51_people_curriculum.sql` (gốc repo) | Tạo mới | WP1 | AI soạn draft, người dùng review/chạy |
-| 2 | `52_people_teacher_subject.sql` (gốc repo) | Tạo mới — gồm `class_subject.is_primary`, cột sinh `primary_class_id` + UNIQUE, `class_subject_history` | WP1 | AI soạn draft, người dùng review/chạy |
-| 2a | `53_people_class_subject_history.sql` (gốc repo) | **Chỉ khi** môi trường đã chạy bản 52 cũ | WP1 (tuỳ môi trường) | AI soạn draft, người dùng review/chạy |
-| 3 | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Sửa (bảng mới, UNIQUE/CHECK khớp MySQL; `is_primary` thường + history) | WP1 | AI soạn, người dùng review |
+| 1 | `51_people_curriculum.sql` (gốc repo) | Tạo mới — draft đã có ở `docs/phase-1/migrations/` | WP1 | AI soạn draft, người dùng review/chạy |
+| 2 | `52_people_class_subject.sql` (gốc repo) | Tạo mới — gồm `class_subject.is_primary`, cột sinh `primary_class_id` + UNIQUE, `class_subject_history`, backfill exact-match | WP1 | AI soạn draft, người dùng review/chạy |
+| 2a | `53_people_class_subject_history.sql` | **Không tạo** trừ khi có bằng chứng môi trường đã áp bản 52 cũ | WP1 (chỉ khi có bằng chứng) | — |
+| 3 | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Đã cập nhật (bảng mới; `is_primary` thường + history; ghi chú parity) | WP1 | AI soạn, người dùng review |
 | 4 | `backend/IdentityService/.../service/PermissionCatalog.java` | Thêm `curriculum.view/manage` + bundle | WP4 (có thể sớm hơn) | Người dùng |
 | 5 | `backend/PeopleService/.../exception/ErrorCode.java` | Thêm mã 2222+/3043+ | WP2–WP5 | Người dùng |
 | 6 | `backend/PeopleService/.../dto/SubjectRequest.java` | Giữ `code` tuỳ chọn; bổ sung message nếu cần | WP2 | Người dùng |
@@ -445,7 +473,7 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 | 30 | `frontend/src/lib/nav.ts` | Prefix `curriculum.` + menu | Stage 2 | AI |
 | 31 | `frontend/src/app/app.tsx` | Route curriculum + guard | Stage 2 | AI |
 | 32 | `frontend/src/features/academic/pages/*` (curriculum, lớp–môn) | Trang mới | Stage 2 | AI |
-| 33 | `docs/phase-1/*` | Đã cập nhật theo D-08/D-15 Revision 2 (2026-11-20); cập nhật tiếp nếu quyết định đổi | Xong (Revision 2) | AI |
+| 33 | `docs/phase-1/*` | Đã cập nhật theo D-08/D-09/D-15 Revision 3 (2026-11-20); cập nhật tiếp nếu quyết định đổi | Xong (Revision 3, chờ duyệt) | AI |
 
 **Không cần sửa:** ScheduleService, FacilityService (trừ khi chuẩn bị Phase 2), các bảng/cột legacy
 (`school_class.subject_id`, `teacher_specialty`).
@@ -466,7 +494,7 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 | F-08 | Subject không có module guard (D-10) | `CONFLICT` | grep `OrganizationModuleGuard` trong controller = rỗng | Quyết định thời điểm bật + dữ liệu module (BLK-05) |
 | F-09 | READ expression rộng như tài liệu ghi chú | `VERIFIED` | `SubjectController.java:21-23`; `api-contract.md:72` | — |
 | F-10 | Không có curriculum/class_subject/class_subject_history/teacher_subject/specialty_subject | `VERIFIED` | grep `curriculum`, `class_subject_history`, `is_primary` trong `backend` = 0 | — |
-| F-11 | Lớp `DANG_DIEN_RA` vẫn đổi được môn chính | `VERIFIED` (hiện trạng, khớp D-08/D-15 Revision 2) | `SchoolClassService.java:128-135,281-286` vs `api-contract.md` §4.8 | Nghiệm thu hành vi đầy đủ ở WP5 (TC-CLS-021…038) |
+| F-11 | Lớp `DANG_DIEN_RA` vẫn đổi được môn chính | `VERIFIED` (hiện trạng, khớp D-08/D-15) | `SchoolClassService.java:128-135,281-286` vs `api-contract.md` §4.8 | Nghiệm thu đầy đủ ở WP5 (TC-CLS-021…048) |
 | F-12 | Lớp học đã có module guard đầy đủ | `VERIFIED` | `SchoolClassService.java:71-252` | — |
 | F-13 | Kiểm tra môn giáo viên dựa trên tên chuyên môn | `VERIFIED` (hiện trạng) | `TeacherRepository.java:74-84,278` | Đối soát dữ liệu backfill (WP3) |
 | F-14 | `assignable` thiếu `subjectId` | `VERIFIED` | `TeacherController.java:41-47` | — |
@@ -480,7 +508,7 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 | F-22 | Catalog tự seed khi khởi động | `VERIFIED` | `IdentityDataInitializer.java:42-82` | — |
 | F-23 | Gán mã quyền lạ bị `UNKNOWN_PERMISSION` | `VERIFIED` | `PositionService.java:128-135` | — |
 | F-24 | Bundle `ACADEMIC_MANAGEMENT` sẽ tự cấp curriculum nếu thêm | `VERIFIED` | `role-permission-matrix.md:81,179` | Danh sách chức danh đang giữ bundle (BLK-08) |
-| F-25 | Chưa có migration 51/52 | `VERIFIED` | danh sách file gốc repo | — |
+| F-25 | Chưa có migration 51/52 ở gốc repo | `VERIFIED` | danh sách file gốc repo | Draft đã có trong `docs/phase-1/migrations/`, chưa chạy |
 | F-26 | Migration 42 tạo INDEX thường cho `subject.code` | `VERIFIED` | `42_…sql:48` | — |
 | F-27 | Dump schema cũ hơn migration 31/42 | `VERIFIED` | `DB_11_16.sql` (thiếu `code`, `cancel_state`) | — |
 | F-28 | Schema/dữ liệu live | `NOT VERIFIED` | — | Quyền đọc DB staging |
@@ -495,8 +523,9 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 | F-37 | Trang môn dùng module state cho read-only | `VERIFIED` | `subjects-page.tsx:144-147` | — |
 | F-38 | `class.edit` là `orgOnly`, `class.view` là `orgAndDept` | `VERIFIED` | `PermissionCatalog.java:65,67` | — |
 | F-39 | Không có `PUT /classes/{id}/subjects/primary`, `GET /classes/{id}/subject-history` | `VERIFIED` (chưa triển khai) | `SchoolClassController.java` (không có mapping) | WP5 |
-| F-40 | Không có bảng/cột `class_subject_history`, `class_subject.is_primary` | `VERIFIED` (chưa triển khai) | grep `backend` = 0; `people-test-schema.sql` | WP1 tạo ở 52 |
+| F-40 | Không có bảng/cột `class_subject_history`, `class_subject.is_primary` trong source Java/migration gốc | `VERIFIED` (chưa triển khai) | grep `backend` = 0; draft 52 + fixture đã có | WP1 người dùng chạy 52 |
 | F-41 | Chưa có mã lỗi cho thao tác môn chính (`CLASS_SUBJECT_OPERATION_CONFLICT` 2240, `REASON_TOO_LONG` 3054) | `VERIFIED` (chưa triển khai) | `ErrorCode.java` dừng ở 2221/3042 | Người dùng thêm ở WP5 |
+| F-42 | `school_class.version` đã tồn tại → dùng được `expectedVersion` | `VERIFIED` | `people-test-schema.sql` dòng `version BIGINT NOT NULL DEFAULT 0`; `SchoolClassRepository` tăng version khi update | — |
 
 ---
 
@@ -511,6 +540,11 @@ WP8  Handoff FE + cập nhật docs nếu quyết định đổi
 **Cập nhật 2026-11-20 (sau Revision 2 của D-08/D-15):** chỉ sửa các dòng mô tả trong chính file này
 (§1, §3.3, §6, §7.2, §9, §10.2, §10.3, §11, §12, §13, §14). Không chạm source Java/React, không
 tạo/chạy migration, không kết nối DB, không đổi cấu hình, không commit/push.
+
+**Cập nhật 2026-11-20 (Revision 3):** cập nhật §1, §2, §5.3, §9, §10.2, §10.3, §11, §12, §13, §14
+để khớp D-08/D-09/D-15 Revision 3 và các draft WP1 (`docs/phase-1/migrations/`). Không chạy SQL,
+không kết nối database, không sửa logic nghiệp vụ Java/React, không commit/push. Các draft migration
+và H2 fixture **chưa được xác minh trên MySQL**; trạng thái tổng thể là `READY FOR USER REVIEW`.
 
 **Trạng thái:** WP0 hoàn tất phần audit. **Dừng chờ người dùng review và phê duyệt** trước khi
 chuyển sang WP1.

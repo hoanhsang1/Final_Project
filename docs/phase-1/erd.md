@@ -105,10 +105,13 @@ erDiagram
 `CURRICULUM_SUBJECT_PREREQUISITE`, `CLASS_SUBJECT`, `CLASS_SUBJECT_HISTORY`, `SPECIALTY_SUBJECT`,
 `TEACHER_SUBJECT`, và cột `SCHOOL_CLASS.curriculum_id`.
 
-Ghi chú môn chính (D-15): `CLASS_SUBJECT.is_primary` đánh dấu **đúng một** dòng mỗi lớp (ép bằng
-UNIQUE trên cột sinh `primary_class_id`); `SCHOOL_CLASS.subject_id` là bản sao của dòng đó.
+Ghi chú môn chính (D-15): `CLASS_SUBJECT.is_primary` đánh dấu môn chính; UNIQUE trên cột sinh
+`primary_class_id` bảo đảm **tối đa một** primary/lớp, còn **tối thiểu một** primary khi
+`SCHOOL_CLASS.subject_id != NULL` do transaction + application validation. `SCHOOL_CLASS.subject_id`
+là bản sao của dòng primary.
 `CLASS_SUBJECT_HISTORY` là bảng append-only ghi mỗi lần đổi môn chính; snapshot môn/giáo viên
-**không** FK tới `SUBJECT`/`STAFF_PROFILE` để lịch sử không phụ thuộc dữ liệu hiện tại.
+**không** FK tới `SUBJECT`/`STAFF_PROFILE` để lịch sử không phụ thuộc dữ liệu hiện tại. Mỗi dòng
+lưu cả nguồn cũ/mới (`old_source`, `new_source`), `reason` bắt buộc và `operation_id` bắt buộc.
 
 Hai đường từ `CURRICULUM_SUBJECT` sang `CURRICULUM_SUBJECT_PREREQUISITE` là **hai FK tổ hợp**
 khác nhau trên cùng bảng nối: một cho môn đang xét, một cho môn tiên quyết.
@@ -173,7 +176,7 @@ Bảng nối `curriculum_subject_prerequisite` có **hai** quan hệ cha tới c
 | `curriculum_subject` | `(curriculum_id, subject_id)` | `(curriculum_id, sequence_no)`, **`(curriculum_id, subject_id, org_id)`** (bắt buộc cho FK của bảng nối) | `(subject_id, org_id)` |
 | `curriculum_subject_prerequisite` | `(curriculum_id, subject_id, prerequisite_subject_id)` | — (PK đã chặn cạnh trùng) | `(org_id, prerequisite_subject_id)`, `(org_id, subject_id)` |
 | `class_subject` | `(class_id, subject_id)` | **`(primary_class_id)`** — tối đa một primary/lớp | `(org_id, subject_id)`, `(teacher_id, org_id)`, `(curriculum_id, org_id)`, `(class_id, org_id)` (cho FK tổ hợp) |
-| `class_subject_history` | `id` | `(org_id, operation_id)` — idempotency, NULL hợp lệ | `(org_id, class_id, changed_at)`, `(org_id, new_subject_id)` |
+| `class_subject_history` | `id` | `(org_id, operation_id)` — idempotency, cả hai NOT NULL | `(org_id, class_id, changed_at)`, `(org_id, new_subject_id)` |
 | `specialty_subject` | `(specialty_id, subject_id)` | — | `(org_id, subject_id)` |
 | `teacher_subject` | `(user_id, subject_id)` | — | `(org_id, subject_id, status)`, `(org_id, user_id)` |
 | `school_class` (đổi) | `id` | **`(id, org_id)` — bắt buộc thêm**, `(org_id, class_code)` | — |
@@ -244,7 +247,7 @@ Bảng nối `curriculum_subject_prerequisite` có **hai** quan hệ cha tới c
 | D-02 | Curriculum template cấp tổ chức; lớp tham chiếu 1 curriculum; **không học kỳ** | Thêm `CURRICULUM`; cột `school_class.curriculum_id`; không có bảng kỳ |
 | D-06 | `specialty_subject` + `teacher_subject` | Thêm `SPECIALTY_SUBJECT`, `TEACHER_SUBJECT` |
 | D-07 | Nhiều tiên quyết, bảng nối riêng | Thêm `CURRICULUM_SUBJECT_PREREQUISITE` + 2 FK tổ hợp |
-| D-09 | Giáo viên theo môn | `class_subject.teacher_id` nullable; fallback `school_class.teacher_id` **chỉ** cho dòng `LEGACY` suy ra khi lớp chưa có `class_subject` |
+| D-09 | Giáo viên theo môn | `class_subject.teacher_id` nullable là nguồn sự thật; fallback `school_class.teacher_id` **chỉ** cho dòng `LEGACY` suy ra khi lớp **chưa có bản ghi `class_subject` tương ứng**; bản ghi tồn tại mà `teacher_id = NULL` nghĩa là chưa phân công |
 | D-12 | Sửa tại chỗ + version | `curriculum.version`; không bảng version |
 | D-15 | Giữ `school_class.subject_id`, đồng bộ với `class_subject.is_primary` và lưu history | Thêm `CLASS_SUBJECT.is_primary` + UNIQUE cột sinh; thêm `CLASS_SUBJECT_HISTORY`; quan hệ `SCHOOL_CLASS }o--o| SUBJECT` giữ nguyên |
 | D-08 | Đổi môn chính khi `DANG_DIEN_RA`, lưu snapshot lịch sử | `CLASS_SUBJECT_HISTORY` append-only; snapshot không FK tới `SUBJECT`/`STAFF_PROFILE` |

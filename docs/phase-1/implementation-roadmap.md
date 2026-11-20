@@ -60,22 +60,27 @@ các lựa chọn cuối, không còn bước "chờ chốt".
      `curriculum_subject_prerequisite`, `school_class.curriculum_id`, **và** index
      `uq_school_class_id_org (id, org_id)` — bắt buộc cho FK tổ hợp ở migration 52.
      Bảng nối dùng hai FK tổ hợp 3 cột trỏ `curriculum_subject(curriculum_id, subject_id, org_id)`.
-  2. Tạo `52_people_teacher_subject.sql` (specialty_subject, teacher_subject, class_subject,
-     class_subject_history).
+  2. Tạo `52_people_class_subject.sql` (specialty_subject, teacher_subject, class_subject,
+     class_subject_history, backfill).
      `class_subject` dùng FK tổ hợp `(class_id, org_id) → school_class(id, org_id)`, có
      `is_primary` + cột sinh `primary_class_id` + UNIQUE `uq_class_subject_primary`.
-     Nếu môi trường đã có `class_subject` từ bản 52 cũ, dùng `53_people_class_subject_history.sql`
-     (draft dự phòng) thay vì sửa file đã chạy.
+     `class_subject_history` có `old_source`/`new_source`, `reason`/`operation_id` NOT NULL,
+     UNIQUE `(org_id, operation_id)`, FK `(class_id, org_id)` RESTRICT.
+     **Không** tạo migration 53 trừ khi xác minh một bản 52 cũ đã chạy.
   3. Đổi `uq_subject_org_code` thành **UNIQUE** sau pre-check trùng (D-04; nhiều NULL hợp lệ).
   4. (Tuỳ chọn D-03) thêm cột default trên `subject` nếu người dùng muốn.
   5. Cập nhật `backend/PeopleService/src/test/resources/people-test-schema.sql` tương ứng
      (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1).
-  6. Viết script backfill riêng (D-11), chưa chạy production; script báo cáo phần không khớp.
-     Backfill `class_subject.is_primary = 1` cho dòng khớp `school_class.subject_id`.
+  6. Viết script backfill riêng (D-11), chưa chạy production; script báo cáo phần không khớp/mập mờ.
+     Backfill `class_subject.is_primary = 1` **chỉ** cho dòng khớp chính xác
+     `school_class.subject_id`; không đoán.
   7. Bảng `class_subject_history` **không** backfill hồi tố (không có dữ liệu nguồn).
-- **File:** các migration ở thư mục gốc repo; test schema H2 nêu trên.
-- **Test:** TC-LEG-001…015 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
-  TC-LEG-009…015.
+  8. Chạy pre-check `migrations/51_52_precheck.sql` và post-check `51_52_postcheck.sql` trên staging;
+     lưu báo cáo manual review.
+- **File:** draft `docs/phase-1/migrations/51_people_curriculum.sql`,
+  `52_people_class_subject.sql`, precheck/postcheck, `ROLLBACK.md`; test schema H2 nêu trên.
+- **Test:** TC-LEG-001…020 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
+  TC-LEG-009…020.
 - **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback đã ghi; không đổi dữ liệu cũ.
 - **Rollback:** drop bảng mới/cột mới + index mới; không đụng cột cũ.
 
@@ -156,15 +161,16 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   3. `SchoolClassController`: 7 endpoint mục 4 `api-contract.md` (gồm đổi môn chính + history).
   4. `SchoolClassResponse` thêm `curriculumId` (field mới, không phá);
      `ClassSubjectResponse` thêm `isPrimary`.
-  5. Gán giáo viên theo môn: kiểm `teacher_subject` + `DANG_DAY`; **không** fallback
-     `school_class.teacher_id` khi lớp đã có `class_subject`.
+  5. Gán giáo viên theo môn: kiểm `teacher_subject` + `DANG_DAY`; **chỉ** fallback
+     `school_class.teacher_id` khi lớp chưa có bản ghi `class_subject` tương ứng (D-09).
   6. Audit `CLASS_CURRICULUM_APPLIED`, `CLASS_SUBJECT_*`, `CLASS_PRIMARY_SUBJECT_CHANGED`.
   7. (D-15) Đồng bộ môn chính: tách service đổi môn chính (ví dụ `PrimarySubjectChangeService`)
-     gồm một `@Transactional`: khoá lớp → ghi `class_subject_history` → cập nhật
+     gồm một `@Transactional`: kiểm `operationId`/idempotency → khoá lớp → kiểm `expectedVersion`
+     (bắt buộc) → ghi `class_subject_history` (kèm `old_source`/`new_source`) → cập nhật
      `school_class.subject_id` + version → đồng bộ `is_primary` (tái dùng dòng nếu có) → audit.
      Cả `PUT /classes/{id}/subjects/primary` và `PUT /classes/{id}` (khi `subjectId` đổi) phải
-     gọi **cùng** service này; API class-subject **không** cho xoá dòng primary (409
-     `CLASS_SUBJECT_LEGACY_PROTECTED`).
+     gọi **cùng** service này; `changedBy` lấy từ JWT; API class-subject **không** cho xoá dòng
+     primary (409 `CLASS_SUBJECT_LEGACY_PROTECTED`).
   8. `GET /classes/{id}/subject-history` — chỉ đọc, trả snapshot.
   9. (D-08/D-15) `DELETE /classes/{id}`: nếu lớp đã có `class_subject_history` → 409 `CONFLICT`
      (message: có lịch sử môn), **không** CASCADE/xoá history; kiểm trước để không rơi lỗi FK 500.
@@ -177,7 +183,7 @@ các lựa chọn cuối, không còn bước "chờ chốt".
     `.../service/PrimarySubjectChangeService.java`, `.../dto/ClassSubject*`,
     `.../dto/ChangePrimarySubjectRequest.java`, `.../dto/SubjectChangeHistoryResponse.java`,
     `.../dto/ApplyCurriculumRequest.java`
-- **Test:** TC-CLS-001…038, TC-RBAC-014/015, TC-CON-002/004.
+- **Test:** TC-CLS-001…048, TC-RBAC-014/015, TC-CON-002/004.
 - **DoD:** lớp legacy đọc được; lớp mới áp curriculum đúng; sửa template không đổi snapshot;
   đổi môn chính (kể cả `DANG_DIEN_RA`) sinh history + đồng bộ `school_class.subject_id`, một
   transaction, không chuyển giáo viên, không tạo primary thứ hai; dòng primary được bảo vệ.
@@ -239,7 +245,7 @@ WP0 ─┬─> WP1 ─┬─> WP4 ──> WP5 ──> WP7
 
 | Loại | Đường dẫn | Hành động |
 |---|---|---|
-| Migration | `51_people_curriculum.sql` (kèm `curriculum_subject_prerequisite`, `uq_curriculum_subject_org`, `uq_school_class_id_org`), `52_people_teacher_subject.sql` (gốc repo) | Tạo mới, chạy 51 trước 52 |
+| Migration | `51_people_curriculum.sql` (kèm `curriculum_subject_prerequisite`, `uq_curriculum_subject_org`, `uq_school_class_id_org`), `52_people_class_subject.sql` (gốc repo) | Tạo mới, chạy 51 trước 52 |
 | Test schema | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Sửa |
 | Error | `.../exception/ErrorCode.java` | Sửa (nếu chốt mã mới) |
 | Subject | `.../controller/SubjectController.java`, `.../repository/SubjectRepository.java`, `.../dto/SubjectRequest.java` | Sửa |

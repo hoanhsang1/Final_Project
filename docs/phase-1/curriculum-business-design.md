@@ -184,8 +184,8 @@ CHECK `subject_id <> prerequisite_subject_id`.
 | `source` | varchar(20) | NOT NULL — `LEGACY` / `CURRICULUM` / `MANUAL` |
 | `sequence_no` | smallint | NULL — snapshot thứ tự từ `curriculum_subject`; `MANUAL`/`LEGACY` để NULL |
 | `teacher_id` | char(36) | NULL — giáo viên môn này (D-09) |
-| `is_primary` | tinyint(1) | NOT NULL DEFAULT 0 — môn chính; đúng một dòng/lớp (D-15) |
-| `primary_class_id` | char(36) GENERATED | `CASE WHEN is_primary THEN class_id END` STORED; UNIQUE để ép một primary/lớp |
+| `is_primary` | tinyint(1) | NOT NULL DEFAULT 0 — môn chính; DB bảo đảm **tối đa** một dòng/lớp (D-15) |
+| `primary_class_id` | char(36) GENERATED | `CASE WHEN is_primary = 1 THEN class_id END` STORED; UNIQUE ép **tối đa** một primary/lớp |
 | `required_sessions` | smallint | NULL — snapshot từ curriculum |
 | `planned_sessions` | smallint | NULL — override trước khi xếp lịch |
 | `theory_sessions` | smallint | NULL |
@@ -209,7 +209,9 @@ Index: `idx_class_subject_org_subject(org_id, subject_id)`, `idx_class_subject_t
 UNIQUE `uq_class_subject_primary(primary_class_id)`.
 
 > Bất biến "`school_class.subject_id` = môn primary" không thể ép bằng FK (vì `class_subject`
-> tham chiếu ngược `school_class`); service bảo đảm trong cùng transaction (D-15). Kiểm tra đồng bộ
+> tham chiếu ngược `school_class`); service bảo đảm trong cùng transaction (D-15). UNIQUE trên
+> `primary_class_id` chỉ bảo đảm **tối đa** một primary; việc **tối thiểu một** primary khi
+> `school_class.subject_id != NULL` do transaction + application validation. Kiểm tra đồng bộ
 > định kỳ ở `database-schema.md` §6.
 
 > FK tổ hợp `(class_id, org_id)` yêu cầu `school_class` có `uq_school_class_id_org (id, org_id)`.
@@ -241,12 +243,14 @@ Snapshot môn cũ/mới **không** phụ thuộc bảng `subject` hiện tại.
 | `old_subject_code` | varchar(50) | NULL — snapshot |
 | `old_subject_name` | varchar(200) | NULL — snapshot |
 | `old_teacher_id` | char(36) | NULL — giáo viên của môn cũ tại thời điểm đổi |
+| `old_source` | varchar(20) | NULL — `LEGACY`/`CURRICULUM`/`MANUAL` của dòng cũ |
 | `new_subject_id` | char(36) | NOT NULL |
 | `new_subject_code` | varchar(50) | NULL — snapshot |
 | `new_subject_name` | varchar(200) | NOT NULL — snapshot |
-| `reason` | varchar(500) | NULL |
-| `operation_id` | varchar(64) | NULL — idempotency (UNIQUE `(org_id, operation_id)`) |
-| `changed_by` | char(36) | NOT NULL — user thực hiện |
+| `new_source` | varchar(20) | NOT NULL — `LEGACY`/`CURRICULUM`/`MANUAL` của dòng mới |
+| `reason` | varchar(500) | **NOT NULL** — bắt buộc, ≤ 500 ký tự |
+| `operation_id` | varchar(64) | **NOT NULL** — idempotency (UNIQUE `(org_id, operation_id)`) |
+| `changed_by` | char(36) | NOT NULL — user thực hiện, lấy từ JWT |
 | `changed_at` | datetime(3) | NOT NULL |
 
 FK `(class_id, org_id) → school_class(id, org_id)` ON DELETE RESTRICT (không xoá lớp còn history).
@@ -345,10 +349,11 @@ Index `(org_id, class_id, changed_at)`. `changed_at` là **thời điểm hiệu
 **Luồng đổi môn chính (một transaction):**
 
 1. Khoá lớp `SELECT … FOR UPDATE`; kiểm `org_id`, trạng thái ∈ {`CHUA_BAT_DAU`,`DANG_DIEN_RA`},
-   `expectedVersion` nếu client gửi.
+   `expectedVersion` (**bắt buộc**) khớp `school_class.version`.
 2. Kiểm môn mới tồn tại, **active**, cùng org.
 3. Xác định dòng primary hiện tại (hoặc suy ra từ `school_class.subject_id` nếu lớp chưa có dòng).
-4. Insert `class_subject_history` (snapshot cũ/mới + `old_teacher_id` + actor + lý do).
+4. Insert `class_subject_history` (snapshot cũ/mới + `old_teacher_id` + `old_source`/`new_source`
+   + actor + lý do + `operation_id`).
 5. Cập nhật `school_class.subject_id = newSubjectId`, `version = version + 1`.
 6. Đồng bộ `class_subject`:
    - Nếu `(class_id, newSubjectId)` đã tồn tại → **tái dùng** dòng đó: `is_primary = 1`; **không**
@@ -361,9 +366,17 @@ Index `(org_id, class_id, changed_at)`. `changed_at` là **thời điểm hiệu
 **Không làm:** không áp lại curriculum, không đổi các môn khác, không chép `teacher_id` cũ sang
 môn mới, không xoá history.
 
+**Trường bắt buộc:** `subjectId`, `reason` (≤ 500 ký tự), `expectedVersion`, `operationId`;
+`changedBy` lấy từ JWT, không nhận từ body.
+
+**Idempotency:** cùng `operationId` + cùng payload chuẩn hoá → trả kết quả thành công cũ, **không**
+tạo history mới; cùng `operationId` + payload khác → 409. Transaction lỗi ở bất kỳ bước nào →
+rollback toàn bộ, không để history một phần.
+
 **Thất bại:** trạng thái không cho phép → 409 `CLASS_NOT_EDITABLE`; môn inactive → 400
-`SUBJECT_INACTIVE`; trùng dòng primary (đua) → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`; version lệch
-→ 409 `DATA_CHANGED`.
+`SUBJECT_INACTIVE`; trùng dòng primary (đua) / `operationId` tái dùng payload khác → 409
+`CLASS_SUBJECT_OPERATION_CONFLICT`; version lệch → 409 version conflict; thiếu trường bắt buộc hoặc
+`reason` > 500 → 400.
 
 Điều chỉnh sâu hơn giữa kỳ (đổi nhiều môn, hoàn tác) là tính năng tương lai, ngoài Phase 1.
 
@@ -406,11 +419,13 @@ môn mới, không xoá history.
 | BR-CUR-19 | **Không có mô hình học kỳ**: không `term_no`, không bảng `academic_term` ở Phase 1 (D-02) |
 | BR-CUR-20 | `planned_sessions` không được âm; nếu có buổi đã xếp, không cho giảm dưới số đã dùng (Phase 2) |
 | BR-CUR-21 | Tiên quyết chỉ **cảnh báo** khi chưa đạt ở Phase 1; không chặn xếp lịch (D-07) |
-| BR-CUR-22 | Mỗi lớp có tối đa **một** dòng `class_subject.is_primary = 1`; ép bằng UNIQUE trên cột sinh `primary_class_id` |
+| BR-CUR-22 | Mỗi lớp có **tối đa một** dòng `class_subject.is_primary = 1` (ép bằng UNIQUE trên cột sinh `primary_class_id`); **tối thiểu một** primary khi `school_class.subject_id != NULL` do transaction + application validation, UNIQUE không bảo đảm |
 | BR-CUR-23 | Đổi môn chính ghi `class_subject_history` trước rồi mới cập nhật `school_class`/`class_subject`; lỗi bất kỳ bước nào rollback toàn bộ |
 | BR-CUR-24 | Đổi môn chính **không** chuyển giáo viên cũ; dòng môn mới `teacher_id = NULL` |
 | BR-CUR-25 | Nếu môn mới đã có trong `class_subject` của lớp, tái dùng dòng đó (chỉ đặt `is_primary=1`), không tạo dòng thứ hai |
 | BR-CUR-26 | Không xoá cứng lớp đã có `class_subject_history`; `DELETE /classes/{id}` trả 409 `CONFLICT`, không CASCADE/xoá lịch sử (D-08/D-15) |
+| BR-CUR-27 | Fallback `school_class.teacher_id` **chỉ** khi lớp chưa có bản ghi `class_subject` tương ứng; bản ghi tồn tại mà `teacher_id = NULL` nghĩa là chưa phân công (D-09) |
+| BR-CUR-28 | Request đổi môn chính bắt buộc `reason`, `expectedVersion`, `operationId`; cùng `operationId` + cùng payload trả kết quả cũ, payload khác trả 409 (D-08) |
 
 ---
 
@@ -486,14 +501,20 @@ Trước: lớp C002 primary = Toán (`9999…9001`, GV `2222…0005`). Yêu c�
 `PUT /api/classes/5555…5002/subjects/primary`
 
 ```json
-{ "subjectId": "9999…9002", "reason": "Điều chỉnh chuyên môn giữa kỳ", "expectedVersion": 4 }
+{
+  "subjectId": "9999…9002",
+  "reason": "Điều chỉnh chuyên môn giữa kỳ",
+  "expectedVersion": 4,
+  "operationId": "0f5f7c1e-0d5a-4a6e-9d3b-2f3c1a9b7e10"
+}
 ```
 
 Sau (một transaction):
 
 - `class_subject_history`: `old_subject_id=…9001`, `old_subject_code=TOAN10`,
-  `old_subject_name=Toán 10`, `old_teacher_id=2222…0005`, `new_subject_id=…9002`,
-  `new_subject_code=LY10`, `new_subject_name=Vật lý 10`, `changed_by`, `changed_at`, `reason`.
+  `old_subject_name=Toán 10`, `old_teacher_id=2222…0005`, `old_source=CURRICULUM`,
+  `new_subject_id=…9002`, `new_subject_code=LY10`, `new_subject_name=Vật lý 10`,
+  `new_source=CURRICULUM`, `operation_id=0f5f…7e10`, `changed_by`, `changed_at`, `reason`.
 - `school_class.subject_id = …9002`, `version = 5`.
 - Dòng `(C002, …9002)` **tái dùng** (đã có), `is_primary = 1`, `teacher_id` **vẫn NULL**.
 - Dòng `(C002, …9001)` giữ nguyên, `is_primary = 0`, `teacher_id = 2222…0005` (không xoá).
@@ -552,7 +573,7 @@ Câu hỏi kỹ thuật còn lại (không phải quyết định nghiệp vụ)
    từng trường không?
 3. Clone curriculum (`POST /curricula/{id}/clone`) có cần ở Phase 1 không? Nếu có, phải map lại
    toàn bộ cạnh tiên quyết.
-4. `operation_id` trong `class_subject_history`: client sinh hay server sinh khi thiếu? Đề xuất:
-   server sinh nếu body không có; client gửi khi muốn retry-safe.
+4. `operation_id` trong `class_subject_history`: **đã chốt** bắt buộc do client sinh; thiếu →
+   `400`; lưu lâu dài và UNIQUE `(org_id, operation_id)`.
 5. Có cần API đọc history phân trang (`GET /classes/{id}/subject-history`) hay chỉ hiển thị trong
    chi tiết lớp? Đề xuất: có, phân trang `page/size`. 
