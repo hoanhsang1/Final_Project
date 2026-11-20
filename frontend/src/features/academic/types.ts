@@ -152,7 +152,6 @@ export interface ClassInput {
   subjectId?: string
   startDate?: string
   endDate?: string
-  status?: 'active' | 'inactive' | 'archived'
 }
 
 export interface ClassUpdateInput {
@@ -203,11 +202,8 @@ export interface SubjectInput {
 }
 
 export const CLASS_STATUS_LABELS: Record<string, string> = {
-  active: 'Đang hoạt động',
-  inactive: 'Tạm dừng',
-  archived: 'Đã lưu trữ',
-  DANG_HOAT_DONG: 'Đang hoạt động',
-  TAM_DUNG: 'Tạm dừng',
+  CHUA_BAT_DAU: 'Chưa bắt đầu',
+  DANG_DIEN_RA: 'Đang diễn ra',
   DA_KET_THUC: 'Đã kết thúc',
   DA_HUY: 'Đã huỷ',
 }
@@ -234,7 +230,7 @@ export const CONTRACT_TYPE_LABELS: Record<string, string> = {
 export const TEACHING_STATUS_LABELS: Record<string, string> = {
   DANG_DAY: 'Đang dạy',
   TAM_NGHI: 'Tạm nghỉ',
-  DA_NGHI: 'Đã nghỉ',
+  NGHI_VIEC: 'Đã nghỉ',
 }
 
 export const STUDENT_STATUS_LABELS: Record<string, string> = {

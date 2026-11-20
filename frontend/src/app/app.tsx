@@ -7,6 +7,7 @@ import { AcademicLanding } from '@/routes/academic-landing'
 import { NotFoundPage } from '@/routes/not-found-page'
 import { PlannedPage } from '@/routes/planned-page'
 import { LoginPage } from '@/features/auth/pages/login-page'
+import { RegisterPage } from '@/features/auth/pages/register-page'
 import { ChangePasswordPage } from '@/features/auth/pages/change-password-page'
 import { ProfilePage } from '@/features/auth/pages/profile-page'
 import { PublicPlannedPage } from '@/features/auth/pages/public-planned-page'
@@ -77,7 +78,14 @@ export function App() {
             </GuestOnly>
           }
         />
-        <Route path="/dang-ky" element={<PublicPlannedPage screen="dang-ky" />} />
+        <Route
+          path="/dang-ky"
+          element={
+            <GuestOnly>
+              <RegisterPage />
+            </GuestOnly>
+          }
+        />
         <Route path="/quen-mat-khau" element={<PublicPlannedPage screen="quen-mat-khau" />} />
         <Route path="/dat-lai-mat-khau" element={<PublicPlannedPage screen="dat-lai-mat-khau" />} />
 

@@ -7,7 +7,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 
@@ -21,8 +20,8 @@ public class PasswordChangeService {
         var hashes=jdbc.queryForList("SELECT password_hash FROM account WHERE id=? AND status='active' FOR UPDATE",String.class,userId);
         if(hashes.isEmpty() || !encoder.matches(request.currentPassword(),hashes.get(0)))
             throw new AppException(ErrorCode.CURRENT_PASSWORD_INCORRECT);
-        if(request.newPassword().getBytes(StandardCharsets.UTF_8).length>72 ||
-                encoder.matches(request.newPassword(),hashes.get(0)))
+        PasswordPolicy.validate(request.newPassword());
+        if(encoder.matches(request.newPassword(),hashes.get(0)))
             throw new AppException(ErrorCode.PASSWORD_UNCHANGED);
         jdbc.update("UPDATE account SET password_hash=?,must_change_password=FALSE WHERE id=?",
             encoder.encode(request.newPassword()),userId);

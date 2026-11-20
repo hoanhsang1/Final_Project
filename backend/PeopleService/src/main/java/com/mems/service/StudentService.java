@@ -88,13 +88,29 @@ public class StudentService {
         Date dob = request.dateOfBirth() != null ? Date.valueOf(request.dateOfBirth()) : null;
         String email = request.email() != null && !request.email().isBlank() ? request.email().trim().toLowerCase() : null;
         String phone = request.phone() != null && !request.phone().isBlank() ? request.phone().trim() : null;
+        String status = request.status() == null || request.status().isBlank()
+            ? "active" : request.status().trim().toLowerCase();
 
         StudentResponse updated = repository.update(
-            id, orgId, request.fullName().trim(), dob, email, phone, request.status()
+            id, orgId, request.fullName().trim(), dob, email, phone, status
         );
 
+        syncAccountStatus(before, status, orgId);
         audit.record(orgId, actor.userId(), "STUDENT_UPDATED", id, Map.of("before", before, "after", updated));
         return updated;
+    }
+
+    /** Hồ sơ ngừng học (inactive/suspended) → khóa đăng nhập; mở lại active → mở tài khoản. */
+    private void syncAccountStatus(StudentResponse student, String status, String orgId) {
+        if (student.accountCreatedAt() == null) return;
+        boolean active = "active".equals(status);
+        boolean wasActive = "active".equalsIgnoreCase(student.status());
+        if (active == wasActive) return;
+        if (active) {
+            identity.enableAccount(student.id(), orgId);
+        } else {
+            identity.disableAccount(student.id(), orgId);
+        }
     }
 
     /** Tạo tài khoản đăng nhập cho hồ sơ học sinh đã có (quy tắc 12). */
@@ -142,6 +158,9 @@ public class StudentService {
         moduleGuard.requireModule(orgId, "STUDENT_MANAGEMENT");
 
         StudentResponse before = repository.require(id, orgId, true);
+        if (before.accountCreatedAt() != null) {
+            identity.disableAccount(id, orgId);
+        }
         repository.delete(id, orgId);
 
         audit.record(orgId, actor.userId(), "STUDENT_DELETED", id, before);

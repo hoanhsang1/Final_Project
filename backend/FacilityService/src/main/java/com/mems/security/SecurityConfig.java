@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/departments/*/facilities", "/departments/*/facilities/**").authenticated()
+                .requestMatchers("/outbox/**").authenticated()
                 .anyRequest().denyAll())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();

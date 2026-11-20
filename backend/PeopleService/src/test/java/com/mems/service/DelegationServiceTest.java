@@ -155,6 +155,14 @@ class DelegationServiceTest {
     }
 
     @Test
+    @DisplayName("DEL-04: job hết hạn chuyển ủy quyền quá hạn sang EXPIRED")
+    void expireDelegationsMarksOverdue() {
+        service.expireDelegations();
+
+        verify(delegations).markExpired();
+    }
+
+    @Test
     @DisplayName("Chỉ Owner được quản lý ủy quyền")
     void nonOwnerCannotCreate() {
         when(actor.owner()).thenReturn(false);

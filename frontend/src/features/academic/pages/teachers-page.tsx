@@ -1,4 +1,4 @@
-import { GraduationCap, Pencil, Plus, UserRound, Users } from 'lucide-react'
+import { GraduationCap, Pencil, Plus, RefreshCw, UserRound, Users } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,7 +19,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
-import { useTeacher, useTeachers, useUpdateTeacher } from '@/features/academic/hooks'
+import { useChangeTeacherStatus, useTeacher, useTeachers, useUpdateTeacher } from '@/features/academic/hooks'
 import {
   CONTRACT_TYPE_LABELS,
   TEACHING_STATUS_LABELS,
@@ -54,6 +54,7 @@ function TeacherEditDialog({
   const update = useUpdateTeacher(userId ?? '')
   const [form, setForm] = useState<TeacherForm | null>(null)
   const [error, setError] = useState<string>()
+  const [mismatch, setMismatch] = useState<{ id: string; name: string }[] | null>(null)
 
   const teacher = detail.data
   const current = useMemo<TeacherForm>(
@@ -69,6 +70,7 @@ function TeacherEditDialog({
   )
 
   const toggleSpecialty = (id: string) => {
+    setMismatch(null)
     setForm({
       ...current,
       specialtyIds: current.specialtyIds.includes(id)
@@ -77,7 +79,7 @@ function TeacherEditDialog({
     })
   }
 
-  const submit = () => {
+  const submit = (confirm = false) => {
     if (!teacher) return
     setError(undefined)
     if (!current.fullName.trim()) {
@@ -96,15 +98,25 @@ function TeacherEditDialog({
         specialtyIds: current.specialtyIds,
         contractType: current.contractType || undefined,
         version: teacher.version,
+        confirm: confirm || undefined,
       },
       {
         onSuccess: () => {
           toast.success('Đã cập nhật hồ sơ giáo viên.')
           setForm(null)
+          setMismatch(null)
           onOpenChange(false)
         },
-        onError: (cause) =>
-          setError(ApiError.from(cause).message || 'Không cập nhật được hồ sơ giáo viên.'),
+        onError: (cause) => {
+          const apiError = ApiError.from(cause)
+          const classes = (apiError.details as { classes?: { id: string; name: string }[] } | undefined)
+            ?.classes
+          if (apiError.code === 'SPECIALTY_MISMATCH' && classes?.length) {
+            setMismatch(classes)
+            return
+          }
+          setError(apiError.message || 'Không cập nhật được hồ sơ giáo viên.')
+        },
       },
     )
   }
@@ -188,6 +200,29 @@ function TeacherEditDialog({
                   ) : null}
                 </div>
               </Field>
+              {mismatch ? (
+                <div className="space-y-2 rounded-md border border-warning-200 bg-warning-50/40 p-3 text-sm">
+                  <p className="font-medium text-ink-900">
+                    Chuyên môn mới không còn khớp môn học của các lớp giáo viên đang phụ trách:
+                  </p>
+                  <ul className="list-disc pl-5 text-ink-600">
+                    {mismatch.map((item) => (
+                      <li key={item.id}>{item.name}</li>
+                    ))}
+                  </ul>
+                  <p className="text-ink-600">
+                    Vẫn lưu sẽ giữ nguyên phân công hiện tại và cần rà soát lại lớp sau.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => submit(true)} isLoading={update.isPending}>
+                      Vẫn lưu
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setMismatch(null)}>
+                      Quay lại
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {error ? <p className="text-sm text-danger-600">{error}</p> : null}
             </>
           ) : null}
@@ -196,8 +231,75 @@ function TeacherEditDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Đóng
           </Button>
-          <Button onClick={submit} isLoading={update.isPending} disabled={!teacher}>
+          <Button onClick={() => submit()} isLoading={update.isPending} disabled={!teacher}>
             Lưu thay đổi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type TeachingStatus = 'DANG_DAY' | 'TAM_NGHI' | 'NGHI_VIEC'
+
+function TeacherStatusDialog({
+  userId,
+  currentStatus,
+  fullName,
+  onOpenChange,
+}: {
+  userId: string
+  currentStatus: string | null
+  fullName: string
+  onOpenChange: (open: boolean) => void
+}) {
+  const change = useChangeTeacherStatus(userId)
+  // Component chỉ được mount khi mở dialog nên trạng thái khởi tạo luôn khớp giáo viên đang chọn.
+  const [status, setStatus] = useState<TeachingStatus>((currentStatus as TeachingStatus | null) ?? 'DANG_DAY')
+
+  const submit = () => {
+    change.mutate(status, {
+      onSuccess: (detail) => {
+        toast.success(
+          `Đã đổi trạng thái giảng dạy sang “${
+            TEACHING_STATUS_LABELS[detail.teachingStatus ?? status] ?? status
+          }”.`,
+        )
+        onOpenChange(false)
+      },
+      onError: (cause) => toast.error(ApiError.from(cause).message || 'Không đổi được trạng thái giảng dạy.'),
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Đổi trạng thái giảng dạy</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Giáo viên: <span className="font-medium text-ink-900">{fullName || '—'}</span>
+          </p>
+          <Field label="Trạng thái mới">
+            <Select value={status} onValueChange={(value) => setStatus(value as TeachingStatus)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DANG_DAY">Đang dạy</SelectItem>
+                <SelectItem value="TAM_NGHI">Tạm nghỉ</SelectItem>
+                <SelectItem value="NGHI_VIEC">Nghỉ việc</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Đóng
+          </Button>
+          <Button onClick={submit} isLoading={change.isPending}>
+            Lưu trạng thái
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -218,6 +320,7 @@ export function TeachersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailUser, setDetailUser] = useState<TeacherItem | null>(null)
   const [editUser, setEditUser] = useState<string | null>(null)
+  const [statusUser, setStatusUser] = useState<TeacherItem | null>(null)
 
   const teachers = useTeachers({
     page,
@@ -313,6 +416,12 @@ export function TeachersPage() {
               Sửa
             </Button>
           ) : null}
+          {can(PERM.teacherChangeStatus) ? (
+            <Button variant="ghost" size="sm" onClick={() => setStatusUser(row)}>
+              <RefreshCw aria-hidden="true" />
+              Trạng thái
+            </Button>
+          ) : null}
         </div>
       ),
     },
@@ -388,7 +497,7 @@ export function TeachersPage() {
             <SelectItem value="all">Mọi trạng thái</SelectItem>
             <SelectItem value="DANG_DAY">Đang dạy</SelectItem>
             <SelectItem value="TAM_NGHI">Tạm nghỉ</SelectItem>
-            <SelectItem value="DA_NGHI">Đã nghỉ</SelectItem>
+            <SelectItem value="NGHI_VIEC">Đã nghỉ</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -434,6 +543,14 @@ export function TeachersPage() {
         open={Boolean(editUser)}
         onOpenChange={(open) => !open && setEditUser(null)}
       />
+      {statusUser ? (
+        <TeacherStatusDialog
+          userId={statusUser.userId}
+          currentStatus={statusUser.teachingStatus}
+          fullName={statusUser.fullName}
+          onOpenChange={(open) => !open && setStatusUser(null)}
+        />
+      ) : null}
     </PageContainer>
   )
 }

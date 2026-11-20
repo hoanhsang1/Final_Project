@@ -71,12 +71,14 @@ class RouteContractTest {
             "people-transfer-requests-api",
             "people-notifications-api",
             "people-delegations-api",
-            "people-general-manager-api"
+            "people-general-manager-api",
+            "people-audit-logs-api"
         );
         for (String id : stripIds) {
             List<String> filters = (List<String>) route(id).get("filters");
             assertThat(filters).as("%s phải có StripPrefix=1", id).containsExactly("StripPrefix=1");
         }
+        assertThat(hasPath("people-audit-logs-api", "/api/audit-logs/**,/api/audit-logs")).isTrue();
     }
 
     @Test

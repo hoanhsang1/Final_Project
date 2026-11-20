@@ -36,7 +36,8 @@ public class GeneralManagerRepository {
             LEFT JOIN staff_profile sp ON sp.user_id=a.user_id AND sp.org_id=a.org_id
             LEFT JOIN department d ON d.id=dm.department_id AND d.org_id=dm.org_id
             WHERE a.org_id=? AND a.status='ACTIVE' AND p.deleted_at IS NULL
-              AND p.scope='ORGANIZATION' AND p.name=?
+              AND p.scope='ORGANIZATION'
+              AND (p.system_code='GENERAL_MANAGER' OR p.name=?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             ORDER BY a.created_at, a.id
             """,
@@ -81,7 +82,8 @@ public class GeneralManagerRepository {
             FROM assignment a
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id
             WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
-              AND p.deleted_at IS NULL AND p.scope='ORGANIZATION' AND p.name=?
+              AND p.deleted_at IS NULL AND p.scope='ORGANIZATION'
+              AND (p.system_code='GENERAL_MANAGER' OR p.name=?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, Integer.class, orgId, userId, positionName, now, now);
         return count != null && count > 0;
@@ -89,7 +91,8 @@ public class GeneralManagerRepository {
 
     public String findPositionId(String orgId, String positionName) {
         List<String> ids = jdbc.queryForList(
-            "SELECT id FROM `position` WHERE org_id=? AND name=? AND deleted_at IS NULL",
+            "SELECT id FROM `position` WHERE org_id=? AND (system_code='GENERAL_MANAGER' OR name=?)"
+                + " AND deleted_at IS NULL",
             String.class, orgId, positionName);
         if (ids.isEmpty()) return null;
         String id = ids.get(0);
@@ -105,8 +108,8 @@ public class GeneralManagerRepository {
     public String createPosition(String orgId, String positionName, String description) {
         String id = UUID.randomUUID().toString();
         jdbc.update("""
-            INSERT INTO `position`(id,org_id,name,description,created_at,profile_type,scope)
-            VALUES (?,?,?,?,?,'GENERAL','ORGANIZATION')
+            INSERT INTO `position`(id,org_id,name,system_code,description,created_at,profile_type,scope)
+            VALUES (?,?,?,'GENERAL_MANAGER',?,?,'GENERAL','ORGANIZATION')
             """, id, orgId, positionName, description, Timestamp.from(Instant.now()));
         return id;
     }

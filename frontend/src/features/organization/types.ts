@@ -156,6 +156,7 @@ export interface TransferRequest {
   toDepartmentName: string
   reason: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  requestedBy: string
   requestedByName: string
   requestedAt: string
   appliedAt: string | null

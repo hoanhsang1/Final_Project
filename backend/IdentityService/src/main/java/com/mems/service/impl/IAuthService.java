@@ -10,6 +10,8 @@ public interface IAuthService {
 
     LoginResponse login(LoginRequest request);
 
+    LoginResponse login(LoginRequest request, String clientIp);
+
     LoginResponse refresh(RefreshTokenRequest request);
 
     void logout(LogoutRequest request);

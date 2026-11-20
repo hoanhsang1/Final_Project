@@ -3,13 +3,17 @@ package com.mems.service;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
+import com.mems.outbox.OutboxEventTypes;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,9 +30,11 @@ public class FacilityService {
     private static final Set<String> ISSUE_STATUSES = Set.of("open", "in_progress", "resolved", "unresolved");
 
     private final JdbcTemplate jdbc;
+    private final OutboxEventRepository outbox;
 
-    public FacilityService(JdbcTemplate jdbc) {
+    public FacilityService(JdbcTemplate jdbc, OutboxEventRepository outbox) {
         this.jdbc = jdbc;
+        this.outbox = outbox;
     }
 
     // ------------------------------------------------------------------ rooms
@@ -190,6 +196,8 @@ public class FacilityService {
                 now, equipment.id(), orgId);
             logStatus(equipment.id(), orgId, userId, equipment.status(), "broken", "Issue reported");
         }
+        publishIncident(orgId, OutboxEventTypes.FACILITY_INCIDENT_OPENED, id, equipment,
+            "open", Map.of("occurredAt", now.toInstant().toString()));
         return requireIssue(id, orgId, departmentId);
     }
 
@@ -203,12 +211,24 @@ public class FacilityService {
             WHERE id=? AND org_id=?
             """, now, now, issueId, orgId);
         EquipmentResponse equipment = requireEquipment(issue.equipmentId(), orgId, departmentId);
-        if (!"in_use".equals(equipment.status())) {
-            jdbc.update("UPDATE equipment SET status='in_use', updated_at=? WHERE id=? AND org_id=?",
-                now, equipment.id(), orgId);
-            // TODO(PHẦN 7): chính sách đưa thiết bị về in_use sau khi xử lý sự cố chưa được chốt.
-            logStatus(equipment.id(), orgId, userId, equipment.status(), "in_use", "Issue resolved");
+        Integer openIssues = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM incident_report
+            WHERE org_id=? AND equipment_id=? AND status='open'
+            """, Integer.class, orgId, equipment.id());
+        // FAC-01: chỉ khôi phục khi không còn sự cố mở, và về đúng trạng thái trước khi báo hỏng.
+        if (openIssues != null && openIssues == 0 && "broken".equals(equipment.status())) {
+            String restore = jdbc.query("""
+                SELECT old_status FROM equipment_status_log
+                WHERE equipment_id=? AND new_status='broken'
+                ORDER BY changed_at DESC, id DESC LIMIT 1
+                """, rs -> rs.next() ? rs.getString(1) : null, equipment.id());
+            if (restore == null || restore.isBlank()) restore = "in_use";
+            jdbc.update("UPDATE equipment SET status=?, updated_at=? WHERE id=? AND org_id=?",
+                restore, now, equipment.id(), orgId);
+            logStatus(equipment.id(), orgId, userId, "broken", restore, "Issue resolved");
         }
+        publishIncident(orgId, OutboxEventTypes.FACILITY_INCIDENT_RESOLVED, issueId, equipment,
+            "resolved", Map.of("resolvedAt", now.toInstant().toString()));
         return requireIssue(issueId, orgId, departmentId);
     }
 
@@ -246,6 +266,21 @@ public class FacilityService {
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** SCH-04: chỉ phát event; Schedule đánh dấu buổi bị ảnh hưởng, không tự đổi phòng. */
+    private void publishIncident(String orgId, String eventType, String incidentId,
+                                 EquipmentResponse equipment, String status,
+                                 Map<String, Object> extra) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("incidentId", incidentId);
+        payload.put("equipmentId", equipment.id());
+        payload.put("equipmentName", equipment.name());
+        payload.put("roomId", equipment.roomId());
+        payload.put("status", status);
+        payload.putAll(extra);
+        outbox.append(orgId, "FACILITY_INCIDENT", incidentId, null, eventType, 1,
+            UUID.randomUUID().toString(), payload);
+    }
 
     private RoomResponse requireRoom(String id, String orgId, String departmentId) {
         List<RoomResponse> rows = jdbc.query("""

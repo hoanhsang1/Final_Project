@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import { authApi } from '@/features/auth/api'
@@ -6,7 +6,12 @@ import { hydrateSessionContext } from '@/features/auth/module-hydration'
 import { hasAnyPermission, hasPermission, isOwner, isSuperAdmin } from '@/lib/nav'
 import { queryKeys } from '@/lib/query-keys'
 import { useSessionStore } from '@/stores/session-store'
-import type { ChangePasswordRequest, LoginRequest, Session } from '@/types/session'
+import type {
+  ChangePasswordRequest,
+  LoginRequest,
+  RegisterOrganizationRequest,
+  Session,
+} from '@/types/session'
 
 export function useSession(): Session | null {
   return useSessionStore((state) => state.session)
@@ -36,6 +41,22 @@ export function useLoginMutation() {
       loginSuccess(response)
       void hydrateSessionContext()
     },
+  })
+}
+
+/** Danh mục module công khai cho biểu mẫu đăng ký tổ chức. */
+export function usePublicModules() {
+  return useQuery({
+    queryKey: ['public-modules'],
+    queryFn: () => authApi.publicModules(),
+    staleTime: 10 * 60_000,
+  })
+}
+
+/** Đăng ký tổ chức mới — backend tạo tổ chức và tài khoản chủ ở trạng thái PENDING. */
+export function useRegisterOrganization() {
+  return useMutation({
+    mutationFn: (payload: RegisterOrganizationRequest) => authApi.register(payload),
   })
 }
 

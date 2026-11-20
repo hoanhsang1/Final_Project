@@ -1,10 +1,11 @@
-import { ArrowLeftRight, FileText } from 'lucide-react'
+import { ArrowLeftRight, CheckCircle2, FileText, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   Dialog,
   DialogBody,
@@ -24,8 +25,9 @@ import { PageContainer } from '@/components/layout/page-container'
 import { usePermission } from '@/features/auth/hooks'
 import {
   TRANSFER_STATUS_LABELS,
-  TRANSFER_STEP_LABELS,
+  type TransferRequest,
 } from '@/features/organization/types'
+import { TransferTimeline } from '@/features/workflows/components/transfer-timeline'
 import {
   useMyResignations,
   useResignationMutations,
@@ -53,6 +55,13 @@ export function MyRequestsPage() {
   const [targetDepartmentId, setTargetDepartmentId] = useState('')
   const [transferReason, setTransferReason] = useState('')
   const [formError, setFormError] = useState<string>()
+
+  const [decisionTarget, setDecisionTarget] = useState<{
+    request: TransferRequest
+    decision: 'approve' | 'reject'
+  } | null>(null)
+  const [decisionNote, setDecisionNote] = useState('')
+  const [cancelTarget, setCancelTarget] = useState<TransferRequest | null>(null)
 
   const targets = (departments.data ?? []).filter((department) => department.id !== departmentId)
 
@@ -201,25 +210,62 @@ export function MyRequestsPage() {
             ) : null}
             {(transfer.mine.data ?? []).map((request) => (
               <Card key={request.id}>
-                <CardContent className="flex flex-col gap-1 py-4">
+                <CardContent className="flex flex-col gap-3 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm text-ink-900">
-                      {request.fromDepartmentName} → {request.toDepartmentName}
-                    </p>
+                    <div>
+                      <p className="text-sm text-ink-900">
+                        {request.fromDepartmentName} → {request.toDepartmentName}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink-500">
+                        Yêu cầu bởi {request.requestedByName} · Gửi{' '}
+                        {formatDateTime(request.requestedAt)}
+                      </p>
+                    </div>
                     <Badge tone={request.status === 'APPROVED' ? 'success' : request.status === 'REJECTED' || request.status === 'CANCELLED' ? 'danger' : 'warning'} dot>
                       {TRANSFER_STATUS_LABELS[request.status] ?? request.status}
                     </Badge>
                   </div>
                   <p className="text-xs text-ink-500">{request.reason}</p>
-                  <p className="text-xs text-ink-500">
-                    Bước chờ:{' '}
-                    {request.actionableSteps.length
-                      ? request.actionableSteps
-                          .map((step) => TRANSFER_STEP_LABELS[step] ?? step)
-                          .join(', ')
-                      : '—'}{' '}
-                    · Gửi {formatDateTime(request.requestedAt)}
-                  </p>
+                  <TransferTimeline steps={request.steps} />
+                  {request.actionableSteps.includes('EMPLOYEE') ||
+                  (request.status === 'PENDING' && request.requestedBy === userId) ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {request.status === 'PENDING' && request.requestedBy === userId ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCancelTarget(request)}
+                        >
+                          Huỷ yêu cầu
+                        </Button>
+                      ) : null}
+                      {request.actionableSteps.includes('EMPLOYEE') ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDecisionNote('')
+                              setDecisionTarget({ request, decision: 'reject' })
+                            }}
+                          >
+                            <XCircle aria-hidden="true" />
+                            Từ chối
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setDecisionNote('')
+                              setDecisionTarget({ request, decision: 'approve' })
+                            }}
+                          >
+                            <CheckCircle2 aria-hidden="true" />
+                            Xác nhận chuyển
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
@@ -301,6 +347,99 @@ export function MyRequestsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={Boolean(decisionTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDecisionTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {decisionTarget?.decision === 'approve'
+                ? 'Xác nhận chuyển phòng ban'
+                : 'Từ chối điều chuyển'}
+            </DialogTitle>
+            <DialogDescription>
+              {decisionTarget
+                ? `${decisionTarget.request.fromDepartmentName} → ${decisionTarget.request.toDepartmentName}`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <Field
+              label="Ghi chú"
+              hint="Tuỳ chọn, tối đa 1000 ký tự. Backend kiểm tra lại bước EMPLOYEE và thứ tự 4 bước."
+            >
+              <Textarea
+                rows={3}
+                maxLength={1000}
+                value={decisionNote}
+                onChange={(event) => setDecisionNote(event.target.value)}
+              />
+            </Field>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDecisionTarget(null)}>
+              Huỷ
+            </Button>
+            <Button
+              variant={decisionTarget?.decision === 'reject' ? 'danger' : 'primary'}
+              isLoading={transfer.decide.isPending}
+              onClick={() => {
+                if (!decisionTarget) return
+                transfer.decide.mutate(
+                  {
+                    id: decisionTarget.request.id,
+                    step: 'EMPLOYEE',
+                    decision: decisionTarget.decision,
+                    input: { note: decisionNote.trim() || undefined },
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success(
+                        decisionTarget.decision === 'approve'
+                          ? 'Đã xác nhận chuyển phòng ban.'
+                          : 'Đã từ chối điều chuyển.',
+                      )
+                      setDecisionTarget(null)
+                    },
+                    onError: (error) => toast.error(ApiError.from(error).message),
+                  },
+                )
+              }}
+            >
+              {decisionTarget?.decision === 'approve' ? 'Xác nhận' : 'Từ chối'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null)
+        }}
+        title="Huỷ yêu cầu điều chuyển?"
+        description="Chỉ người tạo yêu cầu mới huỷ được yêu cầu đang chờ duyệt."
+        confirmLabel="Huỷ yêu cầu"
+        tone="danger"
+        isLoading={transfer.cancel.isPending}
+        onConfirm={() => {
+          if (!cancelTarget) return
+          transfer.cancel.mutate(
+            { id: cancelTarget.id },
+            {
+              onSuccess: () => {
+                toast.success('Đã huỷ yêu cầu điều chuyển.')
+                setCancelTarget(null)
+              },
+              onError: (error) => toast.error(ApiError.from(error).message),
+            },
+          )
+        }}
+      />
     </PageContainer>
   )
 }

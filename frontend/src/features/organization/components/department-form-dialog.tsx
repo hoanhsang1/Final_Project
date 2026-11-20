@@ -21,7 +21,7 @@ import {
 } from '@/features/organization/hooks'
 import type { Department } from '@/features/organization/types'
 import { ApiError } from '@/lib/api-error'
-import { MODULE_CATALOG, moduleLabel } from '@/lib/modules'
+import { DEPARTMENT_MODULE_CATALOG, moduleLabel } from '@/lib/modules'
 
 interface FormErrors {
   name?: string
@@ -58,8 +58,11 @@ export function DepartmentFormDialog({
   const toggleModule = (code: string) => {
     setModuleCodes((current) => {
       if (current.includes(code)) return current.filter((item) => item !== code)
-      if (current.length >= 6) {
-        setErrors((errors) => ({ ...errors, modules: 'Tối đa 6 module cho mỗi phòng ban.' }))
+      if (current.length >= DEPARTMENT_MODULE_CATALOG.length) {
+        setErrors((errors) => ({
+          ...errors,
+          modules: `Tối đa ${DEPARTMENT_MODULE_CATALOG.length} module cho mỗi phòng ban.`,
+        }))
         return current
       }
       return [...current, code]
@@ -140,7 +143,7 @@ export function DepartmentFormDialog({
           <fieldset>
             <legend className="mb-2 text-sm font-medium text-ink-700">Module sử dụng</legend>
             <div className="grid gap-1.5 sm:grid-cols-2">
-              {MODULE_CATALOG.map((module) => (
+              {DEPARTMENT_MODULE_CATALOG.map((module) => (
                 <label
                   key={module.code}
                   htmlFor={`department-module-${module.code}`}
@@ -168,7 +171,8 @@ export function DepartmentFormDialog({
               </p>
             ) : null}
             <p className="mt-2 text-2xs leading-relaxed text-ink-400">
-              Chỉ chọn được module đã bật ở cấp tổ chức. Module lõi không thể tắt.
+              Chỉ gán được module đã bật ở cấp tổ chức và có quyền nghiệp vụ gắn theo. Module lõi
+              không thể tắt.
             </p>
           </fieldset>
 

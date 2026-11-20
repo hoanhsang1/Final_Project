@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 
@@ -19,6 +21,11 @@ public class AccountProvisioningService {
     public AccountProvisioningService(JdbcTemplate jdbc,PasswordEncoder encoder) { this.jdbc=jdbc;this.encoder=encoder; }
     @Transactional(timeout=15)
     public Map<String,String> create(ProvisionAccountRequest request) {
+        // Provisioning do People gọi: chỉ nhận role không phải Owner/legacy.
+        String role = RoleCatalog.normalize(request.role());
+        if (!RoleCatalog.PLATFORM_CREATABLE.contains(role))
+            throw new AppException(ErrorCode.ROLE_NOT_ASSIGNABLE,
+                "Role " + role + " cannot be provisioned through PeopleService");
         Integer organizations=jdbc.queryForObject("SELECT COUNT(*) FROM organization WHERE id=? AND status='active'",
             Integer.class,request.orgId());
         if(organizations==null || organizations!=1)
@@ -36,7 +43,7 @@ public class AccountProvisioningService {
             """,request.userId(),request.orgId(),request.username().trim(),request.email().trim(),
             encoder.encode(request.temporaryPassword()),request.appointedBy());
         int assigned=jdbc.update("INSERT INTO account_role(account_id,role_id) SELECT ?,id FROM role WHERE code=?",
-            request.userId(),request.role());
+            request.userId(),role);
         if(assigned!=1) throw new IllegalStateException("Department roles have not been seeded");
         return Map.of("userId",request.userId());
     }
@@ -47,11 +54,22 @@ public class AccountProvisioningService {
         int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
             encoder.encode(password),id,orgId);
         if(updated!=1) throw new AppException(ErrorCode.ACCOUNT_NOT_FOUND);
+        revokeSessions(id);
         return Map.of("temporaryPassword",password);
     }
     @Transactional
     public void disable(String id,String orgId) {
         jdbc.update("UPDATE account SET status='disabled' WHERE id=? AND org_id=?",id,orgId);
+        revokeSessions(id);
+    }
+    private void revokeSessions(String accountId) {
+        jdbc.update("UPDATE refresh_token SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL",
+            Timestamp.from(Instant.now()),accountId);
+    }
+
+    @Transactional
+    public void enable(String id,String orgId) {
+        jdbc.update("UPDATE account SET status='active' WHERE id=? AND org_id=?",id,orgId);
     }
 
     @Transactional

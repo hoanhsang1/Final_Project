@@ -4,6 +4,7 @@ import com.mems.client.IdentityClient;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.AssignmentRepository;
 import com.mems.repository.PositionRepository;
 import com.mems.repository.SchoolClassRepository;
@@ -65,6 +66,9 @@ class StudentClassManagementTest {
     private SubjectRepository subjectRepository;
 
     @Mock
+    private OutboxEventRepository outbox;
+
+    @Mock
     private AssignmentRepository assignmentRepository;
 
     @Mock
@@ -80,7 +84,7 @@ class StudentClassManagementTest {
         moduleGuard = new OrganizationModuleGuard(identityClient);
         studentService = new StudentService(studentRepository, actor, moduleGuard, audit, identityClient);
         classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit,
-            teacherRepository, classStatusService, subjectRepository, "TEACHER_ASSIGNMENT");
+            teacherRepository, classStatusService, subjectRepository, outbox, "TEACHER_ASSIGNMENT");
         effectivePermissions = new EffectivePermissionsService(jdbc, identityClient,
             assignmentRepository, positionRepository);
     }
@@ -293,6 +297,91 @@ class StudentClassManagementTest {
 
         verify(studentRepository).delete("student-1", "org-1");
         verify(audit).record(eq("org-1"), eq("user-admin"), eq("STUDENT_DELETED"), eq("student-1"), any());
+    }
+
+    @Test
+    @DisplayName("STU-02: chuyển hồ sơ sang suspended → khóa tài khoản đăng nhập")
+    void suspendingStudentDisablesLoginAccount() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("user-admin");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.moduleStatus("org-1")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "active")));
+        StudentResponse before = student("student-1", "alice@example.com", Instant.now());
+        when(studentRepository.require("student-1", "org-1", true)).thenReturn(before);
+        StudentResponse after = new StudentResponse("student-1", "org-1", "STU001", "Alice",
+            LocalDate.of(2002, 5, 10), "alice@example.com", null, "suspended", null, null, null,
+            "user-admin", Instant.now(), null, "alice@example.com", before.accountCreatedAt());
+        when(studentRepository.update(eq("student-1"), eq("org-1"), eq("Alice"), any(), any(), any(),
+            eq("suspended"))).thenReturn(after);
+
+        studentService.update("student-1", new StudentUpdateRequest("Alice", null,
+            "alice@example.com", null, "suspended"));
+
+        verify(identityClient).disableAccount("student-1", "org-1");
+        verify(identityClient, never()).enableAccount(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("STU-02: mở lại hồ sơ active → mở tài khoản đăng nhập")
+    void reactivatingStudentEnablesLoginAccount() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("user-admin");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.moduleStatus("org-1")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "active")));
+        StudentResponse before = new StudentResponse("student-1", "org-1", "STU001", "Alice",
+            LocalDate.of(2002, 5, 10), "alice@example.com", null, "suspended", null, null, null,
+            "user-admin", Instant.now(), null, "alice@example.com", Instant.now());
+        when(studentRepository.require("student-1", "org-1", true)).thenReturn(before);
+        StudentResponse after = new StudentResponse("student-1", "org-1", "STU001", "Alice",
+            LocalDate.of(2002, 5, 10), "alice@example.com", null, "active", null, null, null,
+            "user-admin", Instant.now(), null, "alice@example.com", before.accountCreatedAt());
+        when(studentRepository.update(eq("student-1"), eq("org-1"), eq("Alice"), any(), any(), any(),
+            eq("active"))).thenReturn(after);
+
+        studentService.update("student-1", new StudentUpdateRequest("Alice", null,
+            "alice@example.com", null, "active"));
+
+        verify(identityClient).enableAccount("student-1", "org-1");
+        verify(identityClient, never()).disableAccount(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("STU-02: hồ sơ chưa có tài khoản → không gọi Identity khi đổi trạng thái")
+    void statusUpdateWithoutAccountSkipsIdentity() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("user-admin");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.moduleStatus("org-1")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "active")));
+        StudentResponse before = student("student-1", "alice@example.com", null);
+        when(studentRepository.require("student-1", "org-1", true)).thenReturn(before);
+        when(studentRepository.update(eq("student-1"), eq("org-1"), eq("Alice"), any(), any(), any(),
+            eq("inactive"))).thenReturn(before);
+
+        studentService.update("student-1", new StudentUpdateRequest("Alice", null,
+            "alice@example.com", null, "inactive"));
+
+        verify(identityClient, never()).disableAccount(anyString(), anyString());
+        verify(identityClient, never()).enableAccount(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("STU-02: xóa sinh viên đã có tài khoản → khóa tài khoản trước khi xóa mềm")
+    void deletingStudentDisablesLoginAccount() {
+        when(actor.orgId()).thenReturn("org-1");
+        when(actor.userId()).thenReturn("user-admin");
+        when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));
+        when(identityClient.moduleStatus("org-1")).thenReturn(List.of(
+            java.util.Map.of("code", "STUDENT_MANAGEMENT", "status", "active")));
+        when(studentRepository.require("student-1", "org-1", true)).thenReturn(
+            student("student-1", "alice@example.com", Instant.now()));
+
+        studentService.delete("student-1");
+
+        verify(identityClient).disableAccount("student-1", "org-1");
+        verify(studentRepository).delete("student-1", "org-1");
     }
 
     @Test

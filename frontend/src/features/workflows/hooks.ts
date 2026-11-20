@@ -4,6 +4,7 @@ import { refreshEffectivePermissions } from '@/features/auth/module-hydration'
 import { notificationsApi } from '@/features/organization/api'
 import type { AppNotification } from '@/features/organization/types'
 import {
+  approvalInboxApi,
   delegationsApi,
   effectivePermissionsApi,
   generalManagerApi,
@@ -27,10 +28,44 @@ export function useResignations(departmentId: string | undefined, status?: Resig
   })
 }
 
+/** Hộp duyệt hợp nhất do backend lọc theo thẩm quyền (không cần quyền xem phòng ban). */
+export function useApprovalInbox(resignationStatus: ResignationStatus = 'PENDING') {
+  return useQuery({
+    queryKey: ['approval-inbox', resignationStatus],
+    queryFn: () => approvalInboxApi.get(resignationStatus),
+    staleTime: 15_000,
+  })
+}
+
+/** Quyết định nghỉ việc từ hộp duyệt hợp nhất — departmentId lấy từ chính request. */
+export function useInboxResignationDecision() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      departmentId,
+      requestId,
+      decision,
+      note,
+    }: {
+      departmentId: string
+      requestId: string
+      decision: 'approve' | 'reject'
+      note?: string
+    }) => resignationsApi.decide(departmentId, requestId, decision, note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['approval-inbox'] })
+      void queryClient.invalidateQueries({ queryKey: ['resignation-requests'] })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      void queryClient.invalidateQueries({ queryKey: ['departments'] })
+    },
+  })
+}
+
 export function useResignationMutations(departmentId: string | undefined) {
   const queryClient = useQueryClient()
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['resignation-requests'] })
+    void queryClient.invalidateQueries({ queryKey: ['approval-inbox'] })
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
     void queryClient.invalidateQueries({ queryKey: ['departments'] })
   }
@@ -72,6 +107,7 @@ export function useTransferWorkflow() {
   const queryClient = useQueryClient()
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['transfer-requests'] })
+    void queryClient.invalidateQueries({ queryKey: ['approval-inbox'] })
     void queryClient.invalidateQueries({ queryKey: ['notifications'] })
   }
 

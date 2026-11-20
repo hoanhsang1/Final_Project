@@ -1,5 +1,6 @@
 package com.mems.repository;
 
+import com.mems.dto.ClassLifecycleInboxItem;
 import com.mems.dto.ClassTeacherInfo;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.exception.AppException;
@@ -205,6 +206,55 @@ public class SchoolClassRepository {
             throw new AppException(ErrorCode.CLASS_NOT_FOUND);
         }
         return rows.get(0);
+    }
+
+    /**
+     * Các yêu cầu đóng/hủy lớp đang chờ duyệt trong tổ chức. Thẩm quyền duyệt
+     * (trưởng phòng phụ trách đào tạo / GM được uỷ quyền) áp dụng sau, ở service.
+     */
+    public List<ClassLifecycleInboxItem> pendingLifecycle(String orgId) {
+        return jdbc.query("""
+            SELECT c.id AS class_id, c.class_code, c.name AS class_name, c.status AS class_status,
+                   'CLOSE' AS kind, c.close_requested_by AS requester_id, rq.full_name AS requester_name,
+                   (SELECT e.reason FROM class_close_event e
+                     WHERE e.class_id=c.id AND e.org_id=c.org_id AND e.action='REQUESTED'
+                     ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS reason,
+                   (SELECT e.created_at FROM class_close_event e
+                     WHERE e.class_id=c.id AND e.org_id=c.org_id AND e.action='REQUESTED'
+                     ORDER BY e.created_at DESC, e.id DESC LIMIT 1) AS requested_at,
+                   (SELECT COUNT(*) FROM class_student cs
+                     WHERE cs.class_id=c.id AND cs.org_id=c.org_id) AS student_count
+            FROM school_class c
+            LEFT JOIN staff_profile rq ON rq.user_id=c.close_requested_by AND rq.org_id=c.org_id
+            WHERE c.org_id=? AND c.deleted_at IS NULL AND c.close_state='PENDING'
+            UNION ALL
+            SELECT c.id, c.class_code, c.name, c.status,
+                   'CANCEL', c.cancel_requested_by, rq.full_name,
+                   (SELECT e.reason FROM class_close_event e
+                     WHERE e.class_id=c.id AND e.org_id=c.org_id AND e.action='CANCEL_REQUESTED'
+                     ORDER BY e.created_at DESC, e.id DESC LIMIT 1),
+                   (SELECT e.created_at FROM class_close_event e
+                     WHERE e.class_id=c.id AND e.org_id=c.org_id AND e.action='CANCEL_REQUESTED'
+                     ORDER BY e.created_at DESC, e.id DESC LIMIT 1),
+                   (SELECT COUNT(*) FROM class_student cs
+                     WHERE cs.class_id=c.id AND cs.org_id=c.org_id)
+            FROM school_class c
+            LEFT JOIN staff_profile rq ON rq.user_id=c.cancel_requested_by AND rq.org_id=c.org_id
+            WHERE c.org_id=? AND c.deleted_at IS NULL AND c.cancel_state='PENDING'
+            ORDER BY requested_at DESC, class_code
+            """, (rs, rowNum) -> new ClassLifecycleInboxItem(
+                rs.getString("class_id"),
+                rs.getString("class_code"),
+                rs.getString("class_name"),
+                rs.getString("class_status"),
+                rs.getString("kind"),
+                rs.getString("requester_id"),
+                rs.getString("requester_name"),
+                rs.getString("reason"),
+                rs.getTimestamp("requested_at") != null
+                    ? rs.getTimestamp("requested_at").toInstant() : null,
+                rs.getInt("student_count")
+            ), orgId, orgId);
     }
 
     public void checkClassCodeAvailable(String orgId, String classCode) {

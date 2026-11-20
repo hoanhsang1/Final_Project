@@ -91,7 +91,7 @@ describe('điều hướng theo quyền hiệu lực', () => {
   it('module chưa đăng ký thì ẩn mục tương ứng', () => {
     const withModules = session({
       permissions: [PERM.classView, PERM.scheduleView],
-      moduleStates: { CLASS_MANAGEMENT: 'active', SCHEDULE_MANAGEMENT: 'not_registered' },
+      moduleStates: { STUDENT_MANAGEMENT: 'active', SCHEDULE_MANAGEMENT: 'not_registered' },
     })
     const ids = visibleItemIds(withModules)
     expect(ids).toContain('classes')
@@ -101,12 +101,62 @@ describe('điều hướng theo quyền hiệu lực', () => {
   it('module đang tắt hoặc bị khóa vẫn hiện để đọc, chỉ chặn ghi', () => {
     const readOnly = session({
       permissions: [PERM.classView, PERM.scheduleView],
-      moduleStates: { CLASS_MANAGEMENT: 'disabled', SCHEDULE_MANAGEMENT: 'locked' },
+      moduleStates: { STUDENT_MANAGEMENT: 'disabled', SCHEDULE_MANAGEMENT: 'locked' },
     })
     const ids = visibleItemIds(readOnly)
     expect(ids).toContain('classes')
     expect(ids).toContain('schedule')
-    expect(canWriteModule(readOnly, 'CLASS_MANAGEMENT')).toBe(false)
+    expect(canWriteModule(readOnly, 'STUDENT_MANAGEMENT')).toBe(false)
+  })
+
+  // Item 10: `class.*` do backend gắn STUDENT_MANAGEMENT, không phải CLASS_MANAGEMENT.
+  it('lớp học theo trạng thái STUDENT_MANAGEMENT, không theo CLASS_MANAGEMENT', () => {
+    const classOnly = session({
+      permissions: [PERM.classView, PERM.classSelfView],
+      moduleStates: { CLASS_MANAGEMENT: 'active', STUDENT_MANAGEMENT: 'not_registered' },
+    })
+    expect(visibleItemIds(classOnly)).not.toContain('classes')
+    expect(visibleItemIds(classOnly)).not.toContain('my-classes')
+
+    const studentOnly = session({
+      permissions: [PERM.classView, PERM.classSelfView],
+      moduleStates: { CLASS_MANAGEMENT: 'not_registered', STUDENT_MANAGEMENT: 'active' },
+    })
+    expect(visibleItemIds(studentOnly)).toContain('classes')
+    expect(visibleItemIds(studentOnly)).toContain('my-classes')
+  })
+
+  // MOD-01: PeopleService không gate API giáo viên bằng TEACHER_MANAGEMENT.
+  it('menu Giáo viên chỉ theo quyền nhân sự, không phụ thuộc TEACHER_MANAGEMENT', () => {
+    const withoutTeacherModule = session({
+      permissions: [PERM.employeeView],
+      moduleStates: { TEACHER_MANAGEMENT: 'not_registered', STUDENT_MANAGEMENT: 'active' },
+    })
+    expect(visibleItemIds(withoutTeacherModule)).toContain('teachers')
+
+    const withoutPermission = session({
+      permissions: [],
+      moduleStates: { TEACHER_MANAGEMENT: 'active', STUDENT_MANAGEMENT: 'active' },
+    })
+    expect(visibleItemIds(withoutPermission)).not.toContain('teachers')
+  })
+
+  it('STUDENT_MANAGEMENT tắt/khóa: vẫn hiện lớp để đọc nhưng chặn ghi', () => {
+    const readOnly = session({
+      permissions: [PERM.classView, PERM.classCreate, PERM.classSelfView],
+      moduleStates: { STUDENT_MANAGEMENT: 'locked' },
+    })
+    const ids = visibleItemIds(readOnly)
+    expect(ids).toContain('classes')
+    expect(ids).toContain('my-classes')
+    expect(canWriteModule(readOnly, 'STUDENT_MANAGEMENT')).toBe(false)
+
+    const disabled = session({
+      permissions: [PERM.classView],
+      moduleStates: { STUDENT_MANAGEMENT: 'disabled' },
+    })
+    expect(visibleItemIds(disabled)).toContain('classes')
+    expect(canWriteModule(disabled, 'STUDENT_MANAGEMENT')).toBe(false)
   })
 
   it('khi chưa có nguồn dữ liệu module thì không ẩn nhầm', () => {

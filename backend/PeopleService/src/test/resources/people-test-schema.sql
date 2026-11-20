@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS department_module (
 );
 CREATE TABLE IF NOT EXISTS position (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
- name VARCHAR(200) NOT NULL, description VARCHAR(1000), created_at TIMESTAMP NOT NULL,
+ name VARCHAR(200) NOT NULL, system_code VARCHAR(50), description VARCHAR(1000), created_at TIMESTAMP NOT NULL,
  profile_type VARCHAR(20) NOT NULL DEFAULT 'GENERAL',
  scope VARCHAR(20) NOT NULL DEFAULT 'DEPARTMENT', department_id VARCHAR(36), deleted_at TIMESTAMP,
  UNIQUE(org_id,name), UNIQUE(id,org_id)
@@ -83,6 +83,39 @@ CREATE TABLE IF NOT EXISTS subject (
  updated_by VARCHAR(36), updated_at TIMESTAMP,
  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)
 );
+-- Phase 1 Revision 3: curriculum templates (migration 51 logical schema).
+CREATE TABLE IF NOT EXISTS curriculum (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
+ code VARCHAR(50) NOT NULL, name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
+ description VARCHAR(1000), grade_level VARCHAR(50), program_code VARCHAR(50),
+ is_active BOOLEAN NOT NULL DEFAULT TRUE, version BIGINT NOT NULL DEFAULT 0,
+ created_by VARCHAR(36), created_at TIMESTAMP NOT NULL, updated_by VARCHAR(36), updated_at TIMESTAMP,
+ UNIQUE(id,org_id), UNIQUE(org_id,code), UNIQUE(org_id,name_unaccented)
+);
+CREATE TABLE IF NOT EXISTS curriculum_subject (
+ curriculum_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ sequence_no SMALLINT NOT NULL, required_sessions SMALLINT NOT NULL,
+ theory_sessions SMALLINT NOT NULL DEFAULT 0, practice_sessions SMALLINT NOT NULL DEFAULT 0,
+ session_minutes SMALLINT NOT NULL, is_required BOOLEAN NOT NULL DEFAULT TRUE, note VARCHAR(500),
+ created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP,
+ PRIMARY KEY(curriculum_id,subject_id), UNIQUE(curriculum_id,sequence_no),
+ UNIQUE(curriculum_id,subject_id,org_id),
+ FOREIGN KEY(curriculum_id,org_id) REFERENCES curriculum(id,org_id) ON DELETE CASCADE,
+ FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
+ CONSTRAINT chk_curriculum_subject_sessions CHECK(
+  required_sessions > 0 AND session_minutes > 0 AND theory_sessions >= 0 AND practice_sessions >= 0)
+);
+CREATE TABLE IF NOT EXISTS curriculum_subject_prerequisite (
+ curriculum_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL,
+ prerequisite_subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ created_at TIMESTAMP NOT NULL,
+ PRIMARY KEY(curriculum_id,subject_id,prerequisite_subject_id),
+ FOREIGN KEY(curriculum_id,subject_id,org_id)
+  REFERENCES curriculum_subject(curriculum_id,subject_id,org_id) ON DELETE CASCADE,
+ FOREIGN KEY(curriculum_id,prerequisite_subject_id,org_id)
+  REFERENCES curriculum_subject(curriculum_id,subject_id,org_id),
+ CONSTRAINT chk_csp_not_self CHECK(subject_id <> prerequisite_subject_id)
+);
 CREATE TABLE IF NOT EXISTS teacher_profile (
  user_id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  contract_type VARCHAR(20), teaching_status VARCHAR(20) NOT NULL DEFAULT 'DANG_DAY',
@@ -110,12 +143,14 @@ CREATE TABLE IF NOT EXISTS school_class (
  class_code VARCHAR(100) NOT NULL, name VARCHAR(200) NOT NULL,
  academic_year VARCHAR(50), status VARCHAR(20) NOT NULL DEFAULT 'active',
  teacher_id VARCHAR(36), start_date DATE, end_date DATE, subject_id VARCHAR(36),
+ curriculum_id VARCHAR(36),
  version BIGINT NOT NULL DEFAULT 0, close_state VARCHAR(10) NOT NULL DEFAULT 'NONE',
  cancel_state VARCHAR(10) NOT NULL DEFAULT 'NONE', cancel_request_reason VARCHAR(1000),
  cancel_requested_by VARCHAR(36), close_requested_by VARCHAR(36),
  needs_reassignment BOOLEAN NOT NULL DEFAULT FALSE, reassignment_reason VARCHAR(255),
  created_by VARCHAR(36) NOT NULL, created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP, deleted_at TIMESTAMP,
- UNIQUE(org_id, class_code)
+ UNIQUE(org_id, class_code), UNIQUE(id, org_id),
+ FOREIGN KEY(curriculum_id,org_id) REFERENCES curriculum(id,org_id)
 );
 CREATE TABLE IF NOT EXISTS class_student (
  class_id VARCHAR(36) NOT NULL, student_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL, enrolled_at TIMESTAMP NOT NULL,
@@ -126,6 +161,67 @@ CREATE TABLE IF NOT EXISTS class_status_log (
  id VARCHAR(36) PRIMARY KEY, class_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
  from_status VARCHAR(20), to_status VARCHAR(20) NOT NULL, reason VARCHAR(1000),
  changed_by VARCHAR(36), changed_at TIMESTAMP NOT NULL
+);
+-- Phase 1 Revision 3: class-subject snapshot + history (migration 52 logical schema).
+-- H2 PARITY LIMITATIONS:
+--  * MySQL uses a STORED generated column primary_class_id = CASE WHEN is_primary = 1 THEN class_id END.
+--    H2 2.x has no STORED generated column, so this is a plain column. The service must set it to
+--    class_id when is_primary is true (1) and NULL otherwise; the UNIQUE index then enforces
+--    "at most one primary per class". That is NOT the same as a DB-generated MySQL column.
+--  * H2 cannot prove the minimum-primary invariant; transaction + application validation must.
+--  * is_primary is BOOLEAN here (MySQL is tinyint(1)); tests must map true/false, not 1/0.
+CREATE TABLE IF NOT EXISTS class_subject (
+ class_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ curriculum_id VARCHAR(36), source VARCHAR(20) NOT NULL DEFAULT 'MANUAL', sequence_no SMALLINT,
+ teacher_id VARCHAR(36), is_primary BOOLEAN NOT NULL DEFAULT FALSE, primary_class_id VARCHAR(36),
+ required_sessions SMALLINT, planned_sessions SMALLINT, theory_sessions SMALLINT,
+ practice_sessions SMALLINT, session_minutes SMALLINT,
+ status VARCHAR(20) NOT NULL DEFAULT 'PLANNED', note VARCHAR(500),
+ created_by VARCHAR(36), created_at TIMESTAMP NOT NULL, updated_by VARCHAR(36), updated_at TIMESTAMP,
+ PRIMARY KEY(class_id,subject_id),
+ UNIQUE(primary_class_id),
+ FOREIGN KEY(class_id,org_id) REFERENCES school_class(id,org_id) ON DELETE CASCADE,
+ FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
+ FOREIGN KEY(curriculum_id,org_id) REFERENCES curriculum(id,org_id),
+ FOREIGN KEY(teacher_id,org_id) REFERENCES staff_profile(user_id,org_id),
+ CONSTRAINT chk_class_subject_status CHECK(status IN ('PLANNED','ACTIVE','COMPLETED','CANCELLED')),
+ CONSTRAINT chk_class_subject_source CHECK(source IN ('LEGACY','CURRICULUM','MANUAL')),
+ CONSTRAINT chk_class_subject_sequence CHECK(sequence_no IS NULL OR sequence_no > 0),
+ CONSTRAINT chk_class_subject_sessions CHECK(
+  (planned_sessions IS NULL OR planned_sessions >= 0)
+  AND (required_sessions IS NULL OR required_sessions > 0)
+  AND (session_minutes IS NULL OR session_minutes > 0))
+);
+CREATE TABLE IF NOT EXISTS class_subject_history (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL, class_id VARCHAR(36) NOT NULL,
+ old_subject_id VARCHAR(36), old_subject_code VARCHAR(50), old_subject_name VARCHAR(200),
+ old_teacher_id VARCHAR(36), old_source VARCHAR(20),
+ new_subject_id VARCHAR(36) NOT NULL, new_subject_code VARCHAR(50), new_subject_name VARCHAR(200) NOT NULL,
+ new_source VARCHAR(20) NOT NULL, reason VARCHAR(500) NOT NULL, operation_id VARCHAR(64) NOT NULL,
+ changed_by VARCHAR(36) NOT NULL, changed_at TIMESTAMP NOT NULL,
+ UNIQUE(org_id,operation_id),
+ FOREIGN KEY(class_id,org_id) REFERENCES school_class(id,org_id),
+ CONSTRAINT chk_csh_subject_change CHECK(old_subject_id IS NULL OR old_subject_id <> new_subject_id),
+ CONSTRAINT chk_csh_old_source CHECK(old_source IS NULL OR old_source IN ('LEGACY','CURRICULUM','MANUAL')),
+ CONSTRAINT chk_csh_new_source CHECK(new_source IN ('LEGACY','CURRICULUM','MANUAL'))
+);
+CREATE TABLE IF NOT EXISTS specialty_subject (
+ specialty_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
+ PRIMARY KEY(specialty_id,subject_id),
+ FOREIGN KEY(specialty_id,org_id) REFERENCES specialty(id,org_id) ON DELETE CASCADE,
+ FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id)
+);
+CREATE TABLE IF NOT EXISTS teacher_subject (
+ user_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'APPROVED', source VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+ approved_by VARCHAR(36), approved_at TIMESTAMP, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
+ updated_at TIMESTAMP,
+ PRIMARY KEY(user_id,subject_id),
+ FOREIGN KEY(user_id,org_id) REFERENCES teacher_profile(user_id,org_id) ON DELETE CASCADE,
+ FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
+ CONSTRAINT chk_teacher_subject_source CHECK(source IN ('SPECIALTY','MANUAL')),
+ CONSTRAINT chk_teacher_subject_status CHECK(status IN ('PENDING','APPROVED','REVOKED'))
 );
 CREATE TABLE IF NOT EXISTS class_close_event (
  id VARCHAR(36) PRIMARY KEY, class_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
@@ -162,4 +258,28 @@ CREATE TABLE IF NOT EXISTS delegation_permission (
  delegation_id VARCHAR(36) NOT NULL, permission_code VARCHAR(100) NOT NULL,
  PRIMARY KEY (delegation_id, permission_code),
  FOREIGN KEY (delegation_id) REFERENCES delegation(id) ON DELETE CASCADE
+);
+
+-- Phase 2 outbox: business row + event row share one transaction.
+CREATE TABLE IF NOT EXISTS outbox_event (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ event_id VARCHAR(36) NOT NULL,
+ aggregate_type VARCHAR(40) NOT NULL,
+ aggregate_id VARCHAR(36) NOT NULL,
+ aggregate_version BIGINT,
+ event_type VARCHAR(80) NOT NULL,
+ event_version INT NOT NULL DEFAULT 1,
+ organization_id VARCHAR(36) NOT NULL,
+ correlation_id VARCHAR(36),
+ payload LONGTEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ attempts INT NOT NULL DEFAULT 0,
+ next_attempt_at TIMESTAMP NOT NULL,
+ locked_until TIMESTAMP,
+ last_error VARCHAR(1000),
+ replayed_at TIMESTAMP,
+ replayed_by VARCHAR(36),
+ created_at TIMESTAMP NOT NULL,
+ published_at TIMESTAMP,
+ UNIQUE (event_id)
 );

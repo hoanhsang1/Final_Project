@@ -20,7 +20,9 @@ public class AccessProfileService {
         if(roles.contains("OWNER") || roles.contains("ORG_OWNER"))
             return new AccessProfile("OWNER",null,PermissionCatalog.ENTRIES.stream()
                 .map(PermissionCatalog.PermissionDefinition::code).collect(Collectors.toCollection(TreeSet::new)));
-        if(roles.contains("MANAGER") || roles.contains("STAFF")) return people.resolve(account.getId(),account.getOrgId());
+        if(roles.contains("MANAGER") || roles.contains("STAFF"))
+            return people.resolve(account.getId(),account.getOrgId(),
+                roles.contains("MANAGER") ? "MANAGER" : "STAFF");
         Set<String> permissions=new TreeSet<>(jdbc.queryForList("""
             SELECT DISTINCT p.code FROM permission p JOIN role_permission rp ON rp.permission_id=p.id
             JOIN account_role ar ON ar.role_id=rp.role_id WHERE ar.account_id=?

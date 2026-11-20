@@ -8,6 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,8 @@ import java.util.UUID;
 @Service
 public class OrganizationApprovalService {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private final JdbcTemplate jdbc;
 
     public OrganizationApprovalService(JdbcTemplate jdbc) {
@@ -23,13 +27,19 @@ public class OrganizationApprovalService {
     }
 
     public void recordAudit(String orgId, String actorId, String action, String entityType, String entityId) {
+        recordAudit(orgId, actorId, action, entityType, entityId, null);
+    }
+
+    public void recordAudit(String orgId, String actorId, String action, String entityType, String entityId,
+                            Map<String, Object> details) {
         try {
+            String payload = details == null || details.isEmpty() ? null : JSON.writeValueAsString(details);
             jdbc.update(
                 """
-                INSERT INTO audit_log (id, org_id, actor_account_id, action, entity_type, entity_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO audit_log (id, org_id, actor_account_id, action, entity_type, entity_id, new_value, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
-                UUID.randomUUID().toString(), orgId, actorId, action, entityType, entityId
+                UUID.randomUUID().toString(), orgId, actorId, action, entityType, entityId, payload
             );
         } catch (Exception ignored) {
             // Log table might be optional in some test environments
@@ -213,7 +223,7 @@ public class OrganizationApprovalService {
     }
 
     @Transactional
-    public void approve(String orgId) {
+    public void approve(String orgId, String actorId) {
         requirePending(orgId);
 
         jdbc.update(
@@ -251,11 +261,11 @@ public class OrganizationApprovalService {
             orgId
         );
 
-        recordAudit(orgId, null, "ORG_APPROVED", "ORGANIZATION", orgId);
+        recordAudit(orgId, actorId, "ORG_APPROVED", "ORGANIZATION", orgId);
     }
 
     @Transactional
-    public void reject(String orgId) {
+    public void reject(String orgId, String actorId, String reason) {
         requirePending(orgId);
 
         jdbc.update(
@@ -293,11 +303,11 @@ public class OrganizationApprovalService {
             orgId
         );
 
-        recordAudit(orgId, null, "ORG_REJECTED", "ORGANIZATION", orgId);
+        recordAudit(orgId, actorId, "ORG_REJECTED", "ORGANIZATION", orgId, reasonDetails(reason));
     }
 
     @Transactional
-    public void suspend(String orgId, String reason) {
+    public void suspend(String orgId, String actorId, String reason) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
             throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
@@ -315,11 +325,11 @@ public class OrganizationApprovalService {
             """,
             orgId
         );
-        recordAudit(orgId, null, "ORG_SUSPENDED", "ORGANIZATION", orgId);
+        recordAudit(orgId, actorId, "ORG_SUSPENDED", "ORGANIZATION", orgId, reasonDetails(reason));
     }
 
     @Transactional
-    public void reactivate(String orgId, String reason) {
+    public void reactivate(String orgId, String actorId, String reason) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
             throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
@@ -337,11 +347,11 @@ public class OrganizationApprovalService {
             """,
             orgId
         );
-        recordAudit(orgId, null, "ORG_REACTIVATED", "ORGANIZATION", orgId);
+        recordAudit(orgId, actorId, "ORG_REACTIVATED", "ORGANIZATION", orgId, reasonDetails(reason));
     }
 
     @Transactional
-    public void updateModules(String orgId, List<String> modules) {
+    public void updateModules(String orgId, String actorId, List<String> modules) {
         List<String> statuses = jdbc.queryForList("SELECT status FROM organization WHERE id = ?", String.class, orgId);
         if (statuses.isEmpty()) {
             throw new AppException(ErrorCode.ORGANIZATION_NOT_FOUND);
@@ -375,6 +385,11 @@ public class OrganizationApprovalService {
             }
         }
 
-        recordAudit(orgId, null, "ORG_MODULES_UPDATED", "ORGANIZATION", orgId);
+        recordAudit(orgId, actorId, "ORG_MODULES_UPDATED", "ORGANIZATION", orgId,
+            Map.of("modules", modules));
+    }
+
+    private Map<String, Object> reasonDetails(String reason) {
+        return reason == null || reason.isBlank() ? null : Map.of("reason", reason.trim());
     }
 }

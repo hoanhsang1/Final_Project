@@ -4,9 +4,11 @@ import com.mems.client.IdentityClient;
 import com.mems.repository.MemberRepository;
 import com.mems.security.Actor;
 import com.mems.service.ClassApprovalPolicy;
+import com.mems.service.ClassStatusService;
 import com.mems.service.EffectivePermissionsService;
 import com.mems.service.NotificationService;
 import com.mems.service.ResignationApprovalPolicy;
+import com.mems.service.ResignationService;
 import com.mems.service.TransferService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,8 +41,10 @@ class WorkflowEndpointMappingTest {
     @Mock private Actor actor;
     @Mock private TransferService transfers;
     @Mock private NotificationService notifications;
-    @Mock private ResignationApprovalPolicy resignations;
+    @Mock private ResignationService resignationService;
+    @Mock private ResignationApprovalPolicy resignationPolicy;
     @Mock private ClassApprovalPolicy classes;
+    @Mock private ClassStatusService classStatus;
     @Mock private MemberRepository members;
     @Mock private EffectivePermissionsService effectivePermissions;
     @Mock private IdentityClient identity;
@@ -52,7 +56,8 @@ class WorkflowEndpointMappingTest {
         mvc = MockMvcBuilders.standaloneSetup(
             new TransferController(transfers),
             new NotificationController(notifications),
-            new ApprovalCapabilityController(actor, transfers, resignations, classes),
+            new ApprovalCapabilityController(actor, transfers, resignationService,
+                resignationPolicy, classes, classStatus),
             new EffectivePermissionController(actor, members, effectivePermissions, identity)
         ).build();
 
@@ -61,8 +66,10 @@ class WorkflowEndpointMappingTest {
         when(transfers.inbox()).thenReturn(List.of());
         when(notifications.mine()).thenReturn(List.of());
         when(transfers.canDecideAny()).thenReturn(true);
-        when(resignations.canApproveAny("org-1")).thenReturn(false);
+        when(resignationPolicy.canApproveAny("org-1")).thenReturn(false);
         when(classes.canApprove("org-1")).thenReturn(false);
+        when(resignationService.inbox(null)).thenReturn(List.of());
+        when(classStatus.approvalInbox()).thenReturn(List.of());
         when(members.findDepartmentId("user-1", "org-1")).thenReturn(Optional.of("dept-1"));
         when(effectivePermissions.resolve("org-1", "user-1", "dept-1"))
             .thenReturn(new EffectivePermissionsService.EffectivePermissions(
@@ -90,6 +97,16 @@ class WorkflowEndpointMappingTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.transfer").value(true))
             .andExpect(jsonPath("$.any").value(true));
+    }
+
+    @Test
+    void approvalInboxIsMapped() throws Exception {
+        mvc.perform(get("/users/me/approval-inbox"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.transfers").isArray())
+            .andExpect(jsonPath("$.resignations").isArray())
+            .andExpect(jsonPath("$.classLifecycle").isArray())
+            .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test

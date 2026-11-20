@@ -26,13 +26,13 @@ const department: Department = {
   name: 'Tổ Toán – Tin',
   description: 'Chuyên môn toán tin',
   createdAt: '2026-01-01T00:00:00Z',
-  modules: ['TEACHER_MANAGEMENT', 'STUDENT_MANAGEMENT'],
+  modules: ['SCHEDULE_MANAGEMENT', 'STUDENT_MANAGEMENT'],
 }
 
 beforeEach(() => {
   vi.mocked(departmentsApi.moduleImpact).mockResolvedValue({
-    removedModules: ['TEACHER_MANAGEMENT'],
-    positions: [{ id: 'pos-1', name: 'Trưởng bộ môn', permissions: ['teacher.view'], members: 3 }],
+    removedModules: ['SCHEDULE_MANAGEMENT'],
+    positions: [{ id: 'pos-1', name: 'Trưởng bộ môn', permissions: ['schedule.view'], members: 3 }],
     affectedMembers: 5,
   })
   vi.mocked(departmentsApi.update).mockReset()
@@ -45,13 +45,13 @@ describe('DepartmentFormDialog — cảnh báo gỡ module', () => {
       <DepartmentFormDialog open onOpenChange={() => undefined} department={department} />,
     )
 
-    await userEvent.click(screen.getByLabelText('Quản lý giáo viên'))
+    await userEvent.click(screen.getByLabelText('Quản lý lịch học'))
 
     await waitFor(() =>
-      expect(departmentsApi.moduleImpact).toHaveBeenCalledWith('dept-1', ['TEACHER_MANAGEMENT']),
+      expect(departmentsApi.moduleImpact).toHaveBeenCalledWith('dept-1', ['SCHEDULE_MANAGEMENT']),
     )
     const alert = await screen.findByRole('status')
-    expect(within(alert).getByText(/Gỡ Quản lý giáo viên ảnh hưởng/)).toBeInTheDocument()
+    expect(within(alert).getByText(/Gỡ Quản lý lịch học ảnh hưởng/)).toBeInTheDocument()
     expect(alert).not.toBeNull()
     expect(within(alert as HTMLElement).getByText('5')).toBeInTheDocument()
     expect(
@@ -70,7 +70,7 @@ describe('DepartmentFormDialog — cảnh báo gỡ module', () => {
       <DepartmentFormDialog open onOpenChange={() => undefined} department={department} />,
     )
 
-    await userEvent.click(screen.getByLabelText('Quản lý giáo viên'))
+    await userEvent.click(screen.getByLabelText('Quản lý lịch học'))
     expect(
       await screen.findByText(
         'Không tải được cảnh báo ảnh hưởng; vẫn có thể lưu thay đổi.',
@@ -99,5 +99,31 @@ describe('DepartmentFormDialog — cảnh báo gỡ module', () => {
 
     expect(await screen.findByText('Vui lòng nhập tên phòng ban.')).toBeInTheDocument()
     expect(departmentsApi.update).not.toHaveBeenCalled()
+  })
+
+  it('chỉ cho chọn module có quyền nghiệp vụ, giữ nguyên module cũ khi lưu', async () => {
+    const legacy: Department = {
+      ...department,
+      modules: ['STUDENT_MANAGEMENT', 'SCHEDULE_MANAGEMENT', 'CLASS_MANAGEMENT'],
+    }
+    vi.mocked(departmentsApi.update).mockResolvedValue(legacy)
+
+    renderPage(<DepartmentFormDialog open onOpenChange={() => undefined} department={legacy} />)
+
+    // CLASS_MANAGEMENT không còn gắn quyền nào nên không hiện để chọn thêm/bỏ.
+    expect(screen.queryByLabelText('Quản lý lớp học')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Quản lý giáo viên')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Quản lý sinh viên')).toBeInTheDocument()
+    expect(screen.getByLabelText('Quản lý lịch học')).toBeInTheDocument()
+    expect(screen.getByLabelText('Cơ sở vật chất')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }))
+    await waitFor(() =>
+      expect(departmentsApi.update).toHaveBeenCalledWith('dept-1', {
+        name: 'Tổ Toán – Tin',
+        description: 'Chuyên môn toán tin',
+        moduleCodes: ['STUDENT_MANAGEMENT', 'SCHEDULE_MANAGEMENT', 'CLASS_MANAGEMENT'],
+      }),
+    )
   })
 })

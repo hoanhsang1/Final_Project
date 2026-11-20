@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -124,6 +125,36 @@ class TransferServiceTest {
     }
 
     @Test
+    @DisplayName("TRF-02: người được chuyển không tự duyệt bước của mình dù là trưởng phòng")
+    void employeeCannotApproveOwnTransferSteps() {
+        currentUser.set("emp-1");
+        when(transfers.headHolders(ORG, "dept-old", TransferService.HEAD_POSITION_NAMES))
+            .thenReturn(Set.of("emp-1"));
+        installState(request(Map.of()));
+
+        assertThatThrownBy(() -> service.decide(REQUEST, "SOURCE_HEAD", true, null))
+            .isInstanceOf(AppException.class)
+            .extracting(e -> ((AppException) e).getErrorCode())
+            .isEqualTo(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
+        verify(transfers, never()).decideStep(anyString(), anyString(), anyString(),
+            anyString(), any());
+    }
+
+    @Test
+    @DisplayName("TRF-02: bước tự xác nhận của nhân sự không bị chặn bởi quy tắc tự duyệt")
+    void employeeStillConfirmsOwnEmployeeStep() {
+        currentUser.set("emp-1");
+        installState(request(Map.of("SOURCE_HEAD", "APPROVED", "TARGET_HEAD", "APPROVED",
+            "HR", "APPROVED")));
+        when(members.transferToDepartment(eq("emp-1"), eq(ORG), eq("dept-old"), eq("dept-new"),
+            anyString(), anyString())).thenReturn(0);
+
+        service.decide(REQUEST, "EMPLOYEE", true, "Đồng ý");
+
+        verify(transfers).decideStep(eq(REQUEST), eq("EMPLOYEE"), eq("APPROVED"), eq("emp-1"), any());
+    }
+
+    @Test
     @DisplayName("Người không giữ bước không được duyệt thay")
     void strangerCannotDecideStep() {
         currentUser.set("stranger");
@@ -149,6 +180,70 @@ class TransferServiceTest {
             .isEqualTo(ErrorCode.TRANSFER_STEP_NOT_ALLOWED);
         verify(transfers, never()).decideStep(anyString(), anyString(), anyString(),
             anyString(), any());
+    }
+
+    @ParameterizedTest(name = "Chấp thuận bước {0} khi bước trước chưa xong → 409 OUT_OF_ORDER")
+    @ValueSource(strings = {"TARGET_HEAD", "HR", "EMPLOYEE"})
+    void approvalRequiresEarlierStepsApproved(String step) {
+        configureActorFor(step);
+        installState(request(Map.of()));
+
+        assertThatThrownBy(() -> service.decide(REQUEST, step, true, null))
+            .isInstanceOf(AppException.class)
+            .extracting(e -> ((AppException) e).getErrorCode())
+            .isEqualTo(ErrorCode.TRANSFER_STEP_OUT_OF_ORDER);
+        verify(transfers, never()).decideStep(anyString(), anyString(), anyString(),
+            anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Nhân sự chỉ thấy bước EMPLOYEE khi ba bước trước đã chấp thuận")
+    void employeeStepActionableOnlyAfterEarlierApprovals() {
+        currentUser.set("emp-1");
+        when(transfers.listRelated(ORG, "emp-1")).thenAnswer(invocation -> List.of(state.get()));
+
+        state.set(request(Map.of("SOURCE_HEAD", "APPROVED", "TARGET_HEAD", "APPROVED")));
+        assertThat(service.mine().get(0).actionableSteps()).doesNotContain("EMPLOYEE");
+
+        state.set(request(Map.of("SOURCE_HEAD", "APPROVED", "TARGET_HEAD", "APPROVED",
+            "HR", "APPROVED")));
+        assertThat(service.mine().get(0).actionableSteps()).containsExactly("EMPLOYEE");
+    }
+
+    @Test
+    @DisplayName("Nhân sự xác nhận bước EMPLOYEE sau khi đủ ba bước và yêu cầu được áp dụng")
+    void employeeApprovesAfterEarlierSteps() {
+        currentUser.set("emp-1");
+        installState(request(Map.of("SOURCE_HEAD", "APPROVED", "TARGET_HEAD", "APPROVED",
+            "HR", "APPROVED")));
+        when(members.transferToDepartment(eq("emp-1"), eq(ORG), eq("dept-old"), eq("dept-new"),
+            anyString(), anyString())).thenReturn(0);
+
+        TransferResponse response = service.decide(REQUEST, "EMPLOYEE", true, "Đồng ý chuyển");
+
+        assertThat(response.steps()).anySatisfy(step -> {
+            assertThat(step.step()).isEqualTo("EMPLOYEE");
+            assertThat(step.decision()).isEqualTo("APPROVED");
+        });
+        verify(transfers).markApplied(eq(REQUEST), eq("emp-1"));
+    }
+
+    @Test
+    @DisplayName("Chỉ người được chuyển mới huỷ được yêu cầu của chính mình")
+    void requesterCanCancelButOthersCannot() {
+        state.set(request(Map.of()));
+        when(transfers.requireForUpdate(REQUEST, ORG)).thenReturn(request(Map.of()));
+        when(transfers.cancel(REQUEST, "requester")).thenReturn(true);
+        when(transfers.require(REQUEST, ORG)).thenReturn(request(Map.of()));
+
+        service.cancel(REQUEST, "Đổi ý");
+        verify(transfers).cancel(REQUEST, "requester");
+
+        currentUser.set("emp-1");
+        assertThatThrownBy(() -> service.cancel(REQUEST, null))
+            .isInstanceOf(AppException.class)
+            .extracting(e -> ((AppException) e).getErrorCode())
+            .isEqualTo(ErrorCode.TRANSFER_CANCEL_NOT_ALLOWED);
     }
 
     @ParameterizedTest(name = "Từ chối ở bước {0} → REJECTED, không áp dụng")

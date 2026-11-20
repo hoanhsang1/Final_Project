@@ -27,3 +27,12 @@ if (!window.matchMedia) {
 if (!window.HTMLElement.prototype.scrollIntoView) {
   window.HTMLElement.prototype.scrollIntoView = vi.fn()
 }
+
+// Radix use-size (Checkbox) đo kích thước phần tử bằng ResizeObserver.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

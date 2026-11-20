@@ -35,10 +35,10 @@ class DefaultPositionSeederTest {
         assertThat(permissions("org-new", "Giáo viên"))
             .containsExactly("class.self_view", "schedule.self_view");
         assertThat(permissions("org-new", "Trưởng phòng ban"))
-            .contains("employee.view", "class.view", "schedule.view");
+            .contains("employee.view", "department.view", "class.view", "schedule.view");
         assertThat(permissions("org-new", "Giáo vụ"))
             .contains("subject.view", "subject.manage");
-        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(49);
+        assertThat(permissions("org-new", "Quản trị viên tổ chức")).hasSize(50);
     }
 
     @Test
@@ -46,7 +46,7 @@ class DefaultPositionSeederTest {
     void departmentHeadGetsDepartmentEmployeeView() {
         seeder.ensureForOrg("org-head");
 
-        assertThat(permissions("org-head", "Trưởng phòng ban")).contains("employee.view");
+        assertThat(permissions("org-head", "Trưởng phòng ban")).contains("employee.view", "department.view");
         assertThat(permissions("org-head", "Trưởng phòng ban"))
             .doesNotContain("employee.create", "employee.edit", "employee.delete",
                 "employee.assign_position");

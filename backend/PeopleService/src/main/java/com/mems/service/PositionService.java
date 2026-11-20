@@ -48,8 +48,11 @@ public class PositionService {
         validateRequest(request);
         String orgId=actor.orgId();
         var before=repository.require(id,orgId,true);
-        requireWithinOwnPermissions(before.permissions(),before.bundleCodes(),
-            request.scope(),request.departmentId());
+        requireManageExisting(before);
+        if (!Objects.equals(before.scope(),request.scope())
+            || !Objects.equals(before.departmentId(),request.departmentId()))
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                "scope and departmentId cannot be changed; clone the position instead");
         requireWithinOwnPermissions(request.permissions(),request.bundleCodes(),
             request.scope(),request.departmentId());
         var result=repository.save(id,orgId,request,false);
@@ -60,8 +63,7 @@ public class PositionService {
     public void delete(String id) {
         String orgId=actor.orgId();
         var before=repository.require(id,orgId,true);
-        requireWithinOwnPermissions(before.permissions(),before.bundleCodes(),
-            before.scope(),before.departmentId());
+        requireManageExisting(before);
         repository.delete(id,orgId);
         audit.record(orgId,actor.userId(),"POSITION_DELETED",id,before);
     }
@@ -79,6 +81,8 @@ public class PositionService {
     public PositionCloneResponse clone(String id, PositionCloneRequest request) {
         String orgId=actor.orgId();
         PositionResponse source=repository.require(id,orgId,false);
+        if (!actor.owner() && "ORGANIZATION".equals(source.scope()))
+            throw actor.forbidden("Only the organization owner can clone an organization-wide position");
         DepartmentResponse target=departments.require(request.departmentId(),orgId,false);
         Set<String> available=availablePermissions(target);
 
@@ -106,7 +110,7 @@ public class PositionService {
         requireWithinOwnPermissions(payload);
 
         String newId=UUID.randomUUID().toString();
-        PositionResponse created=repository.save(newId,orgId,payload,true);
+        PositionResponse created=repository.save(newId,orgId,payload,true,source.profileType());
         audit.record(orgId,actor.userId(),"POSITION_CLONED",newId,Map.of(
             "sourcePositionId",id,"departmentId",request.departmentId(),
             "removedPermissions",removed,"droppedBundles",droppedBundles));
@@ -179,6 +183,26 @@ public class PositionService {
             }
         }
         return codes;
+    }
+
+    /** RBAC-01: xét quyền trên dữ liệu đã lưu; chức danh ORGANIZATION hoặc dùng chung chỉ Owner quản lý. */
+    private void requireManageExisting(PositionResponse position) {
+        if (actor.owner()) return;
+        if ("ORGANIZATION".equals(position.scope())||position.departmentId()==null)
+            throw actor.forbidden("Only the organization owner can manage organization-wide or shared positions");
+        String departmentId=position.departmentId();
+        Set<String> all=new HashSet<>(position.permissions());
+        Map<String,Set<String>> bundlePermissions=effectivePermissions.bundlePermissions();
+        position.bundleCodes().forEach(code -> all.addAll(bundlePermissions.getOrDefault(code,Set.of())));
+        if (all.isEmpty()) {
+            if (!actor.hasPermissionIn("position.manage",departmentId))
+                throw actor.forbidden("Missing permission to manage positions in this department");
+            return;
+        }
+        for (String permission : all) {
+            if (!actor.hasPermissionIn(permission,departmentId))
+                throw actor.forbidden("Cannot manage a position with permissions beyond your own");
+        }
     }
 
     /** Rule 18: người không phải OWNER chỉ quản lý chức vụ trong phạm vi quyền của mình. */

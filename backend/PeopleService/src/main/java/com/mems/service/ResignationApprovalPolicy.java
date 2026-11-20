@@ -49,29 +49,41 @@ public class ResignationApprovalPolicy {
             || subjectId != null && subjectId.equals(actorId)) {
             throw new AppException(ErrorCode.SELF_APPROVAL_NOT_ALLOWED);
         }
-        if (actor.owner()) return;
+        if (!canApprove(orgId, departmentId, requesterId, subjectId)) {
+            throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
+        }
+    }
+
+    /**
+     * Phiên bản không ném lỗi của {@link #requireApprover}: dùng cho hộp duyệt
+     * để chỉ hiện các yêu cầu người gọi thực sự có thẩm quyền xử lý, tách khỏi
+     * quyền xem phòng ban/nhân sự. Giữ nguyên thứ tự leo thang DEC-08.
+     */
+    public boolean canApprove(String orgId, String departmentId, String requesterId,
+                              String subjectId) {
+        String actorId = actor.userId();
+        if (requesterId != null && requesterId.equals(actorId)
+            || subjectId != null && subjectId.equals(actorId)) {
+            return false;
+        }
+        if (actor.owner()) return true;
 
         // Level 1: only position-derived holders count. Delegated grants are level 3,
         // otherwise a delegated GM could jump ahead of HR and the department head.
         Set<String> directHolders = directPermissionHolderIds(orgId, departmentId, requesterId, subjectId);
-        if (directHolders.contains(actorId)) return;
-        if (!directHolders.isEmpty())
-            throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
+        if (directHolders.contains(actorId)) return true;
+        if (!directHolders.isEmpty()) return false;
 
         // Level 2: department head when no eligible HR approver remains. A head who is
         // the requester/subject is not an approver, so level 3 stays reachable.
         Set<String> heads = headIds(orgId, departmentId);
         heads.remove(requesterId);
         heads.remove(subjectId);
-        if (heads.contains(actorId)) return;
-        if (!heads.isEmpty())
-            throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
+        if (heads.contains(actorId)) return true;
+        if (!heads.isEmpty()) return false;
 
-        // Level 3: general manager with an active, matching delegation. Reached only when
-        // no direct holder and no eligible head remain.
-        if (hasDelegatedPermission(orgId, actorId)) return;
-
-        throw new AppException(ErrorCode.RESIGNATION_APPROVER_NOT_ALLOWED);
+        // Level 3: general manager with an active, matching delegation.
+        return hasDelegatedPermission(orgId, actorId);
     }
 
     /** Recipients to notify when a request is created (requester and subject excluded). */
@@ -114,7 +126,7 @@ public class ResignationApprovalPolicy {
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id AND p.deleted_at IS NULL
             WHERE a.org_id=? AND a.department_id=? AND a.status='ACTIVE'
               AND a.scope_type='DEPARTMENT' AND p.scope='DEPARTMENT'
-              AND p.name IN (?,?)
+              AND (p.system_code='DEPT_HEAD' OR p.name IN (?,?))
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, String.class, params.toArray()));
     }
@@ -149,7 +161,8 @@ public class ResignationApprovalPolicy {
             FROM assignment a
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id AND p.deleted_at IS NULL
             WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
-              AND p.scope='ORGANIZATION' AND p.name=?
+              AND p.scope='ORGANIZATION'
+              AND (p.system_code='GENERAL_MANAGER' OR p.name=?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, Integer.class, orgId, userId,
             GeneralManagerService.GENERAL_MANAGER_POSITION_NAME, now, now);

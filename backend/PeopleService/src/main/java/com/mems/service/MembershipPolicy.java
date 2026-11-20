@@ -53,6 +53,13 @@ public class MembershipPolicy {
     public void check(String departmentId, String targetRole, Set<String> proposedPositions) {
         String orgId = actor.orgId();
 
+        // targetRole chỉ là nhãn thành viên, không phải căn cứ cấp quyền.
+        if (!Set.of("MANAGER", "STAFF").contains(targetRole) && !"OWNER".equals(targetRole))
+            throw new AppException(ErrorCode.VALIDATION_ERROR,
+                "Membership role must be MANAGER, STAFF or OWNER");
+        if ("OWNER".equals(targetRole) && !actor.owner())
+            throw actor.forbidden("Only the organization owner can manage owner appointments");
+
         // Luôn xác thực chức vụ thuộc tổ chức và khoá mẫu quyền.
         List<com.mems.dto.PositionResponse> loaded = new ArrayList<>();
         for (String id : proposedPositions) loaded.add(positions.require(id, orgId, true));
@@ -62,10 +69,6 @@ public class MembershipPolicy {
         // Quy tắc 18 / Phần 2: chức danh cấp tổ chức (Tổng quản lý, HR cấp tổ chức) do Owner gán.
         if (loaded.stream().anyMatch(p -> "ORGANIZATION".equals(p.scope())))
             throw actor.forbidden("Only the organization owner can assign ORGANIZATION-scope positions");
-
-        // Người quản lý nhân sự phòng ban chỉ thao tác trên STAFF cùng phòng.
-        if (!"STAFF".equals(targetRole))
-            throw actor.forbidden("Only STAFF in your own department can be managed");
 
         Set<String> available = effectivePermissions
             .resolve(orgId, actor.userId(), departmentId).permissions();

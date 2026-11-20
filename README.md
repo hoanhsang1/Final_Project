@@ -288,6 +288,7 @@ cp .env.example .env      # Windows: copy .env.example .env
 | `CORS_ALLOWED_ORIGINS` | Không | Mặc định `http://localhost:5173,http://127.0.0.1:5173,https://*.vercel.app` (service đọc biến này; gateway đọc cấu hình riêng) |
 | `TEACHER_ASSIGNMENT_MODULE_CODE` | Không | Mặc định `TEACHER_ASSIGNMENT` (chỉ kiểm tra cờ module) |
 | `OWNER_BOOTSTRAP_*` | Không | Tạo tài khoản OWNER đầu tiên cho một tổ chức đã tồn tại |
+| `SUPER_ADMIN_BOOTSTRAP_*` | Không | Tạo một tài khoản SUPER_ADMIN khi chưa tồn tại (dev/staging; mật khẩu ≥ 12 ký tự, ≤ 72 byte UTF-8) |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Không | **Không còn được mã sử dụng**; xem ghi chú bên dưới |
 
 Tạo khoá:
@@ -304,8 +305,8 @@ openssl rand -hex 32        # INTERNAL_API_KEY
 > Đặt biến trong terminal rồi chạy `java -jar` trong **cùng** cửa sổ đó.
 >
 > `ADMIN_BOOTSTRAP_PASSWORD` trong `.env.example` là biến cũ. Mã hiện tại **không** đọc
-> biến này; `platform_admin` được đặt lại mật khẩu `123456` mỗi lần IdentityService khởi
-> động (xem mục 13).
+> biến này và **không** tự đặt lại mật khẩu tài khoản nào. Tài khoản cũ còn hash `123456`
+> phải được đổi mật khẩu qua luồng `POST /api/v1/auth/change-password` (xem mục 13).
 
 ---
 
@@ -578,7 +579,7 @@ Mô hình nhóm đang dùng: **frontend trên Vercel** → **Cloudflare Quick Tu
 | `Unknown database 'mems_identity_db'` | Chưa nạp SQL mục 4. |
 | Lỗi cú pháp ở `DEFAULT (UUID())` | MySQL cũ hơn 8.0.16. Nâng cấp MySQL. |
 | `Access denied for user` | `DB_USERNAME` / `DB_PASSWORD` sai hoặc chưa đặt trong đúng cửa sổ terminal. |
-| Đăng nhập `platform_admin` sai mật khẩu | Mật khẩu dev là `123456` (IdentityService đặt lại mỗi lần khởi động). `ADMIN_BOOTSTRAP_PASSWORD` không có tác dụng. |
+| Đăng nhập `platform_admin` sai mật khẩu | Mã hiện tại không đặt lại mật khẩu. Đổi mật khẩu tài khoản cũ (xem mục 13) hoặc bật `SUPER_ADMIN_BOOTSTRAP_*` trên môi trường dev để tạo tài khoản mới. |
 | Đăng nhập tài khoản mẫu trả 403 “no assigned roles” | `15_sprint4_sample.sql` chạy trước khi IdentityService tạo role. Chạy lại script 15. |
 | Gọi API trả 503 `IDENTITY_UNAVAILABLE` | IdentityService chưa chạy, thiếu `INTERNAL_API_KEY` khớp giữa hai service, hoặc chưa chạy `06_identity_department_access.sql` (thiếu cột `provisioned_by`). |
 | Gọi API trả 403 `FORBIDDEN` | Tài khoản thiếu quyền, hoặc giáo viên nằm ngoài phòng ban của người gọi. |
@@ -600,18 +601,25 @@ Mô hình nhóm đang dùng: **frontend trên Vercel** → **Cloudflare Quick Tu
 ## 13. Ghi chú bảo mật
 
 - **Không commit `.env`.** Repo công khai; lộ khoá JWT là ai cũng ký được token.
-- `platform_admin` hiện được `IdentityDataInitializer` **đặt lại mật khẩu thành `123456`
-  mỗi lần IdentityService khởi động**, và `AuthService` có nhánh chấp nhận `123456` cho
-  `platform_admin`/`admin`. Đây là tiện ích dev; **phải sửa trước khi triển khai thật**
-  (`backend/IdentityService/src/main/java/com/mems/config/IdentityDataInitializer.java`
-  và `AuthService.java`).
+- `IdentityDataInitializer` **không còn** đặt lại mật khẩu và `AuthService` **không còn**
+  nhánh chấp nhận `123456`. Tài khoản cũ còn hash `123456` phải đăng nhập rồi gọi
+  `POST /api/v1/auth/change-password` với `currentPassword` là mật khẩu hiện tại và
+  `newPassword` ≥ 12 ký tự (≤ 72 byte UTF-8). Nếu không đăng nhập được, quản trị DB đặt
+  hash mới bằng BCrypt rồi buộc người dùng đổi lại — **không** đặt lại mật khẩu production
+  hàng loạt.
+- Tạo tài khoản SUPER_ADMIN mới trên dev/staging bằng `SUPER_ADMIN_BOOTSTRAP_*`
+  (`SUPER_ADMIN_BOOTSTRAP_ENABLED=true`): chỉ tạo khi email/username chưa tồn tại, cờ
+  `must_change_password=1`, không ghi mật khẩu vào log. Tắt biến sau lần đăng nhập đầu.
 - `INTERNAL_API_KEY` là khoá dùng chung giữa Identity và People. Đặt tối thiểu 32 ký tự,
   không gửi xuống frontend.
 - Đổi `JWT_SECRET_BASE64` làm toàn bộ token cũ mất hiệu lực.
 - CORS của service đọc từ `CORS_ALLOWED_ORIGINS`; CORS của gateway đang khai báo trực
   tiếp trong `backend/APIGateway/src/main/resources/application.yml` — đổi domain thì
   phải sửa file này.
-- Chưa có giới hạn số lần đăng nhập sai (schema đã có cột nhưng mã chưa dùng).
+- Đăng nhập sai bị giới hạn theo cặp **(username, IP)**: 5 lần/15 phút → khóa 15 phút;
+  toàn bộ username đó sai 20 lần/15 phút → khóa 15 phút. Phản hồi luôn là 429 chung
+  (`LOGIN_RATE_LIMITED`), không tiết lộ username có tồn tại; mỗi lần sai ghi `audit_log`
+  (không ghi mật khẩu).
 
 ---
 
@@ -625,7 +633,9 @@ Mô hình nhóm đang dùng: **frontend trên Vercel** → **Cloudflare Quick Tu
   `TEACHER_ASSIGNMENT`; nếu module bật, API gán trực tiếp trả
   `409 TEACHER_ASSIGNMENT_MODULE_ACTIVE`.
 - **Chưa gửi email** (quên/đặt lại mật khẩu, thông báo). Chưa có tự đăng ký giáo viên.
-- **Chưa có API đổi trạng thái dạy** `TAM_NGHI` / `NGHI_VIEC`; dữ liệu mẫu đặt sẵn.
+- **Trạng thái giảng dạy** đã có `PUT /teachers/{staffId}/teaching-status`
+  (`DANG_DAY`, `TAM_NGHI`, `NGHI_VIEC`); đổi sang `NGHI_VIEC` vẫn cần xử lý lớp đang phụ
+  trách theo quy trình phân công lại.
 - **Không kiểm tra trùng lịch** khi gán giáo viên (ngoài phạm vi Sprint 4).
 - **Xoá:** lớp và học sinh dùng xoá mềm (`deleted_at`); nhân sự, phòng ban, chức vụ bị
   xoá khỏi bảng (không có thùng rác/khôi phục).

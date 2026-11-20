@@ -157,6 +157,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # CC-06: nhật ký tổ chức (People). FE gọi /api/audit-logs.
+        - id: people-audit-logs-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/audit-logs/**,/api/audit-logs
+          filters:
+            - StripPrefix=1
+
         # Phần 7 — lịch học & cơ sở vật chất (FE gọi /api/departments/{id}/...).
         - id: schedule-department-api
           uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}

@@ -264,6 +264,42 @@ class ResignationApprovalPolicyTest {
             .containsExactlyInAnyOrder(HR, HEAD);
     }
 
+    @Test
+    @DisplayName("canApprove=true cho HR giữ quyền trực tiếp, false cho người ngoài cuộc")
+    void canApproveReflectsEscalationWithoutThrowing() {
+        stubMembers(REQUESTER, EMPLOYEE, HR, "outsider");
+        stubDirectPermission(HR);
+
+        assertThat(policy.canApprove(ORG, DEPT, REQUESTER, EMPLOYEE)).isTrue();
+
+        when(actor.userId()).thenReturn("outsider");
+        assertThat(policy.canApprove(ORG, DEPT, REQUESTER, EMPLOYEE)).isFalse();
+    }
+
+    @Test
+    @DisplayName("canApprove=false cho chính người yêu cầu hoặc người xin nghỉ")
+    void canApproveIsFalseForRequesterAndSubject() {
+        stubMembers(REQUESTER, EMPLOYEE, HEAD);
+        stubHeads(HEAD);
+
+        when(actor.userId()).thenReturn(REQUESTER);
+        assertThat(policy.canApprove(ORG, DEPT, REQUESTER, EMPLOYEE)).isFalse();
+
+        when(actor.userId()).thenReturn(EMPLOYEE);
+        // Trưởng phòng khác vẫn tồn tại nên subject cũng không nhảy cấp.
+        assertThat(policy.canApprove(ORG, DEPT, REQUESTER, EMPLOYEE)).isFalse();
+    }
+
+    @Test
+    @DisplayName("canApprove=true cho GM có uỷ quyền khi không còn HR/trưởng phòng")
+    void canApproveAllowsDelegatedGeneralManager() {
+        when(actor.userId()).thenReturn(GM);
+        stubMembers(REQUESTER, EMPLOYEE, GM);
+        stubGeneralManager(true);
+
+        assertThat(policy.canApprove(ORG, DEPT, REQUESTER, EMPLOYEE)).isTrue();
+    }
+
     private void stubMembers(String... userIds) {
         when(jdbc.queryForList(contains("FROM department_member"), eq(String.class), eq(ORG)))
             .thenReturn(List.of(userIds));

@@ -117,6 +117,14 @@ public class TeacherRepository {
             """, Timestamp.from(Instant.now()), userId, orgId);
     }
 
+    public void updateTeachingStatus(String userId, String orgId, String status, String updatedBy) {
+        jdbc.update("""
+            UPDATE teacher_profile
+            SET teaching_status=?, version=version+1, updated_by=?, updated_at=?
+            WHERE user_id=? AND org_id=?
+            """, status, updatedBy, Timestamp.from(Instant.now()), userId, orgId);
+    }
+
     /** Số lớp đang chờ/đang diễn ra của giáo viên — cần phân công lại khi nghỉ việc. */
     public long activeClassCount(String userId, String orgId) {
         Long count = jdbc.queryForObject("""
@@ -257,7 +265,8 @@ public class TeacherRepository {
                    sp.full_name AS actor_name
             FROM people_audit_log a
             LEFT JOIN staff_profile sp ON sp.user_id = a.actor_user_id AND sp.org_id = a.org_id
-            WHERE a.org_id=? AND a.target_id=? AND a.action IN ('TEACHER_CREATED','TEACHER_UPDATED')
+            WHERE a.org_id=? AND a.target_id=? AND a.action IN
+                ('TEACHER_CREATED','TEACHER_UPDATED','TEACHER_STATUS_CHANGED')
             ORDER BY a.created_at DESC
             """, (rs, n) -> new TeacherHistoryResponse(
                 rs.getString("id"), rs.getString("action"), rs.getString("actor_user_id"),

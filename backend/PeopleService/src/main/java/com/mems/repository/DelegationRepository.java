@@ -78,6 +78,15 @@ public class DelegationRepository {
         return ids;
     }
 
+    /** DEL-04: chuyển ủy quyền quá hạn sang EXPIRED. Idempotent, chạy được nhiều instance. */
+    public int markExpired() {
+        Timestamp now = Timestamp.from(Instant.now());
+        return jdbc.update("""
+            UPDATE delegation SET status='EXPIRED', updated_at=?
+            WHERE status='ACTIVE' AND effective_to IS NOT NULL AND effective_to<?
+            """, now, now);
+    }
+
     public DelegationResponse require(String id, String orgId) {
         List<DelegationResponse> rows = jdbc.query(baseSelect() + " WHERE d.id=? AND d.org_id=?",
             this::map, id, orgId);

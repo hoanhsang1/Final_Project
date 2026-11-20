@@ -53,7 +53,6 @@ type ClassForm = {
   subjectId: string
   startDate: string
   endDate: string
-  status: 'active' | 'inactive' | 'archived'
 }
 
 const EMPTY_FORM: ClassForm = {
@@ -63,7 +62,6 @@ const EMPTY_FORM: ClassForm = {
   subjectId: '',
   startDate: '',
   endDate: '',
-  status: 'active',
 }
 
 function ClassFormDialog({
@@ -93,7 +91,6 @@ function ClassFormDialog({
             subjectId: schoolClass.subjectId ?? 'none',
             startDate: schoolClass.startDate ?? '',
             endDate: schoolClass.endDate ?? '',
-            status: 'active',
           }
         : EMPTY_FORM,
     )
@@ -146,7 +143,6 @@ function ClassFormDialog({
         subjectId: form.subjectId === 'none' ? undefined : form.subjectId || undefined,
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
-        status: form.status,
       }
       mutations.create.mutate(input, handlers)
     }
@@ -215,23 +211,13 @@ function ClassFormDialog({
                 onChange={(event) => setForm({ ...form, endDate: event.target.value })}
               />
             </Field>
-            {!schoolClass ? (
-              <Field label="Trạng thái">
-                <Select
-                  value={form.status}
-                  onValueChange={(value) => setForm({ ...form, status: value as ClassForm['status'] })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Đang hoạt động</SelectItem>
-                    <SelectItem value="inactive">Tạm dừng</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            ) : null}
           </div>
+          {!schoolClass ? (
+            <p className="text-xs text-ink-500">
+              Lớp mới bắt đầu ở trạng thái “Chưa bắt đầu”; trạng thái tự chuyển khi tới ngày bắt
+              đầu/kết thúc.
+            </p>
+          ) : null}
           {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         </DialogBody>
         <DialogFooter>
@@ -332,7 +318,7 @@ function ClassDetailDialog({
           {schoolClass ? (
             <>
               <div className="flex flex-wrap gap-2">
-                <Badge tone={schoolClass.status === 'DANG_HOAT_DONG' ? 'success' : 'neutral'}>
+                <Badge tone={schoolClass.status === 'DA_HUY' ? 'danger' : schoolClass.status === 'DANG_DIEN_RA' ? 'success' : 'neutral'}>
                   {CLASS_STATUS_LABELS[schoolClass.status] ?? schoolClass.status}
                 </Badge>
                 <Badge tone={schoolClass.closeState === 'PENDING' ? 'warning' : 'outline'}>
@@ -900,7 +886,7 @@ export function ClassesPage() {
       header: 'Trạng thái',
       cell: (row) => (
         <div className="flex flex-wrap gap-1">
-          <Badge tone={row.status === 'DANG_HOAT_DONG' ? 'success' : 'neutral'}>
+          <Badge tone={row.status === 'DA_HUY' ? 'danger' : row.status === 'DANG_DIEN_RA' ? 'success' : 'neutral'}>
             {CLASS_STATUS_LABELS[row.status] ?? row.status}
           </Badge>
           {row.closeState === 'PENDING' ? <Badge tone="warning">Chờ đóng</Badge> : null}
@@ -998,8 +984,8 @@ export function ClassesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Mọi trạng thái</SelectItem>
-            <SelectItem value="DANG_HOAT_DONG">Đang hoạt động</SelectItem>
-            <SelectItem value="TAM_DUNG">Tạm dừng</SelectItem>
+            <SelectItem value="CHUA_BAT_DAU">Chưa bắt đầu</SelectItem>
+            <SelectItem value="DANG_DIEN_RA">Đang diễn ra</SelectItem>
             <SelectItem value="DA_KET_THUC">Đã kết thúc</SelectItem>
             <SelectItem value="DA_HUY">Đã huỷ</SelectItem>
           </SelectContent>

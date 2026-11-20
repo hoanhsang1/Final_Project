@@ -76,6 +76,17 @@ export function useUpdateTeacher(staffId: string) {
   })
 }
 
+export function useChangeTeacherStatus(staffId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (status: 'DANG_DAY' | 'TAM_NGHI' | 'NGHI_VIEC') =>
+      teachersApi.changeStatus(staffId, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['teachers'] })
+    },
+  })
+}
+
 export function useStudents(params: {
   page?: number
   size?: number
@@ -210,6 +221,7 @@ export function useClassMutations() {
   const queryClient = useQueryClient()
   const invalidate = async (id?: string) => {
     await queryClient.invalidateQueries({ queryKey: ['classes'] })
+    await queryClient.invalidateQueries({ queryKey: ['approval-inbox'] })
     if (id) await queryClient.invalidateQueries({ queryKey: academicKeys.class(id) })
   }
   return {

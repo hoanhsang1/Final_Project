@@ -43,9 +43,14 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
-        @Valid @RequestBody LoginRequest request
+        @Valid @RequestBody LoginRequest request,
+        jakarta.servlet.http.HttpServletRequest http
     ) {
-        return ResponseEntity.ok(authService.login(request));
+        String forwarded = http.getHeader("X-Forwarded-For");
+        String clientIp = forwarded != null && !forwarded.isBlank()
+                ? forwarded.split(",")[0].trim()
+                : http.getRemoteAddr();
+        return ResponseEntity.ok(authService.login(request, clientIp));
     }
     
     

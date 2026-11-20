@@ -16,5 +16,7 @@ public record ResignationResponse(
     String decidedBy,
     String decidedByName,
     Instant decidedAt,
+    /** Tên phòng ban của nhân sự — có thể null với dữ liệu cũ đã xoá phòng ban. */
+    String departmentName,
     String decisionNote
 ) {}

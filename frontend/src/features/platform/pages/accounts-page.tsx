@@ -39,7 +39,29 @@ import {
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime } from '@/lib/format'
 
-const ASSIGNABLE_ROLES = ['OWNER', 'MANAGER', 'STAFF', 'ACADEMIC_STAFF', 'STUDENT']
+/** Tạo mới: Owner do đăng ký tổ chức; role legacy không cấp mới. */
+const CREATE_ROLES = ['MANAGER', 'STAFF', 'STUDENT', 'TEACHER']
+/** Lọc danh sách: vẫn cần thấy tài khoản cũ đang giữ role legacy. */
+const FILTER_ROLES = [
+  'OWNER',
+  'ORG_OWNER',
+  'MANAGER',
+  'STAFF',
+  'STUDENT',
+  'TEACHER',
+  'ORG_ADMIN',
+  'ACADEMIC_STAFF',
+  'FACILITY_STAFF',
+]
+const EMPLOYEE_ROLES = ['MANAGER', 'STAFF']
+const SELF_SERVICE_ROLES = ['STUDENT', 'TEACHER']
+
+/** Đổi role chỉ trong cùng lớp quyền; đổi chéo lớp do People quyết định. */
+function sameClassRoles(current: string): string[] {
+  if (EMPLOYEE_ROLES.includes(current)) return EMPLOYEE_ROLES
+  if (SELF_SERVICE_ROLES.includes(current)) return SELF_SERVICE_ROLES
+  return []
+}
 
 export function AccountsPage() {
   const [search, setSearch] = useState('')
@@ -125,6 +147,10 @@ export function AccountsPage() {
 
   const submitRole = () => {
     if (!roleTarget) return
+    if (!sameClassRoles(roleTarget.role).includes(nextRole)) {
+      setFormError('Không thể đổi sang vai trò khác lớp quyền. Việc này do tổ chức quản lý.')
+      return
+    }
     mutations.updateRole.mutate(
       { id: roleTarget.id, role: nextRole },
       {
@@ -261,7 +287,7 @@ export function AccountsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Mọi vai trò</SelectItem>
-            {ASSIGNABLE_ROLES.map((code) => (
+            {FILTER_ROLES.map((code) => (
               <SelectItem key={code} value={code}>
                 {ACCOUNT_ROLE_LABELS[code] ?? code}
               </SelectItem>
@@ -342,7 +368,7 @@ export function AccountsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ASSIGNABLE_ROLES.map((code) => (
+                  {CREATE_ROLES.map((code) => (
                     <SelectItem key={code} value={code}>
                       {ACCOUNT_ROLE_LABELS[code] ?? code}
                     </SelectItem>
@@ -394,27 +420,38 @@ export function AccountsPage() {
             <DialogDescription>Thay đổi có hiệu lực ngay sau khi lưu.</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-3">
-            <Field label="Vai trò" required>
-              <Select value={nextRole} onValueChange={setNextRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASSIGNABLE_ROLES.map((code) => (
-                    <SelectItem key={code} value={code}>
-                      {ACCOUNT_ROLE_LABELS[code] ?? code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            {sameClassRoles(roleTarget?.role ?? '').length === 0 ? (
+              <Alert tone="info" title="Vai trò do tổ chức quản lý">
+                Chủ tổ chức và các vai trò cũ không đổi được từ console nền tảng. Quyền truy cập do
+                chức danh trong phòng ban quyết định.
+              </Alert>
+            ) : (
+              <Field label="Vai trò" required>
+                <Select value={nextRole} onValueChange={setNextRole}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sameClassRoles(roleTarget?.role ?? '').map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {ACCOUNT_ROLE_LABELS[code] ?? code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             {formError ? <p className="text-sm text-danger-600">{formError}</p> : null}
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleTarget(null)}>
               Huỷ
             </Button>
-            <Button onClick={submitRole} isLoading={mutations.updateRole.isPending}>
+            <Button
+              onClick={submitRole}
+              isLoading={mutations.updateRole.isPending}
+              disabled={sameClassRoles(roleTarget?.role ?? '').length === 0}
+            >
               Lưu vai trò
             </Button>
           </DialogFooter>

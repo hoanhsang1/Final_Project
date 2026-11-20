@@ -133,7 +133,16 @@ export function MyClassesPage() {
                       {[item.academicYear, item.subjectName].filter(Boolean).join(' · ') || '—'}
                     </p>
                   </div>
-                  <Badge tone={item.status === 'DA_HUY' ? 'danger' : 'success'} dot>
+                  <Badge
+                    tone={
+                      item.status === 'DA_HUY'
+                        ? 'danger'
+                        : item.status === 'DANG_DIEN_RA'
+                          ? 'success'
+                          : 'neutral'
+                    }
+                    dot
+                  >
                     {CLASS_STATUS_LABELS[item.status] ?? item.status}
                   </Badge>
                 </div>

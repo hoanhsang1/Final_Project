@@ -14,7 +14,7 @@ public class JwtService {
     private final JwtEncoder jwtEncoder;
     private final long accessTokenSeconds;
     public JwtService(@Value("${jwt.secret-base64}") String secretBase64,
-            @Value("${jwt.access-token-seconds:900}") long accessTokenSeconds) {
+            @Value("${jwt.access-token-seconds:300}") long accessTokenSeconds) {
         byte[] secret=Base64.getDecoder().decode(secretBase64);
         if(secret.length<32) throw new IllegalArgumentException("JWT secret must contain at least 32 bytes");
         if(accessTokenSeconds<60 || accessTokenSeconds>900) throw new IllegalArgumentException("Access token lifetime must be 60 to 900 seconds");
@@ -37,6 +37,8 @@ public class JwtService {
             .claim("permissionScopes",permissionScopes)
             // PeopleService dùng claim này để loại quyền đã thu hồi và nạp lại từ DB mỗi request.
             .claim("delegatedPermissions",new TreeSet<>(profile.delegatedPermissions()))
+            // People không xác minh được lúc cấp token: quyền có thể thiếu/cũ, không phải "toàn quyền".
+            .claim("permissionsStale",profile.isStale())
             .claims(claims -> claims.put("departmentId",profile.departmentId()));
         if(orgId!=null) builder.claim("orgId",orgId);
         return jwtEncoder.encode(JwtEncoderParameters.from(

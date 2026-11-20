@@ -23,7 +23,9 @@ public class TeacherController {
     @PreAuthorize("hasAuthority('employee.create')")
     public ResponseEntity<CreatedTeacherResponse> create(@Valid @RequestBody TeacherCreateRequest request) {
         var created = service.create(request);
-        return ResponseEntity.created(URI.create("/teachers/" + created.userId())).body(created);
+        // HR-02: mật khẩu tạm trong body ⇒ cấm cache.
+        return ResponseEntity.created(URI.create("/teachers/" + created.userId()))
+            .headers(noStore()).body(created);
     }
 
     @GetMapping
@@ -68,5 +70,20 @@ public class TeacherController {
     public TeacherDetailResponse update(@PathVariable String staffId,
                                         @Valid @RequestBody TeacherUpdateRequest request) {
         return service.update(staffId, request);
+    }
+
+    /** Đổi trạng thái giảng dạy — quyền riêng, không dùng employee.edit. */
+    @PutMapping("/{staffId}/teaching-status")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('teacher.change_status')")
+    public TeacherDetailResponse changeTeachingStatus(@PathVariable String staffId,
+                                                      @Valid @RequestBody TeacherStatusRequest request) {
+        return service.changeTeachingStatus(staffId, request);
+    }
+
+    private HttpHeaders noStore() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.setPragma("no-cache");
+        return headers;
     }
 }

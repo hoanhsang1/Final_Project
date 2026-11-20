@@ -10,13 +10,6 @@ const SCREENS: Record<
   string,
   { title: string; description: string; api: string; note?: string }
 > = {
-  'dang-ky': {
-    title: 'Đăng ký tổ chức',
-    description:
-      'Biểu mẫu đăng ký trường học hoặc trung tâm: tên tổ chức, loại hình, tài khoản chủ sở hữu và module đề nghị. Sau khi gửi, tổ chức ở trạng thái chờ duyệt và chưa đăng nhập được.',
-    api: 'POST /api/v1/auth/register · GET /api/v1/modules',
-    note: 'Backend đã có endpoint. Giao diện chưa nằm trong phạm vi FE-00.',
-  },
   'quen-mat-khau': {
     title: 'Quên mật khẩu',
     description:
@@ -32,7 +25,7 @@ const SCREENS: Record<
   },
 }
 
-export function PublicPlannedPage({ screen }: { screen: 'dang-ky' | 'quen-mat-khau' | 'dat-lai-mat-khau' }) {
+export function PublicPlannedPage({ screen }: { screen: 'quen-mat-khau' | 'dat-lai-mat-khau' }) {
   const content = SCREENS[screen]!
 
   return (

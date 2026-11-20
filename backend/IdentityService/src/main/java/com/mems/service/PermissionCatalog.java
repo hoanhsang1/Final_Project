@@ -49,6 +49,7 @@ public final class PermissionCatalog {
         orgAndDept("employee.approve_resignation", "Approve or reject resignation requests", null),
         orgAndDept("employee.transfer", "Initiate department transfer requests", null),
         orgAndDept("employee.approve_transfer", "Approve the HR step of department transfers", null),
+        orgAndDept("teacher.change_status", "Change a teacher's teaching status", null),
         orgAndDept("position.view", "View positions", null),
         orgAndDept("position.manage", "Create, update and delete positions", null),
         orgAndDept("department.view", "View departments", null),
@@ -100,7 +101,9 @@ public final class PermissionCatalog {
         orgAndDept("facility.equipment.update", "Update equipment", "FACILITY_MANAGEMENT"),
         orgAndDept("facility.equipment.delete", "Delete equipment", "FACILITY_MANAGEMENT"),
         orgAndDept("facility.issue.report", "Report facility issues", "FACILITY_MANAGEMENT"),
-        orgAndDept("facility.issue.resolve", "Resolve facility issues", "FACILITY_MANAGEMENT")
+        orgAndDept("facility.issue.resolve", "Resolve facility issues", "FACILITY_MANAGEMENT"),
+        // Nhật ký tổ chức — xem thao tác trong toàn tổ chức (CC-06).
+        orgOnly("org.audit.view", "View organization audit logs", null)
     );
 
     public static final List<BundleDefinition> BUNDLES = List.of(
@@ -109,7 +112,8 @@ public final class PermissionCatalog {
             Set.of("employee.view", "employee.create", "employee.edit", "employee.delete",
                 "employee.reset_password", "employee.assign_position", "employee.view_detail",
                 "employee.resign", "employee.approve_resignation", "employee.transfer",
-                "employee.approve_transfer", "position.view", "position.manage", "department.view"),
+                "employee.approve_transfer", "teacher.change_status",
+                "position.view", "position.manage", "department.view"),
             Set.of(SCOPE_ORGANIZATION, SCOPE_DEPARTMENT)),
         new BundleDefinition("ACADEMIC_MANAGEMENT", "Quản lý đào tạo học sinh",
             "Quản lý học sinh và lớp học",

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { classesApi, subjectsApi } from '@/features/academic/api'
 import type * as AcademicApi from '@/features/academic/api'
@@ -26,7 +26,7 @@ const schoolClass: SchoolClass = {
   academicYear: '2026-2027',
   startDate: null,
   endDate: null,
-  status: 'DANG_HOAT_DONG',
+  status: 'DANG_DIEN_RA',
   teacher: null,
   closeState: 'NONE',
   version: 1,
@@ -54,6 +54,13 @@ const subject: Subject = {
   createdAt: null,
   updatedAt: null,
 }
+
+beforeAll(() => {
+  // Radix Select dùng Pointer Capture — jsdom chưa hỗ trợ.
+  Element.prototype.hasPointerCapture ??= () => false
+  Element.prototype.releasePointerCapture ??= () => undefined
+  Element.prototype.setPointerCapture ??= () => undefined
+})
 
 beforeEach(() => {
   vi.mocked(classesApi.list).mockReset()
@@ -102,5 +109,35 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
     expect(await screen.findByText('LH-10A1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tạo lớp' })).toBeInTheDocument()
     await waitFor(() => expect(classesApi.list).toHaveBeenCalledTimes(1))
+  })
+
+  it('tạo lớp không gửi trạng thái — backend luôn khởi tạo CHUA_BAT_DAU', async () => {
+    vi.mocked(classesApi.create).mockResolvedValue(schoolClass)
+    renderPage(<ClassesPage />)
+    await screen.findByText('LH-10A1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo lớp' }))
+    const dialog = await screen.findByRole('dialog')
+    const inputs = within(dialog).getAllByRole('textbox')
+    await userEvent.type(inputs[0]!, 'LH-10A3')
+    await userEvent.type(inputs[1]!, 'Lớp 10A3')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
+
+    await waitFor(() => expect(classesApi.create).toHaveBeenCalled())
+    expect(vi.mocked(classesApi.create).mock.calls[0]?.[0]).not.toHaveProperty('status')
+  })
+
+  it('bộ lọc trạng thái dùng đúng mã trạng thái của backend', async () => {
+    renderPage(<ClassesPage />)
+    await screen.findByText('LH-10A1')
+
+    await userEvent.click(screen.getByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Đang diễn ra' }))
+
+    await waitFor(() =>
+      expect(classesApi.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'DANG_DIEN_RA' }),
+      ),
+    )
   })
 })

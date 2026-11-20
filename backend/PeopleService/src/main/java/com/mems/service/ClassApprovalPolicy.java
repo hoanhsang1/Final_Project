@@ -105,7 +105,7 @@ public class ClassApprovalPolicy {
             WHERE a.org_id=? AND dm.module_code=? AND a.status='ACTIVE'
               AND a.scope_type='DEPARTMENT'
               AND p.scope='DEPARTMENT'
-              AND p.name IN (?,?)
+              AND (p.system_code='DEPT_HEAD' OR p.name IN (?,?))
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, String.class, params.toArray()));
     }
@@ -131,7 +131,7 @@ public class ClassApprovalPolicy {
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id
             WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
               AND p.deleted_at IS NULL AND p.scope='ORGANIZATION'
-              AND p.name=?
+              AND (p.system_code='GENERAL_MANAGER' OR p.name=?)
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, Integer.class, orgId, userId,
             com.mems.service.GeneralManagerService.GENERAL_MANAGER_POSITION_NAME, now, now);

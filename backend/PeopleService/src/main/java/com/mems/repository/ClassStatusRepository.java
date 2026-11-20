@@ -47,7 +47,7 @@ public class ClassStatusRepository {
         );
     };
 
-    public record TransitionRow(String id, String status) {}
+    public record TransitionRow(String id, String status, String classCode) {}
 
     public List<String> organizationsWithClasses() {
         return jdbc.queryForList(
@@ -56,19 +56,21 @@ public class ClassStatusRepository {
 
     public List<TransitionRow> dueToStart(String orgId, LocalDate today) {
         return jdbc.query("""
-            SELECT id, status FROM school_class
+            SELECT id, status, class_code FROM school_class
             WHERE org_id = ? AND deleted_at IS NULL AND status = 'CHUA_BAT_DAU'
               AND start_date IS NOT NULL AND start_date <= ?
-            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status")),
+            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status"),
+            rs.getString("class_code")),
             orgId, Date.valueOf(today));
     }
 
     public List<TransitionRow> dueToEnd(String orgId, LocalDate today) {
         return jdbc.query("""
-            SELECT id, status FROM school_class
+            SELECT id, status, class_code FROM school_class
             WHERE org_id = ? AND deleted_at IS NULL AND status = 'DANG_DIEN_RA'
               AND end_date IS NOT NULL AND end_date < ?
-            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status")),
+            """, (rs, n) -> new TransitionRow(rs.getString("id"), rs.getString("status"),
+            rs.getString("class_code")),
             orgId, Date.valueOf(today));
     }
 
@@ -173,11 +175,19 @@ public class ClassStatusRepository {
     }
 
     public void insertCloseEvent(String classId, String orgId, String action, String actorId, String reason) {
+        // Các bước trong cùng một mili-giây sẽ trùng created_at; cộng dồn để giữ đúng thứ tự sự kiện.
+        Timestamp last = jdbc.query("""
+            SELECT MAX(created_at) FROM class_close_event WHERE class_id = ? AND org_id = ?
+            """, rs -> rs.next() ? rs.getTimestamp(1) : null, classId, orgId);
+        Instant at = Instant.now();
+        if (last != null && !at.isAfter(last.toInstant())) {
+            at = last.toInstant().plusMillis(1);
+        }
         jdbc.update("""
             INSERT INTO class_close_event(id, class_id, org_id, action, actor_id, reason, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """, UUID.randomUUID().toString(), classId, orgId, action, actorId, reason,
-            Timestamp.from(Instant.now()));
+            Timestamp.from(at));
     }
 
     public List<ClassCloseEventResponse> closeEvents(String classId, String orgId) {

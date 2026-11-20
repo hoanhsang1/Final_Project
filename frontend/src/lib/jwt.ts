@@ -9,6 +9,7 @@ export interface JwtClaims {
   permissions?: string[]
   permissionScopes?: Record<string, string[]>
   delegatedPermissions?: string[]
+  permissionsStale?: boolean
   departmentId?: string | null
   orgId?: string | null
   mustChangePassword?: boolean
@@ -85,6 +86,7 @@ export function claimsToSession(claims: JwtClaims): Session | null {
     permissions: asStringArray(claims.permissions),
     permissionScopes: normalizeScopes(claims.permissionScopes),
     delegatedPermissions: asStringArray(claims.delegatedPermissions),
+    permissionsStale: claims.permissionsStale === true,
     modules: [],
     expiresAt: claims.exp ? claims.exp * 1000 : undefined,
   }

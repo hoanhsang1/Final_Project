@@ -39,7 +39,7 @@ public class AccountController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> createAccount(@RequestBody Map<String, Object> payload) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(accountService.createAccount(payload));
+        return credentialResponse(HttpStatus.CREATED, accountService.createAccount(payload));
     }
 
     @PatchMapping("/{id}/status")
@@ -71,7 +71,15 @@ public class AccountController {
         String newPassword = payload != null && payload.get("new_password") != null
                 ? payload.get("new_password").toString()
                 : null;
-        return ResponseEntity.ok(accountService.resetPassword(id, newPassword));
+        return credentialResponse(HttpStatus.OK, accountService.resetPassword(id, newPassword));
+    }
+
+    /** HR-02: response chứa mật khẩu tạm không được cache ở trình duyệt/proxy. */
+    private <T> ResponseEntity<T> credentialResponse(HttpStatus status, T body) {
+        return ResponseEntity.status(status)
+                .header("Cache-Control", "no-store")
+                .header("Pragma", "no-cache")
+                .body(body);
     }
 }
 

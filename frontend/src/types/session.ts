@@ -51,6 +51,11 @@ export interface Session {
   /** Quyền đang nhận qua ủy quyền. */
   delegatedPermissions: string[]
   /**
+   * Backend chưa xác minh được quyền khi cấp token (PeopleService tạm lỗi).
+   * Quyền có thể thiếu/cũ — KHÔNG phải toàn quyền; UI phải cảnh báo.
+   */
+  permissionsStale?: boolean
+  /**
    * Module đang bật — backend hiện KHÔNG trả trong JWT.
    * Để trống nghĩa là "chưa xác định": UI dựa vào quyền, backend vẫn chặn bằng MODULE_NOT_ENABLED.
    */

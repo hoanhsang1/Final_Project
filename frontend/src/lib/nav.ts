@@ -334,8 +334,9 @@ export const WORKSPACES: Workspace[] = [
             label: 'Giáo viên',
             to: '/dao-tao/giao-vien',
             icon: UserRound,
+            // PeopleService không gate API giáo viên bằng module nào; chỉ kiểm
+            // quyền nhân sự (employee.* / class.assign_teacher / teacher.change_status).
             permissions: [PERM.employeeView, PERM.teacherChangeStatus, PERM.classAssignTeacher],
-            modules: ['TEACHER_MANAGEMENT'],
             status: 'ready',
           },
           {
@@ -361,7 +362,10 @@ export const WORKSPACES: Workspace[] = [
             to: '/dao-tao/lop-hoc',
             icon: BookOpen,
             permissions: [PERM.classView, PERM.classCreate],
-            modules: ['CLASS_MANAGEMENT'],
+            // `class.*` thuộc module STUDENT_MANAGEMENT ở backend (PeopleService
+            // requireModuleReadable). CLASS_MANAGEMENT chỉ còn là danh mục cũ,
+            // không gắn quyền nào nên không dùng để ẩn/hiện mục này.
+            modules: ['STUDENT_MANAGEMENT'],
             status: 'ready',
           },
           {
@@ -370,7 +374,7 @@ export const WORKSPACES: Workspace[] = [
             to: '/dao-tao/lop-cua-toi',
             icon: BookOpen,
             permissions: [PERM.classSelfView],
-            modules: ['CLASS_MANAGEMENT'],
+            modules: ['STUDENT_MANAGEMENT'],
             status: 'ready',
           },
         ],

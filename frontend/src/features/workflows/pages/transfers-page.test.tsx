@@ -92,6 +92,7 @@ const pendingInbox: TransferRequest = {
   toDepartmentName: 'Phòng Hành chính – Nhân sự',
   reason: 'Nhu cầu chuyên môn',
   status: 'PENDING',
+  requestedBy: 'user-owner',
   requestedByName: 'Trưởng phòng',
   requestedAt: '2026-02-01T08:00:00Z',
   appliedAt: null,

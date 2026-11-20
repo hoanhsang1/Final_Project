@@ -61,25 +61,23 @@ public class TransferRepository {
     }
 
     public List<TransferResponse> listPending(String orgId) {
-        return idsToResponses(jdbc.queryForList("""
-            SELECT id FROM transfer_request
-            WHERE org_id=? AND status='PENDING'
-            ORDER BY requested_at, id
-            """, String.class, orgId), orgId);
+        return attachSteps(jdbc.query(BASE_QUERY + """
+             WHERE t.org_id=? AND t.status='PENDING'
+             ORDER BY t.requested_at, t.id
+            """, this::map, orgId));
     }
 
     /** Yêu cầu mà người dùng là người được chuyển hoặc người khởi tạo. */
     public List<TransferResponse> listRelated(String orgId, String userId) {
-        return idsToResponses(jdbc.queryForList("""
-            SELECT id FROM transfer_request
-            WHERE org_id=? AND (user_id=? OR requested_by=?)
-            ORDER BY requested_at DESC, id
-            """, String.class, orgId, userId, userId), orgId);
+        return attachSteps(jdbc.query(BASE_QUERY + """
+             WHERE t.org_id=? AND (t.user_id=? OR t.requested_by=?)
+             ORDER BY t.requested_at DESC, t.id
+            """, this::map, orgId, userId, userId));
     }
 
     public Optional<TransferResponse> find(String id, String orgId) {
         var rows = jdbc.query(BASE_QUERY + " WHERE t.id=? AND t.org_id=?", this::map, id, orgId);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+        return rows.isEmpty() ? Optional.empty() : Optional.of(attachSteps(rows).get(0));
     }
 
     public TransferResponse require(String id, String orgId) {
@@ -130,6 +128,7 @@ public class TransferRepository {
         List<Object> params = new ArrayList<>();
         params.add(orgId);
         params.add(departmentId);
+        params.add(com.mems.service.PositionSystemCodes.DEPT_HEAD);
         params.addAll(names);
         Timestamp now = Timestamp.from(Instant.now());
         params.add(now);
@@ -140,8 +139,8 @@ public class TransferRepository {
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id AND p.deleted_at IS NULL
             WHERE a.org_id=? AND a.status='ACTIVE'
               AND a.scope_type='DEPARTMENT' AND a.department_id=?
-              AND p.name IN (""" + String.join(",", Collections.nCopies(names.size(), "?")) + """
-              )
+              AND (p.system_code=? OR p.name IN (""" + String.join(",", Collections.nCopies(names.size(), "?")) + """
+              ))
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, String.class, params.toArray()));
     }
@@ -152,6 +151,7 @@ public class TransferRepository {
             : headPositionNames.stream().filter(Objects::nonNull).distinct().toList();
         if (names.isEmpty()) return false;
         List<Object> params = new ArrayList<>(List.of(orgId, userId));
+        params.add(com.mems.service.PositionSystemCodes.DEPT_HEAD);
         params.addAll(names);
         Timestamp now = Timestamp.from(Instant.now());
         params.add(now);
@@ -162,8 +162,8 @@ public class TransferRepository {
             JOIN `position` p ON p.id=a.position_id AND p.org_id=a.org_id AND p.deleted_at IS NULL
             WHERE a.org_id=? AND a.user_id=? AND a.status='ACTIVE'
               AND a.scope_type='DEPARTMENT'
-              AND p.name IN (""" + String.join(",", Collections.nCopies(names.size(), "?")) + """
-              )
+              AND (p.system_code=? OR p.name IN (""" + String.join(",", Collections.nCopies(names.size(), "?")) + """
+              ))
               AND a.effective_from<=? AND (a.effective_to IS NULL OR a.effective_to>=?)
             """, Integer.class, params.toArray());
         return count != null && count > 0;
@@ -191,10 +191,31 @@ public class TransferRepository {
             String.class, params.toArray()));
     }
 
-    private List<TransferResponse> idsToResponses(List<String> ids, String orgId) {
-        List<TransferResponse> result = new ArrayList<>(ids.size());
-        for (String id : ids) result.add(require(id, orgId));
-        return result;
+    /** TRF-04: nạp bước duyệt cho cả danh sách bằng một truy vấn thay vì N+1. */
+    private List<TransferResponse> attachSteps(List<TransferResponse> rows) {
+        if (rows.isEmpty()) return rows;
+        String in = String.join(",", Collections.nCopies(rows.size(), "?"));
+        Map<String, List<TransferStepResponse>> grouped = new HashMap<>();
+        jdbc.query("""
+            SELECT a.request_id, a.step, a.decision, a.decided_by, sp.full_name AS decided_by_name,
+                   a.decided_at, a.note
+            FROM transfer_approval a
+            LEFT JOIN staff_profile sp ON sp.user_id=a.decided_by AND sp.org_id=a.org_id
+            WHERE a.request_id IN (""" + in + """
+            )
+            ORDER BY a.request_id, CASE a.step
+                WHEN 'SOURCE_HEAD' THEN 1 WHEN 'TARGET_HEAD' THEN 2
+                WHEN 'HR' THEN 3 ELSE 4 END
+            """, rs -> {
+                grouped.computeIfAbsent(rs.getString("request_id"), k -> new ArrayList<>())
+                    .add(new TransferStepResponse(
+                        rs.getString("step"), rs.getString("decision"), rs.getString("decided_by"),
+                        rs.getString("decided_by_name"), instant(rs.getTimestamp("decided_at")),
+                        rs.getString("note")));
+            }, rows.stream().map(TransferResponse::id).toArray());
+        return rows.stream()
+            .map(row -> row.withSteps(grouped.getOrDefault(row.id(), List.of())))
+            .toList();
     }
 
     private static final String BASE_QUERY = """
@@ -212,31 +233,14 @@ public class TransferRepository {
         """;
 
     private TransferResponse map(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
-        String id = rs.getString("id");
         return new TransferResponse(
-            id, rs.getString("user_id"), rs.getString("username"), rs.getString("full_name"),
+            rs.getString("id"), rs.getString("user_id"), rs.getString("username"), rs.getString("full_name"),
             rs.getString("from_department_id"), rs.getString("from_department_name"),
             rs.getString("to_department_id"), rs.getString("to_department_name"),
             rs.getString("reason"), rs.getString("status"),
             rs.getString("requested_by"), rs.getString("requested_by_name"),
             instant(rs.getTimestamp("requested_at")), instant(rs.getTimestamp("applied_at")),
-            rs.getString("applied_by"), steps(id), List.of());
-    }
-
-    private List<TransferStepResponse> steps(String requestId) {
-        return jdbc.query("""
-            SELECT a.step, a.decision, a.decided_by, sp.full_name AS decided_by_name,
-                   a.decided_at, a.note
-            FROM transfer_approval a
-            LEFT JOIN staff_profile sp ON sp.user_id=a.decided_by AND sp.org_id=a.org_id
-            WHERE a.request_id=?
-            ORDER BY CASE a.step
-                WHEN 'SOURCE_HEAD' THEN 1 WHEN 'TARGET_HEAD' THEN 2
-                WHEN 'HR' THEN 3 ELSE 4 END
-            """, (rs, n) -> new TransferStepResponse(
-                rs.getString("step"), rs.getString("decision"), rs.getString("decided_by"),
-                rs.getString("decided_by_name"), instant(rs.getTimestamp("decided_at")),
-                rs.getString("note")), requestId);
+            rs.getString("applied_by"), List.of(), List.of());
     }
 
     private Instant instant(Timestamp value) {

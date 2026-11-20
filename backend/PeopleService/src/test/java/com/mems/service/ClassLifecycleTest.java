@@ -10,6 +10,7 @@ import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.SchoolClassUpdateRequest;
 import com.mems.exception.AppException;
+import com.mems.outbox.OutboxEventRepository;
 import com.mems.repository.ClassStatusRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
@@ -63,10 +64,12 @@ class ClassLifecycleTest {
         OrganizationModuleGuard guard = mock(OrganizationModuleGuard.class);
         classes = new SchoolClassRepository(jdbc);
         statusRepository = new ClassStatusRepository(jdbc);
-        statusService = new ClassStatusService(statusRepository, classes, actor, guard);
+        OutboxEventRepository outbox = mock(OutboxEventRepository.class);
+        statusService = new ClassStatusService(statusRepository, classes, actor, guard,
+            mock(ClassApprovalPolicy.class), mock(NotificationService.class), outbox);
         classService = new SchoolClassService(classes, mock(StudentRepository.class), actor, guard,
             mock(PeopleAuditService.class), mock(TeacherRepository.class), statusService,
-            mock(SubjectRepository.class), "TEACHER_ASSIGNMENT");
+            mock(SubjectRepository.class), outbox, "TEACHER_ASSIGNMENT");
     }
 
     @Test
@@ -302,6 +305,41 @@ class ClassLifecycleTest {
             new SchoolClassUpdateRequest("Name", null, TODAY, TODAY.minusDays(1), 0L)))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    @DisplayName("Hộp duyệt lớp: trả cả yêu cầu đóng và hủy đang PENDING kèm lý do/người tạo")
+    void pendingLifecycleListsCloseAndCancelRequests() {
+        insertClass("class-close", "DANG_DIEN_RA", "NONE", TODAY.minusDays(5), TODAY.plusDays(5), 0);
+        jdbc.update("""
+            UPDATE school_class SET close_state='PENDING', close_requested_by='creator-1'
+            WHERE id='class-close'
+            """);
+        jdbc.update("""
+            INSERT INTO class_close_event(id,class_id,org_id,action,actor_id,reason,created_at)
+            VALUES ('ev-close','class-close','org-1','REQUESTED','creator-1','Đã hết chương trình', ?)
+            """, Timestamp.from(NOW));
+
+        insertClass("class-cancel", "CHUA_BAT_DAU", "NONE", TODAY, TODAY.plusDays(10), 0);
+        jdbc.update("""
+            UPDATE school_class
+            SET cancel_state='PENDING', cancel_requested_by='creator-2', cancel_request_reason='Sai lịch'
+            WHERE id='class-cancel'
+            """);
+        jdbc.update("""
+            INSERT INTO class_close_event(id,class_id,org_id,action,actor_id,reason,created_at)
+            VALUES ('ev-cancel','class-cancel','org-1','CANCEL_REQUESTED','creator-2','Sai lịch', ?)
+            """, Timestamp.from(NOW));
+
+        var items = classes.pendingLifecycle("org-1");
+
+        assertThat(items).extracting(item -> item.classId() + ":" + item.kind())
+            .containsExactlyInAnyOrder("class-close:CLOSE", "class-cancel:CANCEL");
+        assertThat(items).allSatisfy(item -> {
+            assertThat(item.requesterId()).isNotNull();
+            assertThat(item.reason()).isNotBlank();
+            assertThat(item.requestedAt()).isNotNull();
+        });
     }
 
     private void assertClassNotCancellable(String id) {

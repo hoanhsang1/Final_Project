@@ -26,62 +26,19 @@ import { useDepartments, useEmployeeDirectory } from '@/features/organization/ho
 import {
   TRANSFER_STATUS_LABELS,
   TRANSFER_STEP_LABELS,
-  TRANSFER_STEP_ORDER,
   type TransferRequest,
-  type TransferStep,
 } from '@/features/organization/types'
+import { TransferTimeline } from '@/features/workflows/components/transfer-timeline'
 import { useTransferWorkflow } from '@/features/workflows/hooks'
 import { PERM } from '@/lib/permissions'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime } from '@/lib/format'
-import { cn } from '@/lib/cn'
 
 const STATUS_TONE: Record<string, 'warning' | 'success' | 'danger' | 'neutral'> = {
   PENDING: 'warning',
   APPROVED: 'success',
   REJECTED: 'danger',
   CANCELLED: 'neutral',
-}
-
-function TransferTimeline({ steps }: { steps: TransferStep[] }) {
-  return (
-    <ol className="flex flex-col gap-2">
-      {TRANSFER_STEP_ORDER.map((code) => {
-        const step = steps.find((item) => item.step === code)
-        const decision = step?.decision ?? 'PENDING'
-        return (
-          <li key={code} className="flex items-start gap-2 text-xs">
-            <span
-              className={cn(
-                'mt-1 size-2 shrink-0 rounded-full',
-                decision === 'APPROVED'
-                  ? 'bg-success-500'
-                  : decision === 'REJECTED'
-                    ? 'bg-danger-500'
-                    : 'bg-ink-300',
-              )}
-              aria-hidden="true"
-            />
-            <div>
-              <p className="font-medium text-ink-700">
-                {TRANSFER_STEP_LABELS[code]}
-                {decision !== 'PENDING' ? (
-                  <span className="ml-2 font-normal text-ink-400">
-                    {decision === 'APPROVED' ? 'đã duyệt' : 'từ chối'}
-                    {step?.decidedByName ? ` · ${step.decidedByName}` : ''}
-                    {step?.decidedAt ? ` · ${formatDateTime(step.decidedAt)}` : ''}
-                  </span>
-                ) : (
-                  <span className="ml-2 font-normal text-ink-400">đang chờ</span>
-                )}
-              </p>
-              {step?.note ? <p className="text-ink-500">“{step.note}”</p> : null}
-            </div>
-          </li>
-        )
-      })}
-    </ol>
-  )
 }
 
 function TransferCard({
@@ -138,7 +95,8 @@ function TransferCard({
 }
 
 export function TransfersPage() {
-  const { can } = usePermission()
+  const { can, session } = usePermission()
+  const currentUserId = session?.user.id ?? ''
   const workflow = useTransferWorkflow()
   const departments = useDepartments()
   const directory = useEmployeeDirectory()
@@ -283,7 +241,7 @@ export function TransfersPage() {
                   key={request.id}
                   request={request}
                   canDecide={request.actionableSteps.length > 0}
-                  canCancel={request.status === 'PENDING'}
+                  canCancel={request.status === 'PENDING' && request.requestedBy === currentUserId}
                   onDecision={setDecisionTarget}
                   onCancel={setCancelTarget}
                 />

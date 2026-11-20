@@ -49,6 +49,14 @@ export const teachersApi = {
     const { data } = await api.put<TeacherDetail>(`/teachers/${staffId}`, input)
     return data
   },
+
+  async changeStatus(
+    staffId: string,
+    status: 'DANG_DAY' | 'TAM_NGHI' | 'NGHI_VIEC',
+  ): Promise<TeacherDetail> {
+    const { data } = await api.put<TeacherDetail>(`/teachers/${staffId}/teaching-status`, { status })
+    return data
+  },
 }
 
 export const studentsApi = {
