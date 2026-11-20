@@ -21,7 +21,7 @@
 | `role-permission-matrix.md` | Giữ nguyên quyền; không thêm mã mới (đã đúng từ Revision 2) |
 | `teacher-subject-design.md` | BR-TCH-18 theo D-09 tinh chỉnh |
 | `validation-and-error-cases.md` | E-40…E-43, AC-VAL-17…20, `expectedVersion` bắt buộc |
-| `test-cases.md` | TC-CLS-039…048, TC-LEG-016…020, ma trận AC |
+| `test-cases.md` | TC-CLS-039…048, TC-LEG-016…024, ma trận AC |
 | `implementation-roadmap.md` | WP1 dùng 51/52 (không 53), WP5 `operationId`/`expectedVersion`, test range 001…048 |
 | `review-report.md` | Viết lại thành Revision 3 (`READY FOR USER REVIEW`) |
 | `wp0-readiness-report.md` | Ghi chú Revision 3 + bỏ migration 53 không bằng chứng |
@@ -91,9 +91,33 @@ Năm bất biến primary (tài liệu hoá + test):
 4. Không quá một primary/lớp.
 5. Tạo lớp/đổi môn/backfill giữ các bất biến trên.
 
----
+### 3.1. Xác minh optimistic locking (`school_class.version`)
 
-## 4. Migration 51/52/53 — trạng thái
+Đọc source tại HEAD `bfa9b53` + dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
+
+| Hạng mục | Bằng chứng | Kết luận |
+|---|---|---|
+| `version` tồn tại trong schema MySQL | `DB_11_16.sql:376-401` (`version bigint NOT NULL DEFAULT '0'`) | `VERIFIED` trên dump trong repo; **chưa chạy** `information_schema` trên DB thật |
+| Không có migration nào tạo/đổi cột | `grep CREATE TABLE school_class` trên các file `[0-9]*.sql`: 0 kết quả; cột đến từ dump gốc | `VERIFIED` (repo) |
+| Entity | People Service **không dùng JPA**; `SchoolClassResponse` (record) có `long version`, map `rs.getLong("version")` (`SchoolClassRepository.java:48`) | `VERIFIED` — không có `@Version` |
+| Update có điều kiện + tăng version | `SchoolClassRepository.update` (`:289-303`): `SET ..., version = version + 1 ... WHERE id=? AND org_id=? AND deleted_at IS NULL AND version=?`; `assignTeacher` (`:306-313`) tương tự | `VERIFIED` |
+| Service xử lý 0 dòng | `SchoolClassService.update` (`:130-138`) ném `STATUS_CHANGED` (2207, 409); `assignTeacher` (`:195-197`) ném `DATA_CHANGED` (2212, 409) | `VERIFIED` — **khác mã** giữa hai luồng hiện có |
+| Request bắt buộc version | `SchoolClassUpdateRequest.version`: `@NotNull(VERSION_REQUIRED)` + `@PositiveOrZero` (`:17-18`) | `VERIFIED` — version **đã bắt buộc**, không phải tuỳ chọn |
+| H2 vs MySQL | H2 `version BIGINT NOT NULL DEFAULT 0` (`people-test-schema.sql:147`); MySQL cùng kiểu/default | `VERIFIED` (cùng kiểu); khác biệt `datetime(3)` vs `TIMESTAMP` không ảnh hưởng locking |
+
+**Chưa xác minh được:** DB staging/production thực tế có đúng dump `DB_11_16.sql` hay không (không
+được kết nối DB trong task này). Nếu staging lệch dump, `expectedVersion` vẫn dùng được nhưng phải
+chạy `SHOW COLUMNS FROM school_class LIKE 'version'` trước khi triển khai.
+
+**Hệ quả thiết kế (không sửa Java ở task này):**
+
+- `PUT /classes/{id}` hiện trả **2207 `STATUS_CHANGED`** khi version lệch. Endpoint mới
+  `PUT .../subjects/primary` trong thiết kế dùng **2212 `DATA_CHANGED`**. WP5 phải chọn: giữ
+  `STATUS_CHANGED` cho toàn bộ luồng lớp (khuyến nghị, không đổi hành vi cũ) hoặc ghi rõ lý do đổi —
+  không tự ý đổi mã lỗi của endpoint hiện có.
+- Không cần thêm cột/trigger; `version` đã tồn tại và repository đã tăng đúng.
+
+
 
 | File | Trạng thái | Nội dung |
 |---|---|---|
@@ -121,8 +145,12 @@ Nằm ở `migrations/51_52_precheck.sql`, gồm:
 8. `class_subject.subject_id` không tồn tại trong `subject` (FK sẽ fail).
 9. Lớp đã kết thúc/huỷ còn `subject_id`.
 10. `school_class.subject_id` không tồn tại trong `subject` cùng org (backfill sẽ fail FK).
+11. **Phân loại từng lớp** (`AUTO_BACKFILL_CANDIDATE` / `MANUAL_REVIEW` / `BLOCK_MIGRATION` /
+    `NO_ACTION` kèm `reason_code`) — query 10.
+12. Tổng hợp số lớp theo nhãn — query 11.
+13. Danh sách `BLOCK_MIGRATION` (query 12) và `MANUAL_REVIEW` (query 13).
 
-Truy vấn 4–7 chỉ chạy sau khi xác nhận `class_subject` tồn tại (truy vấn 0).
+Truy vấn 4–7 và phần B (10–13) chỉ chạy sau khi xác nhận `class_subject` tồn tại (truy vấn 0).
 Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải được đưa vào báo cáo manual review.
 
 ---
@@ -138,12 +166,32 @@ Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải �
 4. Không backfill `class_subject_history` hồi tố (không có actor/thời điểm/lý do nguồn).
 5. Không suy đoán khi dữ liệu mập mờ.
 
+**Phân loại dữ liệu (pre-check phần B):**
+
+| Nhãn | `reason_code` | Hành động |
+|---|---|---|
+| `AUTO_BACKFILL_CANDIDATE` | `INSERT_LEGACY_ROW` / `MARK_EXACT_PRIMARY` | Backfill tự động 5a/5b |
+| `MANUAL_REVIEW` | `PRIMARY_SUBJECT_MISMATCH` / `PRIMARY_WITHOUT_CLASS_SUBJECT` | Không tự sửa; người dùng quyết định |
+| `BLOCK_MIGRATION` | `CS_ORPHAN_SUBJECT` / `CS_ORG_MISMATCH` / `CLASS_ORPHAN_SUBJECT` / `MULTI_PRIMARY` | Dừng; sửa dữ liệu trước |
+| `NO_ACTION` | `PRIMARY_OK` / `NO_SUBJECT` | Không làm gì |
+
+**Bảo đảm của draft 52:**
+
+- 5a có `NOT EXISTS` dòng khớp **và** `NOT EXISTS` primary → không tạo trùng `(class_id, subject_id)`,
+  không ghi đè primary mâu thuẫn, không tạo primary khi `subject_id IS NULL`.
+- 5b dùng bảng tạm `tmp_m52_has_primary` (tránh MySQL 1093), chỉ set primary cho lớp chưa có.
+- 5a/5b **chỉ** tác động lớp `deleted_at IS NULL` (khớp pre-check phần B). Lớp đã xoá mềm không bị
+  sửa; nếu có luồng khôi phục lớp phải kiểm primary riêng (ngoài phạm vi migration này).
+- 5.0 `mems_m52_assert_backfill_safe` dừng khi còn subject mồ côi/org lệch;
+  5c `mems_m52_assert_no_duplicate_primary` dừng khi >1 primary/lớp.
+
 **Unresolved rows (phải xử lý tay):**
 
 - Lớp có `subject_id` nhưng không có dòng `class_subject` nào và không thể tạo do ràng buộc khác.
 - Lớp đã có >1 dòng `is_primary=1` (từ bản nháp cũ) → migration **dừng** (SIGNAL) trước khi thêm UNIQUE.
 - `class_subject` trỏ môn/lớp khác org.
 - `class_subject.subject_id` hoặc `school_class.subject_id` không tồn tại trong `subject` cùng org.
+- Primary lệch `school_class.subject_id`, hoặc `subject_id IS NULL` mà có primary → `MANUAL_REVIEW`.
 
 Các trường hợp trên **chưa có dữ liệu thực tế** để kiểm; báo cáo này không khẳng định đã xử lý.
 
@@ -179,26 +227,34 @@ Không thêm permission ID mới; dùng `class.edit`/`class.view` hiện có.
 
 ## 9. Rollback risks
 
+Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → export history → export
+`class_subject` + bảng liên quan → xác minh → drop FK → drop index/cột sinh → drop bảng con → cha).
+
 - `class_subject_history`: mất vĩnh viễn nếu drop mà chưa export (không tái tạo được actor/thời gian/lý do).
 - `class_subject`: mất snapshot môn/giáo viên/số buổi của lớp.
 - `is_primary`: mất dấu primary; có thể suy lại từ `subject_id` nếu dữ liệu nhất quán.
 - Backfill `LEGACY`: xoá sẽ mất dòng môn legacy đã tạo.
+- Partial rollback phải drop **ngược dependency**: `uq_class_subject_primary` → `primary_class_id`
+  → `is_primary`; đảo thứ tự sẽ bị MySQL từ chối.
 - Nếu đã phát sinh history/dữ liệu mới → **forward-fix**, không rollback.
-- Chi tiết + thứ tự lệnh: `migrations/ROLLBACK.md`.
+- Chi tiết + tên FK/index: `migrations/ROLLBACK.md`.
 
 ---
 
 ## 10. Unresolved technical decisions
 
 1. **MySQL generated column** chưa được kiểm thực tế trên MySQL 8 staging.
-2. **`expectedVersion`:** `school_class.version` **tồn tại** trong H2 schema và dùng trong
-   `SchoolClassRepository` (`version = version + 1 ... AND version = ?`), nên không cần đổi schema.
-   Tuy nhiên `SchoolClassUpdateRequest.version` hiện **tuỳ chọn** (`@PositiveOrZero Long version`);
-   WP5 phải bắt buộc khi đổi `subjectId`. Không thay bằng timestamp.
+2. **`expectedVersion`:** `school_class.version` **tồn tại** trong dump MySQL (`DB_11_16.sql:391`) và
+   H2 schema; repository tăng version đúng. `SchoolClassUpdateRequest.version` **đã bắt buộc**
+   (`@NotNull VERSION_REQUIRED`). Việc còn lại chỉ là đảm bảo endpoint mới đổi môn chính trả 409
+   thống nhất — hiện `PUT /classes/{id}` trả `STATUS_CHANGED` (2207), thiết kế mới đề xuất
+   `DATA_CHANGED` (2212); xem §3.1. Không thay bằng timestamp.
 3. Mã lỗi mới 2240/3054 cần người dùng xác nhận thêm vào enum (đề xuất, chưa sửa code).
 4. `GET /classes/{id}/subject-history` có cần lọc thời gian/actor không (Phase 1 đang phân trang).
 5. `plannedSessions`/`sessionMinutes` khi tạo dòng mới giữ thiết kế hiện tại; không đặt default mới.
 6. Outbox: không triển khai ở Phase 1 (giữ nguyên quyết định).
+7. **Dữ liệu staging** chưa được kiểm: chưa chạy pre-check/post-check; chưa xác minh dump
+   `DB_11_16.sql` khớp DB thật.
 
 ---
 
@@ -210,6 +266,8 @@ Không thêm permission ID mới; dùng `class.edit`/`class.view` hiện có.
   retry sau thất bại, D-09 fallback, rollback cập nhật `class_subject`, `subject_id` = primary.
 - TC-LEG-016…020: backfill exact-match, báo cáo mập mờ, MySQL generated column, H2 parity,
   UNIQUE chặn >1 primary.
+- TC-LEG-021…024: phân loại pre-check đủ 6 trường hợp, backfill chạy lại idempotent, backfill không
+  ghi đè/không tạo primary khi `subject_id NULL`, rollback đúng dependency.
 - E-40…E-43, AC-VAL-17…20.
 
 **Đã thực thi: KHÔNG.** Không chạy Maven, không chạy H2, không chạy migration, không gọi API. Mọi

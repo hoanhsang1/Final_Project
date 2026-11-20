@@ -495,8 +495,14 @@ Endpoint lớp hiện có (`SchoolClassController`) nhận `subjectId` trong bod
   Nó phải chạy **cùng luồng** với §4.8 (khoá lớp, ghi `class_subject_history`, đồng bộ
   `class_subject`), trong cùng transaction. Khi đó request **bắt buộc** có thêm:
   `reason` (≤ 500), `operationId`, và `version` (dùng làm `expectedVersion`, phải khớp
-  `school_class.version`). Thiếu → 400; lệch version → 409 `DATA_CHANGED`; trùng `operationId` +
+  `school_class.version`). Thiếu → 400; lệch version → 409; trùng `operationId` +
   payload khác → 409 `CLASS_SUBJECT_OPERATION_CONFLICT`. `changedBy` lấy từ JWT.
+
+  > **Lưu ý mã lỗi version (đã đối chiếu code HEAD `bfa9b53`):** `PUT /classes/{id}` hiện trả
+  > `STATUS_CHANGED` (2207, 409) khi `repository.update` trả 0 dòng; `assignTeacher` trả
+  > `DATA_CHANGED` (2212, 409). Thiết kế §4.8 dùng `DATA_CHANGED`. WP5 phải chốt một mã thống
+  > nhất; **không** tự đổi hành vi endpoint cũ nếu người dùng chưa duyệt (xem
+  > `wp1-readiness-report.md` §3.1).
 - Nếu lớp đã `DA_KET_THUC/DA_HUY/CLOSED` → 409 `CLASS_NOT_EDITABLE` như hiện tại, không ghi history.
 - Response giữ nguyên `ClassResponse` hiện có (không thêm hợp đồng mới).
 

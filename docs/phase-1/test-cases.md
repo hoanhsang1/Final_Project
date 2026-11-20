@@ -244,6 +244,10 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-018 | MySQL generated column | `INSERT ... (is_primary=1)` | `primary_class_id = class_id`; `is_primary=0` → NULL; không được list `primary_class_id` trong INSERT (errno 3105) | DB |
 | TC-LEG-019 | H2 parity | chạy IT H2 | `primary_class_id` là cột thường, service phải set; ghi rõ H2 **không** chứng minh MySQL generated column | DB |
 | TC-LEG-020 | UNIQUE chỉ chặn >1 primary | INSERT 2 dòng `is_primary=1` cùng lớp trên MySQL | Dòng thứ hai bị UNIQUE từ chối | DB |
+| TC-LEG-021 | Phân loại pre-check đủ 6 trường hợp | staging có: khớp primary; chưa primary; primary lệch; >1 primary; `subject_id NULL` có primary; subject/class khác org | Query 10 trả đúng `reason_code`/nhãn `NO_ACTION`, `AUTO_BACKFILL_CANDIDATE`, `MANUAL_REVIEW`, `BLOCK_MIGRATION`; query 12 chỉ liệt kê block | DB |
+| TC-LEG-022 | Backfill chạy lại idempotent | chạy 5a/5b hai lần trên staging | Lần 2 không tạo dòng mới, không đổi `is_primary`, số dòng `class_subject` giữ nguyên; PK không bị vi phạm | DB |
+| TC-LEG-023 | Backfill không ghi đè/không tạo sai primary | lớp `subject_id NULL` có primary; lớp có primary lệch subject; lớp đã xoá mềm có `subject_id` | 5a không chèn; 5b không đổi primary hiện có và không chạm lớp `deleted_at` khác NULL; dòng thuộc `MANUAL_REVIEW`, migration không tự sửa | DB |
+| TC-LEG-024 | Rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối (cột sinh/index phụ thuộc) | DB |
 
 ---
 
@@ -270,7 +274,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
 | AC-VAL-01…11 | E-01…E-29 |
 | AC-VAL-12…20, AC-SUB-15…17 | TC-CLS-021…048, E-30…E-43 |
-| Legacy | TC-LEG-001…020 |
+| Legacy | TC-LEG-001…024 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency) |
 | Concurrency | TC-CON-001…006 |
 
 ---
@@ -294,7 +298,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 - D-06a → TC-TCH-008…011, TC-RBAC-010 là Phase 2; TC-TCH-019 xác nhận `APPROVED` ngay.
 - D-07 → TC-CUR-009/010/019…024, TC-LEG-011…015, TC-CON-006.
 - D-14 → TC-RBAC-011/012.
-- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…020.
+- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…024.
 - D-09 → TC-CLS-046 (fallback chỉ khi chưa có bản ghi `class_subject` tương ứng).
 
 Câu hỏi kỹ thuật còn lại:

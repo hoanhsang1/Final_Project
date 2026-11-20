@@ -51,6 +51,28 @@ BEGIN
   END IF;
 END$
 
+DROP PROCEDURE IF EXISTS mems_m52_assert_backfill_safe$
+CREATE PROCEDURE mems_m52_assert_backfill_safe()
+BEGIN
+  DECLARE v_bad INT DEFAULT 0;
+  -- Đếm mọi dòng sẽ làm FK/backfill fail: subject mồ côi, org lệch, lớp trỏ môn mồ côi.
+  SELECT
+    (SELECT COUNT(*) FROM class_subject cs
+      LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
+      WHERE s.id IS NULL)
+  + (SELECT COUNT(*) FROM class_subject cs
+      JOIN school_class c ON c.id = cs.class_id
+      WHERE c.org_id <> cs.org_id)
+  + (SELECT COUNT(*) FROM school_class c
+      LEFT JOIN subject s ON s.id = c.subject_id AND s.org_id = c.org_id
+      WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL AND s.id IS NULL)
+  INTO v_bad;
+  IF v_bad > 0 THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'M52 ABORT: orphan subject or org mismatch — resolve precheck BLOCK_MIGRATION first';
+  END IF;
+END$
+
 DELIMITER ;
 
 -- 1) specialty_subject (D-06)
@@ -147,6 +169,10 @@ CALL mems_m52_add_col('class_subject', 'primary_class_id',
   'CHAR(36) GENERATED ALWAYS AS (CASE WHEN is_primary = 1 THEN class_id END) STORED');
 
 -- 5) Backfill exact-match (D-11): chỉ dùng school_class.subject_id, không đoán.
+-- 5.0) Dừng nếu dữ liệu sẽ làm FK/backfill fail (orphan subject, org lệch).
+--      Tương ứng precheck section B: BLOCK_MIGRATION phải = 0.
+CALL mems_m52_assert_backfill_safe();
+
 -- 5a) Tạo dòng LEGACY khi lớp có subject_id nhưng chưa có dòng khớp và chưa có primary.
 INSERT INTO class_subject(class_id, subject_id, org_id, source, teacher_id, is_primary, status, created_at)
 SELECT c.id, c.subject_id, c.org_id, 'LEGACY', c.teacher_id, 1, 'PLANNED', NOW(3)
@@ -162,6 +188,8 @@ WHERE c.subject_id IS NOT NULL
 
 -- 5b) Đánh primary cho dòng khớp chính xác nếu lớp chưa có primary.
 --     Dùng bảng tạm để tránh MySQL error 1093 (update table read in subquery).
+--     Phạm vi = lớp còn sống (deleted_at IS NULL), khớp pre-check phần B; lớp đã xoá mềm
+--     không bị sửa vì không nằm trong phân loại nào.
 DROP TEMPORARY TABLE IF EXISTS tmp_m52_has_primary;
 CREATE TEMPORARY TABLE tmp_m52_has_primary (class_id char(36) NOT NULL PRIMARY KEY);
 INSERT INTO tmp_m52_has_primary (class_id)
@@ -173,6 +201,7 @@ LEFT JOIN tmp_m52_has_primary p ON p.class_id = cs.class_id
 SET cs.is_primary = 1
 WHERE c.subject_id = cs.subject_id
   AND c.subject_id IS NOT NULL
+  AND c.deleted_at IS NULL
   AND p.class_id IS NULL;
 
 DROP TEMPORARY TABLE IF EXISTS tmp_m52_has_primary;
@@ -224,5 +253,6 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
 DROP PROCEDURE IF EXISTS mems_m52_add_col;
 DROP PROCEDURE IF EXISTS mems_m52_add_unique;
 DROP PROCEDURE IF EXISTS mems_m52_assert_no_duplicate_primary;
+DROP PROCEDURE IF EXISTS mems_m52_assert_backfill_safe;
 
 -- Post-check: chạy docs/phase-1/migrations/51_52_postcheck.sql

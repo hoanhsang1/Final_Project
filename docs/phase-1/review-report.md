@@ -49,7 +49,7 @@ báo cáo rà soát tay; **không** tạo migration 53 khi không có bằng ch�
 | 5 | `api-contract.md` | §4.7 `PUT /classes/{id}` bắt buộc field khi đổi môn; §4.8 field bắt buộc + idempotency; §4.9 response có source/operationId; bảng mã lỗi |
 | 6 | `validation-and-error-cases.md` | E-40…E-43; bảng optimistic locking `expectedVersion` bắt buộc; AC-VAL-17…20 |
 | 7 | `teacher-subject-design.md` | BR-TCH-18 fallback theo bản ghi |
-| 8 | `test-cases.md` | TC-CLS-039…048, TC-LEG-016…020, ma trận cập nhật |
+| 8 | `test-cases.md` | TC-CLS-039…048, TC-LEG-016…024, ma trận cập nhật |
 | 9 | `implementation-roadmap.md` | WP1 (52 tên chuẩn, không 53), WP5 (idempotency + `expectedVersion` + source) |
 | 10 | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Fixture H2: `curriculum*`, `class_subject`, `class_subject_history`, `teacher_subject`, `specialty_subject`, `school_class.curriculum_id` |
 | 11 | `docs/phase-1/migrations/51_people_curriculum.sql` | **Draft** — KHÔNG chạy |
@@ -73,6 +73,22 @@ báo cáo rà soát tay; **không** tạo migration 53 khi không có bằng ch�
 | Source Java/React bị thay đổi | 0 |
 | SQL đã chạy / DB đã kết nối | 0 |
 | Test đã chạy | 0 |
+
+### 1.4. Lượt rà soát kỹ thuật bổ sung (2026-11-20)
+
+Sau khi Viết lại Revision 3, rà thêm các điểm còn thiếu (vẫn **không** chạy SQL/Java/React):
+
+1. **Pre-check/post-check:** thêm phần B phân loại từng lớp `AUTO_BACKFILL_CANDIDATE` /
+   `MANUAL_REVIEW` / `BLOCK_MIGRATION` / `NO_ACTION` kèm `reason_code`; post-check mục 7 xác nhận
+   backfill idempotent, không tạo primary sai, không trùng khóa.
+2. **Draft 52:** thêm `mems_m52_assert_backfill_safe` (subject mồ côi/org lệch) chạy trước 5a;
+   xác nhận 5a/5b không trùng khóa, không ghi đè primary, không tạo primary khi `subject_id NULL`.
+3. **Rollback:** viết lại `ROLLBACK.md` thành 7 bước cố định + bảng tên FK/index đối chiếu draft thật.
+4. **Optimistic locking:** xác minh `school_class.version` trong dump MySQL/H2, repository
+   `version = version + 1 ... AND version = ?`, request `@NotNull` — xem `wp1-readiness-report.md` §3.1.
+5. **Test:** thêm TC-LEG-021…024; sửa lại nội dung TC-LEG-020 (UNIQUE primary, không phải opId).
+6. **Phạm vi backfill:** 5a/5b chỉ tác động lớp `deleted_at IS NULL` (khớp phần B); post-check 7c/7d/7e
+   cũng lọc tương ứng để không báo nhầm dữ liệu lớp đã xoá mềm.
 
 ---
 
@@ -229,10 +245,12 @@ Tuỳ chọn: `plannedSessions`/`sessionMinutes` (chỉ khi phải tạo dòng m
 
 ### 4.3. `PUT /api/classes/{id}` (hiện có)
 
-- `subjectId` **không đổi** → hành vi cũ, `version` vẫn tuỳ chọn như hiện tại.
+- `subjectId` **không đổi** → hành vi cũ; `version` vẫn **bắt buộc** như hiện tại
+  (`SchoolClassUpdateRequest` `@NotNull VERSION_REQUIRED`), không đổi hợp đồng.
 - `subjectId` **đổi** → **bắt buộc** `reason`, `operationId`, `version` (= `expectedVersion`);
-  thiếu → 400 `VALIDATION_ERROR`; lệch version → 409 `DATA_CHANGED`; cùng `operationId` payload
-  khác → 409.
+  thiếu → 400 `VALIDATION_ERROR`; lệch version → 409 (hiện `PUT /classes/{id}` trả
+  `STATUS_CHANGED` 2207; endpoint mới đề xuất `DATA_CHANGED` 2212 — xem `wp1-readiness-report.md`
+  §3.1, cần chốt khi code); cùng `operationId` payload khác → 409.
 - Service **không** được `repository.save()` thẳng với `subjectId` mới; phải gọi
   `PrimarySubjectChangeService`.
 - Response `ClassResponse` **không đổi** (không phá FE).
@@ -313,7 +331,11 @@ họ còn giữ chức danh ORGANIZATION. Tài liệu ghi rõ, không tự mở 
 | TC-LEG-017 | Lớp không khớp/mơ hồ → báo cáo rà soát, không tự đoán |
 | TC-LEG-018 | MySQL: cột sinh + UNIQUE chặn primary thứ hai |
 | TC-LEG-019 | Khác biệt H2: bất biến tối thiểu **không** kiểm được trên H2 |
-| TC-LEG-020 | UNIQUE `(org_id, operation_id)` chặn history trùng |
+| TC-LEG-020 | UNIQUE `(primary_class_id)` chặn primary thứ hai (không bảo đảm tối thiểu) |
+| TC-LEG-021 | Pre-check phân loại đủ 6 trường hợp (AUTO/MANUAL/BLOCK/NO_ACTION) |
+| TC-LEG-022 | Backfill chạy lại idempotent (không trùng, không đổi primary) |
+| TC-LEG-023 | Không tạo primary khi `subject_id NULL`, không ghi đè primary mâu thuẫn |
+| TC-LEG-024 | Partial rollback đúng dependency index → cột sinh → `is_primary` |
 
 ### 7.3. Ánh xạ 24 kịch bản yêu cầu
 

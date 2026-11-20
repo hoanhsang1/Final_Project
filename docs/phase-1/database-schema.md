@@ -607,7 +607,17 @@ WHERE NOT EXISTS (
 
 ### 5.3. `class_subject` (legacy)
 
+**Phân loại dữ liệu trước backfill** (chi tiết SQL: `migrations/51_52_precheck.sql` phần B):
+
+| Nhãn | Ý nghĩa | Hành động |
+|---|---|---|
+| `AUTO_BACKFILL_CANDIDATE` | Lớp có `subject_id`, chưa có dòng khớp **và** chưa có primary (`INSERT_LEGACY_ROW`), hoặc đã có dòng khớp nhưng chưa primary (`MARK_EXACT_PRIMARY`) | Backfill tự động bước 5a/5b |
+| `MANUAL_REVIEW` | Có primary nhưng khác `school_class.subject_id`, hoặc `subject_id IS NULL` mà vẫn có primary | **Không** tự sửa; đưa vào báo cáo duyệt tay |
+| `BLOCK_MIGRATION` | Subject mồ côi (class/class_subject trỏ môn không tồn tại cùng org), org lệch, >1 primary/lớp | **Dừng**; sửa dữ liệu trước khi chạy 52 |
+| `NO_ACTION` | Đã nhất quán (primary khớp `subject_id`, hoặc lớp không có môn) | Không làm gì |
+
 ```sql
+-- 5a) Chỉ tạo dòng LEGACY khi: có subject_id, chưa có dòng khớp, VÀ lớp chưa có primary.
 INSERT INTO class_subject(class_id, subject_id, org_id, source, teacher_id, is_primary, status, created_at)
 SELECT c.id, c.subject_id, c.org_id, 'LEGACY', c.teacher_id, 1, 'PLANNED', NOW(3)
 FROM school_class c
@@ -615,16 +625,27 @@ WHERE c.subject_id IS NOT NULL
   AND c.deleted_at IS NULL
   AND NOT EXISTS (
     SELECT 1 FROM class_subject x
-    WHERE x.class_id = c.id AND x.subject_id = c.subject_id);
+    WHERE x.class_id = c.id AND x.subject_id = c.subject_id)
+  AND NOT EXISTS (
+    SELECT 1 FROM class_subject p
+    WHERE p.class_id = c.id AND p.is_primary = 1);
+
+-- 5b) Đánh primary cho dòng khớp chính xác khi lớp chưa có primary
+--     (dùng bảng tạm để tránh MySQL 1093 — xem draft 52 bước 5b).
 ```
 
 - Không backfill `required_sessions`/`session_minutes` (không có nguồn); để NULL.
 - `is_primary = 1` cho dòng khớp `school_class.subject_id`; `primary_class_id` là cột sinh nên
   **không** liệt kê trong INSERT.
-- Nếu lớp đã có sẵn dòng `class_subject` khớp môn chính (do dữ liệu nhập trước), không set primary
-  trong câu INSERT trên; phải chạy `UPDATE` ở mục 6.3b (idempotent) để bảo đảm đúng một primary.
-- Lớp đã kết thúc vẫn backfill để giữ lịch sử; `status` có thể đặt `COMPLETED` nếu
-  `c.status='DA_KET_THUC'` (tuỳ chọn, cần chốt).
+- **Bảo đảm của draft 52:** 5a không tạo trùng `(class_id, subject_id)` (có `NOT EXISTS`), không ghi
+  đè primary đang mâu thuẫn (có `NOT EXISTS primary`), không tạo primary khi
+  `school_class.subject_id IS NULL` (điều kiện `subject_id IS NOT NULL`); 5b dùng bảng tạm
+  `tmp_m52_has_primary`; 5c gọi `mems_m52_assert_no_duplicate_primary`; bước 5.0 gọi
+  `mems_m52_assert_backfill_safe` để dừng khi còn subject mồ côi/org lệch.
+- **Phạm vi 5a/5b:** chỉ lớp `deleted_at IS NULL`, khớp pre-check phần B và post-check 7a/7c/7d/7e.
+  Lớp đã xoá mềm không bị sửa (không nằm trong phân loại nào); nếu sau này có luồng khôi phục lớp,
+  phải kiểm primary của lớp đó riêng — migration này không bảo đảm.
+- Lớp đã kết thúc vẫn backfill để giữ lịch sử; `status` giữ `PLANNED` (không tự suy `COMPLETED`).
 - **Không** tạo `class_subject_history` hồi tố: không có dữ liệu nguồn (không biết actor/thời điểm).
 
 ---
@@ -635,6 +656,15 @@ WHERE c.subject_id IS NOT NULL
 
 Chạy **trên staging**, ghi lại kết quả. Bất kỳ truy vấn nào trả dòng đều phải vào **báo cáo manual
 review**; migration **không** tự sửa/đoán.
+
+Bản đầy đủ nằm ở `migrations/51_52_precheck.sql`:
+- Query 0–9: kiểm tra tồn tại bảng/cột, trùng khóa, org lệch, subject mồ côi.
+- **Phần B (query 10–13):** phân loại **từng lớp** thành `AUTO_BACKFILL_CANDIDATE`,
+  `MANUAL_REVIEW`, `BLOCK_MIGRATION`, `NO_ACTION` (kèm `reason_code`), tổng hợp theo nhãn và xuất
+  danh sách block/review. Migration 52 **chỉ được chạy** khi `BLOCK_MIGRATION = 0`; mọi dòng
+  `MANUAL_REVIEW` phải được người dùng xử lý hoặc chấp nhận bằng văn bản.
+
+Dưới đây là bản rút gọn:
 
 ```sql
 -- a) class_subject / class_subject_history đã tồn tại? cột đã có chưa?
@@ -841,14 +871,20 @@ Kỳ vọng: 0 dòng cho cả ba truy vấn. Bảng mới ở Phase 1 nên thự
 
 ## 7. Rollback / bù trừ
 
+Kế hoạch đầy đủ theo **7 bước bắt buộc** ở `migrations/ROLLBACK.md`:
+(1) xác nhận không có thao tác nghiệp vụ đang chạy → (2) export `class_subject_history` →
+(3) export `class_subject` + bảng liên quan → (4) xác minh export → (5) drop FK → (6) drop index/cột
+sinh theo dependency → (7) drop bảng/cột con → cha. Tên FK/index trong tài liệu đó lấy trực tiếp từ
+draft 51/52, không suy đoán.
+
 | Thay đổi | Rollback an toàn |
 |---|---|
 | Thêm bảng mới | `DROP TABLE` chỉ khi chưa dùng; tốt nhất giữ bảng và tắt tính năng |
-| `school_class.curriculum_id` | `ALTER TABLE school_class DROP FOREIGN KEY ...; DROP COLUMN` (mất liên kết, không mất dữ liệu lớp) |
+| `school_class.curriculum_id` | `ALTER TABLE school_class DROP FOREIGN KEY fk_school_class_curriculum;` rồi `DROP COLUMN curriculum_id` (mất liên kết, không mất dữ liệu lớp) |
 | `uq_school_class_id_org` | `DROP INDEX uq_school_class_id_org` — chỉ làm **sau** khi đã drop FK `class_subject` |
 | Bảng nối tiên quyết | `DROP TABLE curriculum_subject_prerequisite` (chỉ khi chưa dùng); drop trước `curriculum_subject` |
-| `class_subject_history` | **Giữ bảng là an toàn nhất.** Nếu buộc phải bỏ: export toàn bộ history ra file lưu trữ trước, drop FK `fk_csh_class` rồi `DROP TABLE`; **không** âm thầm xoá lịch sử |
-| `class_subject.is_primary`/`primary_class_id` | `DROP INDEX uq_class_subject_primary; ALTER TABLE ... DROP COLUMN primary_class_id, DROP COLUMN is_primary` — chỉ sau khi đã bỏ mọi code đọc hai cột này; mất thông tin "môn nào là primary" (có thể suy lại từ `school_class.subject_id` khi rollback) |
+| `class_subject_history` | **Giữ bảng là an toàn nhất.** Nếu buộc phải bỏ: `mysqldump` toàn bộ history ra file, xác minh số dòng, drop FK `fk_csh_class` rồi `DROP TABLE`; **không** âm thầm xoá lịch sử |
+| `class_subject.is_primary`/`primary_class_id` | Thứ tự ngược dependency: `DROP INDEX uq_class_subject_primary` → `DROP COLUMN primary_class_id` → `DROP COLUMN is_primary` — chỉ sau khi đã bỏ mọi code đọc hai cột này |
 | Unique code | `DROP INDEX ... , ADD INDEX` (trở về index thường) — không mất dữ liệu |
 | Backfill | Không cần rollback nếu bảng mới; nếu muốn, `DELETE` **chỉ** dòng do backfill tạo (`source='LEGACY'` và không có history tham chiếu). Dòng `class_subject` do người dùng tạo (`MANUAL`/`CURRICULUM`) **không** xoá |
 
@@ -913,6 +949,7 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
 | `ALTER TABLE … AFTER` | Hỗ trợ | Không hỗ trợ | Không dùng `AFTER` trong draft 51/52; đặt cột ở cuối `ALTER TABLE` |
 | Composite FK cần index tiền tố trái | Bắt buộc | Bắt buộc | Test schema phải thêm `UNIQUE(id, org_id)` trên `school_class` |
 | Kiểu `is_primary` | `tinyint(1)` | `BOOLEAN` | Test map `true`/`false`, không so `1`/`0` trực tiếp |
+| `school_class.version` | `bigint NOT NULL DEFAULT '0'` (dump `DB_11_16.sql:391`) | `BIGINT NOT NULL DEFAULT 0` | Giống kiểu/giá trị mặc định; không có generated/trigger. Optimistic locking làm thủ công ở repository (`version = version + 1 ... AND version = ?`), **không** dùng `@Version` |
 | Bất biến "tối thiểu một primary" | Transaction + app | Transaction + app | H2 **không** kiểm được; nghiệm thu trên MySQL staging (TC-CLS-047/048) |
 
 > Hệ quả: **DB H2 chỉ kiểm được "tối đa một primary"** khi cột `primary_class_id` được service cập
@@ -937,9 +974,9 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
    chưa có bằng chứng một bản 52 cũ đã chạy (mục 4.3).
 2. Cập nhật schema test H2 tương ứng để test phản ánh đúng MySQL (composite FK, UNIQUE 3 cột,
    UNIQUE primary; lưu ý khác biệt cột sinh ở mục 9.1). H2 **không** thay thế kiểm MySQL staging.
-3. Chạy pre-check 6.0 (tồn tại bảng/cột/index, trùng khóa, lớp thiếu primary, org lệch), 6.1
-   (trùng mã môn), 6.3a (bất biến primary) và 6.5 (cạnh tiên quyết) trên **staging**, không
-   production.
+3. Chạy pre-check 6.0 + **phần B phân loại backfill** (tồn tại bảng/cột/index, trùng khóa, lớp thiếu
+   primary, org lệch, subject mồ côi), 6.1 (trùng mã môn), 6.3a (bất biến primary) và 6.5 (cạnh tiên
+   quyết) trên **staging**, không production. Kết quả phải có `BLOCK_MIGRATION = 0`.
 4. Chỉ chạy production theo quy trình riêng của bạn, có backup và rollback đã kiểm (§7).
 5. Viết code entity/repository/service/controller theo `implementation-roadmap.md` (người dùng tự viết).
    Luồng đổi môn chính **phải** là một `@Transactional` duy nhất (history → `school_class` →

@@ -73,16 +73,24 @@ các lựa chọn cuối, không còn bước "chờ chốt".
      (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1).
   6. Viết script backfill riêng (D-11), chưa chạy production; script báo cáo phần không khớp/mập mờ.
      Backfill `class_subject.is_primary = 1` **chỉ** cho dòng khớp chính xác
-     `school_class.subject_id`; không đoán.
+     `school_class.subject_id`; không đoán, không tạo primary khi `subject_id IS NULL`, không ghi đè
+     primary đang mâu thuẫn, không tạo trùng `(class_id, subject_id)`.
   7. Bảng `class_subject_history` **không** backfill hồi tố (không có dữ liệu nguồn).
-  8. Chạy pre-check `migrations/51_52_precheck.sql` và post-check `51_52_postcheck.sql` trên staging;
-     lưu báo cáo manual review.
+  8. Chạy pre-check `migrations/51_52_precheck.sql` (query 0–9 + **phần B phân loại 10–13**) và
+     post-check `51_52_postcheck.sql` mục 7 trên staging; lưu báo cáo manual review.
+     **Gate:** `BLOCK_MIGRATION = 0` và mọi `MANUAL_REVIEW` đã được người dùng xử lý/chấp nhận.
+  9. Trước khi chạy 52 trên dữ liệu thật, xác nhận optimistic locking: `school_class.version` tồn tại
+     (dump `DB_11_16.sql:391`, H2 `people-test-schema.sql:147`) và `SchoolClassRepository.update`
+     dùng `version = version + 1 ... AND version = ?` — xem `wp1-readiness-report.md` §6.
 - **File:** draft `docs/phase-1/migrations/51_people_curriculum.sql`,
   `52_people_class_subject.sql`, precheck/postcheck, `ROLLBACK.md`; test schema H2 nêu trên.
-- **Test:** TC-LEG-001…020 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
-  TC-LEG-009…020.
-- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback đã ghi; không đổi dữ liệu cũ.
-- **Rollback:** drop bảng mới/cột mới + index mới; không đụng cột cũ.
+- **Test:** TC-LEG-001…024 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
+  TC-LEG-009…024.
+- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback 7 bước đã ghi;
+  không đổi dữ liệu cũ.
+- **Rollback:** theo `ROLLBACK.md` — quiesce → export history → export class_subject/liên quan →
+  xác minh → drop FK → drop index/cột sinh đúng dependency → drop bảng con → cha. Nếu đã có history
+  hoặc dữ liệu mới: **forward-fix**, không rollback.
 
 ### WP2 — Hoàn thiện Subject (M)
 

@@ -1,51 +1,170 @@
 # Rollback plan — Migration 51/52 (Phase 1 Revision 3)
 
 > **DRAFT — chưa chạy migration nào.** Tài liệu này chỉ mô tả kế hoạch; không có lệnh nào được thực thi.
+> Mọi tên bảng/FK/index dưới đây lấy **trực tiếp** từ `51_people_curriculum.sql` và
+> `52_people_class_subject.sql` trong cùng thư mục — không suy đoán tên constraint.
 
-## 1. Thứ tự rollback
+## 0. Phân biệt hai kiểu rollback
 
-Rollback ngược thứ tự tạo: drop FK → drop unique/index → drop bảng/cột.
+| Kiểu | Khi nào | Phạm vi |
+|---|---|---|
+| **Full rollback** | 52 vừa chạy, **chưa** phát sinh `class_subject_history`, chưa cấu hình dữ liệu mới | Bỏ toàn bộ bảng/cột của 51+52 |
+| **Partial rollback** | Chỉ cần bỏ cơ chế primary nhưng **giữ** `class_subject` | Chỉ bỏ `uq_class_subject_primary`, `primary_class_id`, `is_primary` |
+| **Forward-fix** (khuyến nghị khi đã có dữ liệu) | Đã có history hoặc người dùng đã cấu hình môn/giáo viên | Không drop; viết migration bổ sung |
 
-| Bước | Việc | Lệnh gợi ý | Ghi chú |
-|---|---|---|---|
-| R1 | Bỏ FK history | `ALTER TABLE class_subject_history DROP FOREIGN KEY fk_csh_class;` | Bắt buộc trước khi drop bảng |
-| R2 | Export history | `SELECT * FROM class_subject_history;` → lưu file | **Bắt buộc** nếu định drop |
-| R3 | Drop history | `DROP TABLE class_subject_history;` | Chỉ sau R2 |
-| R4 | Drop unique primary | `ALTER TABLE class_subject DROP INDEX uq_class_subject_primary;` | Nếu **giữ** bảng và chỉ bỏ primary: phải drop cột sinh `primary_class_id` **trước** khi drop `is_primary` (cột sinh phụ thuộc `is_primary`); thứ tự: drop index → `DROP COLUMN primary_class_id` → `DROP COLUMN is_primary` |
-| R5 | Drop FK class_subject | `ALTER TABLE class_subject DROP FOREIGN KEY fk_class_subject_class, DROP FOREIGN KEY fk_class_subject_subject, DROP FOREIGN KEY fk_class_subject_curriculum, DROP FOREIGN KEY fk_class_subject_teacher;` | — |
-| R6 | Drop class_subject | `DROP TABLE class_subject;` | Mất snapshot môn của lớp |
-| R7 | Drop teacher_subject / specialty_subject | `DROP TABLE teacher_subject; DROP TABLE specialty_subject;` | — |
-| R8 | Drop prerequisite | `DROP TABLE curriculum_subject_prerequisite;` | Trước curriculum_subject |
-| R9 | Drop curriculum_subject | `DROP TABLE curriculum_subject;` | — |
-| R10 | Drop FK curriculum của lớp | `ALTER TABLE school_class DROP FOREIGN KEY fk_school_class_curriculum;` | — |
-| R11 | Drop cột | `ALTER TABLE school_class DROP COLUMN curriculum_id;` | — |
-| R12 | Drop curriculum | `DROP TABLE curriculum;` | — |
-| R13 | Drop unique lớp | `ALTER TABLE school_class DROP INDEX uq_school_class_id_org;` | Chỉ sau khi mọi FK tổ hợp đã drop |
-| R14 | Trả index code (nếu đã đổi) | `ALTER TABLE subject DROP INDEX uq_subject_org_code, ADD INDEX uq_subject_org_code (org_id, code);` | Không mất dữ liệu |
+## 1. Thứ tự rollback bắt buộc (7 bước)
+
+### Bước 1 — Kiểm tra không có thao tác nghiệp vụ đang chạy
+
+Điều kiện tiên quyết, làm **trước** mọi lệnh DDL:
+
+```sql
+-- 1a) Không còn kết nối đang chạy lệnh (ngoài chính session kiểm tra)
+SELECT id, user, host, db, command, time, state
+FROM information_schema.processlist
+WHERE db = 'mems_people_db' AND command <> 'Sleep';
+
+-- 1b) Không có ghi history trong 5 phút gần nhất (ngưỡng tham khảo; bỏ qua nếu bảng chưa tồn tại)
+SELECT COUNT(*) AS recent_history
+FROM class_subject_history
+WHERE changed_at > NOW(3) - INTERVAL 5 MINUTE;
+
+-- 1c) Không có request đổi môn chính đang chờ (app log/metrics — kiểm ngoài SQL)
+```
+
+Yêu cầu vận hành: tạm dừng endpoint ghi của People Service (ít nhất
+`PUT /classes/{id}`, `PUT /classes/{id}/subjects/primary`, `DELETE /classes/{id}`) hoặc chuyển
+gateway sang maintenance. **Không** tắt DB, không kill session khi chưa xác nhận với người dùng.
+
+### Bước 2 — Export `class_subject_history`
+
+Bắt buộc nếu định drop bảng. Dùng `mysqldump` (không dùng `SELECT ... INTO OUTFILE` vì phụ thuộc
+`secure_file_priv`):
+
+```bash
+mysqldump --single-transaction --no-create-info --complete-insert \
+  mems_people_db class_subject_history > class_subject_history_data.sql
+```
+
+Nếu bảng chưa tồn tại (52 chưa chạy), ghi rõ "không có gì để export" và bỏ qua bước 2–4.
+
+### Bước 3 — Export `class_subject` và dữ liệu liên quan
+
+```bash
+mysqldump --single-transaction --no-create-info --complete-insert \
+  mems_people_db class_subject curriculum curriculum_subject \
+  curriculum_subject_prerequisite specialty_subject teacher_subject \
+  > phase1_related_data.sql
+
+-- Ảnh hưởng lên school_class (cột do 51/52 thêm/sửa)
+mysqldump --single-transaction --no-create-info --complete-insert \
+  mems_people_db school_class > school_class_data.sql
+```
+
+`school_class` export để khôi phục `subject_id`/`teacher_id`/`version` nếu bước drop bị sai.
+
+### Bước 4 — Xác minh dữ liệu export
+
+```sql
+SELECT 'class_subject_history' AS t, COUNT(*) FROM class_subject_history
+UNION ALL SELECT 'class_subject', COUNT(*) FROM class_subject
+UNION ALL SELECT 'curriculum', COUNT(*) FROM curriculum
+UNION ALL SELECT 'curriculum_subject', COUNT(*) FROM curriculum_subject
+UNION ALL SELECT 'curriculum_subject_prerequisite', COUNT(*) FROM curriculum_subject_prerequisite
+UNION ALL SELECT 'specialty_subject', COUNT(*) FROM specialty_subject
+UNION ALL SELECT 'teacher_subject', COUNT(*) FROM teacher_subject
+UNION ALL SELECT 'school_class', COUNT(*) FROM school_class;
+```
+
+Đối chiếu số dòng trong file dump với kết quả trên (grep `INSERT INTO` hoặc restore thử vào schema
+nháp). Chỉ chuyển sang bước 5 khi **khớp 100%** và file có kích thước > 0.
+
+### Bước 5 — Drop FK theo đúng thứ tự phụ thuộc
+
+Tên lấy từ hai file draft:
+
+| # | Lệnh | Ghi chú |
+|---|---|---|
+| 5.1 | `ALTER TABLE class_subject_history DROP FOREIGN KEY fk_csh_class;` | Bắt buộc trước khi drop bảng history/`school_class` |
+| 5.2 | `ALTER TABLE class_subject DROP FOREIGN KEY fk_class_subject_teacher, DROP FOREIGN KEY fk_class_subject_curriculum, DROP FOREIGN KEY fk_class_subject_subject, DROP FOREIGN KEY fk_class_subject_class;` | 4 FK của 52 |
+| 5.3 | `ALTER TABLE teacher_subject DROP FOREIGN KEY fk_teacher_subject_teacher, DROP FOREIGN KEY fk_teacher_subject_subject;` | — |
+| 5.4 | `ALTER TABLE specialty_subject DROP FOREIGN KEY fk_specialty_subject_specialty, DROP FOREIGN KEY fk_specialty_subject_subject;` | — |
+| 5.5 | `ALTER TABLE curriculum_subject_prerequisite DROP FOREIGN KEY fk_csp_subject, DROP FOREIGN KEY fk_csp_prerequisite;` | Trước FK của `curriculum_subject` |
+| 5.6 | `ALTER TABLE curriculum_subject DROP FOREIGN KEY fk_curriculum_subject_curriculum, DROP FOREIGN KEY fk_curriculum_subject_subject;` | — |
+| 5.7 | `ALTER TABLE school_class DROP FOREIGN KEY fk_school_class_curriculum;` | `school_class` **không** bị drop |
+
+> `DROP TABLE` tự xoá FK **của chính bảng đó**; các lệnh trên chỉ cần khi bảng đích còn tồn tại và
+> bảng khác vẫn trỏ tới (ví dụ `curriculum` bị drop trong khi `school_class` còn FK). Nếu rollback
+> toàn bộ và drop theo thứ tự con → cha ở bước 7, có thể bỏ qua 5.2–5.6 nhưng **phải** chạy 5.1 và 5.7
+> theo đúng thứ tự nêu trên.
+
+### Bước 6 — Drop index và generated column theo đúng dependency
+
+Chỉ dùng cho **partial rollback** (giữ `class_subject`). DDL trong 52 tạo theo thứ tự:
+`is_primary` → `primary_class_id` (sinh từ `is_primary`) → `uq_class_subject_primary` (trên
+`primary_class_id`). Vì vậy phải bỏ **ngược chiều**:
+
+```sql
+ALTER TABLE class_subject DROP INDEX uq_class_subject_primary;  -- 6.1 index phụ thuộc cột sinh
+ALTER TABLE class_subject DROP COLUMN primary_class_id;         -- 6.2 cột sinh phụ thuộc is_primary
+ALTER TABLE class_subject DROP COLUMN is_primary;               -- 6.3 cuối cùng
+```
+
+Nếu `is_primary`/`primary_class_id` được thêm từ **bản nháp 52 cũ** (không phải draft này), kiểm tra
+`information_schema.columns` trước; không drop cột không tồn tại.
+
+Không drop `chk_class_subject_primary`/`chk_class_subject_source` khi vẫn giữ bảng — chúng không
+phụ thuộc cột sinh. Nếu muốn bỏ, drop riêng bằng `ALTER TABLE class_subject DROP CHECK ...`.
+
+### Bước 7 — Drop bảng/cột theo thứ tự phụ thuộc (con → cha)
+
+```sql
+DROP TABLE class_subject_history;                 -- 7.1 con của school_class
+DROP TABLE class_subject;                         -- 7.2 con của school_class/subject/curriculum/staff_profile
+DROP TABLE curriculum_subject_prerequisite;       -- 7.3 con của curriculum_subject
+DROP TABLE curriculum_subject;                    -- 7.4 con của curriculum/subject
+DROP TABLE teacher_subject;                       -- 7.5 con của teacher_profile/subject
+DROP TABLE specialty_subject;                     -- 7.6 con của specialty/subject
+
+ALTER TABLE school_class DROP COLUMN curriculum_id;          -- 7.7 sau khi fk_school_class_curriculum đã drop
+ALTER TABLE school_class DROP INDEX uq_school_class_id_org;  -- 7.8 sau khi mọi FK tổ hợp dùng nó đã drop
+DROP TABLE curriculum;                            -- 7.9 cha, drop cuối
+```
+
+Nếu 52 từng đổi UNIQUE `subject.code` (khối D-04 commented — chỉ xảy ra nếu người dùng tự bỏ
+comment và chạy):
+
+```sql
+ALTER TABLE subject DROP INDEX uq_subject_org_code,
+  ADD INDEX uq_subject_org_code (org_id, code);
+```
 
 ## 2. Dữ liệu có thể mất
 
-- `class_subject_history`: **mất vĩnh viễn** nếu drop mà không export (actor/thời điểm/lý do/nguồn
-  không thể tái tạo).
-- `class_subject`: mất snapshot môn/giáo viên/số buổi đã cấu hình cho lớp.
-- `class_subject.is_primary`: mất dấu primary; có thể suy lại từ `school_class.subject_id` nếu dữ
-  liệu còn nhất quán.
-- Backfill `source='LEGACY'`: xoá các dòng này sẽ mất bản ghi môn legacy đã tạo từ `school_class`.
-- `teacher_subject`/`specialty_subject`: mất cấu hình chuyên môn đã nhập sau migration.
+| Đối tượng | Mức mất | Ghi chú |
+|---|---|---|
+| `class_subject_history` | **Vĩnh viễn** nếu drop không export | Không tái tạo được actor/thời điểm/lý do/nguồn |
+| `class_subject` | Mất snapshot môn/GV/số buổi của lớp | Có thể suy lại một phần từ `school_class.subject_id` |
+| `class_subject.is_primary` | Mất dấu primary | Suy lại được nếu `school_class.subject_id` còn nhất quán |
+| Dòng `source='LEGACY'` | Mất bản ghi legacy đã backfill | Không phân biệt được với dữ liệu nhập tay sau này |
+| `teacher_subject` / `specialty_subject` | Mất cấu hình chuyên môn đã nhập sau migration | Backfill lại chỉ khôi phục phần suy ra từ `teacher_specialty` |
+| `curriculum*` | Mất template + tiên quyết | — |
+| `school_class.curriculum_id` | Mất liên kết lớp → curriculum | Không suy lại được nếu không có export |
 
 ## 3. Điều kiện an toàn để rollback
 
-1. Không còn request đổi môn chính/áp curriculum đang chạy.
-2. Đã export `class_subject_history` và `class_subject`.
-3. Đã xác nhận `school_class.subject_id` vẫn khớp primary trước khi drop cột/index.
-4. Đã drop FK theo đúng thứ tự; không drop index mà FK còn dùng.
-5. Có backup DB tại thời điểm trước migration.
+1. Không còn request đổi môn chính/áp curriculum đang chạy (bước 1).
+2. Đã export và **xác minh** `class_subject_history`, `class_subject`, `school_class` và các bảng 51/52.
+3. Đã xác nhận `school_class.subject_id` khớp primary trước khi drop cột/index.
+4. Đã drop FK đúng thứ tự; không drop index mà FK còn dùng.
+5. Có backup toàn DB tại thời điểm trước migration.
+6. Không có migration 53 áp dụng sau 52 (nếu có, rollback phải tính cả 53).
 
-## 4. Khi nào forward-fix thay vì rollback
+## 4. Khi nào **bắt buộc** forward-fix thay vì rollback
 
-- Migration đã chạy và **đã phát sinh history** hoặc người dùng đã cấu hình `class_subject` mới.
-- Chỉ sai constraint/index/backfill cục bộ → viết migration bổ sung (forward-fix) sửa đúng phần sai,
-  **không** drop bảng/cột, **không** xoá history.
+- Đã phát sinh `class_subject_history` (dù chỉ 1 dòng) — rollback sẽ mất audit không tái tạo được.
+- Người dùng đã cấu hình `class_subject`/`teacher_subject` mới sau migration.
+- Chỉ sai constraint/index/backfill cục bộ → viết migration bổ sung sửa đúng phần sai.
 - Không sửa file 51/52 đã áp dụng; luôn tạo file mới.
 
 ## 5. Migration 53

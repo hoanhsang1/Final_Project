@@ -416,3 +416,27 @@ Câu hỏi kỹ thuật còn lại:
 
 Đã chốt (không còn mở): mã 2222–2240/3043–3054 được dùng cho thiết kế này; người dùng xác nhận
 khi sửa `ErrorCode.java`. `operationId` lưu **vĩnh viễn** ở Phase 1 (không dọn).
+
+---
+
+## 10. Cổng dữ liệu trước migration (không phải lỗi HTTP)
+
+Đây **không** phải mã lỗi API và **không** thêm vào `ErrorCode.java`; chúng là nhãn trong
+`migrations/51_52_precheck.sql` (phần B) quyết định 52 có được chạy hay không.
+
+| Nhãn | Trường hợp | Hành động |
+|---|---|---|
+| `AUTO_BACKFILL_CANDIDATE` | `INSERT_LEGACY_ROW`: lớp có `subject_id`, chưa có dòng khớp, chưa primary · `MARK_EXACT_PRIMARY`: đã có dòng khớp, chưa primary | Backfill tự động (5a/5b) |
+| `MANUAL_REVIEW` | `PRIMARY_SUBJECT_MISMATCH`: primary khác `school_class.subject_id` · `PRIMARY_WITHOUT_CLASS_SUBJECT`: `subject_id NULL` mà có primary | Không tự sửa; người dùng quyết định trước/sau migration |
+| `BLOCK_MIGRATION` | `CS_ORPHAN_SUBJECT` · `CS_ORG_MISMATCH` · `CLASS_ORPHAN_SUBJECT` · `MULTI_PRIMARY` | Dừng; sửa dữ liệu rồi chạy lại pre-check |
+| `NO_ACTION` | Primary khớp chính xác, hoặc lớp không có môn | Không làm gì |
+
+- Migration 52 gọi `mems_m52_assert_backfill_safe` (orphan/org) và
+  `mems_m52_assert_no_duplicate_primary` trước/sau backfill; vi phạm → `SIGNAL 45000`, dừng script.
+- Sau migration, `51_52_postcheck.sql` mục 7 phải trả `BLOCK_MIGRATION = 0`,
+  `AUTO_BACKFILL_CANDIDATE = 0`; mọi dòng `MANUAL_REVIEW` phải khớp danh sách đã chấp nhận trước đó.
+- Backfill **không** tạo primary khi `school_class.subject_id IS NULL`, **không** ghi đè primary đang
+  mâu thuẫn, **không** tạo trùng `(class_id, subject_id)`.
+- Phạm vi phân loại/backfill là lớp `deleted_at IS NULL`; lớp đã xoá mềm không bị sửa và không được
+  post-check 7a/7c/7d/7e đánh giá.
+
