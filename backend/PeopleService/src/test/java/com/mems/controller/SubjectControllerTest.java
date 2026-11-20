@@ -127,7 +127,7 @@ class SubjectControllerTest {
     }
 
     @Test
-    @DisplayName("POST /subjects thiếu name -> 400 INVALID_KEY")
+    @DisplayName("POST /subjects thiếu name -> 400 NAME_REQUIRED")
     void createWithoutNameReturns400() throws Exception {
         SubjectRequest req = new SubjectRequest("TOAN", "   ", null);
 
@@ -136,7 +136,7 @@ class SubjectControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("INVALID_KEY"));
+            .andExpect(jsonPath("$.code").value("NAME_REQUIRED"));
     }
 
     @Test

@@ -94,8 +94,9 @@ class AutoScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("TC-AUTO-003: Lớp chưa có giáo viên -> unscheduled với lý do")
-    void testClassWithoutTeacher() {
+    @DisplayName("TC-AUTO-003: Lớp chưa có giáo viên và không có subjectId -> unscheduled với lý do")
+    void testClassWithoutTeacherAndSubject() {
+        // Dùng constructor backward-compatible (không có subjectId → subjectId=null)
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
             null, null, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
@@ -104,7 +105,58 @@ class AutoScheduleServiceTest {
 
         assertThat(result.summary().scheduled()).isEqualTo(0);
         assertThat(result.summary().unscheduled()).isEqualTo(1);
+        // Lý do phải đề cập đến việc chưa có giáo viên hoặc môn học
         assertThat(result.unscheduled().get(0).reason()).contains("chưa có giáo viên");
+    }
+
+    @Test
+    @DisplayName("TC-AUTO-008: Lớp có subjectId nhưng chưa assign teacher -> tìm eligible qua D-06 -> xếp được")
+    void testClassWithSubjectIdNoAssignedTeacher() {
+        // Lớp có subjectId nhưng không có assigned teacher
+        ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
+            null, null, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+            "subj-1", "Toán", 20);
+        when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+
+        // people.eligibleTeachers trả về 1 giáo viên đủ điều kiện (nguồn teacher_subject D-06)
+        EligibleTeacherInfo eligibleTeacher = new EligibleTeacherInfo("teacher-99", "GV Đủ Điều Kiện", DEPT);
+        when(people.eligibleTeachers(ORG, "subj-1")).thenReturn(List.of(eligibleTeacher));
+
+        RoomInfo room = new RoomInfo("room-1", "R101", "Phòng 101", 30, "active", DEPT, 0);
+        when(facility.rooms(ORG, DEPT)).thenReturn(List.of(room));
+
+        ScheduleResponse session = new ScheduleResponse("sess-8", "class-1", "Lớp 1", "teacher-99",
+            "room-1", Instant.now(), Instant.now().plusSeconds(5400), "scheduled", DEPT);
+        when(scheduleService.create(eq(ORG), eq(DEPT), any(ScheduleRequest.class))).thenReturn(session);
+
+        AutoScheduleResult result = autoScheduleService.generate(ORG, DEPT, sampleRequest);
+
+        assertThat(result.summary().totalRequested()).isEqualTo(1);
+        assertThat(result.summary().scheduled()).isEqualTo(1);
+        assertThat(result.summary().unscheduled()).isEqualTo(0);
+        assertThat(result.scheduled()).hasSize(1);
+        // Xác nhận eligibleTeachers được gọi đúng với subjectId
+        verify(people).eligibleTeachers(ORG, "subj-1");
+    }
+
+    @Test
+    @DisplayName("TC-AUTO-009: Lớp có subjectId nhưng không có eligible teacher nào -> unscheduled với lý do")
+    void testClassWithSubjectIdButNoEligibleTeacher() {
+        ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
+            null, null, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+            "subj-1", "Toán", 20);
+        when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+
+        // Không có giáo viên nào đủ điều kiện dạy môn này
+        when(people.eligibleTeachers(ORG, "subj-1")).thenReturn(List.of());
+
+        AutoScheduleResult result = autoScheduleService.generate(ORG, DEPT, sampleRequest);
+
+        assertThat(result.summary().scheduled()).isEqualTo(0);
+        assertThat(result.summary().unscheduled()).isEqualTo(1);
+        assertThat(result.unscheduled().get(0).reason()).contains("Không có giáo viên đủ điều kiện");
+        assertThat(result.unscheduled().get(0).reason()).contains("Toán");
+        verify(people).eligibleTeachers(ORG, "subj-1");
     }
 
     @Test

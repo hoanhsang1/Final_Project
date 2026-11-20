@@ -34,7 +34,8 @@ import java.util.stream.Collectors;
  *  1. Không trùng lịch giáo viên.
  *  2. Không trùng lịch phòng.
  *  3. Không trùng lịch lớp.
- *  4. Giáo viên phải đủ điều kiện dạy môn (teacher_specialty → specialty.name_unaccented = subject.name_unaccented).
+ *  4. Giáo viên phải đủ điều kiện dạy môn (nguồn chuẩn D-06: teacher_subject.status='APPROVED',
+ *     fallback: teacher_specialty để tương thích ngược).
  *  5. Phòng phải active, không có thiết bị hỏng, đủ sức chứa.
  */
 @Service
@@ -76,23 +77,31 @@ public class AutoScheduleService {
                 continue;
             }
 
-            // subjectId: lấy từ ClassInfo — field subjectName. Cần subjectId để tìm eligible teachers.
-            // ClassInfo hiện có subjectName, không có subjectId.
-            // Ta dùng teacherId đã được assign (nếu có) hoặc tìm eligible teachers qua subjectName.
-            // Với MVP: nếu lớp có assigned teacher → dùng teacher đó.
-            // Nếu không → tìm eligible teachers. Cần biết subjectId.
-            // Ta gọi internal endpoint với subjectId = null sẽ lỗi.
-            // Giải pháp: ClassInfo.teacherId() đã có. Nếu có assigned teacher → dùng.
-            // Nếu không có → unscheduled với lý do rõ ràng (cần assign teacher trước).
+            // Tìm eligible teachers theo D-06:
+            //   Ưu tiên 1: lớp có assigned teacher → chỉ dùng teacher đó (đã được BM xác nhận).
+            //   Ưu tiên 2: lớp có subjectId → gọi people.eligibleTeachers() (nguồn chuẩn teacher_subject).
+            //   Fallback : không có cả hai → unscheduled với lý do rõ ràng.
 
             List<EligibleTeacherInfo> eligibleTeachers;
+            String subjectId = info.subjectId();
+
             if (info.teacherId() != null && !info.teacherId().isBlank()) {
-                // Lớp đã có giáo viên được assign → chỉ dùng giáo viên đó
+                // Lớp đã có giáo viên được assign → ưu tiên dùng teacher đó
                 eligibleTeachers = List.of(new EligibleTeacherInfo(info.teacherId(), info.teacherName(), departmentId));
+            } else if (subjectId != null && !subjectId.isBlank()) {
+                // Chưa assign teacher nhưng biết subjectId → tìm eligible qua teacher_subject (D-06)
+                eligibleTeachers = people.eligibleTeachers(orgId, subjectId);
+                if (eligibleTeachers.isEmpty()) {
+                    unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
+                        info.subjectName(), "Không có giáo viên đủ điều kiện dạy môn " + info.subjectName()
+                            + ". Hãy phân công giáo viên cho môn học này."));
+                    continue;
+                }
             } else {
-                // Chưa assign → không thể xếp lịch tự động (cần biết subjectId để tìm eligible)
+                // Không có assigned teacher và không có subjectId → không thể xác định eligible teachers
                 unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
-                    info.subjectName(), "Lớp chưa có giáo viên được phân công. Hãy gán giáo viên trước khi xếp lịch tự động."));
+                    info.subjectName(), "Lớp chưa có giáo viên được phân công và chưa có môn học. "
+                        + "Hãy gán giáo viên hoặc môn học trước khi xếp lịch tự động."));
                 continue;
             }
 
