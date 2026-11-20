@@ -215,11 +215,19 @@ cs_chk AS (
         ELSE 0
       END AS ok
     FROM information_schema.table_constraints tc
+    -- MySQL 8 stores CHECK_CLAUSE with escaped string literals:
+    --   (_utf8mb4\'PLANNED\',_utf8mb4\'ACTIVE\')   on 8.0.16+ via information_schema
+    -- while SHOW CREATE / dumps print _utf8mb4'PLANNED'. Removing CHAR(92) (backslash)
+    -- after the quotes makes the match independent of that display form. Tab/LF/CR
+    -- are removed too so a clause spread over several lines normalises the same way
+    -- as the single-line expected string.
     JOIN (
       SELECT constraint_schema, constraint_name,
-             LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+             LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               REPLACE(REPLACE(REPLACE(
                check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
-               '(', ''), ')', '')) AS norm
+               '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+               CHAR(92), '')) AS norm
       FROM information_schema.check_constraints
       WHERE constraint_schema = DATABASE()
     ) cc
@@ -232,9 +240,11 @@ cs_chk AS (
 cs_gen AS (
   SELECT COUNT(*) AS n,
          COALESCE(SUM(
-           LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+           LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+             REPLACE(REPLACE(
              generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
-             '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend'
+             '''', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+             CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend'
          ), 0) AS ok
   FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = 'class_subject'
@@ -365,9 +375,11 @@ SELECT tc.constraint_name, cc.norm AS normalized_clause,
 FROM information_schema.table_constraints tc
 JOIN (
   SELECT constraint_schema, constraint_name,
-         LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+           REPLACE(REPLACE(REPLACE(
            check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
-           '(', ''), ')', '')) AS norm
+           '(', ''), ')', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), ''),
+           CHAR(92), '')) AS norm
   FROM information_schema.check_constraints
   WHERE constraint_schema = DATABASE()
 ) cc
