@@ -20,17 +20,35 @@ DELIMITER $
 -- ---------------------------------------------------------------------------
 -- Abort if an existing class_subject is not the Revision-3 schema.
 -- Skips silently when the table does not exist (it will be created below).
+-- Verifies structure, not just constraint names:
+--   * exactly the 20 Revision-3 columns (no missing, no extra)
+--   * PK (class_id, subject_id) in order
+--   * PRIMARY + 4 indexes with exact column lists/order; unique flags;
+--     no prefix (SUB_PART) columns. Any extra index is rejected except the
+--     InnoDB FK-support indexes on (class_id,org_id) and (subject_id,org_id)
+--     (non-unique, no prefix) that MySQL creates when a FK has no left-prefix
+--     index of its own.
+--   * 4 FKs with exact source->target column mappings (same schema)
+--   * 5 CHECKs with exact normalised expressions
+--   * primary_class_id = STORED GENERATED with exact CASE expression
+-- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
 -- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS mems_m52_assert_class_subject_schema$
 CREATE PROCEDURE mems_m52_assert_class_subject_schema()
 BEGIN
   DECLARE v_exists INT DEFAULT 0;
-  DECLARE v_cols INT DEFAULT 0;
   DECLARE v_total_cols INT DEFAULT 0;
-  DECLARE v_idx INT DEFAULT 0;
-  DECLARE v_fk INT DEFAULT 0;
-  DECLARE v_chk INT DEFAULT 0;
+  DECLARE v_cols INT DEFAULT 0;
+  DECLARE v_idx_total INT DEFAULT 0;
+  DECLARE v_idx_ok INT DEFAULT 0;
+  DECLARE v_idx_prefix INT DEFAULT 0;
+  DECLARE v_idx_extra INT DEFAULT 0;
   DECLARE v_pk INT DEFAULT 0;
+  DECLARE v_fk_total INT DEFAULT 0;
+  DECLARE v_fk_ok INT DEFAULT 0;
+  DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_chk_total INT DEFAULT 0;
+  DECLARE v_chk_ok INT DEFAULT 0;
   DECLARE v_gen INT DEFAULT 0;
 
   schema_check: BEGIN
@@ -40,54 +58,161 @@ BEGIN
       LEAVE schema_check;
     END IF;
 
-    SELECT COUNT(*) INTO v_cols FROM information_schema.columns
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND column_name IN ('class_id','subject_id','org_id','curriculum_id','source',
-          'sequence_no','teacher_id','is_primary','primary_class_id','required_sessions',
-          'planned_sessions','theory_sessions','practice_sessions','session_minutes',
-          'status','note','created_by','created_at','updated_by','updated_at');
+    -- Columns: exact set of 20 (missing or extra both fail).
+    SELECT COUNT(*),
+           COALESCE(SUM(column_name IN (
+             'class_id','subject_id','org_id','curriculum_id','source','sequence_no',
+             'teacher_id','is_primary','primary_class_id','required_sessions',
+             'planned_sessions','theory_sessions','practice_sessions','session_minutes',
+             'status','note','created_by','created_at','updated_by','updated_at')), 0)
+    INTO v_total_cols, v_cols
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'class_subject';
 
-    -- No extra columns either: an unknown old table must not be silently kept.
-    SELECT COUNT(*) INTO v_total_cols FROM information_schema.columns
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject';
+    -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
+    -- Allowed beyond the 5 Revision-3 groups: InnoDB FK-support indexes on
+    -- (class_id,org_id) and (subject_id,org_id), non-unique, no prefix.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0),
+           COALESCE(SUM(bad_extra), 0)
+    INTO v_idx_total, v_idx_ok, v_idx_prefix, v_idx_extra
+    FROM (
+      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
+        CASE
+          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
+            AND i.cols = 'class_id,subject_id' THEN 1
+          WHEN i.index_name = 'uq_class_subject_primary' AND i.non_unique = 0
+            AND i.cols = 'primary_class_id' THEN 1
+          WHEN i.index_name = 'idx_class_subject_org_subject' AND i.non_unique = 1
+            AND i.cols = 'org_id,subject_id' THEN 1
+          WHEN i.index_name = 'idx_class_subject_teacher' AND i.non_unique = 1
+            AND i.cols = 'teacher_id,org_id' THEN 1
+          WHEN i.index_name = 'idx_class_subject_curriculum' AND i.non_unique = 1
+            AND i.cols = 'curriculum_id,org_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0
+                AND i.cols = 'class_id,subject_id')
+            OR (i.index_name = 'uq_class_subject_primary' AND i.non_unique = 0
+                AND i.cols = 'primary_class_id')
+            OR (i.index_name = 'idx_class_subject_org_subject' AND i.non_unique = 1
+                AND i.cols = 'org_id,subject_id')
+            OR (i.index_name = 'idx_class_subject_teacher' AND i.non_unique = 1
+                AND i.cols = 'teacher_id,org_id')
+            OR (i.index_name = 'idx_class_subject_curriculum' AND i.non_unique = 1
+                AND i.cols = 'curriculum_id,org_id')
+            OR (i.non_unique = 1 AND i.has_prefix = 0
+                AND i.cols IN ('class_id,org_id', 'subject_id,org_id'))
+            THEN 0
+          ELSE 1
+        END AS bad_extra
+      FROM (
+        SELECT index_name, non_unique,
+               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
+               MAX(sub_part IS NOT NULL) AS has_prefix
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+        GROUP BY index_name, non_unique
+      ) i
+    ) x;
 
-    SELECT COUNT(DISTINCT index_name) INTO v_idx FROM information_schema.statistics
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND index_name IN ('idx_class_subject_org_subject','idx_class_subject_teacher',
-                           'idx_class_subject_curriculum','uq_class_subject_primary');
-
-    SELECT COUNT(DISTINCT constraint_name) INTO v_fk FROM information_schema.table_constraints
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND constraint_type = 'FOREIGN KEY'
-        AND constraint_name IN ('fk_class_subject_class','fk_class_subject_subject',
-                                'fk_class_subject_curriculum','fk_class_subject_teacher');
-
-    SELECT COUNT(DISTINCT constraint_name) INTO v_chk FROM information_schema.table_constraints
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND constraint_type = 'CHECK'
-        AND constraint_name IN ('chk_class_subject_status','chk_class_subject_source',
-                                'chk_class_subject_primary','chk_class_subject_sessions',
-                                'chk_class_subject_sequence');
-
-    SELECT COUNT(*) INTO v_pk FROM (
+    -- PK explicit check (ordering + single PK).
+    SELECT COUNT(*) INTO v_pk
+    FROM (
       SELECT index_name FROM information_schema.statistics
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject' AND index_name = 'PRIMARY'
+      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+        AND index_name = 'PRIMARY'
       GROUP BY index_name
-      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index) = 'class_id,subject_id'
+      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')
+             = 'class_id,subject_id'
     ) pk;
 
-    SELECT COUNT(*) INTO v_gen FROM information_schema.columns
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND column_name = 'primary_class_id'
-        AND extra LIKE '%GENERATED%'
-        AND generation_expression LIKE '%is_primary%'
-        AND generation_expression LIKE '%class_id%';
+    -- FKs: exact source column -> referenced schema.table.column mapping.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
+    FROM (
+      SELECT k.constraint_name, k.map, k.wrong_schema,
+        CASE
+          WHEN k.constraint_name = 'fk_class_subject_class'
+            AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
+          WHEN k.constraint_name = 'fk_class_subject_subject'
+            AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
+          WHEN k.constraint_name = 'fk_class_subject_curriculum'
+            AND k.map = 'curriculum_id->curriculum.id,org_id->curriculum.org_id' THEN 1
+          WHEN k.constraint_name = 'fk_class_subject_teacher'
+            AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
+          ELSE 0
+        END AS ok
+      FROM (
+        SELECT constraint_name,
+               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+                                   referenced_column_name)
+                            ORDER BY ordinal_position SEPARATOR ',') AS map,
+               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+        FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+          AND referenced_table_name IS NOT NULL
+        GROUP BY constraint_name
+      ) k
+    ) y;
 
-    IF v_cols <> 20 OR v_total_cols <> 20 OR v_idx <> 4 OR v_fk <> 4 OR v_chk <> 5
-       OR v_pk <> 1 OR v_gen <> 1 THEN
+    -- CHECKs: exact normalised expression per constraint.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0)
+    INTO v_chk_total, v_chk_ok
+    FROM (
+      SELECT tc.constraint_name, cc.norm,
+        CASE
+          WHEN tc.constraint_name = 'chk_class_subject_status'
+            AND cc.norm = 'statusinplanned,active,completed,cancelled' THEN 1
+          WHEN tc.constraint_name = 'chk_class_subject_source'
+            AND cc.norm = 'sourceinlegacy,curriculum,manual' THEN 1
+          WHEN tc.constraint_name = 'chk_class_subject_primary'
+            AND cc.norm = 'is_primaryin0,1' THEN 1
+          WHEN tc.constraint_name = 'chk_class_subject_sessions'
+            AND cc.norm = 'planned_sessionsisnullorplanned_sessions>=0andrequired_sessionsisnullorrequired_sessions>0andsession_minutesisnullorsession_minutes>0' THEN 1
+          WHEN tc.constraint_name = 'chk_class_subject_sequence'
+            AND cc.norm = 'sequence_noisnullorsequence_no>0' THEN 1
+          ELSE 0
+        END AS ok
+      FROM information_schema.table_constraints tc
+      JOIN (
+        SELECT constraint_schema, constraint_name,
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+                 '(', ''), ')', '')) AS norm
+        FROM information_schema.check_constraints
+        WHERE constraint_schema = DATABASE()
+      ) cc
+        ON cc.constraint_schema = tc.constraint_schema
+       AND cc.constraint_name = tc.constraint_name
+      WHERE tc.table_schema = DATABASE() AND tc.table_name = 'class_subject'
+        AND tc.constraint_type = 'CHECK'
+    ) z;
+
+    -- Generated column: STORED + exact CASE expression.
+    SELECT COUNT(*) INTO v_gen
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+      AND column_name = 'primary_class_id'
+      AND extra LIKE '%GENERATED%' AND extra LIKE '%STORED%'
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
+            '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend';
+
+    IF v_total_cols <> 20 OR v_cols <> 20
+       OR v_idx_ok <> 5 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+       OR v_pk <> 1
+       OR v_fk_total <> 4 OR v_fk_ok <> 4 OR v_fk_schema_bad <> 0
+       OR v_chk_total <> 5 OR v_chk_ok <> 5
+       OR v_gen <> 1 THEN
       SELECT 'class_subject_schema_mismatch' AS issue,
-             v_cols AS cols_20, v_total_cols AS total_cols_20, v_idx AS idx_4, v_fk AS fk_4,
-             v_chk AS chk_5, v_pk AS pk_1, v_gen AS generated_1;
+             v_total_cols AS total_cols_20, v_cols AS named_cols_20,
+             v_idx_total AS idx_total, v_idx_ok AS idx_ok_5,
+             v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
+             v_pk AS pk_1,
+             v_fk_total AS fk_4, v_fk_ok AS fk_ok_4, v_fk_schema_bad AS fk_schema_0,
+             v_chk_total AS chk_5, v_chk_ok AS chk_ok_5,
+             v_gen AS gen_1;
       SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'M52 ABORT: existing class_subject is not Revision-3 schema; fix manually';
     END IF;
@@ -95,14 +220,34 @@ BEGIN
 END$
 
 -- ---------------------------------------------------------------------------
--- Abort if an existing teacher_subject is not the D-06a schema (no PENDING).
+-- Abort if an existing teacher_subject is not the D-06a schema.
+-- Verifies structure, not just constraint names:
+--   * exactly the 10 Revision-3 columns (no missing, no extra)
+--   * PK (user_id, subject_id); PRIMARY + 2 indexes with exact column lists and
+--     order, unique flags, no prefix columns. Extra indexes are rejected except
+--     InnoDB FK-support indexes on (user_id,org_id) and (subject_id,org_id)
+--     (non-unique, no prefix).
+--   * 2 FKs with exact source->target column mappings (same schema)
+--   * CHECK source exactly SPECIALTY/MANUAL
+--   * CHECK status exactly APPROVED/REVOKED — no PENDING or any other value
+-- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
 -- ---------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS mems_m52_assert_teacher_subject_schema$
 CREATE PROCEDURE mems_m52_assert_teacher_subject_schema()
 BEGIN
   DECLARE v_exists INT DEFAULT 0;
+  DECLARE v_total_cols INT DEFAULT 0;
   DECLARE v_cols INT DEFAULT 0;
-  DECLARE v_status_chk INT DEFAULT 0;
+  DECLARE v_idx_total INT DEFAULT 0;
+  DECLARE v_idx_ok INT DEFAULT 0;
+  DECLARE v_idx_prefix INT DEFAULT 0;
+  DECLARE v_idx_extra INT DEFAULT 0;
+  DECLARE v_pk INT DEFAULT 0;
+  DECLARE v_fk_total INT DEFAULT 0;
+  DECLARE v_fk_ok INT DEFAULT 0;
+  DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_chk_total INT DEFAULT 0;
+  DECLARE v_chk_ok INT DEFAULT 0;
   DECLARE v_pending INT DEFAULT 0;
 
   ts_check: BEGIN
@@ -112,22 +257,139 @@ BEGIN
       LEAVE ts_check;
     END IF;
 
-    SELECT COUNT(*) INTO v_cols FROM information_schema.columns
+    -- Columns: exact set of 10.
+    SELECT COUNT(*),
+           COALESCE(SUM(column_name IN (
+             'user_id','subject_id','org_id','status','source',
+             'approved_by','approved_at','created_by','created_at','updated_at')), 0)
+    INTO v_total_cols, v_cols
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'teacher_subject';
+
+    -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
+    -- Allowed beyond the 3 Revision-3 groups: InnoDB FK-support indexes on
+    -- (user_id,org_id) and (subject_id,org_id), non-unique, no prefix.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0),
+           COALESCE(SUM(bad_extra), 0)
+    INTO v_idx_total, v_idx_ok, v_idx_prefix, v_idx_extra
+    FROM (
+      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
+        CASE
+          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
+            AND i.cols = 'user_id,subject_id' THEN 1
+          WHEN i.index_name = 'idx_teacher_subject_org_subject_status'
+            AND i.non_unique = 1
+            AND i.cols = 'org_id,subject_id,status' THEN 1
+          WHEN i.index_name = 'idx_teacher_subject_org_user' AND i.non_unique = 1
+            AND i.cols = 'org_id,user_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0
+                AND i.cols = 'user_id,subject_id')
+            OR (i.index_name = 'idx_teacher_subject_org_subject_status'
+                AND i.non_unique = 1
+                AND i.cols = 'org_id,subject_id,status')
+            OR (i.index_name = 'idx_teacher_subject_org_user' AND i.non_unique = 1
+                AND i.cols = 'org_id,user_id')
+            OR (i.non_unique = 1 AND i.has_prefix = 0
+                AND i.cols IN ('user_id,org_id', 'subject_id,org_id'))
+            THEN 0
+          ELSE 1
+        END AS bad_extra
+      FROM (
+        SELECT index_name, non_unique,
+               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
+               MAX(sub_part IS NOT NULL) AS has_prefix
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
+        GROUP BY index_name, non_unique
+      ) i
+    ) x;
+
+    -- PK explicit check (ordering + single PK).
+    SELECT COUNT(*) INTO v_pk
+    FROM (
+      SELECT index_name FROM information_schema.statistics
       WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
-        AND column_name IN ('user_id','subject_id','org_id','status','source',
-                            'approved_by','approved_at','created_by','created_at','updated_at');
+        AND index_name = 'PRIMARY'
+      GROUP BY index_name
+      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')
+             = 'user_id,subject_id'
+    ) pk;
 
-    SELECT COUNT(*) INTO v_status_chk FROM information_schema.table_constraints
-      WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
-        AND constraint_type = 'CHECK' AND constraint_name = 'chk_teacher_subject_status';
+    -- FKs: exact source column -> referenced schema.table.column mapping.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
+    FROM (
+      SELECT k.constraint_name, k.map, k.wrong_schema,
+        CASE
+          WHEN k.constraint_name = 'fk_teacher_subject_teacher'
+            AND k.map = 'user_id->teacher_profile.user_id,org_id->teacher_profile.org_id' THEN 1
+          WHEN k.constraint_name = 'fk_teacher_subject_subject'
+            AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
+          ELSE 0
+        END AS ok
+      FROM (
+        SELECT constraint_name,
+               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+                                   referenced_column_name)
+                            ORDER BY ordinal_position SEPARATOR ',') AS map,
+               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+        FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
+          AND referenced_table_name IS NOT NULL
+        GROUP BY constraint_name
+      ) k
+    ) y;
 
-    SELECT COUNT(*) INTO v_pending FROM information_schema.check_constraints
-      WHERE constraint_schema = DATABASE() AND constraint_name = 'chk_teacher_subject_status'
-        AND check_clause LIKE '%PENDING%';
+    -- CHECKs: exact normalised expression per constraint.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0)
+    INTO v_chk_total, v_chk_ok
+    FROM (
+      SELECT tc.constraint_name, cc.norm,
+        CASE
+          WHEN tc.constraint_name = 'chk_teacher_subject_source'
+            AND cc.norm = 'sourceinspecialty,manual' THEN 1
+          WHEN tc.constraint_name = 'chk_teacher_subject_status'
+            AND cc.norm = 'statusinapproved,revoked' THEN 1
+          ELSE 0
+        END AS ok
+      FROM information_schema.table_constraints tc
+      JOIN (
+        SELECT constraint_schema, constraint_name,
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+                 '(', ''), ')', '')) AS norm
+        FROM information_schema.check_constraints
+        WHERE constraint_schema = DATABASE()
+      ) cc
+        ON cc.constraint_schema = tc.constraint_schema
+       AND cc.constraint_name = tc.constraint_name
+      WHERE tc.table_schema = DATABASE() AND tc.table_name = 'teacher_subject'
+        AND tc.constraint_type = 'CHECK'
+    ) z;
 
-    IF v_cols <> 10 OR v_status_chk <> 1 OR v_pending > 0 THEN
+    -- Explicit PENDING guard (diagnostic; exact CHECK match already covers it).
+    SELECT COUNT(*) INTO v_pending
+    FROM information_schema.check_constraints
+    WHERE constraint_schema = DATABASE()
+      AND constraint_name = 'chk_teacher_subject_status'
+      AND check_clause LIKE '%PENDING%';
+
+    IF v_total_cols <> 10 OR v_cols <> 10
+       OR v_idx_ok <> 3 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+       OR v_pk <> 1
+       OR v_fk_total <> 2 OR v_fk_ok <> 2 OR v_fk_schema_bad <> 0
+       OR v_chk_total <> 2 OR v_chk_ok <> 2
+       OR v_pending > 0 THEN
       SELECT 'teacher_subject_schema_mismatch' AS issue,
-             v_cols AS cols_10, v_status_chk AS status_check_1, v_pending AS pending_check_0;
+             v_total_cols AS total_cols_10, v_cols AS named_cols_10,
+             v_idx_total AS idx_total, v_idx_ok AS idx_ok_3,
+             v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
+             v_pk AS pk_1,
+             v_fk_total AS fk_2, v_fk_ok AS fk_ok_2, v_fk_schema_bad AS fk_schema_0,
+             v_chk_total AS chk_2, v_chk_ok AS chk_ok_2, v_pending AS pending_0;
       SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'M52 ABORT: teacher_subject must be D-06a (APPROVED/REVOKED only)';
     END IF;

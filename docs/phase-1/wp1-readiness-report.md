@@ -141,8 +141,11 @@ Pre-check tách hai file để **không truy vấn bảng chưa tồn tại**:
 1. Bảng/cột đã tồn tại (migration chạy một phần?).
 2. Verdict `next_step`: `DATA_PRECHECK_READY` / `SKIP_DATA_PRECHECK_NO_TABLE` /
    `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`.
-3. Checklist 20 cột bắt buộc, 4 index, PK `(class_id, subject_id)`, 9 FK/CHECK, cột sinh
-   `primary_class_id` của `class_subject` (present = 0 → thiếu/sai).
+3. Checklist 20 cột bắt buộc (không thiếu/không thừa), PK `(class_id, subject_id)`, 5 nhóm index
+   (PRIMARY + 4) đúng cột/thứ tự/UNIQUE và không prefix — chỉ cho phép thêm 2 index hỗ trợ FK do
+   InnoDB tự tạo `(class_id, org_id)`/`(subject_id, org_id)`, mọi index lạ ⇒ BLOCKED; 4 FK đúng
+   cột nguồn→bảng.cột đích; 5 CHECK đúng biểu thức; cột sinh `primary_class_id` STORED đúng biểu
+   thức (present = 0 → thiếu/sai).
 4. `teacher_subject` CHECK status chứa `PENDING` hay không (bảng cũ → 52 ABORT).
 5. `subject.code` trùng trong org.
 6. Index/constraint 51/52 đã có.
@@ -195,9 +198,11 @@ primary phải giữ được ngay sau 52 — không có trạng thái “chờ 
 - 5.0 `mems_m52_assert_backfill_safe` dừng khi còn: subject mồ côi/org lệch, `class_subject` mồ côi
   lớp/giáo viên, `school_class.subject_id`/`teacher_id` mồ côi, primary lệch `subject_id`, primary
   khi `subject_id IS NULL`; 5c `mems_m52_assert_no_duplicate_primary` dừng khi >1 primary/lớp.
-- Với bảng `class_subject`/`teacher_subject` **đã tồn tại** từ bản nháp cũ: 52 chạy audit schema
-  (20 cột, 4 index, 4 FK, 5 CHECK, PK, cột sinh) và `SIGNAL` ABORT nếu không khớp Revision 3 —
-  **không** tự `ADD COLUMN` để “nâng cấp”, **không** sửa migration đã áp dụng.
+- Với bảng `class_subject`/`teacher_subject` **đã tồn tại** từ bản nháp cũ: 52 chạy audit schema —
+  `class_subject` đúng 20 cột, PK, 5 nhóm index, 4 FK đúng đích, 5 CHECK đúng biểu thức, cột sinh
+  STORED; `teacher_subject` đúng 10 cột, PK, 3 nhóm index, 2 FK đúng đích, 2 CHECK (status chỉ
+  `APPROVED/REVOKED`) — và `SIGNAL` ABORT nếu không khớp Revision 3. **Không** tự `ADD COLUMN` để
+  “nâng cấp”, **không** sửa migration đã áp dụng.
 
 **Unresolved rows (phải xử lý tay trước 52):**
 

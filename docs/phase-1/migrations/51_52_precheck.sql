@@ -24,25 +24,177 @@ WHERE table_schema = DATABASE()
                      'class_subject','class_subject_history','specialty_subject','teacher_subject')
 ORDER BY table_name, ordinal_position;
 
--- 0b) Kết luận bước tiếp theo (điều khiển việc có chạy PART B hay không)
+-- 0b) Verdict bước tiếp theo. DATA_PRECHECK_READY CHỈ khi class_subject đã đúng
+--     toàn bộ schema Revision 3: 20 cột (không thiếu/không thừa), PK, 5 index
+--     (PRIMARY + 4), 4 FK đúng bảng/cột đích, 5 CHECK đúng biểu thức, và
+--     primary_class_id là cột sinh STORED đúng biểu thức.
+--     Thiếu/sai bất kỳ thành phần nào => BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE.
+--
+--     Index: 5 nhóm index Revision 3 phải đúng tên + danh sách cột + thứ tự +
+--     tính UNIQUE + không dùng prefix (SUB_PART). Ngoài 5 nhóm đó chỉ cho phép
+--     index hỗ trợ FK do InnoDB tự tạo khi FK chưa có index tiền tố trái:
+--       (class_id, org_id)  cho fk_class_subject_class
+--       (subject_id, org_id) cho fk_class_subject_subject
+--     Các index này phải non-unique và không prefix; mọi index lạ/UNIQUE thừa
+--     => bad_extra > 0 => BLOCKED.
+--
+--     So khớp CHECK/cột sinh bằng cách chuẩn hoá check_clause/generation_expression:
+--     bỏ backtick, tiền tố _utf8mb4, khoảng trắng, dấu nháy, ngoặc và backslash,
+--     rồi so sánh nguyên văn với biểu thức kỳ vọng (lowercase).
+WITH cs_cols AS (
+  SELECT COUNT(*) AS total_cols,
+         COALESCE(SUM(column_name IN (
+           'class_id','subject_id','org_id','curriculum_id','source','sequence_no',
+           'teacher_id','is_primary','primary_class_id','required_sessions',
+           'planned_sessions','theory_sessions','practice_sessions','session_minutes',
+           'status','note','created_by','created_at','updated_by','updated_at')), 0) AS named_cols
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+),
+cs_idx AS (
+  SELECT COUNT(*) AS total_idx,
+         COALESCE(SUM(ok), 0) AS ok_idx,
+         COALESCE(MAX(has_prefix), 0) AS idx_prefix,
+         COALESCE(SUM(bad_extra), 0) AS bad_extra
+  FROM (
+    SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
+      CASE
+        WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
+          AND i.cols = 'class_id,subject_id' THEN 1
+        WHEN i.index_name = 'uq_class_subject_primary' AND i.non_unique = 0
+          AND i.cols = 'primary_class_id' THEN 1
+        WHEN i.index_name = 'idx_class_subject_org_subject' AND i.non_unique = 1
+          AND i.cols = 'org_id,subject_id' THEN 1
+        WHEN i.index_name = 'idx_class_subject_teacher' AND i.non_unique = 1
+          AND i.cols = 'teacher_id,org_id' THEN 1
+        WHEN i.index_name = 'idx_class_subject_curriculum' AND i.non_unique = 1
+          AND i.cols = 'curriculum_id,org_id' THEN 1
+        ELSE 0
+      END AS ok,
+      CASE
+        WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0
+              AND i.cols = 'class_id,subject_id')
+          OR (i.index_name = 'uq_class_subject_primary' AND i.non_unique = 0
+              AND i.cols = 'primary_class_id')
+          OR (i.index_name = 'idx_class_subject_org_subject' AND i.non_unique = 1
+              AND i.cols = 'org_id,subject_id')
+          OR (i.index_name = 'idx_class_subject_teacher' AND i.non_unique = 1
+              AND i.cols = 'teacher_id,org_id')
+          OR (i.index_name = 'idx_class_subject_curriculum' AND i.non_unique = 1
+              AND i.cols = 'curriculum_id,org_id')
+          OR (i.non_unique = 1 AND i.has_prefix = 0
+              AND i.cols IN ('class_id,org_id', 'subject_id,org_id'))
+          THEN 0
+        ELSE 1
+      END AS bad_extra
+    FROM (
+      SELECT index_name, non_unique,
+             GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
+             MAX(sub_part IS NOT NULL) AS has_prefix
+      FROM information_schema.statistics
+      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+      GROUP BY index_name, non_unique
+    ) i
+  ) x
+),
+cs_fk AS (
+  SELECT COUNT(*) AS total_fk,
+         COALESCE(SUM(ok), 0) AS ok_fk,
+         COALESCE(MAX(wrong_schema), 0) AS fk_wrong_schema
+  FROM (
+    SELECT k.constraint_name, k.map, k.wrong_schema,
+      CASE
+        WHEN k.constraint_name = 'fk_class_subject_class'
+          AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
+        WHEN k.constraint_name = 'fk_class_subject_subject'
+          AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
+        WHEN k.constraint_name = 'fk_class_subject_curriculum'
+          AND k.map = 'curriculum_id->curriculum.id,org_id->curriculum.org_id' THEN 1
+        WHEN k.constraint_name = 'fk_class_subject_teacher'
+          AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
+        ELSE 0
+      END AS ok
+    FROM (
+      SELECT constraint_name,
+             GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+                                 referenced_column_name)
+                          ORDER BY ordinal_position SEPARATOR ',') AS map,
+             MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+      FROM information_schema.key_column_usage
+      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+        AND referenced_table_name IS NOT NULL
+      GROUP BY constraint_name
+    ) k
+  ) y
+),
+cs_chk AS (
+  SELECT COUNT(*) AS total_chk,
+         COALESCE(SUM(ok), 0) AS ok_chk
+  FROM (
+    SELECT tc.constraint_name, cc.norm,
+      CASE
+        WHEN tc.constraint_name = 'chk_class_subject_status'
+          AND cc.norm = 'statusinplanned,active,completed,cancelled' THEN 1
+        WHEN tc.constraint_name = 'chk_class_subject_source'
+          AND cc.norm = 'sourceinlegacy,curriculum,manual' THEN 1
+        WHEN tc.constraint_name = 'chk_class_subject_primary'
+          AND cc.norm = 'is_primaryin0,1' THEN 1
+        WHEN tc.constraint_name = 'chk_class_subject_sessions'
+          AND cc.norm = 'planned_sessionsisnullorplanned_sessions>=0andrequired_sessionsisnullorrequired_sessions>0andsession_minutesisnullorsession_minutes>0' THEN 1
+        WHEN tc.constraint_name = 'chk_class_subject_sequence'
+          AND cc.norm = 'sequence_noisnullorsequence_no>0' THEN 1
+        ELSE 0
+      END AS ok
+    FROM information_schema.table_constraints tc
+    JOIN (
+      SELECT constraint_schema, constraint_name,
+             LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+               '(', ''), ')', '')) AS norm
+      FROM information_schema.check_constraints
+      WHERE constraint_schema = DATABASE()
+    ) cc
+      ON cc.constraint_schema = tc.constraint_schema
+     AND cc.constraint_name = tc.constraint_name
+    WHERE tc.table_schema = DATABASE() AND tc.table_name = 'class_subject'
+      AND tc.constraint_type = 'CHECK'
+  ) z
+),
+cs_gen AS (
+  SELECT COUNT(*) AS n,
+         COALESCE(SUM(
+           LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+             generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
+             '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend'
+         ), 0) AS ok
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+    AND column_name = 'primary_class_id'
+    AND extra LIKE '%GENERATED%' AND extra LIKE '%STORED%'
+)
 SELECT
   (SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = DATABASE() AND table_name = 'class_subject') AS class_subject_exists,
-  (SELECT COUNT(*) FROM information_schema.columns
-    WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-      AND column_name IN ('class_id','subject_id','org_id','is_primary')) AS cs_key_columns,
   (SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = DATABASE() AND table_name = 'teacher_subject') AS teacher_subject_exists,
+  cs_cols.total_cols, cs_cols.named_cols,
+  cs_idx.ok_idx, cs_idx.idx_prefix, cs_idx.bad_extra, cs_idx.total_idx,
+  cs_fk.total_fk, cs_fk.ok_fk, cs_fk.fk_wrong_schema,
+  cs_chk.total_chk, cs_chk.ok_chk,
+  cs_gen.n AS gen_rows, cs_gen.ok AS gen_ok,
   CASE
     WHEN (SELECT COUNT(*) FROM information_schema.tables
            WHERE table_schema = DATABASE() AND table_name = 'class_subject') = 0
       THEN 'SKIP_DATA_PRECHECK_NO_TABLE'
-    WHEN (SELECT COUNT(*) FROM information_schema.columns
-           WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-             AND column_name IN ('class_id','subject_id','org_id','is_primary')) < 4
-      THEN 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
-    ELSE 'DATA_PRECHECK_READY'
-  END AS next_step;
+    WHEN cs_cols.total_cols = 20 AND cs_cols.named_cols = 20
+      AND cs_idx.ok_idx = 5 AND cs_idx.idx_prefix = 0 AND cs_idx.bad_extra = 0
+      AND cs_fk.total_fk = 4 AND cs_fk.ok_fk = 4 AND cs_fk.fk_wrong_schema = 0
+      AND cs_chk.total_chk = 5 AND cs_chk.ok_chk = 5
+      AND cs_gen.n = 1 AND cs_gen.ok = 1
+      THEN 'DATA_PRECHECK_READY'
+    ELSE 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
+  END AS next_step
+FROM cs_cols, cs_idx, cs_fk, cs_chk, cs_gen;
 
 -- 0c) Cột bắt buộc của class_subject (Revision 3). present = 0 => thiếu.
 --     Bảng không tồn tại => tất cả present = 0 (đúng: sẽ được tạo mới bởi 52).
@@ -61,18 +213,33 @@ LEFT JOIN information_schema.columns c
   ON c.table_schema = DATABASE() AND c.table_name = 'class_subject' AND c.column_name = req.name
 GROUP BY req.name;
 
--- 0d) Index bắt buộc của class_subject. present = 0 => thiếu.
-WITH req_idx AS (
-  SELECT 'idx_class_subject_org_subject' AS name UNION ALL
-  SELECT 'idx_class_subject_teacher' UNION ALL
-  SELECT 'idx_class_subject_curriculum' UNION ALL
-  SELECT 'uq_class_subject_primary'
-)
-SELECT req_idx.name AS required_index, COALESCE(MAX(st.index_name IS NOT NULL), 0) AS present
-FROM req_idx
-LEFT JOIN information_schema.statistics st
-  ON st.table_schema = DATABASE() AND st.table_name = 'class_subject' AND st.index_name = req_idx.name
-GROUP BY req_idx.name;
+-- 0d) Cấu trúc index thực tế của class_subject (đối chiếu kỳ vọng ở 0b).
+--     expect_cols: danh sách cột + thứ tự; non_unique=0 => UNIQUE.
+--     Dòng '(FK-support ...)' là index InnoDB tự tạo cho FK khi chưa có index
+--     tiền tố trái; được phép nếu non_unique=1 và không prefix.
+SELECT i.index_name, i.non_unique, i.cols,
+       CASE i.index_name
+         WHEN 'PRIMARY' THEN 'class_id,subject_id'
+         WHEN 'uq_class_subject_primary' THEN 'primary_class_id'
+         WHEN 'idx_class_subject_org_subject' THEN 'org_id,subject_id'
+         WHEN 'idx_class_subject_teacher' THEN 'teacher_id,org_id'
+         WHEN 'idx_class_subject_curriculum' THEN 'curriculum_id,org_id'
+         ELSE
+           CASE
+             WHEN i.non_unique = 1
+               AND i.cols IN ('class_id,org_id', 'subject_id,org_id')
+               THEN CONCAT('(FK-support ', i.cols, ')')
+             ELSE '(không thuộc Revision 3)'
+           END
+       END AS expect_cols
+FROM (
+  SELECT index_name, non_unique,
+         GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+  GROUP BY index_name, non_unique
+) i
+ORDER BY i.index_name;
 
 -- 0d2) PRIMARY KEY phải đúng (class_id, subject_id). present = 0 => sai/thiếu.
 SELECT 'PRIMARY(class_id,subject_id)' AS required_pk,
@@ -84,29 +251,73 @@ SELECT 'PRIMARY(class_id,subject_id)' AS required_pk,
           HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') = 'class_id,subject_id'
         ) pk) AS present;
 
--- 0e) FK/CHECK bắt buộc của class_subject. present = 0 => thiếu.
-WITH req_con AS (
-  SELECT 'fk_class_subject_class' AS name UNION ALL
-  SELECT 'fk_class_subject_subject' UNION ALL
-  SELECT 'fk_class_subject_curriculum' UNION ALL
-  SELECT 'fk_class_subject_teacher' UNION ALL
-  SELECT 'chk_class_subject_status' UNION ALL
-  SELECT 'chk_class_subject_source' UNION ALL
-  SELECT 'chk_class_subject_primary' UNION ALL
-  SELECT 'chk_class_subject_sessions' UNION ALL
-  SELECT 'chk_class_subject_sequence'
-)
-SELECT req_con.name AS required_constraint,
-       COALESCE(MAX(tc.constraint_name IS NOT NULL), 0) AS present, MAX(tc.constraint_type) AS type
-FROM req_con
-LEFT JOIN information_schema.table_constraints tc
-  ON tc.table_schema = DATABASE() AND tc.table_name = 'class_subject' AND tc.constraint_name = req_con.name
-GROUP BY req_con.name;
+-- 0e) FK thực tế của class_subject: cột nguồn -> bảng.cột đích (theo thứ tự).
+--     expect_map: mapping kỳ vọng; lệch => 0b trả BLOCKED.
+SELECT k.constraint_name, k.map,
+       CASE k.constraint_name
+         WHEN 'fk_class_subject_class'
+           THEN 'class_id->school_class.id,org_id->school_class.org_id'
+         WHEN 'fk_class_subject_subject'
+           THEN 'subject_id->subject.id,org_id->subject.org_id'
+         WHEN 'fk_class_subject_curriculum'
+           THEN 'curriculum_id->curriculum.id,org_id->curriculum.org_id'
+         WHEN 'fk_class_subject_teacher'
+           THEN 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id'
+         ELSE '(không thuộc Revision 3)'
+       END AS expect_map
+FROM (
+  SELECT constraint_name,
+         GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+                             referenced_column_name)
+                      ORDER BY ordinal_position SEPARATOR ',') AS map
+  FROM information_schema.key_column_usage
+  WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+    AND referenced_table_name IS NOT NULL
+  GROUP BY constraint_name
+) k
+ORDER BY k.constraint_name;
 
--- 0f) Generated column primary_class_id (MySQL). 0 dòng => thiếu/sai.
-SELECT column_name, extra, generation_expression
+-- 0e2) CHECK thực tế của class_subject (biểu thức đã chuẩn hoá như 0b).
+SELECT tc.constraint_name, cc.norm AS normalized_clause,
+       CASE tc.constraint_name
+         WHEN 'chk_class_subject_status'
+           THEN 'statusinplanned,active,completed,cancelled'
+         WHEN 'chk_class_subject_source'
+           THEN 'sourceinlegacy,curriculum,manual'
+         WHEN 'chk_class_subject_primary' THEN 'is_primaryin0,1'
+         WHEN 'chk_class_subject_sessions'
+           THEN 'planned_sessionsisnullorplanned_sessions>=0andrequired_sessionsisnullorrequired_sessions>0andsession_minutesisnullorsession_minutes>0'
+         WHEN 'chk_class_subject_sequence' THEN 'sequence_noisnullorsequence_no>0'
+         ELSE '(không thuộc Revision 3)'
+       END AS expect_clause
+FROM information_schema.table_constraints tc
+JOIN (
+  SELECT constraint_schema, constraint_name,
+         LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+           check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+           '(', ''), ')', '')) AS norm
+  FROM information_schema.check_constraints
+  WHERE constraint_schema = DATABASE()
+) cc
+  ON cc.constraint_schema = tc.constraint_schema
+ AND cc.constraint_name = tc.constraint_name
+WHERE tc.table_schema = DATABASE() AND tc.table_name = 'class_subject'
+  AND tc.constraint_type = 'CHECK'
+ORDER BY tc.constraint_name;
+
+-- 0f) Generated column primary_class_id: phải là STORED GENERATED và đúng biểu thức
+--     `CASE WHEN is_primary = 1 THEN class_id END`. 0 dòng => thiếu/sai/sai loại.
+SELECT column_name, extra, generation_expression,
+       LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+         generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
+         '''', ''), CHAR(92), '')) AS normalized_expression,
+       (LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+          generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
+          '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend') AS expression_ok
 FROM information_schema.columns
-WHERE table_schema = DATABASE() AND table_name = 'class_subject' AND column_name = 'primary_class_id';
+WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+  AND column_name = 'primary_class_id'
+  AND extra LIKE '%GENERATED%' AND extra LIKE '%STORED%';
 
 -- 0g) teacher_subject phải theo D-06a: CHECK không chứa PENDING.
 --     has_pending > 0 => bảng cũ, 52 sẽ ABORT (không tự sửa).

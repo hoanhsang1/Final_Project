@@ -95,9 +95,10 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
    `information_schema` + bảng gốc, chạy được trên DB chưa có `class_subject`) và file mới
    `51_52_precheck_data.sql` (PART B). PART A có verdict `next_step` =
    `DATA_PRECHECK_READY` / `SKIP_DATA_PRECHECK_NO_TABLE` / `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`.
-2. **C2 — bảng `class_subject` cũ.** 52 **không** còn `ADD COLUMN` để "nâng cấp": audit 20 cột /
-   4 index / 4 FK / 5 CHECK / PK / cột sinh và `SIGNAL SQLSTATE '45000'` ABORT nếu lệch Revision 3.
-   `teacher_subject` cũ còn `PENDING` cũng ABORT. Không sửa migration đã áp dụng.
+2. **C2 — bảng `class_subject` cũ.** 52 **không** còn `ADD COLUMN` để "nâng cấp": audit cấu trúc
+   (20 cột, PK, 5 nhóm index, 4 FK đúng cột nguồn→đích, 5 CHECK đúng biểu thức, cột sinh STORED)
+   và `SIGNAL SQLSTATE '45000'` ABORT nếu lệch Revision 3. `teacher_subject` cũ lệch D-06a cũng
+   ABORT. Không sửa migration đã áp dụng.
 3. **C3 — giáo viên mồ côi.** Pre-check thêm truy vấn `school_class.teacher_id` không tồn tại trong
    `staff_profile(user_id, org_id)`; 5.0 assert chặn; **không** set NULL `teacher_id` để né FK.
 4. **C4 — bỏ `MANUAL_REVIEW`.** Mọi xung đột primary là `BLOCK_MIGRATION`; gate là
@@ -107,6 +108,21 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
    drop cột sinh `primary_class_id` → drop `is_primary`.
 7. **Post-check sửa lỗi:** 2b/2c/2d chỉ xét lớp `subject_id IS NOT NULL`; 7a sửa tautology
    `cs.org_id = cs.org_id` → `cs.org_id = c.org_id`; thêm 4d (`class_subject` mồ côi lớp).
+
+**Lượt 3 — siết audit schema (commit `4b2007df`, không chạy SQL):**
+
+1. **Query 0b của pre-check là gate thật:** chỉ trả `DATA_PRECHECK_READY` khi `class_subject` có
+   đúng 20 cột, PK, 5 nhóm index, 4 FK, 5 CHECK và cột sinh STORED — tất cả so khớp theo cấu trúc
+   (cột/thứ tự/biểu thức đã chuẩn hoá), không còn chỉ đếm 4 cột khóa.
+2. **Audit `teacher_subject` đầy đủ:** 10 cột (không thừa), PK, 3 nhóm index, 2 FK đúng bảng/cột
+   đích, CHECK source `SPECIALTY/MANUAL`, CHECK status chỉ `APPROVED/REVOKED` (chặn `PENDING`).
+3. **Audit `class_subject` đầy đủ:** FK cột nguồn→bảng.cột đích + cùng schema, index cột/thứ tự/
+   UNIQUE/không prefix, CHECK đã chuẩn hoá, cột sinh STORED đúng biểu thức, PK đúng thứ tự; mọi
+   lệch ⇒ `SIGNAL 45000`, không tự sửa.
+4. **Index hỗ trợ FK:** InnoDB tự tạo `(class_id, org_id)` và `(subject_id, org_id)` cho 2 FK của
+   `class_subject` (và tương tự ở `teacher_subject`) khi chưa có index tiền tố trái. Audit chấp
+   nhận **đúng** các index non-unique này; index lạ hoặc UNIQUE thừa ⇒ ABORT. Nhờ vậy bảng do
+   chính draft 52 tạo vẫn qua gate, không bị chặn nhầm.
 
 ---
 
@@ -358,6 +374,9 @@ họ còn giữ chức danh ORGANIZATION. Tài liệu ghi rõ, không tự mở 
 | TC-LEG-024 | Partial rollback 4 bước: UNIQUE → CHECK → cột sinh → `is_primary` |
 | TC-LEG-025 | `school_class.teacher_id` mồ côi → `BLOCK_MIGRATION` + 5.0 SIGNAL, không set NULL |
 | TC-LEG-026 | Bảng `class_subject` cũ thiếu cấu trúc → assert SIGNAL, không `ADD COLUMN`; `teacher_subject` cũ còn `PENDING` → 52 ABORT |
+| TC-LEG-027 | Bảng đủ 20 cột nhưng sai index/FK/CHECK/cột sinh → pre-check 0b BLOCKED + 52 SIGNAL |
+| TC-LEG-028 | Index hỗ trợ FK do InnoDB tự tạo không bị chặn nhầm; index lạ vẫn ABORT |
+| TC-LEG-029 | `teacher_subject` sai cột/PK/FK/CHECK ngoài `PENDING` → 52 SIGNAL |
 
 ### 7.3. Ánh xạ 24 kịch bản yêu cầu
 

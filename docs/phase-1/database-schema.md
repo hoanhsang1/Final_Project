@@ -290,6 +290,13 @@ CREATE TABLE IF NOT EXISTS class_subject (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
+> **Index hỗ trợ FK do InnoDB tự tạo:** MySQL yêu cầu index có cột FK làm tiền tố trái đúng thứ tự.
+> Với DDL trên, `fk_class_subject_class` cần `(class_id, org_id)` và `fk_class_subject_subject` cần
+> `(subject_id, org_id)` — cả hai chưa có index phù hợp nên InnoDB **tự tạo** (2 index non-unique).
+> Vì vậy bảng thật trên MySQL có **5 nhóm index Revision 3 + 2 index hỗ trợ FK**. Pre-check 0b và
+> `mems_m52_assert_class_subject_schema` chấp nhận **đúng hai** index hỗ trợ này (non-unique, không
+> prefix); mọi index lạ hoặc UNIQUE thừa ⇒ `bad_extra`/`idx_extra > 0` ⇒ BLOCKED/ABORT.
+
 **Một môn chính/lớp (D-15) — vì sao dùng cột sinh:**
 
 - MySQL không có partial unique index (`WHERE is_primary = 1`). Cột sinh
@@ -433,6 +440,9 @@ CREATE TABLE IF NOT EXISTS teacher_subject (
   luồng duyệt. Nếu một bảng `teacher_subject` cũ còn CHECK 3 giá trị, migration 52 **ABORT**
   (`mems_m52_assert_teacher_subject_schema`) và phải xử lý tay; không tự sửa. Bật duyệt ở Phase 2
   là quyết định riêng kèm migration mới.
+- InnoDB tự tạo index hỗ trợ FK `(user_id, org_id)` cho `fk_teacher_subject_teacher` và
+  `(subject_id, org_id)` cho `fk_teacher_subject_subject`. Audit 52 chấp nhận **đúng hai** index
+  non-unique này; index lạ hoặc UNIQUE thừa ⇒ ABORT.
 
 ---
 
@@ -522,9 +532,13 @@ Nội dung (bản đầy đủ ở `docs/phase-1/migrations/52_people_class_subj
 ```sql
 USE mems_people_db;
 -- 0) Audit bảng cũ trước khi làm gì (C2):
---    mems_m52_assert_class_subject_schema   — 20 cột (không thừa), 4 index, 4 FK,
---      5 CHECK, PK (class_id, subject_id), cột sinh primary_class_id
---    mems_m52_assert_teacher_subject_schema — CHECK status không chứa PENDING (D-06a)
+--    mems_m52_assert_class_subject_schema   — đúng 20 cột (không thừa/thiếu), PK
+--      (class_id, subject_id), 5 nhóm index (PRIMARY + 4) đúng cột/thứ tự/UNIQUE,
+--      không index lạ ngoài 2 index hỗ trợ FK, 4 FK đúng cột nguồn→bảng.cột đích,
+--      5 CHECK đúng biểu thức, cột sinh primary_class_id STORED đúng biểu thức
+--    mems_m52_assert_teacher_subject_schema — đúng 10 cột, PK (user_id, subject_id),
+--      3 nhóm index, 2 FK đúng đích, 2 CHECK đúng biểu thức; status chỉ
+--      APPROVED/REVOKED (không PENDING) (D-06a)
 --    Lệch Revision 3 ⇒ SIGNAL SQLSTATE '45000' ABORT. KHÔNG tự ADD COLUMN.
 -- 1) specialty_subject (mục 3.4)
 -- 2) teacher_subject (mục 3.5) — CHECK status IN ('APPROVED','REVOKED')
@@ -544,8 +558,8 @@ USE mems_people_db;
 **Pre-check bắt buộc trước khi chạy 52** (chi tiết SQL ở mục 6):
 
 1. Trùng `subject.code` trong cùng org (mục 6.1) — trước khi đổi UNIQUE.
-2. `class_subject` đã tồn tại chưa; nếu có, audit đủ 20 cột/4 index/4 FK/5 CHECK/PK/cột sinh
-   (lệch → **không chạy 52**, xử lý tay).
+2. `class_subject` đã tồn tại chưa; nếu có, audit đủ 20 cột / 5 nhóm index (thêm tối đa 2 index
+   hỗ trợ FK) / 4 FK / 5 CHECK / PK / cột sinh (lệch → **không chạy 52**, xử lý tay).
 3. Trùng khóa `(class_id, subject_id)` (nếu bảng đã có từ bản nháp cũ).
 4. `school_class.subject_id` **không** có dòng `class_subject` khớp chính xác.
 5. >1 primary/lớp, primary lệch `subject_id`, hoặc `subject_id IS NULL` mà có primary →
@@ -679,6 +693,10 @@ Pre-check tách làm hai file để **không truy vấn bảng chưa tồn tại
 - `migrations/51_52_precheck.sql` (PART A — schema): chỉ đọc bảng nền và `information_schema`;
   an toàn cả khi DB chưa từng có `class_subject`. Query 0b trả `next_step`:
   `DATA_PRECHECK_READY` / `SKIP_DATA_PRECHECK_NO_TABLE` / `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`.
+  `DATA_PRECHECK_READY` chỉ khi `class_subject` khớp đầy đủ Revision 3: 20 cột, PK
+  `(class_id, subject_id)`, 5 nhóm index đúng cấu trúc (thêm tối đa 2 index hỗ trợ FK), 4 FK đúng
+  bảng/cột đích, 5 CHECK đúng biểu thức, `primary_class_id` là cột sinh STORED đúng biểu thức.
+  Bất kỳ sai/thiếu/thừa nào ⇒ BLOCKED (PART B không được chạy).
 - `migrations/51_52_precheck_data.sql` (PART B — data): chỉ chạy khi `next_step = DATA_PRECHECK_READY`;
   chứa kiểm tra trùng khóa, org lệch, subject/giáo viên/lớp mồ côi, phân loại từng lớp và danh sách
   `BLOCK_MIGRATION`.

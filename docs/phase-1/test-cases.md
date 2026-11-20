@@ -250,6 +250,9 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-024 | Partial rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `chk_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối | DB |
 | TC-LEG-025 | Giáo viên mồ côi chặn migration | `school_class.teacher_id` hoặc `class_subject.teacher_id` không có trong `staff_profile` cùng org | Pre-check data trả `CLASS_ORPHAN_TEACHER`/`CS_ORPHAN_TEACHER`; 52 `SIGNAL` ở `mems_m52_assert_backfill_safe`; **không** set `teacher_id = NULL` | DB |
 | TC-LEG-026 | Bảng cũ thiếu cấu trúc bị từ chối | (a) tạo `class_subject` chỉ có vài cột (bản nháp cũ) rồi chạy 52; (b) `teacher_subject` cũ có CHECK chứa `PENDING` rồi chạy 52 | (a) `mems_m52_assert_class_subject_schema` `SIGNAL` trước backfill, không tự `ADD COLUMN`; (b) `mems_m52_assert_teacher_subject_schema` `SIGNAL`; không tự sửa CHECK | DB |
+| TC-LEG-027 | Bảng cũ sai cấu trúc index/FK/CHECK/cột sinh bị từ chối | staging dựng bảng đủ 20 cột nhưng (i) đảo thứ tự cột trong index, (ii) FK trỏ sai bảng/cột, (iii) CHECK thiếu một giá trị, (iv) `primary_class_id` là cột thường hoặc VIRTUAL | (i)–(iv) pre-check 0b trả `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL 45000` ở audit tương ứng; không tự sửa schema | DB |
+| TC-LEG-028 | Index hỗ trợ FK không bị chặn nhầm | bảng `class_subject`/`teacher_subject` do chính draft 52 tạo trên MySQL | `information_schema.statistics` có thêm index non-unique `(class_id, org_id)`/`(subject_id, org_id)` (và `(user_id, org_id)` cho `teacher_subject`); 0b vẫn trả `DATA_PRECHECK_READY`, 52 audit pass; thêm index lạ khác ⇒ ABORT | DB |
+| TC-LEG-029 | `teacher_subject` sai cấu trúc ngoài `PENDING` | staging: thiếu/đổi cột, sai thứ tự PK, FK trỏ `staff_profile` thay vì `teacher_profile`, CHECK source thiếu `SPECIALTY` | `mems_m52_assert_teacher_subject_schema` `SIGNAL 45000`; không tự sửa | DB |
 
 ---
 
