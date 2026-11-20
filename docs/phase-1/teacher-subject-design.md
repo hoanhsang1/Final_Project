@@ -1,8 +1,8 @@
 # Phase 1 — Thiết kế quan hệ Giáo viên – Môn học
 
-> Tài liệu thiết kế. Hiện trạng đã kiểm chứng tại HEAD `cdd03b8`. Các bảng/cột mới là **đề xuất**;
-> quyết định nghiệp vụ đánh dấu `NEEDS_USER_DECISION` (xem `D-06`, `D-09` trong
-> `subject-business-requirements.md`). Không thay đổi source trong tài liệu này.
+> Tài liệu thiết kế. Hiện trạng đã kiểm chứng tại HEAD `cdd03b8`. Quyết định nghiệp vụ
+> `D-06` (mô hình chuyên môn) và `D-06a` (**không có quy trình duyệt** ở Phase 1) **đã chốt**
+> trong `subject-business-requirements.md`. Tài liệu không thay đổi source.
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | `specialty` | `id, org_id, name, name_unaccented, is_active, created_by, created_at` | UNIQUE `(org_id, name_unaccented)`; không có `subject_id` |
 | `teacher_specialty` | `user_id, specialty_id, org_id` | PK `(user_id, specialty_id)`; FK CASCADE tới `teacher_profile`/`specialty` |
-| `teacher_profile` | `user_id, org_id, contract_type, teaching_status, version` | `teaching_status ∈ DANG_DAY, TAM_NGHI, NGHI_VIEC` |
+| `teacher_profile` | `user_id, org_id, contract_type, teaching_status, version` | `teaching_status ∈ DANG_DAY, TAM_NGHI, NGHI_VIEC`. Lưu ý: API cập nhật giáo viên dùng `staff_profile.version` (không phải cột này) — xem `api-contract.md` §5.2 |
 | `subject` | `id, org_id, name, name_unaccented, is_active, …` | Không liên kết vật lý với `specialty` |
 
 ### 1.2. Cơ chế kiểm tra "giáo viên dạy được môn" hiện tại
@@ -56,13 +56,11 @@ So khớp **theo tên không dấu**, không dùng ID:
 | **B. `teacher_subject` theo Subject ID** | Bảng nối giáo viên–môn | Chính xác, không phụ thuộc tên | Nhập từng môn; mất cách gán theo chuyên môn | Thêm 1 bảng; đổi `teachesSubject` |
 | **C. `specialty_subject` + `teacher_subject`** | Chuyên môn ánh xạ nhiều môn; giáo viên được gán môn trực tiếp, có thể sinh từ chuyên môn | Gán hàng loạt + chính xác theo ID; lưu nguồn gán | Thêm 2 bảng; cần đồng bộ khi đổi ánh xạ | Thêm 2 bảng; backfill |
 
-**Đề xuất:** **C**.
+**Chốt: C (D-06).**
 
 - `specialty_subject` là **ánh xạ danh mục** (chuyên môn ↔ môn), dùng để gợi ý/gán hàng loạt.
 - `teacher_subject` là **nguồn sự thật** khi kiểm tra giáo viên dạy môn.
 - `teacher_specialty` **giữ nguyên** (lịch sử nhân sự, báo cáo), không xoá.
-
-**NEEDS_USER_DECISION (D-06).**
 
 ---
 
@@ -92,7 +90,7 @@ Mục đích: trả lời "chuyên môn Vật lý gồm những môn nào" và g
 | `user_id` | char(36) | PK phần 1 |
 | `subject_id` | char(36) | PK phần 2 |
 | `org_id` | char(36) | NOT NULL |
-| `status` | varchar(20) | NOT NULL DEFAULT `APPROVED`; `PENDING/APPROVED/REVOKED` (nếu bật duyệt) |
+| `status` | varchar(20) | NOT NULL DEFAULT `APPROVED`; Phase 1 chỉ dùng `APPROVED`/`REVOKED` (D-06a) |
 | `source` | varchar(20) | NOT NULL; `SPECIALTY` / `MANUAL` |
 | `approved_by` | char(36) | NULL |
 | `approved_at` | datetime(3) | NULL |
@@ -109,6 +107,10 @@ CHECK `status IN ('PENDING','APPROVED','REVOKED')`, `source IN ('SPECIALTY','MAN
 
 **Quy tắc nguồn sự thật:** mọi kiểm tra "dạy được môn" đọc `teacher_subject` với
 `status='APPROVED'`; **không** đọc tên.
+
+**Baseline Phase 1 (D-06a, không duyệt):** mọi dòng do API tạo/sinh từ chuyên môn đều ghi
+`status='APPROVED'`; thu hồi ghi `REVOKED`. Không có luồng `PENDING`, không có API approve/reject.
+Cột `status` và CHECK 3 giá trị vẫn khai báo để Phase 2 mới bật duyệt mà không đổi schema.
 
 ### 3.3. Truy vấn thay thế `teachesSubject` (pseudocode)
 
@@ -141,8 +143,8 @@ phải được ghi rõ trong code và có test riêng, không để vĩnh viễ
 - **Đề xuất:** thêm ánh xạ chuyên môn → môn:
   - `GET /specialties/{id}/subjects`
   - `PUT /specialties/{id}/subjects` (thay danh sách subjectId)
-- **Quyền:** `employee.edit` (+ scope phòng ban) hoặc quyền mới `curriculum.manage` nếu chốt
-  (xem ma trận).
+- **Quyền:** `employee.edit` (+ scope phòng ban); nếu chốt thêm `teacher.expertise.manage` thì
+  dùng mã đó (xem `role-permission-matrix.md`).
 - **Thay thế:** môn không tồn tại/inactive → `400 INVALID_SPECIALTY`/`SUBJECT_NOT_FOUND`.
 
 ### 4.2. BR-TCH-F02 — Gán chuyên môn môn học cho giáo viên
@@ -156,24 +158,17 @@ Hai cách:
 - **Actor:** OWNER hoặc `employee.edit` (trong phạm vi phòng ban của giáo viên).
 - **Điều kiện:** giáo viên tồn tại trong org; `teaching_status != NGHI_VIEC`; môn active;
   chưa có cặp `(user_id, subject_id)` hoặc đang `REVOKED` (được kích hoạt lại).
-- **Luồng:**
-  1. Ghi `teacher_subject` với `status` theo chính sách duyệt.
-  2. Nếu bật duyệt: `PENDING` + audit `TEACHER_SUBJECT_REQUESTED`; nếu không: `APPROVED`.
-  3. Trả danh sách chuyên môn hiệu lực.
+- **Luồng (Phase 1, D-06a không duyệt):**
+  1. Ghi `teacher_subject` với `status='APPROVED'` (không có bước duyệt).
+  2. Audit `TEACHER_SUBJECT_ASSIGNED` (không dùng `REQUESTED/APPROVED` vì không có luồng duyệt).
+  3. Trả danh sách môn hiệu lực.
 - **Thay thế:** trùng → 409 `TEACHER_SUBJECT_EXISTS`; môn inactive → 400 `SUBJECT_INACTIVE`;
   giáo viên nghỉ việc → 409 `TEACHER_NOT_AVAILABLE`.
 
-### 4.3. BR-TCH-F03 — Duyệt chuyên môn (nếu bật)
+> **Không có luồng duyệt (F03) ở Phase 1.** D-06a đã chốt không duyệt: không quyền
+> `teacher.expertise.approve`, không endpoint approve/reject, không trạng thái `PENDING`.
 
-- **Actor:** người có `teacher.expertise.approve` (đề xuất) hoặc trưởng phòng của giáo viên
-  (cần chốt D-06a).
-- **Điều kiện:** bản ghi `PENDING`; người duyệt không phải người yêu cầu (tránh tự duyệt —
-  đề xuất).
-- **Luồng:** `PENDING → APPROVED` (set `approved_by/at`) hoặc `PENDING → REVOKED`.
-- **Audit:** `TEACHER_SUBJECT_APPROVED/REJECTED`.
-- **Thay thế:** bản ghi không `PENDING` → 409 `TEACHER_SUBJECT_NOT_PENDING`.
-
-### 4.4. BR-TCH-F04 — Thu hồi chuyên môn
+### 4.3. BR-TCH-F04 — Thu hồi chuyên môn
 
 - **Actor:** OWNER hoặc `employee.edit` / `teacher.expertise.manage`.
 - **Điều kiện:** giáo viên không còn dạy môn đó ở lớp `DANG_DIEN_RA` **hoặc** người dùng xác
@@ -184,7 +179,7 @@ Hai cách:
   SCH-01: không tự động thay giáo viên).
 - **Audit:** `TEACHER_SUBJECT_REVOKED` + `affectedClasses`.
 
-### 4.5. BR-TCH-F05 — Chuyển phòng ban
+### 4.4. BR-TCH-F05 — Chuyển phòng ban
 
 - Chuyên môn và môn học là **cấp tổ chức** (`org_id`), không thuộc phòng ban.
 - `TransferService` đổi `department_member.department_id`; **không** xoá `teacher_specialty`
@@ -193,7 +188,7 @@ Hai cách:
 - Lớp cũ vẫn giữ giáo viên; nếu chính sách yêu cầu đổi, dùng luồng phân công lại
   (`class.teacher.reassign`) — không tự động.
 
-### 4.6. BR-TCH-F06 — Nghỉ việc / vô hiệu hoá
+### 4.5. BR-TCH-F06 — Nghỉ việc / vô hiệu hoá
 
 - `teaching_status = NGHI_VIEC` ⇒ không xuất hiện trong danh sách assignable; không gán lớp mới.
 - `teacher_subject` **giữ nguyên** (lịch sử), nhưng truy vấn hiệu lực lọc `teaching_status`.
@@ -201,7 +196,7 @@ Hai cách:
 - `TAM_NGHI`: chặn gán mới giống `NGHI_VIEC`? Hiện `assignTeacher` chỉ chấp nhận `DANG_DAY`
   ⇒ giữ nguyên.
 
-### 4.7. BR-TCH-F07 — Danh sách giáo viên theo môn (phục vụ gán lớp)
+### 4.6. BR-TCH-F07 — Danh sách giáo viên theo môn (phục vụ gán lớp)
 
 - **API đề xuất:** `GET /teachers/assignable?subjectId={id}` (mở rộng endpoint hiện có).
 - **Điều kiện trả về:** `teaching_status='DANG_DAY'`, có position TEACHER, có
@@ -209,17 +204,34 @@ Hai cách:
 - **Quyền:** `class.assign_teacher` / `class.teacher.reassign` (như hiện tại).
 - **Không trả:** giáo viên nghỉ, không chuyên môn, khác org.
 
-### 4.8. Tóm tắt điều kiện từng luồng
+### 4.7. Tóm tắt điều kiện từng luồng (Phase 1)
 
 | Luồng | Actor | Điều kiện đầu vào | Thành công | Thất bại |
 |---|---|---|---|---|
 | F01 Quản lý chuyên môn | `employee.edit` (+scope) | chuyên môn/môn cùng org, môn active | 200, audit | 400 `INVALID_SPECIALTY`/`SUBJECT_INACTIVE` |
-| F02 Gán môn | `employee.edit` / ⚙`teacher.expertise.manage` | GV tồn tại, `!= NGHI_VIEC`, subject active, chưa trùng | 201, `PENDING`/`APPROVED`, audit | 409/400 |
-| F03 Duyệt | ⚙`teacher.expertise.approve` | bản ghi `PENDING`, không tự duyệt | 200 `APPROVED/REVOKED`, audit | 409 `NOT_PENDING`; 403 |
+| F02 Gán môn | `employee.edit` | GV tồn tại, `!= NGHI_VIEC`, subject active, chưa trùng | 201, `APPROVED`, audit | 409/400 |
 | F04 Thu hồi | như F02 | không dạy lớp active hoặc `confirm=true` | 200 `REVOKED`, audit + danh sách lớp | 409 `IN_USE` |
 | F05 Chuyển phòng ban | `TransferService` | luồng chuyển hiện có | đổi phòng, giữ chuyên môn | theo luồng chuyển |
 | F06 Nghỉ việc | `teacher.change_status` | trạng thái hợp lệ | `NGHI_VIEC`, loại khỏi assignable | 409 `TEACHER_NOT_AVAILABLE` khi gán |
 | F07 Assignable theo môn | `class.assign_teacher` | môn tồn tại/org | danh sách GV đủ điều kiện | 403/404 |
+| F08 Đổi môn chính của lớp | `class.edit` | xem `api-contract.md` §4.8 | history + đồng bộ primary | — |
+
+> Phase 1 **không có luồng duyệt** (D-06a); `status` chỉ đi `APPROVED → REVOKED`.
+
+### 4.8. BR-TCH-F08 — Đổi môn chính không chuyển giáo viên (D-08/D-15)
+
+- Đổi môn chính của lớp **không** thay đổi `teacher_subject` của bất kỳ giáo viên nào.
+- Dòng `class_subject` của môn mới có `teacher_id = NULL` (dù môn mới đã có dòng sẵn thì giữ
+  `teacher_id` hiện có của dòng đó — **không** gán giáo viên của môn cũ).
+- Giáo viên cũ vẫn giữ `class_subject.teacher_id` trên dòng môn cũ (dòng này chỉ mất `is_primary`).
+- `class_subject_history.old_teacher_id` là **snapshot tham khảo**, không tạo/gỡ `teacher_subject`.
+- Gán giáo viên cho môn mới là thao tác riêng (`PUT /classes/{id}/subjects/{subjectId}` với
+  `teacherId`) và vẫn kiểm chuyên môn (`SUBJECT_MISMATCH`) + `DANG_DAY`.
+- **Không** fallback `school_class.teacher_id` cho dòng môn mới; fallback này chỉ dùng khi lớp
+  chưa có `class_subject` nào (dòng `LEGACY` suy ra).
+
+> Hệ quả khi code: `TeacherRepository`/service gán giáo viên theo lớp không được suy giáo viên từ
+> `school_class.teacher_id` nếu lớp đã có `class_subject`.
 
 ---
 
@@ -233,15 +245,18 @@ Hai cách:
 | BR-TCH-04 | `teacher_subject` duy nhất theo `(user_id, subject_id)` |
 | BR-TCH-05 | Thu hồi là `REVOKED`, không xoá dòng |
 | BR-TCH-06 | Sinh từ chuyên môn ghi `source=SPECIALTY`; gán tay ghi `source=MANUAL` |
-| BR-TCH-07 | Nếu bật duyệt: chỉ `APPROVED` mới có hiệu lực |
+| BR-TCH-07 | Chỉ `teacher_subject.status='APPROVED'` mới có hiệu lực. Phase 1 (D-06a) mọi dòng gán đều `APPROVED`, không có `PENDING` |
 | BR-TCH-08 | Không tự đổi giáo viên lớp đang dạy khi thu hồi/nghỉ việc |
 | BR-TCH-09 | Chuyển phòng ban không đổi chuyên môn/môn |
 | BR-TCH-10 | Mọi thay đổi chuyên môn có audit + người thực hiện |
-| BR-TCH-11 | `specialty_subject` chỉ là ánh xạ gợi ý; không cấp quyền dạy trực tiếp nếu có duyệt |
+| BR-TCH-11 | `specialty_subject` chỉ là ánh xạ gợi ý/bulk; quyền dạy môn nằm ở `teacher_subject` do API gán tạo |
 | BR-TCH-12 | Org A không thấy/gán chuyên môn của org B |
 | BR-TCH-13 | Khi đổi tên môn, kiểm tra chuyên môn vẫn đúng (nhờ ID) |
 | BR-TCH-14 | Giáo viên có thể dạy nhiều môn; một môn có nhiều giáo viên |
 | BR-TCH-15 | Một lớp–một môn có tối đa một giáo viên ở Phase 1 (D-09) |
+| BR-TCH-16 | Đổi môn chính của lớp **không** chép/suy giáo viên cũ sang môn mới; giáo viên mới phải gán riêng (D-08/D-15) |
+| BR-TCH-17 | `class_subject_history.old_teacher_id` chỉ là snapshot; không tạo/gỡ `teacher_subject` |
+| BR-TCH-18 | Fallback `school_class.teacher_id` chỉ áp cho dòng `LEGACY` suy ra khi lớp **chưa có** `class_subject` |
 
 ---
 
@@ -273,8 +288,8 @@ Hai cách:
 3. Kiểm đếm trước/sau; báo cáo chuyên môn không ánh xạ được môn nào (dữ liệu nhập tự do).
 4. Chỉ sau khi đối soát mới đổi `teachesSubject` sang bảng mới.
 
-> MySQL: câu lệnh trên là **draft minh hoạ**; người dùng tự đưa vào migration riêng sau khi chốt
-> D-06/D-11. Không chạy trên production từ tài liệu này.
+> MySQL: câu lệnh trên là **draft minh hoạ**; người dùng tự đưa vào migration riêng theo D-11
+> (chỉ backfill khớp chính xác, báo cáo phần mập mờ). Không chạy trên production từ tài liệu này.
 
 ---
 
@@ -294,7 +309,7 @@ Hai cách:
 |---|---|---|---|
 | `2222…0005` | `9999…9001` Toán | APPROVED | SPECIALTY |
 | `2222…0005` | `9999…9004` Toán 10 | APPROVED | SPECIALTY |
-| `2222…0006` | `9999…9002` Vật lý | PENDING | MANUAL |
+| `2222…0006` | `9999…9002` Vật lý | APPROVED | MANUAL |
 
 `GET /teachers/assignable?subjectId=9999…9004` trả `2222…0005`; không trả `2222…0006`.
 
@@ -313,18 +328,31 @@ khác biệt cốt lõi so với so khớp tên.
 - AC-TCH-04: Giáo viên `NGHI_VIEC` không xuất hiện trong assignable và không gán lớp được.
 - AC-TCH-05: Thu hồi môn không tự đổi giáo viên lớp đang dạy; trả danh sách lớp ảnh hưởng.
 - AC-TCH-06: Chuyển phòng ban giữ nguyên chuyên môn/môn.
-- AC-TCH-07: Nếu bật duyệt, chỉ `APPROVED` có hiệu lực; `PENDING` không gán lớp được.
+- AC-TCH-07: Phase 1 mọi dòng gán có `status='APPROVED'`; **không** có endpoint approve/reject và
+  không tạo ra `PENDING` (D-06a).
 - AC-TCH-08: Bulk theo chuyên môn sinh đúng các dòng `source=SPECIALTY`.
-- AC-TCH-09: Audit ghi người gán/duyệt/thu hồi.
+- AC-TCH-09: Audit ghi người gán/thu hồi; không có audit approve/reject ở Phase 1.
 
 ---
 
-## 9. Câu hỏi mở
+## 9. Quyết định đã chốt & câu hỏi kỹ thuật còn lại
 
-1. D-06: chọn phương án A/B/C?
-2. D-06a: có bắt buộc duyệt chuyên môn không? Ai duyệt (trưởng phòng, giáo vụ, Owner)?
-3. Có cho giáo viên tự đề xuất môn rồi chờ duyệt không?
-4. Một chuyên môn có thể ánh xạ nhiều môn? (đề xuất: có)
-5. Một môn có thể thuộc nhiều chuyên môn? (đề xuất: có)
-6. Khi thu hồi môn đang dạy lớp `DANG_DIEN_RA`: chặn hay cho phép kèm cảnh báo?
-7. Có cần phân biệt "giáo viên chính" và "trợ giảng" cho một môn/lớp không?
+`D-06` = C (`specialty_subject` + `teacher_subject`, `teacher_subject` là nguồn sự thật) và
+`D-06a` = **không duyệt** ở Phase 1 **đã chốt**. Các điểm kỹ thuật còn lại:
+
+1. Có cho giáo viên tự đề xuất môn không? (ngoài Phase 1 — không có luồng đề xuất/duyệt)
+2. Chỉ áp dụng một chiều: một chuyên môn ánh xạ nhiều môn, một môn có thể thuộc nhiều chuyên môn
+   (không phải quyết định nghiệp vụ, chỉ là dữ liệu).
+3. Khi thu hồi môn đang dạy lớp `DANG_DIEN_RA`: chặn hay cho phép kèm cảnh báo? (đề xuất: chặn,
+   cần `confirm=true`).
+4. Có cần phân biệt "giáo viên chính" và "trợ giảng" cho một môn/lớp không? (đề xuất: không ở
+   Phase 1 — D-09 một giáo viên/môn/lớp).
+
+---
+
+## Phụ lục A — Ghi chú Phase 2 (không có trong hợp đồng Phase 1)
+
+Phase 1 **không** có quy trình duyệt chuyên môn (D-06a). Không có quyền
+`teacher.expertise.approve`, không endpoint approve/reject, không trạng thái `PENDING`.
+Nếu Phase 2 quyết định bật duyệt, phải thiết kế và bổ sung đồng thời: quyền vào catalog, API,
+mã lỗi, audit và test — không tái sử dụng bất kỳ phần nào của tài liệu này làm hợp đồng.

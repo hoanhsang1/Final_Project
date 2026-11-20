@@ -3,6 +3,9 @@
 > Tài liệu thiết kế kiểm thử. Test case đánh dấu **UT** (unit), **IT** (integration/H2),
 > **API** (HTTP/MockMvc), **E2E** (gateway + FE), **DB** (kiểm migration/constraint),
 > **SEC** (bảo mật). Không có test nào được chạy trong tài liệu này.
+> **Trạng thái quyết định:** `D-01`…`D-15` **đã được người dùng chốt** (xem
+> `subject-business-requirements.md`). Test case dưới đây viết theo quyết định cuối, không còn
+> nhánh "nếu D-xx = …".
 > Quy ước lỗi: `validation-and-error-cases.md`. API: `api-contract.md`.
 
 ---
@@ -16,7 +19,7 @@
 | API | MockMvc hoặc HTTP thật | Validation, mã lỗi, quyền, JSON contract |
 | E2E | Gateway + People + Identity + FE | Luồng giáo vụ tạo curriculum → áp lớp |
 | DB | MySQL staging (không production) | DDL, FK, CHECK, backfill, index |
-| SEC | JWT/role | 401/403, cross-org, tự duyệt |
+| SEC | JWT/role | 401/403, cross-org, quyền curriculum |
 
 Lưu ý môi trường:
 
@@ -59,9 +62,9 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 |---|---|---|---|---|---|
 | TC-SUB-001 | Tạo môn thành công | code `TOAN10`, name `Toán 10` | POST `/subjects` với `subject.manage` | 201, `active=true`, `Location`, audit `SUBJECT_CREATED` | API |
 | TC-SUB-002 | Thiếu tên | `{code:"X"}` | POST | 400 `INVALID_KEY`/`NAME_REQUIRED`, không tạo | API |
-| TC-SUB-003 | Tên quá dài | name 201 ký tự | POST | 400 `NAME_TOO_LONG` | API |
+| TC-SUB-003 | Tên quá dài | name 201 ký tự | POST | 400 `INVALID_KEY` (message `NAME_TOO_LONG`) | API |
 | TC-SUB-004 | Trùng tên khác dấu/hoa thường | `toán`, `TOÁN` | POST lần 2 | 409 `CONFLICT` | IT |
-| TC-SUB-005 | Trùng mã (D-04) | code `TOAN` đã tồn tại | POST | 409 `SUBJECT_CODE_EXISTS` | API |
+| TC-SUB-005 | Trùng mã (code có giá trị) | code `TOAN` đã tồn tại | POST | 409 `SUBJECT_CODE_EXISTS` | API |
 | TC-SUB-006 | Sửa môn | đổi mã/name/description | PUT | 200, `updatedAt` có giá trị, audit `SUBJECT_UPDATED` | API |
 | TC-SUB-007 | Sửa sang mã của môn khác | code trùng | PUT | 409 `SUBJECT_CODE_EXISTS` | API |
 | TC-SUB-008 | Xem chi tiết | id hợp lệ | GET | 200 đúng trường `SubjectResponse` | API |
@@ -76,7 +79,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-SUB-017 | Module tắt (D-10) | org tắt `STUDENT_MANAGEMENT` | POST | 400 `MODULE_NOT_ENABLED` | API |
 | TC-SUB-018 | usage | môn có 3 lớp | GET usage | `classesUsingSubject=3`, danh sách đúng | API |
 | TC-SUB-019 | Mã trùng giữa 2 org | cùng code ở org A/B | POST mỗi org | Cả hai 201 | IT |
-| TC-SUB-020 | Mã để trống legacy | code NULL | POST (nếu D-04 cho NULL) | 201; nhiều bản ghi NULL cùng org được | DB |
+| TC-SUB-020 | Mã để trống (D-04) | code NULL | POST hai lần | Cả hai 201; nhiều bản ghi NULL cùng org được | DB |
+| TC-SUB-021 | Hợp đồng danh sách môn giữ mảng (D-13) | không tham số phân trang | GET `/subjects` | Response là JSON array `[...]`, không có `items/total/page/size` | API |
 
 ---
 
@@ -91,7 +95,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CUR-005 | Thêm môn | subject Toán | 201, version tăng | API |
 | TC-CUR-006 | Trùng môn | thêm Toán lần 2 | 409 `CURRICULUM_SUBJECT_DUPLICATE` | API |
 | TC-CUR-007 | Trùng thứ tự | `sequenceNo=1` đã dùng | 409 `CURRICULUM_SEQUENCE_DUPLICATE` | API |
-| TC-CUR-008 | LT+TH ≠ tổng | 30 + 10 ≠ 45 | 400 `THEORY_PRACTICE_MISMATCH` | UT |
+| TC-CUR-008 | LT+TH ≠ tổng — quy tắc tuỳ chọn (D-03 không bắt buộc) | 30 + 10 ≠ 45 | Không lỗi mặc định; nếu tổ chức bật rule tuỳ chọn → 400 `THEORY_PRACTICE_MISMATCH` | UT |
 | TC-CUR-009 | Chu trình tiên quyết | A→B→C→A | 400 `SUBJECT_PREREQUISITE_CYCLE`, data path | UT |
 | TC-CUR-010 | Tự tiên quyết | prerequisite = subjectId | 400 `SUBJECT_PREREQUISITE_CYCLE` | UT |
 | TC-CUR-011 | Version cũ | PUT version=0 khi đã 3 | 409 `DATA_CHANGED` | IT |
@@ -102,6 +106,13 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CUR-016 | Thêm môn org khác | subject org B vào curriculum org A | 400 `SUBJECT_NOT_FOUND` | SEC |
 | TC-CUR-017 | Thêm môn inactive | subject active=false | 400 `SUBJECT_INACTIVE` | API |
 | TC-CUR-018 | Xoá môn khỏi template | DELETE | 200/204, version tăng, lớp đã áp không đổi | API |
+| TC-CUR-019 | Tiên quyết ngoài curriculum | một phần tử `prerequisiteSubjectIds` là môn org A nhưng **không** thuộc curriculum này | 404 `CURRICULUM_SUBJECT_NOT_FOUND`, không ghi cạnh | IT |
+| TC-CUR-020 | Xoá môn đang là tiên quyết | DELETE môn B khi A có cạnh `prerequisite=B` | 409 `CONFLICT` (FK RESTRICT); muốn xoá phải gỡ cạnh của A trước trong cùng transaction | IT |
+| TC-CUR-021 | Nhiều tiên quyết | Tin học có tiên quyết `[Toán, Vật lý]` | 201; 2 cạnh trong `curriculum_subject_prerequisite`; response trả đủ 2 id | API |
+| TC-CUR-022 | Cạnh tiên quyết trùng | `prerequisiteSubjectIds=[Toán, Toán]` | 400 `PREREQUISITE_DUPLICATE`, không ghi cạnh | API |
+| TC-CUR-023 | Quá nhiều tiên quyết | 51 phần tử | 400 `PREREQUISITE_IDS_TOO_MANY`, không ghi | API |
+| TC-CUR-024 | Thay toàn bộ tiên quyết | PUT với mảng mới `[Vật lý]` | 200; cạnh cũ (Toán) bị xoá, chỉ còn Vật lý; version tăng | IT |
+| TC-CUR-025 | Ngừng curriculum không đổi lớp đã áp | active=false | 200; `class_subject` của lớp đã áp không đổi | IT |
 
 ---
 
@@ -115,7 +126,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-004 | Áp với môn inactive | curriculum chứa môn vừa ngừng | 400 `SUBJECT_INACTIVE`, không ghi | IT |
 | TC-CLS-005 | Áp cho lớp đang học | C002 `DANG_DIEN_RA` | 409 `CLASS_SUBJECT_LOCKED` | API |
 | TC-CLS-006 | Version lệch | version sai | 409 `DATA_CHANGED` | API |
-| TC-CLS-007 | Thiếu confirmReplace | lớp đã có curriculum khác, `confirmReplace=false` | 409 `DATA_CHANGED`/`CONFLICT` (cần chốt mã) | API |
+| TC-CLS-007 | Thiếu confirmReplace | lớp đã có curriculum khác, `confirmReplace=false` | 409 `CONFLICT` (api-contract §4.3) | API |
 | TC-CLS-008 | Giữ môn MANUAL | `keepManualSubjects=true` | Môn manual còn, môn curriculum thay đúng | IT |
 | TC-CLS-009 | Thêm môn thủ công | Tin học, 30 buổi, 90 phút | 201, `source=MANUAL` | API |
 | TC-CLS-010 | Thêm trùng môn | Toán đã có | 409 `CLASS_SUBJECT_EXISTS` | API |
@@ -127,6 +138,26 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-016 | Cách ly org | class org B với JWT org A | 404 `CLASS_NOT_FOUND` | SEC |
 | TC-CLS-017 | Version tăng đúng | sau mỗi thao tác ghi | `school_class.version` +1 | IT |
 | TC-CLS-018 | Lớp đã đóng | C005 `close_state=CLOSED` | 409 `CLASS_NOT_EDITABLE` | API |
+| TC-CLS-019 | Xoá dòng LEGACY khớp môn chính (D-15) | DELETE dòng `source=LEGACY` trùng `school_class.subject_id` | 409 `CLASS_SUBJECT_LEGACY_PROTECTED`; đổi môn chính qua `PUT /classes/{id}/subjects/primary` mới xoá được | API |
+| TC-CLS-020 | FK tổ hợp chặn chéo org | INSERT `class_subject` với `class_id` org B + `org_id` org A (SQL trực tiếp) | FK `(class_id, org_id)` từ chối (lỗi ràng buộc) | DB |
+| TC-CLS-021 | Đổi môn chính trước khi bắt đầu | lớp `CHUA_BAT_DAU`, `PUT .../subjects/primary` | 200; history 1 dòng; `school_class.subject_id` đổi; version +1 | IT |
+| TC-CLS-022 | Đổi môn chính khi `DANG_DIEN_RA` | lớp đang học, đổi môn chính | 200; history ghi; môn khác/curriculum **không** đổi | IT |
+| TC-CLS-023 | Từ chối lớp kết thúc/huỷ/đóng | `DA_KET_THUC`, `DA_HUY`, `CLOSED` | 409 `CLASS_NOT_EDITABLE`; **không** có history mới | API |
+| TC-CLS-024 | Môn mới inactive | `subject.is_active = 0` | 400 `SUBJECT_INACTIVE`; không ghi gì | API |
+| TC-CLS-025 | Không xoá dòng primary | DELETE dòng `is_primary = 1` | 409 `CLASS_SUBJECT_LEGACY_PROTECTED`; dòng còn nguyên | API |
+| TC-CLS-026 | Snapshot mã/tên môn cũ | đổi Toán→Lý, sau đó đổi tên/xoá mềm môn Toán | History vẫn hiển thị `old_subject_code/name` gốc | IT |
+| TC-CLS-027 | Lưu `old_teacher_id` + giới hạn `reason` | môn cũ có GV; `reason` 501 ký tự | `reason` 501 → 400 `REASON_TOO_LONG`; `reason` hợp lệ → history lưu `old_teacher_id` đúng, `reason` ≤ 500 | API |
+| TC-CLS-028 | Không chuyển giáo viên | môn cũ có GV A, đổi sang môn mới | Dòng môn mới `teacher_id = NULL`; GV A không xuất hiện ở môn mới | IT |
+| TC-CLS-029 | Môn mới đã có trong lớp | môn Lý đã là dòng `class_subject` của lớp | **Tái dùng** dòng đó (`is_primary=1`), không tạo dòng thứ hai; đúng một primary | IT |
+| TC-CLS-030 | Rollback khi ghi history lỗi | giả lập lỗi DB bước history/`school_class` | 500; không history, `school_class.subject_id` và `class_subject` **không** đổi | IT |
+| TC-CLS-031 | Version lệch | `expectedVersion` cũ | 409 `DATA_CHANGED`; không ghi | API |
+| TC-CLS-032 | Hai request đổi primary đồng thời | 2 request song song | Một thành công; request còn lại 409 `CLASS_SUBJECT_OPERATION_CONFLICT`/`DATA_CHANGED`; không có 2 primary | IT |
+| TC-CLS-033 | Cách ly org khi đổi môn chính | lớp org B với JWT org A | 404 `CLASS_NOT_FOUND`; không history | SEC |
+| TC-CLS-034 | Không có API sửa/xoá history | PUT/DELETE `/classes/{id}/subject-history` | 404/405 (endpoint không tồn tại) | API |
+| TC-CLS-035 | `PUT /classes/{id}` không vòng qua history | đổi `subjectId` qua endpoint lớp | 200; **có** history + đồng bộ primary như §4.8 | API |
+| TC-CLS-036 | Lớp legacy đổi môn chính lần đầu | lớp chưa có `class_subject`, có `subject_id` | Tạo history với `old_subject_*` từ `school_class`; insert dòng primary mới | IT |
+| TC-CLS-037 | Xoá cứng lớp đã có history | `DELETE /classes/{id}` trên lớp đã đổi môn chính ≥1 lần | 409 `CONFLICT` (không 500 do FK); history còn nguyên | API |
+| TC-CLS-038 | Xoá cứng lớp chưa có history | `DELETE /classes/{id}` lớp chưa đổi môn chính | 204 như hành vi hiện tại | API |
 
 ---
 
@@ -138,20 +169,22 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-TCH-002 | Gán môn thủ công | thêm Toán 10 | 201, `source=MANUAL` | API |
 | TC-TCH-003 | Trùng môn | gán lại | 409 `TEACHER_SUBJECT_EXISTS` | API |
 | TC-TCH-004 | Môn inactive | subject active=false | 400 `SUBJECT_INACTIVE` | API |
-| TC-TCH-005 | Bulk theo chuyên môn | chọn chuyên môn Toán | Sinh môn từ `specialty_subject`, `source=SPECIALTY` | IT |
+| TC-TCH-005 | Bulk theo chuyên môn | chọn chuyên môn Toán | Sinh môn từ `specialty_subject`, `source=SPECIALTY`, `status=APPROVED` | IT |
 | TC-TCH-006 | Bulk thu hồi đang dạy | bỏ Toán khi đang dạy C002 | 409 `TEACHER_SUBJECT_IN_USE` + danh sách lớp | API |
 | TC-TCH-007 | Bulk thu hồi có xác nhận | `confirmRevokeInUse=true` | 200, status `REVOKED`, lớp không đổi GV | IT |
-| TC-TCH-008 | Duyệt PENDING | approve | 200 `APPROVED`, `approvedBy/At` | API |
-| TC-TCH-009 | Duyệt lại | approve lần 2 | 409 `TEACHER_SUBJECT_NOT_PENDING` | API |
-| TC-TCH-010 | Từ chối | reject có lý do | 200 `REVOKED` | API |
-| TC-TCH-011 | Tự duyệt | người yêu cầu tự approve | 403 `SELF_APPROVAL_NOT_ALLOWED` | SEC |
+| TC-TCH-008 | ~~Duyệt PENDING~~ **không tồn tại ở Phase 1** (D-06a = không duyệt) | — | — | (Phase 2) |
+| TC-TCH-009 | ~~Duyệt lại~~ **không tồn tại ở Phase 1** | — | — | (Phase 2) |
+| TC-TCH-010 | ~~Từ chối~~ **không tồn tại ở Phase 1** | — | — | (Phase 2) |
+| TC-TCH-011 | ~~Tự duyệt~~ **không tồn tại ở Phase 1** | — | — | (Phase 2) |
 | TC-TCH-012 | Đổi tên môn | đổi Toán → Toán học | `teachesSubject` vẫn true | IT |
 | TC-TCH-013 | Giáo viên nghỉ việc | `NGHI_VIEC` | Không có trong assignable; `teachesSubject=false` | IT |
 | TC-TCH-014 | Chuyển phòng ban | đổi department | `teacher_subject`/`teacher_specialty` giữ nguyên | IT |
 | TC-TCH-015 | Cách ly org | GV org B | 404 | SEC |
 | TC-TCH-016 | assignable theo môn | `subjectId=Tin học` | Chỉ GV có Tin học APPROVED | API |
-| TC-TCH-017 | Sửa ánh xạ chuyên môn | thêm môn vào chuyên môn | `specialty_subject` cập nhật, không tự cấp `teacher_subject` nếu có duyệt | IT |
-| TC-TCH-018 | Version giáo viên | bulk với version cũ | 409 `DATA_CHANGED` | API |
+| TC-TCH-017 | Sửa ánh xạ chuyên môn | thêm môn vào chuyên môn | `specialty_subject` cập nhật; **không** tự sinh `teacher_subject` (gán GV vẫn là thao tác riêng) | IT |
+| TC-TCH-018 | Version giáo viên | bulk với version cũ (`staff_profile.version`) | 409 `DATA_CHANGED` | API |
+| TC-TCH-019 | Gán môn có hiệu lực ngay (D-06a) | POST gán Toán cho GV | 201, `status=APPROVED`, `approvedBy/At=NULL`, `teachesSubject=true` | API |
+| TC-TCH-020 | Không có endpoint duyệt ở Phase 1 | POST `/teachers/{id}/subjects/{subjectId}/approve` | 404/405 (endpoint không tồn tại) | API |
 
 ---
 
@@ -168,7 +201,12 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-RBAC-007 | Audit org | user không `org.audit.view` | 403 khi gọi audit | SEC |
 | TC-RBAC-008 | Không token | không Authorization | 401 `UNAUTHENTICATED` | SEC |
 | TC-RBAC-009 | Chuyên môn theo phòng ban | `employee.edit` DEPT | Chỉ sửa GV phòng mình | SEC |
-| TC-RBAC-010 | Duyệt chuyên môn | không `teacher.expertise.approve` | 403 | SEC |
+| TC-RBAC-010 | ~~Duyệt chuyên môn~~ **không tồn tại ở Phase 1** | — | — | (Phase 2) |
+| TC-RBAC-011 | Quyền curriculum (D-14) | user chỉ có `subject.view` gọi POST/PUT curriculum | 403 `FORBIDDEN` (cần `curriculum.manage`); user có `curriculum.view` gọi GET → 200 | SEC |
+| TC-RBAC-012 | Giáo vụ được cấp qua chức danh | position ORGANIZATION có `curriculum.manage` | POST curriculum → 201; nhân viên thường không có chức danh → 403 | SEC |
+| TC-RBAC-013 | Module guard curriculum (D-10) | `STUDENT_MANAGEMENT` off | GET/POST curriculum → 400 `MODULE_NOT_ENABLED` | SEC |
+| TC-RBAC-014 | Quyền đổi môn chính | user có `class.edit` gọi `PUT .../subjects/primary` | 200; user chỉ có `class.view`/`subject.view` → 403 `FORBIDDEN` | SEC |
+| TC-RBAC-015 | Xem lịch sử đổi môn | user có `class.view` | 200; user không có `class.view` → 403; không vai trò nào sửa/xoá được history | SEC |
 
 ---
 
@@ -184,6 +222,13 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-006 | Giữ `teacher_specialty` | so bảng trước/sau | Không mất dòng | DB |
 | TC-LEG-007 | Org chéo sau backfill | query 6.4 | 0 dòng | DB |
 | TC-LEG-008 | H2 vs MySQL | chạy IT + DDL staging | Constraint giống nhau | DB |
+| TC-LEG-009 | Index `(id, org_id)` của `school_class` | kiểm `information_schema.statistics` | Có unique `uq_school_class_id_org` (bắt buộc trước FK tổ hợp) | DB |
+| TC-LEG-010 | FK tổ hợp `curriculum_subject` chéo org | INSERT `curriculum_id` org A + `subject_id` org B | FK từ chối | DB |
+| TC-LEG-011 | Tiên quyết khác curriculum | INSERT cạnh với `curriculum_id` org A + `prerequisite_subject_id` thuộc curriculum khác | FK tổ hợp `(curriculum_id, prerequisite_subject_id, org_id)` từ chối | DB |
+| TC-LEG-012 | Cạnh tiên quyết chéo org | INSERT cạnh `org_id` A với môn/tiên quyết org B | FK tổ hợp từ chối | DB |
+| TC-LEG-013 | Cạnh trùng bị PK chặn | INSERT cùng `(curriculum_id, subject_id, prerequisite_subject_id)` hai lần | PK từ chối (lỗi ràng buộc) | DB |
+| TC-LEG-014 | Tự tiên quyết bị CHECK chặn | INSERT `subject_id = prerequisite_subject_id` | CHECK từ chối | DB |
+| TC-LEG-015 | UNIQUE 3 cột của `curriculum_subject` | kiểm `information_schema.statistics` | Có `uq_curriculum_subject_org(curriculum_id, subject_id, org_id)` | DB |
 
 ---
 
@@ -191,11 +236,12 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 
 | ID | Mục tiêu | Cách kiểm | Kết quả mong đợi | Loại |
 |---|---|---|---|---|
-| TC-CON-001 | Tạo trùng mã đồng thời | 2 request song song | 1×201, 1×409 `SUBJECT_CODE_EXISTS` | IT |
+| TC-CON-001 | Tạo trùng mã đồng thời | 2 request song song cùng `code` | 1×201, 1×409 `SUBJECT_CODE_EXISTS` | IT |
 | TC-CON-002 | Áp curriculum đồng thời | 2 request cùng version | 1×200, 1×409 `DATA_CHANGED` | IT |
 | TC-CON-003 | Sửa curriculum đồng thời | 2 PUT cùng version | 1×200, 1×409 | IT |
 | TC-CON-004 | Trạng thái lớp đổi giữa chừng | scheduler chuyển `DANG_DIEN_RA` | Request sửa môn nhận 409 `CLASS_SUBJECT_LOCKED` | IT |
 | TC-CON-005 | Bulk chuyên môn đồng thời | 2 PUT cùng version | 1×200, 1×409 | IT |
+| TC-CON-006 | Thêm cạnh tiên quyết đồng thời | 2 request thêm cùng cạnh | 1×201, 1×409 `PREREQUISITE_DUPLICATE`/`CONFLICT` | IT |
 
 ---
 
@@ -203,13 +249,13 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 
 | AC | Test case |
 |---|---|
-| AC-SUB-01…08 | TC-SUB-001…020 |
-| AC-CUR-01…09 | TC-CUR-001…018 |
-| AC-TCH-01…09 | TC-TCH-001…018 |
-| AC-RBAC-01…06 | TC-RBAC-001…010 |
-| AC-VAL-01…07 | E-01…E-24 |
-| Legacy | TC-LEG-001…008 |
-| Concurrency | TC-CON-001…005 |
+| AC-SUB-01…08 | TC-SUB-001…021 |
+| AC-CUR-01…10 | TC-CUR-001…025 |
+| AC-TCH-01…09 | TC-TCH-001…020 (TC-TCH-008…011 không thuộc Phase 1) |
+| AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
+| AC-VAL-01…11 | E-01…E-29 |
+| Legacy | TC-LEG-001…015 |
+| Concurrency | TC-CON-001…006 |
 
 ---
 
@@ -224,9 +270,20 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 
 ---
 
-## 12. Câu hỏi mở
+## 12. Quyết định đã chốt và câu hỏi kỹ thuật
+
+**Đã chốt:** D-01…D-15. Test case không còn nhánh phụ thuộc quyết định:
+
+- D-04 → TC-SUB-005/019/020, TC-CON-001.
+- D-06a → TC-TCH-008…011, TC-RBAC-010 là Phase 2; TC-TCH-019 xác nhận `APPROVED` ngay.
+- D-07 → TC-CUR-009/010/019…024, TC-LEG-011…015, TC-CON-006.
+- D-14 → TC-RBAC-011/012.
+- D-15 → TC-CLS-019.
+
+Câu hỏi kỹ thuật còn lại:
 
 1. Có cần test hiệu năng danh sách môn với 10k bản ghi không?
-2. Có cần test tương thích FE cũ (gọi `GET /subjects` dạng mảng) không (D-13)?
+2. (D-13 đã chốt giữ mảng) TC-SUB-021 đã bao phủ tương thích FE cũ.
 3. Có cần test migration trên bản dump `DB_11_16.sql` không?
 4. Mức độ phủ tối thiểu (line/branch) cho service mới?
+5. Có cần test chu trình tiên quyết với đồ thị lớn (1000 môn) để kiểm hiệu năng DFS không?

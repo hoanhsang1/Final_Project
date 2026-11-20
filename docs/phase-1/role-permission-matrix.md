@@ -1,9 +1,12 @@
 # Phase 1 — Role & Permission Matrix (dùng cơ chế RBAC hiện có)
 
-> Tài liệu thiết kế. **Không thay đổi** catalog quyền, role, bundle hay dữ liệu phân quyền.
-> Mọi mã quyền mới là **Đề xuất**, cần người dùng chốt và tự triển khai. Các mã "Đã có" trích từ
+> Tài liệu thiết kế. **Tài liệu không thay đổi** catalog quyền, role, bundle hay dữ liệu phân quyền
+> thật; người dùng tự thêm mã khi triển khai. Các mã "Đã có" trích từ
 > `backend/IdentityService/src/main/java/com/mems/service/PermissionCatalog.java` tại HEAD `cdd03b8`.
-> Quyết định liên quan: `D-05` (ai quản lý môn), `D-06` (chuyên môn + duyệt), `D-10` (module guard).
+> Trạng thái quyết định: `D-01`…`D-15` **đã chốt**. Liên quan trực tiếp:
+> `D-05` (Giáo vụ quản lý môn, ORGANIZATION), `D-06`/`D-06a` (chuyên môn theo ID; **không duyệt**
+> ở Phase 1), `D-10` (module guard `STUDENT_MANAGEMENT`), `D-14` (tạo riêng
+> `curriculum.view`/`curriculum.manage`, cấp qua chức danh Giáo vụ, ORGANIZATION).
 
 ---
 
@@ -56,37 +59,42 @@ Ghi chú đã kiểm chứng:
 - Không có `subject.create/edit/delete`; mọi thao tác ghi dùng `subject.manage`.
 - OWNER / ORG_OWNER / SUPER_ADMIN nhận toàn bộ catalog (không cần gán từng mã).
 - Module `STUDENT_MANAGEMENT` phải bật ở cấp tổ chức để dùng lớp/học sinh; `SubjectController`
-  hiện **chưa** kiểm module (`D-10`).
+  hiện **chưa** kiểm module — D-10 đã chốt bổ sung guard.
 
 ---
 
-## 3. Quyền đề xuất (chưa tồn tại trong catalog)
+## 3. Quyền mới theo D-14 (người dùng tự thêm vào catalog)
 
-> Tất cả dưới đây là **Đề xuất**. Không tự thêm vào `PermissionCatalog`, seed, migration hay role.
-> Nếu người dùng đồng ý, người dùng tự cập nhật Identity + People theo `implementation-roadmap.md`.
+> Tài liệu **không** tự thêm vào `PermissionCatalog`, seed, migration hay role. Bảng dưới là hợp
+> đồng quyền đã chốt; người dùng tự cập nhật Identity + People theo `implementation-roadmap.md`.
 
-| Mã đề xuất | Module đề xuất | Scope đề xuất | Ý nghĩa | Ghi chú |
+| Mã | Module | Scope | Ý nghĩa | Trạng thái |
 |---|---|---|---|---|
-| `curriculum.view` | STUDENT_MANAGEMENT | ORGANIZATION | Xem chương trình đào tạo | Có thể bỏ nếu dùng `subject.view` |
-| `curriculum.manage` | STUDENT_MANAGEMENT | ORGANIZATION | Tạo/sửa/ngừng chương trình, gán môn | Có thể bỏ nếu dùng `subject.manage` |
-| `teacher.expertise.manage` | — (null) | ORGANIZATION + DEPARTMENT | Gán/thu hồi môn cho giáo viên | Có thể bỏ nếu dùng `employee.edit` |
-| `teacher.expertise.approve` | — (null) | ORGANIZATION + DEPARTMENT | Duyệt/từ chối chuyên môn | Chỉ cần nếu bật duyệt (D-06) |
-| `class.subject.manage` | STUDENT_MANAGEMENT | ORGANIZATION | Gán/bỏ môn khỏi lớp | Có thể bỏ nếu dùng `class.edit` |
+| `curriculum.view` | STUDENT_MANAGEMENT | ORGANIZATION | Xem chương trình đào tạo | **Chốt (D-14)** — thêm vào catalog |
+| `curriculum.manage` | STUDENT_MANAGEMENT | ORGANIZATION | Tạo/sửa/ngừng chương trình, gán môn | **Chốt (D-14)** — thêm vào catalog |
+| `teacher.expertise.manage` | — (null) | ORGANIZATION + DEPARTMENT | Gán/thu hồi môn cho giáo viên | Đề xuất kỹ thuật; Phase 1 dùng `employee.edit` |
+| `teacher.expertise.approve` | — (null) | ORGANIZATION + DEPARTMENT | Duyệt/từ chối chuyên môn | **OUT_OF_SCOPE Phase 1** (D-06a = không duyệt) |
+| `class.subject.manage` | STUDENT_MANAGEMENT | ORGANIZATION | Gán/bỏ môn khỏi lớp | Đề xuất kỹ thuật; Phase 1 dùng `class.edit` |
 
-Bundle đề xuất (nếu tạo quyền mới):
+Bundle:
 
-- `ACADEMIC_MANAGEMENT`: thêm `curriculum.view/manage`, `class.subject.manage`.
-- `HR_MANAGEMENT`: thêm `teacher.expertise.manage/approve`.
+- `ACADEMIC_MANAGEMENT`: thêm `curriculum.view/manage` (D-14).
+- `teacher.expertise.manage`/`class.subject.manage` chỉ là đề xuất, **không** thuộc Phase 1.
+- `teacher.expertise.approve` **không** được tạo ở Phase 1 (D-06a).
 
-**Phương án tối thiểu (không thêm mã nào):**
+Cấp quyền cho Giáo vụ:
 
-- Curriculum dùng `subject.manage` để ghi, `subject.view` để đọc.
-- Gán môn cho lớp dùng `class.edit`.
-- Chuyên môn giáo viên dùng `employee.edit`.
-- Không có duyệt chuyên môn (mọi gán trực tiếp có hiệu lực).
+- Gán `subject.view/manage` và `curriculum.view/manage` vào **chức danh Giáo vụ** (position-based),
+  scope **ORGANIZATION**.
+- **Không** tự cấp cho mọi nhân viên, không tạo role hệ thống mới, không đổi `allowedScopes`.
 
-Ưu: không đổi catalog/role/bundle, triển khai nhanh. Nhược: quyền gộp, khó tách vai trò giáo vụ
-và trưởng phòng; không có audit trạng thái duyệt.
+Quyền dùng cho thao tác khác ở Phase 1 (tối thiểu, không thêm mã):
+
+- Áp curriculum / gán–bỏ môn khỏi lớp: `class.edit`.
+- Đổi môn chính của lớp + xem lịch sử đổi môn: `class.edit` (ghi) / `class.view` (đọc) — **không
+  thêm mã mới** (D-08/D-15).
+- Gán chuyên môn giáo viên: `employee.edit`; mọi gán có hiệu lực ngay (D-06a = không duyệt).
+- Danh sách giáo viên khả dụng theo môn: `class.assign_teacher`/`class.teacher.reassign`.
 
 ---
 
@@ -94,97 +102,87 @@ và trưởng phòng; không có audit trạng thái duyệt.
 
 ### 4.1. Ai được xem danh sách môn?
 
-| Phương án | Quyền | Scope | Hệ quả |
-|---|---|---|---|
-| **A (hiện tại)** | `subject.view` | ORGANIZATION | Chỉ chức danh/vai trò cấp tổ chức |
-| B | `subject.view` | ORGANIZATION + DEPARTMENT | Trưởng phòng xem được môn; cần đổi `allowedScopes` |
-| C | thêm `curriculum.view` cho phòng ban | DEPARTMENT | Không khuyến nghị: môn là danh mục chung |
-
-**Đề xuất:** A cho Phase 1. Nếu nghiệp vụ cần trưởng phòng xem, chọn B (một thay đổi nhỏ ở
-catalog + migration quyền, người dùng tự làm).
-
-**NEEDS_USER_DECISION (D-05).**
+**Chốt:** `subject.view` với scope **ORGANIZATION** (giữ nguyên). Giáo vụ/Owner xem toàn bộ môn
+của tổ chức. Trưởng phòng (chức danh DEPARTMENT) không xem danh mục môn trừ khi được cấp một
+chức danh ORGANIZATION; không mở `allowedScopes` sang DEPARTMENT ở Phase 1 (D-05).
 
 ### 4.2. Ai được tạo/sửa/ngừng môn?
 
-- **A (hiện tại):** OWNER hoặc `subject.manage` (ORGANIZATION).
-- B: cho phép `subject.manage` ở DEPARTMENT.
-- C: tách `subject.create/edit/deactivate` (không khuyến nghị — tăng mã quyền, phải sửa
-  `@PreAuthorize` và FE).
-
-**Đề xuất:** A. Không đổi role. Người được uỷ quyền có thể dùng delegation (ORGANIZATION).
+**Chốt:** OWNER hoặc `subject.manage` (ORGANIZATION), thường gán cho chức danh **Giáo vụ**
+(D-05). Không tách `subject.create/edit/deactivate`; không mở DEPARTMENT. Người được uỷ quyền
+có thể dùng delegation (ORGANIZATION).
 
 ### 4.3. Ai được tạo curriculum?
 
-| Phương án | Quyền | Ghi chú |
-|---|---|---|
-| A | `subject.manage` (hiện có) | Không thêm mã; gộp quyền học vụ |
-| B | `curriculum.manage` (mới, ORGANIZATION) | Tách bạch, rõ nghĩa |
-| C | `curriculum.manage` cho DEPARTMENT | Không khuyến nghị (danh mục chung) |
-
-**Đề xuất:** B nếu người dùng chấp nhận thêm 1 mã; nếu không, A.
+**Chốt (D-14):** `curriculum.manage` (mới, ORGANIZATION) cho ghi; `curriculum.view` cho đọc.
+Cấp cho chức danh Giáo vụ qua position-based. **Không** dùng fallback `subject.manage` — chỉ một
+hợp đồng quyền duy nhất cho nhóm endpoint curriculum (khớp `api-contract.md` §3).
 
 ### 4.4. Ai được gán môn vào lớp?
 
-| Phương án | Quyền | Ghi chú |
-|---|---|---|
-| A | `class.edit` (hiện có, ORGANIZATION) | Đơn giản, dùng luôn quyền sửa lớp |
-| B | `class.subject.manage` (mới) | Tách người sửa thông tin lớp và người phân bổ môn |
-
-**Đề xuất:** A cho Phase 1; cân nhắc B khi có nhiều vai trò học vụ.
+**Chốt:** `class.edit` (hiện có, ORGANIZATION) cho Phase 1. `class.subject.manage` chỉ là đề xuất
+kỹ thuật cho giai đoạn sau; không dùng ở Phase 1.
 
 ### 4.5. Ai được quản lý chuyên môn giáo viên?
 
-| Phương án | Quyền | Scope | Ghi chú |
-|---|---|---|---|
-| A | `employee.edit` (hiện có) | ORGANIZATION + DEPARTMENT | Trưởng phòng quản lý giáo viên phòng mình |
-| B | `teacher.expertise.manage` (mới) | ORGANIZATION + DEPARTMENT | Tách quyền sửa hồ sơ và chuyên môn |
-
-**Đề xuất:** A. Lưu ý `employee.edit` có `moduleCode = null` nên không bị chặn theo module;
-nếu muốn chặn theo STUDENT_MANAGEMENT, phải thêm kiểm tra riêng (đề xuất, không bắt buộc).
+**Chốt:** `employee.edit` (ORGANIZATION + DEPARTMENT). Trưởng phòng quản lý chuyên môn giáo viên
+phòng mình; Giáo vụ/HR quản lý toàn tổ chức. `teacher.expertise.manage` là đề xuất kỹ thuật,
+không thuộc Phase 1. Lưu ý `employee.edit` có `moduleCode = null` nên không bị chặn theo module.
 
 ### 4.6. Có cần duyệt chuyên môn không; ai duyệt?
 
-| Phương án | Luồng | Quyền |
-|---|---|---|
-| A. Không duyệt | Gán là có hiệu lực | `employee.edit` |
-| B. Trưởng phòng duyệt | `PENDING → APPROVED` | `teacher.expertise.approve` scope DEPARTMENT + là trưởng phòng giáo viên |
-| C. Giáo vụ/Owner duyệt | `PENDING → APPROVED` | `teacher.expertise.approve` scope ORGANIZATION |
-
-**Đề xuất:** A cho Phase 1 (đơn giản, khớp code hiện tại); thiết kế sẵn trạng thái `PENDING`
-để bật B/C sau mà không đổi schema.
-
-**NEEDS_USER_DECISION (D-06a).**
+**Chốt (D-06a): KHÔNG duyệt ở Phase 1.** Mọi dòng `teacher_subject` mới có `status = APPROVED`
+ngay; chỉ chuyển `REVOKED` khi thu hồi. Không có `PENDING`, **không có** quan hệ
+`teacher.expertise.approve`, không có API approve/reject. Cột `status` giữ lại cho Phase 2.
 
 ### 4.7. Ai được xem lớp–môn và giáo viên–môn?
 
 | Dữ liệu | Quyền đọc | Scope |
 |---|---|---|
 | Môn của lớp | `class.view` (+ `subject.view` để hiển thị tên môn) | ORGANIZATION + DEPARTMENT cho `class.view` |
-| Curriculum | `subject.view` (A) hoặc `curriculum.view` (B) | ORGANIZATION |
+| Curriculum | `curriculum.view` | ORGANIZATION |
 | Chuyên môn giáo viên | `employee.view` | ORGANIZATION + DEPARTMENT |
 | Danh sách assignable theo môn | `class.assign_teacher` / `class.teacher.reassign` | ORGANIZATION |
 
 Ghi chú: `class.view` cho phép DEPARTMENT nhưng People lọc dữ liệu theo phòng ban của người
 tạo/lớp (xem `SchoolClassService.requireClassInScope`). API môn của lớp phải áp dụng cùng bộ lọc.
 
+### 4.8. Ai được đổi môn chính của lớp (D-08/D-15)?
+
+**Chốt: `class.edit` — không thêm quyền mới.** Đổi môn chính là thao tác ghi trên lớp, cùng quyền
+với áp curriculum/gán môn; không tạo `class.subject.primary` hay tương tự ở Phase 1.
+
+- Ghi (`PUT /classes/{id}/subjects/primary`, `PUT /classes/{id}` đổi `subjectId`): `class.edit`
+  (ORGANIZATION) + module `STUDENT_MANAGEMENT`.
+- Đọc lịch sử (`GET /classes/{id}/subject-history`): `class.view`.
+- Phạm vi phòng ban: giữ đúng `requireClassInScope` như các thao tác lớp khác. Lưu ý `class.edit`
+  là ORGANIZATION-scope nên chức danh DEPARTMENT **không** dùng được (trừ khi người đó còn giữ một
+  chức danh ORGANIZATION); khi đã qua được cổng quyền, service vẫn lọc lớp theo phòng ban.
+- **Không** có quyền riêng cho sửa history: Phase 1 không có API đó (`FORBIDDEN`/404 nếu cố gọi).
+- Xoá lớp (`DELETE /classes/{id}`) dùng `class.delete` (ORGANIZATION). Lớp đã có
+  `class_subject_history` → 409 `CONFLICT` (không phải vấn đề quyền); lịch sử không bị xoá.
+- Lớp `DA_KET_THUC/DA_HUY/CLOSED`: 409 `CLASS_NOT_EDITABLE` (không phải vấn đề quyền).
+
 ---
 
 ## 5. Ma trận chức năng × vai trò mẫu
 
-Ký hiệu: ✅ được phép · ❌ không · ◐ chỉ trong phòng ban · ⚙ cần thêm mã quyền (đề xuất).
+Ký hiệu: ✅ được phép · ❌ không · ◐ chỉ trong phòng ban.
 
 | Chức năng | Owner / Org Owner | Giáo vụ (position ORGANIZATION, ACADEMIC_MANAGEMENT) | Trưởng phòng đào tạo (position DEPARTMENT, HR_MANAGEMENT) | Giáo viên | Nhân viên (STAFF) |
 |---|---|---|---|---|---|
 | Xem môn | ✅ | ✅ `subject.view` | ❌ (scope) | ❌ trừ khi có `subject.view` cấp tổ chức | ◐ nếu được gán |
 | Tạo/sửa/ngừng môn | ✅ | ✅ `subject.manage` | ❌ | ❌ | ❌ |
-| Xem curriculum | ✅ | ✅ `subject.view` hoặc ⚙`curriculum.view` | ❌ hoặc ⚙ nếu mở DEPARTMENT | ❌ | ❌ |
-| Tạo/sửa curriculum | ✅ | ✅ `subject.manage` hoặc ⚙`curriculum.manage` | ❌ | ❌ | ❌ |
-| Áp curriculum / gán môn cho lớp | ✅ | ✅ `class.edit` (+ curriculum) | ❌ (class.edit ORG) | ❌ | ❌ |
+| Xem curriculum | ✅ | ✅ `curriculum.view` | ❌ | ❌ | ❌ |
+| Tạo/sửa curriculum | ✅ | ✅ `curriculum.manage` | ❌ | ❌ | ❌ |
+| Áp curriculum / gán môn cho lớp | ✅ | ✅ `class.edit` | ❌ (class.edit ORG) | ❌ | ❌ |
+| Đổi môn chính của lớp (kể cả `DANG_DIEN_RA`) | ✅ | ✅ `class.edit` | ❌ (class.edit ORGANIZATION) | ❌ | ❌ |
+| Xem lịch sử đổi môn chính | ✅ | ✅ `class.view` | ◐ `class.view` | ❌ | ❌ |
+| Sửa/xoá lịch sử đổi môn | ❌ (không có API) | ❌ | ❌ | ❌ | ❌ |
 | Xem lớp của phòng | ✅ | ✅ `class.view` | ◐ `class.view` | ◐ `class.self_view` (lớp mình dạy) | ◐ nếu được gán |
 | Gán giáo viên cho lớp | ✅ | ✅ `class.assign_teacher` | ❌ | ❌ | ❌ |
 | Gán chuyên môn/môn cho giáo viên | ✅ | ✅ `employee.edit` (ORG) | ◐ `employee.edit` (DEPT) | ❌ | ◐ nếu được gán |
-| Duyệt chuyên môn (nếu bật) | ✅ | ⚙`teacher.expertise.approve` | ⚙ + là trưởng phòng giáo viên | ❌ | ❌ |
+| Duyệt chuyên môn — **OUT_OF_SCOPE Phase 1** (D-06a) | — | — | — | — | — |
 | Xem nhật ký thay đổi môn/curriculum | ✅ `org.audit.view` | ✅ nếu được gán | ❌ | ❌ | ❌ |
 
 Lưu ý:
@@ -199,7 +197,7 @@ Lưu ý:
 
 | Chức danh mẫu | `scope` | `profile_type` | Quyền/bundle gán | Kết quả hiệu lực |
 |---|---|---|---|---|
-| `Giáo vụ đào tạo` | ORGANIZATION | GENERAL | bundle `ACADEMIC_MANAGEMENT` | Quản lý học sinh/lớp + `subject.view/manage`; tạo curriculum (nếu dùng fallback `subject.manage`); áp curriculum nhờ `class.edit` |
+| `Giáo vụ đào tạo` | ORGANIZATION | GENERAL | bundle `ACADEMIC_MANAGEMENT` + `curriculum.view/manage` + `subject.view/manage` | Quản lý học sinh/lớp, môn và curriculum; áp curriculum nhờ `class.edit` |
 | `Trưởng phòng đào tạo` | DEPARTMENT | GENERAL | bundle `HR_MANAGEMENT` + `class.view` | `employee.view/edit` trong phòng; xem lớp phòng mình; **không** tạo/sửa môn |
 | `Giáo viên` | DEPARTMENT | TEACHER | `class.self_view`, `schedule.self_view` | Chỉ xem lớp/lịch của mình; không quản lý môn |
 | `Tổng quản lý được uỷ quyền` | ORGANIZATION | GENERAL | delegation `subject.manage` (30 ngày) | Dùng được `subject.manage` đến hết hạn, sau đó 403 |
@@ -223,13 +221,14 @@ Ví dụ kiểm tra: user giữ `Giáo vụ đào tạo` gọi `POST /api/subjec
 
 | Hành động | Guard đề xuất | Hiện trạng |
 |---|---|---|
-| Xem/tạo/sửa môn | `STUDENT_MANAGEMENT` | Chưa có (D-10) |
-| Xem/tạo/sửa curriculum | `STUDENT_MANAGEMENT` | Chưa có (bảng mới) |
+| Xem/tạo/sửa môn | `STUDENT_MANAGEMENT` | **Chốt (D-10)** — controller phải gọi `moduleGuard.requireModule(...)` |
+| Xem/tạo/sửa curriculum | `STUDENT_MANAGEMENT` | **Chốt (D-10)** — bảng mới, thêm guard khi triển khai |
 | Gán môn cho lớp | `STUDENT_MANAGEMENT` | Lớp đã có |
+| Đổi môn chính / xem lịch sử đổi môn | `STUDENT_MANAGEMENT` | Cùng guard với lớp; thêm khi triển khai endpoint mới |
 | Chuyên môn giáo viên | Không guard (module null) | Đã có |
 
 Nếu tổ chức tắt `STUDENT_MANAGEMENT`, mọi API môn/curriculum trả `400 MODULE_NOT_ENABLED`
-(2106) như Student/Class. Đây là thay đổi hành vi — cần chốt D-10 trước khi code.
+(2106) như Student/Class (D-10 đã chốt).
 
 ---
 
@@ -241,7 +240,8 @@ Nếu tổ chức tắt `STUDENT_MANAGEMENT`, mọi API môn/curriculum trả `4
 - Không cấp quyền cho bất kỳ tài khoản thật nào.
 - Không tạo migration quyền.
 
-Mọi thay đổi quyền phải do người dùng thực hiện sau khi chốt các mục `NEEDS_USER_DECISION`.
+Người dùng tự thêm `curriculum.view`/`curriculum.manage` vào catalog và gán vào chức danh Giáo vụ
+khi triển khai (D-14); tài liệu chỉ mô tả hợp đồng.
 
 ---
 
@@ -252,17 +252,26 @@ Mọi thay đổi quyền phải do người dùng thực hiện sau khi chốt 
 - AC-RBAC-03: OWNER luôn có mọi quyền mới (nếu thêm mã) nhờ cơ chế role-toàn-catalog.
 - AC-RBAC-04: Người được uỷ quyền `subject.manage` dùng được đến hết hạn uỷ quyền.
 - AC-RBAC-05: API chuyên môn lọc theo phòng ban khi scope DEPARTMENT.
-- AC-RBAC-06: Tắt module `STUDENT_MANAGEMENT` (nếu áp D-10) chặn môn/curriculum với
-  `MODULE_NOT_ENABLED`.
+- AC-RBAC-06: Tắt module `STUDENT_MANAGEMENT` chặn môn/curriculum với `MODULE_NOT_ENABLED` (D-10).
+- AC-RBAC-07: Người chỉ có `subject.manage` **không** gọi được curriculum (403) — quyền tách biệt
+  (D-14); người có `curriculum.manage` qua chức danh Giáo vụ gọi được.
+- AC-RBAC-08: Gán `curriculum.manage` cho chức danh DEPARTMENT không tạo hiệu lực (ORGANIZATION-only).
+- AC-RBAC-09: Không tồn tại quyền `teacher.expertise.approve` ở Phase 1; gán chuyên môn có hiệu
+  lực ngay không cần duyệt (D-06a).
+- AC-RBAC-10: Đổi môn chính không cần quyền mới: người có `class.edit` gọi được, người chỉ có
+  `class.view`/`subject.view` nhận 403 (D-08/D-15).
+- AC-RBAC-11: `GET /classes/{id}/subject-history` cần `class.view`; không có endpoint sửa/xoá
+  history cho bất kỳ vai trò nào (kể cả OWNER).
 
 ---
 
-## 10. Câu hỏi mở
+## 10. Quyết định đã chốt & câu hỏi kỹ thuật còn lại
 
-1. D-05: giữ ORGANIZATION-only hay mở DEPARTMENT cho `subject.view/manage`?
-2. Có thêm `curriculum.view/manage` hay dùng lại `subject.*`?
-3. Có thêm `class.subject.manage` hay dùng `class.edit`?
-4. Có thêm `teacher.expertise.*` hay dùng `employee.edit`?
-5. D-06a: có duyệt chuyên môn không; ai duyệt?
-6. D-10: có áp module guard cho Subject không?
-7. Có cần quyền riêng để **ngừng** môn đang được dạy (tách khỏi `subject.manage`)?
+`D-05`, `D-06`, `D-06a`, `D-08`, `D-10`, `D-14`, `D-15` **đã chốt**. Các điểm kỹ thuật không thay
+đổi quyết định:
+
+1. Mã lỗi khi gán `curriculum.manage` cho chức danh DEPARTMENT: dùng `FORBIDDEN` hiện có hay mã
+   riêng? (đề xuất dùng `FORBIDDEN`, không thêm mã).
+2. Có bổ sung `curriculum.view/manage` vào bundle `ACADEMIC_MANAGEMENT` hay chỉ gán theo chức danh?
+   (đề xuất: cả hai — bundle cho tiện, chức danh để kiểm soát).
+3. Có cần quyền riêng để **ngừng** môn đang được dạy (tách khỏi `subject.manage`)? (đề xuất: không).
