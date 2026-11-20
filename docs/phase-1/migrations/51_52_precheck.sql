@@ -25,9 +25,11 @@ WHERE table_schema = DATABASE()
 ORDER BY table_name, ordinal_position;
 
 -- 0b) Verdict bước tiếp theo. DATA_PRECHECK_READY CHỈ khi class_subject đã đúng
---     toàn bộ schema Revision 3: 20 cột (không thiếu/không thừa), PK, 5 index
---     (PRIMARY + 4), 4 FK đúng bảng/cột đích, 5 CHECK đúng biểu thức, và
---     primary_class_id là cột sinh STORED đúng biểu thức.
+--     toàn bộ schema Revision 3: 20 cột (không thiếu/không thừa) ĐÚNG thuộc tính
+--     (kiểu, độ dài, precision/scale, NULL, default, collation, generated), PK,
+--     5 nhóm index (PRIMARY + 4), 4 FK đúng bảng/cột đích + đúng ON UPDATE/
+--     ON DELETE, 5 CHECK đúng biểu thức, và primary_class_id là cột sinh STORED
+--     đúng biểu thức.
 --     Thiếu/sai bất kỳ thành phần nào => BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE.
 --
 --     Index: 5 nhóm index Revision 3 phải đúng tên + danh sách cột + thứ tự +
@@ -50,6 +52,55 @@ WITH cs_cols AS (
            'status','note','created_by','created_at','updated_by','updated_at')), 0) AS named_cols
   FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+),
+-- Column attributes must match CREATE TABLE in 52. COLUMN_TYPE is compared
+-- verbatim; length/precision/scale only where applicable. MySQL 8 reports
+-- explicit DEFAULT NULL and "no default" both as NULL, which is semantically
+-- identical here (no NOT NULL column relies on an implicit default).
+cs_attr AS (
+  SELECT COUNT(*) AS bad
+  FROM (
+    SELECT e.column_name
+    FROM (
+      SELECT 'class_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
+             NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
+             'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
+      UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'curriculum_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'sequence_no','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'is_primary','tinyint(1)','NO','0',-1,3,0,'NONE','NONE'
+      UNION ALL SELECT 'primary_class_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','STORED'
+      UNION ALL SELECT 'required_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'planned_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'theory_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'practice_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'session_minutes','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+      UNION ALL SELECT 'status','varchar(20)','NO','PLANNED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'note','varchar(500)','YES',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
+      UNION ALL SELECT 'updated_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+      UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
+    ) e
+    LEFT JOIN information_schema.columns c
+      ON c.table_schema = DATABASE() AND c.table_name = 'class_subject'
+     AND c.column_name = e.column_name
+    WHERE c.column_name IS NULL
+       OR NOT (c.column_type <=> e.column_type)
+       OR NOT (c.is_nullable <=> e.is_nullable)
+       OR NOT (c.column_default <=> e.def_value)
+       OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
+       OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
+       OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
+       OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
+       OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
+       OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
+       OR (e.extra_rule = 'STORED'
+           AND NOT (c.extra LIKE '%GENERATED%' AND c.extra LIKE '%STORED%'))
+  ) d
 ),
 cs_idx AS (
   SELECT COUNT(*) AS total_idx,
@@ -100,9 +151,10 @@ cs_idx AS (
 cs_fk AS (
   SELECT COUNT(*) AS total_fk,
          COALESCE(SUM(ok), 0) AS ok_fk,
-         COALESCE(MAX(wrong_schema), 0) AS fk_wrong_schema
+         COALESCE(MAX(wrong_schema), 0) AS fk_wrong_schema,
+         COALESCE(SUM(bad_rule), 0) AS fk_rule_bad
   FROM (
-    SELECT k.constraint_name, k.map, k.wrong_schema,
+    SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
       CASE
         WHEN k.constraint_name = 'fk_class_subject_class'
           AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
@@ -113,17 +165,34 @@ cs_fk AS (
         WHEN k.constraint_name = 'fk_class_subject_teacher'
           AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
         ELSE 0
-      END AS ok
+      END AS ok,
+      CASE
+        WHEN k.constraint_name = 'fk_class_subject_class'
+          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
+        WHEN k.constraint_name = 'fk_class_subject_subject'
+          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+        WHEN k.constraint_name = 'fk_class_subject_curriculum'
+          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+        WHEN k.constraint_name = 'fk_class_subject_teacher'
+          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+        ELSE 1
+      END AS bad_rule
     FROM (
-      SELECT constraint_name,
-             GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
-                                 referenced_column_name)
-                          ORDER BY ordinal_position SEPARATOR ',') AS map,
-             MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
-      FROM information_schema.key_column_usage
-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-        AND referenced_table_name IS NOT NULL
-      GROUP BY constraint_name
+      SELECT kcu.constraint_name,
+             GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
+                                 kcu.referenced_column_name)
+                          ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
+             MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
+             MAX(rc.update_rule) AS update_rule,
+             MAX(rc.delete_rule) AS delete_rule
+      FROM information_schema.key_column_usage kcu
+      LEFT JOIN information_schema.referential_constraints rc
+        ON rc.constraint_schema = kcu.constraint_schema
+       AND rc.constraint_name = kcu.constraint_name
+       AND rc.table_name = kcu.table_name
+      WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject'
+        AND kcu.referenced_table_name IS NOT NULL
+      GROUP BY kcu.constraint_name
     ) k
   ) y
 ),
@@ -178,8 +247,9 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = DATABASE() AND table_name = 'teacher_subject') AS teacher_subject_exists,
   cs_cols.total_cols, cs_cols.named_cols,
+  cs_attr.bad AS attr_mismatch,
   cs_idx.ok_idx, cs_idx.idx_prefix, cs_idx.bad_extra, cs_idx.total_idx,
-  cs_fk.total_fk, cs_fk.ok_fk, cs_fk.fk_wrong_schema,
+  cs_fk.total_fk, cs_fk.ok_fk, cs_fk.fk_wrong_schema, cs_fk.fk_rule_bad,
   cs_chk.total_chk, cs_chk.ok_chk,
   cs_gen.n AS gen_rows, cs_gen.ok AS gen_ok,
   CASE
@@ -187,14 +257,16 @@ SELECT
            WHERE table_schema = DATABASE() AND table_name = 'class_subject') = 0
       THEN 'SKIP_DATA_PRECHECK_NO_TABLE'
     WHEN cs_cols.total_cols = 20 AND cs_cols.named_cols = 20
+      AND cs_attr.bad = 0
       AND cs_idx.ok_idx = 5 AND cs_idx.idx_prefix = 0 AND cs_idx.bad_extra = 0
       AND cs_fk.total_fk = 4 AND cs_fk.ok_fk = 4 AND cs_fk.fk_wrong_schema = 0
+      AND cs_fk.fk_rule_bad = 0
       AND cs_chk.total_chk = 5 AND cs_chk.ok_chk = 5
       AND cs_gen.n = 1 AND cs_gen.ok = 1
       THEN 'DATA_PRECHECK_READY'
     ELSE 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
   END AS next_step
-FROM cs_cols, cs_idx, cs_fk, cs_chk, cs_gen;
+FROM cs_cols, cs_attr, cs_idx, cs_fk, cs_chk, cs_gen;
 
 -- 0c) Cột bắt buộc của class_subject (Revision 3). present = 0 => thiếu.
 --     Bảng không tồn tại => tất cả present = 0 (đúng: sẽ được tạo mới bởi 52).
@@ -325,6 +397,24 @@ SELECT constraint_name, check_clause,
        (check_clause LIKE '%PENDING%') AS has_pending
 FROM information_schema.check_constraints
 WHERE constraint_schema = DATABASE() AND constraint_name = 'chk_teacher_subject_status';
+
+-- 0h) Hai bảng phụ của 52: nếu đã tồn tại, 52 sẽ audit đầy đủ và ABORT khi lệch.
+--     Kỳ vọng: history có FK class kiểu RESTRICT/RESTRICT (không CASCADE);
+--     specialty_subject có specialty CASCADE/RESTRICT và subject RESTRICT/RESTRICT.
+--     0h column_count = 0 => bảng chưa tồn tại (52 sẽ CREATE).
+SELECT 'class_subject_history' AS table_name,
+       (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'class_subject_history') AS column_count
+UNION ALL
+SELECT 'specialty_subject',
+       (SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'specialty_subject');
+
+SELECT table_name, constraint_name, update_rule, delete_rule
+FROM information_schema.referential_constraints
+WHERE constraint_schema = DATABASE()
+  AND table_name IN ('class_subject_history', 'specialty_subject')
+ORDER BY table_name, constraint_name;
 
 -- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE)
 SELECT org_id, code, COUNT(*) AS n

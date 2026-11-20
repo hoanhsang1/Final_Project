@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS specialty (
  is_active BOOLEAN NOT NULL DEFAULT TRUE, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented)
 );
+-- H2 PARITY NOTE (D-04): uq_subject_org_code is UNIQUE here because the service
+-- contract (409 on duplicate code) and the D-04 target require it. MySQL staging
+-- only has a NON-unique index from migration 42 until the D-04 UNIQUE ALTER in 52
+-- (currently commented) runs after its pre-check. Do not weaken this fixture:
+-- tests would stop proving the intended contract. Verify D-04 on MySQL staging.
 CREATE TABLE IF NOT EXISTS subject (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  code VARCHAR(50), description VARCHAR(500),
@@ -84,6 +89,10 @@ CREATE TABLE IF NOT EXISTS subject (
  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)
 );
 -- Phase 1 Revision 3: curriculum templates (migration 51 logical schema).
+-- H2 PARITY LIMITATION: secondary indexes of 51/52 (idx_curriculum_subject_subject,
+-- idx_class_subject_*, idx_teacher_subject_*, idx_csh_*, idx_specialty_subject_*) are
+-- omitted here; they do not change query semantics in H2. The MySQL migration audits
+-- them on staging. Constraint/column semantics below mirror 51/52.
 CREATE TABLE IF NOT EXISTS curriculum (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  code VARCHAR(50) NOT NULL, name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
@@ -103,7 +112,8 @@ CREATE TABLE IF NOT EXISTS curriculum_subject (
  FOREIGN KEY(curriculum_id,org_id) REFERENCES curriculum(id,org_id) ON DELETE CASCADE,
  FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
  CONSTRAINT chk_curriculum_subject_sessions CHECK(
-  required_sessions > 0 AND session_minutes > 0 AND theory_sessions >= 0 AND practice_sessions >= 0)
+  required_sessions > 0 AND session_minutes > 0 AND theory_sessions >= 0 AND practice_sessions >= 0),
+ CONSTRAINT chk_curriculum_subject_sequence CHECK(sequence_no > 0)
 );
 CREATE TABLE IF NOT EXISTS curriculum_subject_prerequisite (
  curriculum_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL,
@@ -186,6 +196,8 @@ CREATE TABLE IF NOT EXISTS class_subject (
  FOREIGN KEY(teacher_id,org_id) REFERENCES staff_profile(user_id,org_id),
  CONSTRAINT chk_class_subject_status CHECK(status IN ('PLANNED','ACTIVE','COMPLETED','CANCELLED')),
  CONSTRAINT chk_class_subject_source CHECK(source IN ('LEGACY','CURRICULUM','MANUAL')),
+ -- MySQL 52: CHECK (is_primary IN (0,1)); H2 BOOLEAN uses FALSE/TRUE for the same set.
+ CONSTRAINT chk_class_subject_primary CHECK(is_primary IN (FALSE, TRUE)),
  CONSTRAINT chk_class_subject_sequence CHECK(sequence_no IS NULL OR sequence_no > 0),
  CONSTRAINT chk_class_subject_sessions CHECK(
   (planned_sessions IS NULL OR planned_sessions >= 0)

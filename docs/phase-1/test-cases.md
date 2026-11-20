@@ -253,6 +253,18 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-027 | Bảng cũ sai cấu trúc index/FK/CHECK/cột sinh bị từ chối | staging dựng bảng đủ 20 cột nhưng (i) đảo thứ tự cột trong index, (ii) FK trỏ sai bảng/cột, (iii) CHECK thiếu một giá trị, (iv) `primary_class_id` là cột thường hoặc VIRTUAL | (i)–(iv) pre-check 0b trả `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL 45000` ở audit tương ứng; không tự sửa schema | DB |
 | TC-LEG-028 | Index hỗ trợ FK không bị chặn nhầm | bảng `class_subject`/`teacher_subject` do chính draft 52 tạo trên MySQL | `information_schema.statistics` có thêm index non-unique `(class_id, org_id)`/`(subject_id, org_id)` (và `(user_id, org_id)` cho `teacher_subject`); 0b vẫn trả `DATA_PRECHECK_READY`, 52 audit pass; thêm index lạ khác ⇒ ABORT | DB |
 | TC-LEG-029 | `teacher_subject` sai cấu trúc ngoài `PENDING` | staging: thiếu/đổi cột, sai thứ tự PK, FK trỏ `staff_profile` thay vì `teacher_profile`, CHECK source thiếu `SPECIALTY` | `mems_m52_assert_teacher_subject_schema` `SIGNAL 45000`; không tự sửa | DB |
+| TC-LEG-030 | Sai `DATA_TYPE` bị chặn | staging: `class_subject.created_at` đổi `datetime(3)` → `date`; `source` → `int` | `51_52_precheck.sql` query 0b trả `attr_mismatch > 0` ⇒ `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL` trong `mems_m52_assert_class_subject_schema` (`data_type` so với spec); không tự `MODIFY`. Vị trí: 0b `cs_attr`, audit 52 | DB |
+| TC-LEG-031 | Sai `COLUMN_TYPE` (độ dài/độ chính xác) bị chặn | staging: `note varchar(500)` → `varchar(200)`; `sequence_no smallint` → `int`; `is_primary tinyint(1)` → `tinyint(4)` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`column_type`, `numeric_precision`); không tự sửa. Vị trí: 0b `cs_attr`, `mems_m52_assert_class_subject_schema` | DB |
+| TC-LEG-032 | Sai NULL/DEFAULT bị chặn | staging: `status` cho phép NULL hoặc DEFAULT `'ACTIVE'`; `is_primary` bỏ DEFAULT; `created_at` thêm DEFAULT | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`is_nullable`/`column_default` so sánh NULL-safe `<=>`); không tự sửa. Vị trí: 0b `cs_attr`, audit 52 | DB |
+| TC-LEG-033 | Sai collation bị chặn | staging: `subject.name`/`class_subject.note` dùng `utf8mb4_general_ci` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`collation_name` khác `utf8mb4_unicode_ci`); không tự `CONVERT`. Vị trí: `cs_attr`/spec 20 cột | DB |
+| TC-LEG-034 | Sai `DELETE_RULE` bị chặn | staging: `fk_class_subject_class` `ON DELETE RESTRICT` (đúng phải CASCADE); `fk_class_subject_subject` `ON DELETE CASCADE` (đúng phải RESTRICT) | 0b `cs_fk.fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`v_fk_rule_bad <> 0`); không tự drop/tạo lại FK. Vị trí: 0b join `referential_constraints`, audit 52 | DB |
+| TC-LEG-035 | Sai `UPDATE_RULE` bị chặn | staging: một FK của `class_subject`/`teacher_subject` đặt `ON UPDATE CASCADE` thay vì RESTRICT | 0b `fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL`; không tự sửa. Vị trí: 0b `cs_fk`, audit 52 `v_fk_rule_bad` | DB |
+| TC-LEG-036 | History cascade bị từ chối | staging: `class_subject_history.fk_csh_class` đặt `ON DELETE CASCADE` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`'… history must not cascade'`); history **không** bị xoá theo lớp; không tự sửa FK | DB |
+| TC-LEG-037 | History thiếu cột snapshot | staging: bảng `class_subject_history` cũ thiếu `new_subject_name` (còn 15 cột) hoặc thiếu `uq_csh_operation` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`16` cột + index groups + FK + 3 CHECK); 52 không tự `ADD COLUMN`/`CREATE` đè; precheck 0h cảnh báo số cột | DB |
+| TC-LEG-038 | `specialty_subject` sai schema | staging: bảng `specialty_subject` cũ thiếu `idx_specialty_subject_org_subject`, sai PK, hoặc FK trỏ `staff_profile` | `mems_m52_assert_specialty_subject_schema` (52) `SIGNAL` (5 cột, index whitelist, 2 FK + action, không CHECK lạ); không tự `ALTER`; 0h hiển thị column_count/FK rule | DB |
+| TC-LEG-039 | Trùng tên index nhưng sai định nghĩa | staging: đã có `uq_school_class_id_org` nhưng non-unique hoặc đúng cột sai thứ tự/prefix | 51 `mems_m51_add_unique` `SIGNAL` (`'existing index differs from expected (unique/columns/prefix)'`), **không** bỏ qua theo tên; không tự drop index | DB |
+| TC-LEG-040 | Trùng tên FK nhưng sai mapping/action | staging: đã có `fk_school_class_curriculum` nhưng `ON DELETE CASCADE` hoặc trỏ sai cột | 51 `mems_m51_add_fk` `SIGNAL` (`'existing FK differs from expected (mapping/update/delete rule)'`); không tự drop/tạo lại | DB |
+| TC-LEG-041 | ABORT sau 5a/5b rồi chạy lại | staging cố ý để 52 dừng sau 5b (dữ liệu khiến `mems_m52_assert_no_duplicate_primary`/bước sau `SIGNAL`) | DDL và DML 5a/5b **vẫn tồn tại** (implicit commit); sửa dữ liệu gốc → chạy lại precheck (phải `DATA_PRECHECK_READY`), precheck data (block = 0), 52; 5a/5b idempotent nên số dòng `class_subject`/`source='LEGACY'` không tăng; postcheck 2a–2e = 0 dòng. Vị trí: `ROLLBACK.md` §2 | DB |
 
 ---
 
@@ -279,7 +291,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
 | AC-VAL-01…11 | E-01…E-29 |
 | AC-VAL-12…20, AC-SUB-15…17 | TC-CLS-021…048, E-30…E-43 |
-| Legacy | TC-LEG-001…024 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency) |
+| Legacy | TC-LEG-001…041 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency; 030…041: audit thuộc tính cột, referential action, history/specialty_subject, helper 51, abort-rerun) |
 | Concurrency | TC-CON-001…006 |
 
 ---

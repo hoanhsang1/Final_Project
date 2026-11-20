@@ -985,8 +985,10 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
 | Điểm | MySQL | H2 (test) | Cách xử lý |
 |---|---|---|---|
 | Cột sinh | `GENERATED ALWAYS AS (...) STORED` | H2 2.x hỗ trợ `GENERATED ALWAYS AS (...)` nhưng **không** có `STORED` | Khai báo cột thường `primary_class_id char(36)`; service set = `class_id` khi `is_primary=1`, `NULL` khi ngược lại. UNIQUE vẫn giữ |
-| CHECK constraint | MySQL 8.0.16+ enforce | H2 enforce | Giữ nguyên |
-| `ON DELETE RESTRICT` trên FK `class_subject_history` | Hỗ trợ | Hỗ trợ | Giữ nguyên |
+| CHECK constraint | MySQL 8.0.16+ enforce toàn bộ Revision 3 (5 CHECK `class_subject`, 3 `class_subject_history`, 2 `teacher_subject`, 1 `curriculum_subject`, 2 `curriculum_subject_prerequisite`) | H2 enforce các CHECK đã khai báo | Fixture H2 **phải khai báo cùng tập CHECK** và được cập nhật theo schema Revision 3; trước lượt 4 thiếu `chk_class_subject_primary` và `chk_curriculum_subject_sequence` — đã bổ sung. `is_primary IN (0,1)` biểu diễn H2 là `IN (FALSE, TRUE)` vì cột `BOOLEAN` |
+| `ON DELETE RESTRICT` trên FK `class_subject_history` | Hỗ trợ | Hỗ trợ | Giữ nguyên; history **không** được cascade |
+| `uq_subject_org_code` | Migration 42 tạo **non-unique**; D-04 (khối commented trong 52) mới đổi sang UNIQUE | Fixture H2 khai báo **UNIQUE** | **Không** đổi D-04 và **không** làm yếu H2: service contract "trùng mã môn → 409" dựa vào `DuplicateKeyException` từ UNIQUE này (`SubjectRepository`), và D-04 là target đã chốt. Đây là **lệch có chủ đích**; MySQL staging phải kiểm D-04 riêng (query 1 PART B = 0 dòng) trước khi tin vào ràng buộc |
+| Index phụ của 51/52 | Đầy đủ; precheck 0b và audit 52 kiểm `information_schema.statistics` | Lược bỏ phần lớn index phụ | Không ảnh hưởng semantics; H2 **không** chứng minh index — audit MySQL là nguồn xác nhận |
 | `UNIQUE (org_id, operation_id)` với NULL | Cho phép nhiều NULL | Cho phép nhiều NULL | Giữ nguyên; Revision 3 đặt hai cột NOT NULL nên NULL không còn là đường hợp lệ |
 | `ALTER TABLE … AFTER` | Hỗ trợ | Không hỗ trợ | Không dùng `AFTER` trong draft 51/52; đặt cột ở cuối `ALTER TABLE` |
 | Composite FK cần index tiền tố trái | Bắt buộc | Bắt buộc | Test schema phải thêm `UNIQUE(id, org_id)` trên `school_class` |
@@ -999,6 +1001,12 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
 > column. Test H2 phải kiểm service trả 409 khi cố tạo primary thứ hai **và** phải có kiểm thủ công
 > trên MySQL staging (xem `test-cases.md` TC-CLS-048, TC-LEG-018/019). Tài liệu này **không** tuyên
 > bố schema đã được xác minh chỉ dựa trên H2.
+>
+> Lượt 4 (fix review findings): `51_52_precheck.sql` (0b) và procedure audit trong 52 kiểm **cả thuộc
+> tính cột** (`COLUMN_TYPE`, `IS_NULLABLE`, `COLUMN_DEFAULT`, độ dài/độ chính xác, collation, `EXTRA`)
+> **và referential action** (`UPDATE_RULE`/`DELETE_RULE`) của từng FK. Bảng đã tồn tại
+> `class_subject_history` và `specialty_subject` cũng được audit đầy đủ **trước** `CREATE TABLE IF NOT
+> EXISTS`; sai ⇒ `SIGNAL`, không tự `ALTER`. H2 không mô phỏng các audit này.
 
 ---
 

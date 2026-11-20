@@ -95,6 +95,76 @@ WHERE table_schema = DATABASE()
   AND constraint_name IN ('fk_class_subject_class','fk_school_class_curriculum',
                           'fk_csh_class','chk_class_subject_primary','chk_csh_subject_change');
 
+-- 5b) Số cột phải đúng Revision-3: history 16, specialty_subject 5.
+SELECT 'class_subject_history' AS t, COUNT(*) AS cols,
+       (COUNT(*) = 16) AS cols_ok
+FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
+UNION ALL
+SELECT 'specialty_subject', COUNT(*), (COUNT(*) = 5)
+FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
+
+-- 5c) PK + UNIQUE phải đúng cột/thứ tự (0 dòng = đúng).
+SELECT x.table_name, x.index_name, x.cols, e.expect AS expected_cols
+FROM (
+  SELECT table_name, index_name,
+         GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
+  FROM information_schema.statistics
+  WHERE table_schema = DATABASE()
+    AND table_name IN ('class_subject_history','specialty_subject')
+    AND index_name IN ('PRIMARY','uq_csh_operation')
+  GROUP BY table_name, index_name
+) x
+JOIN (
+            SELECT 'class_subject_history' AS table_name, 'PRIMARY' AS index_name,
+                   'id' AS expect
+  UNION ALL SELECT 'class_subject_history', 'uq_csh_operation', 'org_id,operation_id'
+  UNION ALL SELECT 'specialty_subject', 'PRIMARY', 'specialty_id,subject_id'
+) e ON e.table_name = x.table_name AND e.index_name = x.index_name
+WHERE x.cols <> e.expect;
+
+-- 5d) Referential action phải đúng DDL (0 dòng = đúng).
+--     history.fk_csh_class bắt buộc RESTRICT/RESTRICT: xoá lớp KHÔNG được xoá lịch sử.
+SELECT rc.table_name, rc.constraint_name,
+       rc.update_rule, rc.delete_rule,
+       CASE rc.constraint_name
+         WHEN 'fk_class_subject_class'         THEN 'RESTRICT/CASCADE'
+         WHEN 'fk_class_subject_subject'       THEN 'RESTRICT/RESTRICT'
+         WHEN 'fk_class_subject_curriculum'    THEN 'RESTRICT/RESTRICT'
+         WHEN 'fk_class_subject_teacher'       THEN 'RESTRICT/RESTRICT'
+         WHEN 'fk_teacher_subject_teacher'     THEN 'RESTRICT/CASCADE'
+         WHEN 'fk_teacher_subject_subject'     THEN 'RESTRICT/RESTRICT'
+         WHEN 'fk_csh_class'                   THEN 'RESTRICT/RESTRICT'
+         WHEN 'fk_specialty_subject_specialty' THEN 'RESTRICT/CASCADE'
+         WHEN 'fk_specialty_subject_subject'   THEN 'RESTRICT/RESTRICT'
+         ELSE '(ngoài phạm vi WP1)'
+       END AS expected
+FROM information_schema.referential_constraints rc
+WHERE rc.constraint_schema = DATABASE()
+  AND rc.table_name IN ('class_subject','teacher_subject',
+                        'class_subject_history','specialty_subject')
+  AND NOT (
+        (rc.constraint_name = 'fk_class_subject_class'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
+     OR (rc.constraint_name = 'fk_class_subject_subject'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
+     OR (rc.constraint_name = 'fk_class_subject_curriculum'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
+     OR (rc.constraint_name = 'fk_class_subject_teacher'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
+     OR (rc.constraint_name = 'fk_teacher_subject_teacher'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
+     OR (rc.constraint_name = 'fk_teacher_subject_subject'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
+     OR (rc.constraint_name = 'fk_csh_class'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
+     OR (rc.constraint_name = 'fk_specialty_subject_specialty'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
+     OR (rc.constraint_name = 'fk_specialty_subject_subject'
+          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT'))
+ORDER BY rc.table_name, rc.constraint_name;
+
 -- 6) History phải rỗng ngay sau migration (không backfill hồi tố)
 SELECT COUNT(*) AS history_rows_after_migration FROM class_subject_history;
 

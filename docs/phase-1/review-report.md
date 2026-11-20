@@ -1,14 +1,16 @@
 # Phase 1 — Review Report (Revision 3: D-08 / D-09 / D-15)
 
-> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `bfa9b53`
+> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `f64cea1`
+> (Lượt 4 sửa trên working tree, chưa commit)
 > **Phạm vi:** chỉ tài liệu trong `docs/phase-1/` + SQL migration **draft** trong
 > `docs/phase-1/migrations/` + H2 test schema. Không sửa source Java/React, không chạy SQL, không
 > kết nối database, không đổi cấu hình/deploy, không commit/push/merge.
 
-## TRẠNG THÁI: `READY FOR USER REVIEW` — Revision 3
+## TRẠNG THÁI: `READY FOR FINAL STATIC REVIEW` — Revision 3 + Lượt 4
 
-> **Không phải `APPROVED`.** Bộ tài liệu và migration draft đã đồng bộ nội bộ, nhưng **chưa được
-> người dùng duyệt** và **chưa có migration nào được chạy** trên bất kỳ database nào.
+> **Không phải `APPROVED`.** Finding P1/P2/P3 của Final Static Review đã được sửa trong **logic SQL
+> thực tế** và kiểm static; **chưa chạy** migration/SQL, **chưa** kiểm trên MySQL staging, **chưa**
+> chạy test. Báo cáo chi tiết: `fix-review-findings-report.md`.
 
 Lưu ý trung thực:
 
@@ -59,7 +61,7 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
 | 15 | `docs/phase-1/migrations/51_52_postcheck.sql` | Truy vấn chỉ đọc |
 | 16 | `docs/phase-1/migrations/ROLLBACK.md` | Kế hoạch rollback có điều kiện |
 | 17 | `review-report.md` | Báo cáo này (Revision 3) |
-| 18 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (READY FOR USER REVIEW) |
+| 18 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (`READY FOR FINAL STATIC REVIEW` sau Lượt 4) |
 | 19 | `wp0-readiness-report.md` | Gỡ/điều kiện hoá migration 53; D-09/invariant theo Revision 3 |
 
 ### 1.3. Kết quả kiểm chéo
@@ -123,6 +125,32 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
    `class_subject` (và tương tự ở `teacher_subject`) khi chưa có index tiền tố trái. Audit chấp
    nhận **đúng** các index non-unique này; index lạ hoặc UNIQUE thừa ⇒ ABORT. Nhờ vậy bảng do
    chính draft 52 tạo vẫn qua gate, không bị chặn nhầm.
+
+**Lượt 4 — sửa finding của Final Static Review (vẫn không chạy SQL/Java/React):**
+
+1. **P1 — thuộc tính cột.** Query 0b và procedure audit `class_subject` (20 cột) / `teacher_subject`
+   (10 cột) giờ so cả `DATA_TYPE`, `COLUMN_TYPE`, `CHARACTER_MAXIMUM_LENGTH`, `NUMERIC_PRECISION`,
+   `NUMERIC_SCALE`, `IS_NULLABLE`, `COLUMN_DEFAULT` (NULL-safe `<=>`), `COLLATION_NAME`, `EXTRA`.
+   Kiểm DEFAULT `source='MANUAL'`, `status='PLANNED'`/`'APPROVED'`, `is_primary=0`; lệch ⇒
+   `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE` / `SIGNAL 45000`, không tự `MODIFY`.
+2. **P2 — audit bảng đã tồn tại.** Thêm `mems_m52_assert_history_schema` (16 cột + thuộc tính, PK,
+   `uq_csh_operation`, index phụ, FK `ON DELETE RESTRICT`, 3 CHECK) và
+   `mems_m52_assert_specialty_subject_schema` (5 cột, PK, index whitelist, 2 FK, không CHECK lạ),
+   chạy **trước** `CREATE TABLE IF NOT EXISTS`; sai ⇒ `SIGNAL`, không tự `ALTER`.
+3. **P3 — referential action.** 0b, audit 52 và post-check đều kiểm `UPDATE_RULE`/`DELETE_RULE` của
+   cả 9 FK thuộc `class_subject`/`teacher_subject`/`class_subject_history`/`specialty_subject`;
+   history bắt buộc `RESTRICT` (không cascade).
+4. **P3 — H2 parity.** Thêm `chk_class_subject_primary` và `chk_curriculum_subject_sequence` vào
+   fixture; ghi rõ `uq_subject_org_code` UNIQUE ở H2 vs non-unique ở MySQL (D-04 commented) là lệch
+   **có chủ đích** vì service contract 409 và D-04 target; index phụ lược bỏ ở H2.
+5. **P3 — helper 51.** `mems_m51_add_col` / `mems_m51_add_fk` / `mems_m51_add_unique` kiểm định
+   nghĩa object trùng tên (kiểu/null/default; mapping + update/delete rule; unique/cột/prefix) và
+   `SIGNAL` thay vì bỏ qua theo tên; không tự drop/tạo lại.
+6. **Post-check** thêm 5b–5d (số cột, PK/UNIQUE, referential action của 4 bảng).
+7. **ROLLBACK.md** thêm §2 ABORT giữa chừng (implicit commit, DML 5a/5b còn lại, rerun idempotent)
+   và bước 8 kiểm index hỗ trợ FK còn sót, không drop khi còn FK dùng.
+8. **Test:** TC-LEG-030…041 (sai kiểu/độ dài/NULL/DEFAULT/collation, sai DELETE/UPDATE rule, history
+   cascade/thiếu cột, specialty sai schema, trùng tên index/FK, abort sau 5a/5b rồi rerun).
 
 ---
 
@@ -487,7 +515,8 @@ Trong toàn bộ Revision 3:
 
 ## 12. Điều kiện chuyển sang `APPROVED`
 
-Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED` khi người dùng đã:
+Trạng thái hiện tại là `READY FOR FINAL STATIC REVIEW` (Revision 3 + Lượt 4, xem
+`fix-review-findings-report.md`). Chỉ chuyển `APPROVED` khi người dùng đã:
 
 1. Duyệt D-08/D-09/D-15 tại `subject-business-requirements.md` (nguồn sự thật).
 2. Duyệt DDL + backfill trong `database-schema.md` §3 và migration draft 51/52.
@@ -495,6 +524,8 @@ Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED
    `operationId`/`expectedVersion` trên `PUT /classes/{id}` khi đổi `subjectId`.
 4. Chấp nhận rằng H2 **không** chứng minh hành vi MySQL và cần xác minh staging.
 5. Quyết định thời điểm chạy migration 51/52 trên staging (ngoài phạm vi tài liệu này).
+6. Review `fix-review-findings-report.md` (P1/P2/P3 đã sửa static) và kiểm lại migration trên MySQL
+   staging — đặc biệt audit thuộc tính cột, referential action và history không cascade.
 
 Nếu một `D-xx` thay đổi, phải cập nhật đồng thời:
 `subject-business-requirements.md` → `curriculum-business-design.md` + `database-schema.md` +

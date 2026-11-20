@@ -9,9 +9,18 @@
 -- EXISTING class_subject:
 --   This script creates the table in full when it does not exist. If it already
 --   exists, it is accepted ONLY when it already matches the Revision-3 schema
---   (all columns, indexes, FKs, CHECKs, generated column, PK). Otherwise the
---   script ABORTS with SIGNAL — it never auto-upgrades an unknown old table and
---   never rewrites an already-applied migration file.
+--   (all columns and their attributes, indexes, FKs + referential actions,
+--   CHECKs, generated column, PK). Otherwise the script ABORTS with SIGNAL — it
+--   never auto-upgrades an unknown old table and never rewrites an
+--   already-applied migration file. The same rule applies to pre-existing
+--   teacher_subject, class_subject_history and specialty_subject.
+--
+-- ABORT / PARTIAL BACKFILL (see ROLLBACK.md §2):
+--   MySQL DDL causes implicit commits and this script is not wrapped in one
+--   transaction. If a later step SIGNALs after 5a/5b ran, the backfilled rows
+--   REMAIN. 5a/5b are exact-match and idempotent, so after fixing the cause you
+--   must re-run the pre-check, verify data, then re-run 52 and the post-check.
+--   Do not delete backfilled rows manually without proving their origin.
 -- =============================================================================
 USE mems_people_db;
 
@@ -21,14 +30,16 @@ DELIMITER $
 -- Abort if an existing class_subject is not the Revision-3 schema.
 -- Skips silently when the table does not exist (it will be created below).
 -- Verifies structure, not just constraint names:
---   * exactly the 20 Revision-3 columns (no missing, no extra)
+--   * exactly the 20 Revision-3 columns (no missing, no extra) with matching
+--     type/length/precision/scale, NULL, DEFAULT, collation and generated flag
 --   * PK (class_id, subject_id) in order
 --   * PRIMARY + 4 indexes with exact column lists/order; unique flags;
 --     no prefix (SUB_PART) columns. Any extra index is rejected except the
 --     InnoDB FK-support indexes on (class_id,org_id) and (subject_id,org_id)
 --     (non-unique, no prefix) that MySQL creates when a FK has no left-prefix
 --     index of its own.
---   * 4 FKs with exact source->target column mappings (same schema)
+--   * 4 FKs with exact source->target column mappings (same schema) and exact
+--     ON UPDATE / ON DELETE rules
 --   * 5 CHECKs with exact normalised expressions
 --   * primary_class_id = STORED GENERATED with exact CASE expression
 -- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
@@ -39,6 +50,7 @@ BEGIN
   DECLARE v_exists INT DEFAULT 0;
   DECLARE v_total_cols INT DEFAULT 0;
   DECLARE v_cols INT DEFAULT 0;
+  DECLARE v_attr_bad INT DEFAULT 0;
   DECLARE v_idx_total INT DEFAULT 0;
   DECLARE v_idx_ok INT DEFAULT 0;
   DECLARE v_idx_prefix INT DEFAULT 0;
@@ -47,6 +59,7 @@ BEGIN
   DECLARE v_fk_total INT DEFAULT 0;
   DECLARE v_fk_ok INT DEFAULT 0;
   DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_fk_rule_bad INT DEFAULT 0;
   DECLARE v_chk_total INT DEFAULT 0;
   DECLARE v_chk_ok INT DEFAULT 0;
   DECLARE v_gen INT DEFAULT 0;
@@ -68,6 +81,57 @@ BEGIN
     INTO v_total_cols, v_cols
     FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'class_subject';
+
+    -- Column attributes: type/length/precision/scale, nullability, default,
+    -- collation, generated flag must match CREATE TABLE below. Derived
+    -- attributes (character_maximum_length, numeric_precision/scale) are
+    -- checked where they apply; COLUMN_TYPE covers them otherwise.
+    -- MySQL 8 cannot distinguish explicit DEFAULT NULL from "no default":
+    -- both are COLUMN_DEFAULT IS NULL, which is semantically identical here
+    -- (no NOT NULL column relies on an implicit default).
+    SELECT COUNT(*) INTO v_attr_bad
+    FROM (
+      SELECT e.column_name
+      FROM (
+        SELECT 'class_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
+               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
+               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
+        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'curriculum_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'sequence_no','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'is_primary','tinyint(1)','NO','0',-1,3,0,'NONE','NONE'
+        UNION ALL SELECT 'primary_class_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','STORED'
+        UNION ALL SELECT 'required_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'planned_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'theory_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'practice_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'session_minutes','smallint','YES',NULL,-1,5,0,'NONE','NONE'
+        UNION ALL SELECT 'status','varchar(20)','NO','PLANNED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'note','varchar(500)','YES',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
+        UNION ALL SELECT 'updated_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
+      ) e
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = DATABASE() AND c.table_name = 'class_subject'
+       AND c.column_name = e.column_name
+      WHERE c.column_name IS NULL
+         OR NOT (c.column_type <=> e.column_type)
+         OR NOT (c.is_nullable <=> e.is_nullable)
+         OR NOT (c.column_default <=> e.def_value)
+         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
+         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
+         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
+         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
+         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
+         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
+         OR (e.extra_rule = 'STORED'
+             AND NOT (c.extra LIKE '%GENERATED%' AND c.extra LIKE '%STORED%'))
+    ) d;
 
     -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
     -- Allowed beyond the 5 Revision-3 groups: InnoDB FK-support indexes on
@@ -127,11 +191,13 @@ BEGIN
              = 'class_id,subject_id'
     ) pk;
 
-    -- FKs: exact source column -> referenced schema.table.column mapping.
-    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
-    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
+    -- FKs: exact source column -> referenced schema.table.column mapping,
+    -- plus ON UPDATE / ON DELETE rules (REFERENTIAL_CONSTRAINTS).
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
+           COALESCE(SUM(bad_rule), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
     FROM (
-      SELECT k.constraint_name, k.map, k.wrong_schema,
+      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
         CASE
           WHEN k.constraint_name = 'fk_class_subject_class'
             AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
@@ -142,17 +208,34 @@ BEGIN
           WHEN k.constraint_name = 'fk_class_subject_teacher'
             AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
           ELSE 0
-        END AS ok
+        END AS ok,
+        CASE
+          WHEN k.constraint_name = 'fk_class_subject_class'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
+          WHEN k.constraint_name = 'fk_class_subject_subject'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          WHEN k.constraint_name = 'fk_class_subject_curriculum'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          WHEN k.constraint_name = 'fk_class_subject_teacher'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          ELSE 1
+        END AS bad_rule
       FROM (
-        SELECT constraint_name,
-               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
-                                   referenced_column_name)
-                            ORDER BY ordinal_position SEPARATOR ',') AS map,
-               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
-        FROM information_schema.key_column_usage
-        WHERE table_schema = DATABASE() AND table_name = 'class_subject'
-          AND referenced_table_name IS NOT NULL
-        GROUP BY constraint_name
+        SELECT kcu.constraint_name,
+               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
+                                   kcu.referenced_column_name)
+                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
+               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
+               MAX(rc.update_rule) AS update_rule,
+               MAX(rc.delete_rule) AS delete_rule
+        FROM information_schema.key_column_usage kcu
+        LEFT JOIN information_schema.referential_constraints rc
+          ON rc.constraint_schema = kcu.constraint_schema
+         AND rc.constraint_name = kcu.constraint_name
+         AND rc.table_name = kcu.table_name
+        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject'
+          AND kcu.referenced_table_name IS NOT NULL
+        GROUP BY kcu.constraint_name
       ) k
     ) y;
 
@@ -199,18 +282,21 @@ BEGIN
             generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
             '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend';
 
-    IF v_total_cols <> 20 OR v_cols <> 20
+    IF v_total_cols <> 20 OR v_cols <> 20 OR v_attr_bad <> 0
        OR v_idx_ok <> 5 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
        OR v_pk <> 1
        OR v_fk_total <> 4 OR v_fk_ok <> 4 OR v_fk_schema_bad <> 0
+       OR v_fk_rule_bad <> 0
        OR v_chk_total <> 5 OR v_chk_ok <> 5
        OR v_gen <> 1 THEN
       SELECT 'class_subject_schema_mismatch' AS issue,
              v_total_cols AS total_cols_20, v_cols AS named_cols_20,
+             v_attr_bad AS attr_mismatch_0,
              v_idx_total AS idx_total, v_idx_ok AS idx_ok_5,
              v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
              v_pk AS pk_1,
              v_fk_total AS fk_4, v_fk_ok AS fk_ok_4, v_fk_schema_bad AS fk_schema_0,
+             v_fk_rule_bad AS fk_rule_0,
              v_chk_total AS chk_5, v_chk_ok AS chk_ok_5,
              v_gen AS gen_1;
       SIGNAL SQLSTATE '45000'
@@ -222,12 +308,14 @@ END$
 -- ---------------------------------------------------------------------------
 -- Abort if an existing teacher_subject is not the D-06a schema.
 -- Verifies structure, not just constraint names:
---   * exactly the 10 Revision-3 columns (no missing, no extra)
+--   * exactly the 10 Revision-3 columns (no missing, no extra) with matching
+--     type/length/precision/scale, NULL, DEFAULT, collation and generated flag
 --   * PK (user_id, subject_id); PRIMARY + 2 indexes with exact column lists and
 --     order, unique flags, no prefix columns. Extra indexes are rejected except
 --     InnoDB FK-support indexes on (user_id,org_id) and (subject_id,org_id)
 --     (non-unique, no prefix).
---   * 2 FKs with exact source->target column mappings (same schema)
+--   * 2 FKs with exact source->target column mappings (same schema) and exact
+--     ON UPDATE / ON DELETE rules
 --   * CHECK source exactly SPECIALTY/MANUAL
 --   * CHECK status exactly APPROVED/REVOKED — no PENDING or any other value
 -- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
@@ -238,6 +326,7 @@ BEGIN
   DECLARE v_exists INT DEFAULT 0;
   DECLARE v_total_cols INT DEFAULT 0;
   DECLARE v_cols INT DEFAULT 0;
+  DECLARE v_attr_bad INT DEFAULT 0;
   DECLARE v_idx_total INT DEFAULT 0;
   DECLARE v_idx_ok INT DEFAULT 0;
   DECLARE v_idx_prefix INT DEFAULT 0;
@@ -246,6 +335,7 @@ BEGIN
   DECLARE v_fk_total INT DEFAULT 0;
   DECLARE v_fk_ok INT DEFAULT 0;
   DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_fk_rule_bad INT DEFAULT 0;
   DECLARE v_chk_total INT DEFAULT 0;
   DECLARE v_chk_ok INT DEFAULT 0;
   DECLARE v_pending INT DEFAULT 0;
@@ -265,6 +355,40 @@ BEGIN
     INTO v_total_cols, v_cols
     FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'teacher_subject';
+
+    -- Column attributes: same standard as the class_subject audit.
+    -- status/source defaults are part of D-06a/D-08 behavior and must match.
+    SELECT COUNT(*) INTO v_attr_bad
+    FROM (
+      SELECT e.column_name
+      FROM (
+        SELECT 'user_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
+               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
+               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
+        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'status','varchar(20)','NO','APPROVED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'approved_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'approved_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
+        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
+        UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
+      ) e
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = DATABASE() AND c.table_name = 'teacher_subject'
+       AND c.column_name = e.column_name
+      WHERE c.column_name IS NULL
+         OR NOT (c.column_type <=> e.column_type)
+         OR NOT (c.is_nullable <=> e.is_nullable)
+         OR NOT (c.column_default <=> e.def_value)
+         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
+         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
+         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
+         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
+         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
+         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
+    ) d;
 
     -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
     -- Allowed beyond the 3 Revision-3 groups: InnoDB FK-support indexes on
@@ -318,28 +442,43 @@ BEGIN
              = 'user_id,subject_id'
     ) pk;
 
-    -- FKs: exact source column -> referenced schema.table.column mapping.
-    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
-    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
+    -- FKs: exact source column -> referenced schema.table.column mapping,
+    -- plus ON UPDATE / ON DELETE rules (REFERENTIAL_CONSTRAINTS).
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
+           COALESCE(SUM(bad_rule), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
     FROM (
-      SELECT k.constraint_name, k.map, k.wrong_schema,
+      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
         CASE
           WHEN k.constraint_name = 'fk_teacher_subject_teacher'
             AND k.map = 'user_id->teacher_profile.user_id,org_id->teacher_profile.org_id' THEN 1
           WHEN k.constraint_name = 'fk_teacher_subject_subject'
             AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
           ELSE 0
-        END AS ok
+        END AS ok,
+        CASE
+          WHEN k.constraint_name = 'fk_teacher_subject_teacher'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
+          WHEN k.constraint_name = 'fk_teacher_subject_subject'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          ELSE 1
+        END AS bad_rule
       FROM (
-        SELECT constraint_name,
-               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
-                                   referenced_column_name)
-                            ORDER BY ordinal_position SEPARATOR ',') AS map,
-               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
-        FROM information_schema.key_column_usage
-        WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
-          AND referenced_table_name IS NOT NULL
-        GROUP BY constraint_name
+        SELECT kcu.constraint_name,
+               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
+                                   kcu.referenced_column_name)
+                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
+               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
+               MAX(rc.update_rule) AS update_rule,
+               MAX(rc.delete_rule) AS delete_rule
+        FROM information_schema.key_column_usage kcu
+        LEFT JOIN information_schema.referential_constraints rc
+          ON rc.constraint_schema = kcu.constraint_schema
+         AND rc.constraint_name = kcu.constraint_name
+         AND rc.table_name = kcu.table_name
+        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'teacher_subject'
+          AND kcu.referenced_table_name IS NOT NULL
+        GROUP BY kcu.constraint_name
       ) k
     ) y;
 
@@ -377,23 +516,409 @@ BEGIN
       AND constraint_name = 'chk_teacher_subject_status'
       AND check_clause LIKE '%PENDING%';
 
-    IF v_total_cols <> 10 OR v_cols <> 10
+    IF v_total_cols <> 10 OR v_cols <> 10 OR v_attr_bad <> 0
        OR v_idx_ok <> 3 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
        OR v_pk <> 1
        OR v_fk_total <> 2 OR v_fk_ok <> 2 OR v_fk_schema_bad <> 0
+       OR v_fk_rule_bad <> 0
        OR v_chk_total <> 2 OR v_chk_ok <> 2
        OR v_pending > 0 THEN
       SELECT 'teacher_subject_schema_mismatch' AS issue,
              v_total_cols AS total_cols_10, v_cols AS named_cols_10,
+             v_attr_bad AS attr_mismatch_0,
              v_idx_total AS idx_total, v_idx_ok AS idx_ok_3,
              v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
              v_pk AS pk_1,
              v_fk_total AS fk_2, v_fk_ok AS fk_ok_2, v_fk_schema_bad AS fk_schema_0,
+             v_fk_rule_bad AS fk_rule_0,
              v_chk_total AS chk_2, v_chk_ok AS chk_ok_2, v_pending AS pending_0;
       SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'M52 ABORT: teacher_subject must be D-06a (APPROVED/REVOKED only)';
     END IF;
   END ts_check;
+END$
+
+-- ---------------------------------------------------------------------------
+-- Abort if an existing class_subject_history is not the Revision-3 schema.
+-- History is append-only audit data: a same-name table with ON DELETE CASCADE
+-- (or any other structural drift) must never be accepted, because it would let
+-- history rows disappear with a class. Never auto-ALTER; SIGNAL instead.
+-- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema$
+CREATE PROCEDURE mems_m52_assert_history_schema()
+BEGIN
+  DECLARE v_exists INT DEFAULT 0;
+  DECLARE v_total_cols INT DEFAULT 0;
+  DECLARE v_cols INT DEFAULT 0;
+  DECLARE v_attr_bad INT DEFAULT 0;
+  DECLARE v_idx_ok INT DEFAULT 0;
+  DECLARE v_idx_prefix INT DEFAULT 0;
+  DECLARE v_idx_extra INT DEFAULT 0;
+  DECLARE v_pk INT DEFAULT 0;
+  DECLARE v_fk_total INT DEFAULT 0;
+  DECLARE v_fk_ok INT DEFAULT 0;
+  DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_fk_rule_bad INT DEFAULT 0;
+  DECLARE v_chk_total INT DEFAULT 0;
+  DECLARE v_chk_ok INT DEFAULT 0;
+
+  h_check: BEGIN
+    SELECT COUNT(*) INTO v_exists FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'class_subject_history';
+    IF v_exists = 0 THEN
+      LEAVE h_check;
+    END IF;
+
+    -- Columns: exact set of 16.
+    SELECT COUNT(*),
+           COALESCE(SUM(column_name IN (
+             'id','org_id','class_id','old_subject_id','old_subject_code',
+             'old_subject_name','old_teacher_id','old_source','new_subject_id',
+             'new_subject_code','new_subject_name','new_source','reason',
+             'operation_id','changed_by','changed_at')), 0)
+    INTO v_total_cols, v_cols
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'class_subject_history';
+
+    -- Column attributes (same standard as class_subject/teacher_subject).
+    SELECT COUNT(*) INTO v_attr_bad
+    FROM (
+      SELECT e.column_name
+      FROM (
+        SELECT 'id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
+               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
+               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
+        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'class_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_subject_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_subject_name','varchar(200)','YES',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'old_source','varchar(20)','YES',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'new_subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'new_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'new_subject_name','varchar(200)','NO',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'new_source','varchar(20)','NO',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'reason','varchar(500)','NO',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'operation_id','varchar(64)','NO',NULL,64,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'changed_by','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'changed_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
+      ) e
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = DATABASE() AND c.table_name = 'class_subject_history'
+       AND c.column_name = e.column_name
+      WHERE c.column_name IS NULL
+         OR NOT (c.column_type <=> e.column_type)
+         OR NOT (c.is_nullable <=> e.is_nullable)
+         OR NOT (c.column_default <=> e.def_value)
+         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
+         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
+         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
+         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
+         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
+         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
+    ) d;
+
+    -- Indexes: PRIMARY + uq_csh_operation + 2 secondary; the InnoDB FK-support
+    -- index on (class_id, org_id) is the only allowed extra.
+    SELECT COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0), COALESCE(SUM(bad_extra), 0)
+    INTO v_idx_ok, v_idx_prefix, v_idx_extra
+    FROM (
+      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
+        CASE
+          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
+            AND i.cols = 'id' THEN 1
+          WHEN i.index_name = 'uq_csh_operation' AND i.non_unique = 0
+            AND i.cols = 'org_id,operation_id' THEN 1
+          WHEN i.index_name = 'idx_csh_class_time' AND i.non_unique = 1
+            AND i.cols = 'org_id,class_id,changed_at' THEN 1
+          WHEN i.index_name = 'idx_csh_new_subject' AND i.non_unique = 1
+            AND i.cols = 'org_id,new_subject_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0 AND i.cols = 'id')
+            OR (i.index_name = 'uq_csh_operation' AND i.non_unique = 0
+                AND i.cols = 'org_id,operation_id')
+            OR (i.index_name = 'idx_csh_class_time' AND i.non_unique = 1
+                AND i.cols = 'org_id,class_id,changed_at')
+            OR (i.index_name = 'idx_csh_new_subject' AND i.non_unique = 1
+                AND i.cols = 'org_id,new_subject_id')
+            OR (i.non_unique = 1 AND i.has_prefix = 0 AND i.cols = 'class_id,org_id')
+            THEN 0
+          ELSE 1
+        END AS bad_extra
+      FROM (
+        SELECT index_name, non_unique,
+               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
+               MAX(sub_part IS NOT NULL) AS has_prefix
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
+        GROUP BY index_name, non_unique
+      ) i
+    ) x;
+
+    SELECT COUNT(*) INTO v_pk
+    FROM (
+      SELECT index_name FROM information_schema.statistics
+      WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
+        AND index_name = 'PRIMARY'
+      GROUP BY index_name
+      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') = 'id'
+    ) pk;
+
+    -- FK + referential actions: history must NEVER cascade-delete.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
+           COALESCE(SUM(bad_rule), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
+    FROM (
+      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
+        CASE
+          WHEN k.constraint_name = 'fk_csh_class'
+            AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN k.constraint_name = 'fk_csh_class'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          ELSE 1
+        END AS bad_rule
+      FROM (
+        SELECT kcu.constraint_name,
+               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
+                                   kcu.referenced_column_name)
+                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
+               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
+               MAX(rc.update_rule) AS update_rule,
+               MAX(rc.delete_rule) AS delete_rule
+        FROM information_schema.key_column_usage kcu
+        LEFT JOIN information_schema.referential_constraints rc
+          ON rc.constraint_schema = kcu.constraint_schema
+         AND rc.constraint_name = kcu.constraint_name
+         AND rc.table_name = kcu.table_name
+        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject_history'
+          AND kcu.referenced_table_name IS NOT NULL
+        GROUP BY kcu.constraint_name
+      ) k
+    ) y;
+
+    -- CHECKs: exact normalised expression per constraint.
+    SELECT COUNT(*), COALESCE(SUM(ok), 0)
+    INTO v_chk_total, v_chk_ok
+    FROM (
+      SELECT tc.constraint_name, cc.norm,
+        CASE
+          WHEN tc.constraint_name = 'chk_csh_subject_change'
+            AND cc.norm = 'old_subject_idisnullorold_subject_id<>new_subject_id' THEN 1
+          WHEN tc.constraint_name = 'chk_csh_old_source'
+            AND cc.norm = 'old_sourceisnullorold_sourceinlegacy,curriculum,manual' THEN 1
+          WHEN tc.constraint_name = 'chk_csh_new_source'
+            AND cc.norm = 'new_sourceinlegacy,curriculum,manual' THEN 1
+          ELSE 0
+        END AS ok
+      FROM information_schema.table_constraints tc
+      JOIN (
+        SELECT constraint_schema, constraint_name,
+               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                 check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
+                 '(', ''), ')', '')) AS norm
+        FROM information_schema.check_constraints
+        WHERE constraint_schema = DATABASE()
+      ) cc
+        ON cc.constraint_schema = tc.constraint_schema
+       AND cc.constraint_name = tc.constraint_name
+      WHERE tc.table_schema = DATABASE() AND tc.table_name = 'class_subject_history'
+        AND tc.constraint_type = 'CHECK'
+    ) z;
+
+    IF v_total_cols <> 16 OR v_cols <> 16 OR v_attr_bad <> 0
+       OR v_idx_ok <> 4 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+       OR v_pk <> 1
+       OR v_fk_total <> 1 OR v_fk_ok <> 1 OR v_fk_schema_bad <> 0
+       OR v_fk_rule_bad <> 0
+       OR v_chk_total <> 3 OR v_chk_ok <> 3 THEN
+      SELECT 'class_subject_history_schema_mismatch' AS issue,
+             v_total_cols AS total_cols_16, v_cols AS named_cols_16,
+             v_attr_bad AS attr_mismatch_0,
+             v_idx_ok AS idx_ok_4, v_idx_prefix AS idx_prefix_0,
+             v_idx_extra AS idx_extra_0, v_pk AS pk_1,
+             v_fk_total AS fk_1, v_fk_ok AS fk_ok_1,
+             v_fk_schema_bad AS fk_schema_0, v_fk_rule_bad AS fk_rule_0,
+             v_chk_total AS chk_3, v_chk_ok AS chk_ok_3;
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'M52 ABORT: existing class_subject_history is not Revision-3; history must not cascade';
+    END IF;
+  END h_check;
+END$
+
+-- ---------------------------------------------------------------------------
+-- Abort if an existing specialty_subject is not the Revision-3 schema.
+-- ---------------------------------------------------------------------------
+DROP PROCEDURE IF EXISTS mems_m52_assert_specialty_subject_schema$
+CREATE PROCEDURE mems_m52_assert_specialty_subject_schema()
+BEGIN
+  DECLARE v_exists INT DEFAULT 0;
+  DECLARE v_total_cols INT DEFAULT 0;
+  DECLARE v_cols INT DEFAULT 0;
+  DECLARE v_attr_bad INT DEFAULT 0;
+  DECLARE v_idx_ok INT DEFAULT 0;
+  DECLARE v_idx_prefix INT DEFAULT 0;
+  DECLARE v_idx_extra INT DEFAULT 0;
+  DECLARE v_pk INT DEFAULT 0;
+  DECLARE v_fk_total INT DEFAULT 0;
+  DECLARE v_fk_ok INT DEFAULT 0;
+  DECLARE v_fk_schema_bad INT DEFAULT 0;
+  DECLARE v_fk_rule_bad INT DEFAULT 0;
+  DECLARE v_chk_total INT DEFAULT 0;
+  DECLARE v_chk_ok INT DEFAULT 0;
+
+  ss_check: BEGIN
+    SELECT COUNT(*) INTO v_exists FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
+    IF v_exists = 0 THEN
+      LEAVE ss_check;
+    END IF;
+
+    SELECT COUNT(*),
+           COALESCE(SUM(column_name IN (
+             'specialty_id','subject_id','org_id','created_by','created_at')), 0)
+    INTO v_total_cols, v_cols
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
+
+    SELECT COUNT(*) INTO v_attr_bad
+    FROM (
+      SELECT e.column_name
+      FROM (
+        SELECT 'specialty_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
+               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
+               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
+        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
+        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
+      ) e
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = DATABASE() AND c.table_name = 'specialty_subject'
+       AND c.column_name = e.column_name
+      WHERE c.column_name IS NULL
+         OR NOT (c.column_type <=> e.column_type)
+         OR NOT (c.is_nullable <=> e.is_nullable)
+         OR NOT (c.column_default <=> e.def_value)
+         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
+         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
+         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
+         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
+         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
+         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
+    ) d;
+
+    -- PRIMARY + idx_specialty_subject_org_subject; the two InnoDB FK-support
+    -- indexes on (specialty_id,org_id) / (subject_id,org_id) are the only extras.
+    SELECT COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0), COALESCE(SUM(bad_extra), 0)
+    INTO v_idx_ok, v_idx_prefix, v_idx_extra
+    FROM (
+      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
+        CASE
+          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
+            AND i.cols = 'specialty_id,subject_id' THEN 1
+          WHEN i.index_name = 'idx_specialty_subject_org_subject' AND i.non_unique = 1
+            AND i.cols = 'org_id,subject_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0
+                AND i.cols = 'specialty_id,subject_id')
+            OR (i.index_name = 'idx_specialty_subject_org_subject' AND i.non_unique = 1
+                AND i.cols = 'org_id,subject_id')
+            OR (i.non_unique = 1 AND i.has_prefix = 0
+                AND i.cols IN ('specialty_id,org_id', 'subject_id,org_id'))
+            THEN 0
+          ELSE 1
+        END AS bad_extra
+      FROM (
+        SELECT index_name, non_unique,
+               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
+               MAX(sub_part IS NOT NULL) AS has_prefix
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
+        GROUP BY index_name, non_unique
+      ) i
+    ) x;
+
+    SELECT COUNT(*) INTO v_pk
+    FROM (
+      SELECT index_name FROM information_schema.statistics
+      WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
+        AND index_name = 'PRIMARY'
+      GROUP BY index_name
+      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')
+             = 'specialty_id,subject_id'
+    ) pk;
+
+    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
+           COALESCE(SUM(bad_rule), 0)
+    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
+    FROM (
+      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
+        CASE
+          WHEN k.constraint_name = 'fk_specialty_subject_specialty'
+            AND k.map = 'specialty_id->specialty.id,org_id->specialty.org_id' THEN 1
+          WHEN k.constraint_name = 'fk_specialty_subject_subject'
+            AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
+          ELSE 0
+        END AS ok,
+        CASE
+          WHEN k.constraint_name = 'fk_specialty_subject_specialty'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
+          WHEN k.constraint_name = 'fk_specialty_subject_subject'
+            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
+          ELSE 1
+        END AS bad_rule
+      FROM (
+        SELECT kcu.constraint_name,
+               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
+                                   kcu.referenced_column_name)
+                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
+               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
+               MAX(rc.update_rule) AS update_rule,
+               MAX(rc.delete_rule) AS delete_rule
+        FROM information_schema.key_column_usage kcu
+        LEFT JOIN information_schema.referential_constraints rc
+          ON rc.constraint_schema = kcu.constraint_schema
+         AND rc.constraint_name = kcu.constraint_name
+         AND rc.table_name = kcu.table_name
+        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'specialty_subject'
+          AND kcu.referenced_table_name IS NOT NULL
+        GROUP BY kcu.constraint_name
+      ) k
+    ) y;
+
+    -- No CHECK constraints by design; any CHECK is drift.
+    SELECT COUNT(*) INTO v_chk_total
+    FROM information_schema.table_constraints
+    WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
+      AND constraint_type = 'CHECK';
+    SET v_chk_ok = 0;
+
+    IF v_total_cols <> 5 OR v_cols <> 5 OR v_attr_bad <> 0
+       OR v_idx_ok <> 2 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+       OR v_pk <> 1
+       OR v_fk_total <> 2 OR v_fk_ok <> 2 OR v_fk_schema_bad <> 0
+       OR v_fk_rule_bad <> 0
+       OR v_chk_total <> 0 THEN
+      SELECT 'specialty_subject_schema_mismatch' AS issue,
+             v_total_cols AS total_cols_5, v_cols AS named_cols_5,
+             v_attr_bad AS attr_mismatch_0,
+             v_idx_ok AS idx_ok_2, v_idx_prefix AS idx_prefix_0,
+             v_idx_extra AS idx_extra_0, v_pk AS pk_1,
+             v_fk_total AS fk_2, v_fk_ok AS fk_ok_2,
+             v_fk_schema_bad AS fk_schema_0, v_fk_rule_bad AS fk_rule_0,
+             v_chk_total AS chk_0;
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'M52 ABORT: existing specialty_subject is not Revision-3 schema; fix manually';
+    END IF;
+  END ss_check;
 END$
 
 DROP PROCEDURE IF EXISTS mems_m52_assert_no_duplicate_primary$
@@ -457,8 +982,11 @@ END$
 DELIMITER ;
 
 -- 1) Existing tables must already match Revision 3 / D-06a, else abort.
+--    Absent table => create below; present+matching => continue; present+wrong => SIGNAL.
 CALL mems_m52_assert_class_subject_schema();
 CALL mems_m52_assert_teacher_subject_schema();
+CALL mems_m52_assert_history_schema();
+CALL mems_m52_assert_specialty_subject_schema();
 
 -- 2) specialty_subject (D-06)
 CREATE TABLE IF NOT EXISTS specialty_subject (
@@ -627,6 +1155,8 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
 
 DROP PROCEDURE IF EXISTS mems_m52_assert_class_subject_schema;
 DROP PROCEDURE IF EXISTS mems_m52_assert_teacher_subject_schema;
+DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema;
+DROP PROCEDURE IF EXISTS mems_m52_assert_specialty_subject_schema;
 DROP PROCEDURE IF EXISTS mems_m52_assert_no_duplicate_primary;
 DROP PROCEDURE IF EXISTS mems_m52_assert_backfill_safe;
 

@@ -1,9 +1,11 @@
-# WP1 Readiness Report — Phase 1 Revision 3
+# WP1 Readiness Report — Phase 1 Revision 3 + Lượt 4
 
-> **Trạng thái: `READY FOR USER REVIEW` — KHÔNG phải `APPROVED`.**
-> Báo cáo này mô tả công việc tài liệu/schema draft cho WP1. Không có migration nào được chạy,
-> không có Java/React nào bị sửa, không kết nối DB production/staging, không test nào được thực thi.
-> Ngày: 2026-11-20. Nhánh: `fixFlowCreateEmployee`.
+> **Trạng thái: `READY FOR FINAL STATIC REVIEW` — KHÔNG phải `APPROVED`.**
+> Báo cáo này mô tả công việc tài liệu/schema draft cho WP1. Finding P1/P2/P3 của Final Static
+> Review đã sửa trong logic SQL thực tế (chi tiết: `fix-review-findings-report.md`). Không có
+> migration nào được chạy, không có Java/React nào bị sửa, không kết nối DB production/staging,
+> không test nào được thực thi. Ngày: 2026-11-20. Nhánh: `fixFlowCreateEmployee` (working tree trên
+> HEAD `f64cea1`).
 
 ---
 
@@ -92,9 +94,17 @@ Năm bất biến primary (tài liệu hoá + test):
 4. Không quá một primary/lớp.
 5. Tạo lớp/đổi môn/backfill giữ các bất biến trên.
 
+**Audit schema (Lượt 4):** pre-check 0b và procedure audit trong 52 là **cùng một hợp đồng** cho
+`class_subject` (20 cột) / `teacher_subject` (10 cột): tên cột, `DATA_TYPE`, `COLUMN_TYPE`, độ dài/
+độ chính xác, NULL, DEFAULT, collation, `EXTRA` (generated STORED); PK; index + whitelist index hỗ
+trợ FK; mapping FK + `UPDATE_RULE`/`DELETE_RULE`; CHECK đã chuẩn hoá. `class_subject_history` (16
+cột) và `specialty_subject` (5 cột) được audit đầy đủ trước `CREATE TABLE IF NOT EXISTS`. Lệch ⇒
+`SIGNAL 45000`/`BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; **không** tự `ALTER`.
+
 ### 3.1. Xác minh optimistic locking (`school_class.version`)
 
-Đọc source tại HEAD `bfa9b53` + dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
+Đọc source tại HEAD `f64cea1` (xác minh ban đầu tại `bfa9b53`; không file Java nào bị sửa) +
+dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
 
 | Hạng mục | Bằng chứng | Kết luận |
 |---|---|---|
@@ -241,6 +251,9 @@ Không thêm permission ID mới; dùng `class.edit`/`class.view` hiện có.
 | `is_primary` | `tinyint(1)` | `BOOLEAN` | Test map true/false |
 | `ALTER TABLE … AFTER` | Hỗ trợ | Không | Draft không dùng `AFTER` |
 | Composite FK | Cần index tiền tố trái | Cần tương tự | H2 schema thêm `UNIQUE(id, org_id)` |
+| CHECK constraint | Revision 3 đầy đủ | Thiếu `chk_class_subject_primary` + `chk_curriculum_subject_sequence` trước Lượt 4 | Đã bổ sung; `is_primary IN (0,1)` viết H2 là `IN (FALSE, TRUE)` |
+| `uq_subject_org_code` | Non-unique (migration 42); D-04 commented đổi UNIQUE | UNIQUE | Lệch **có chủ đích**: giữ UNIQUE để test contract 409 (`SubjectRepository` bắt `DuplicateKeyException`) và đúng D-04 target; **không** sửa D-04; MySQL staging phải kiểm D-04 riêng |
+| Index phụ 51/52 | Đầy đủ, audit qua `information_schema` | Lược bỏ phần lớn | H2 không chứng minh index; audit MySQL là nguồn xác nhận. Pre-check 0b/52 audit kiểm cả thuộc tính cột + `UPDATE_RULE`/`DELETE_RULE` |
 
 **Không** tuyên bố schema đã được xác minh chỉ dựa trên H2. Không có test H2 nào được chạy.
 
@@ -259,7 +272,15 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
   chk_class_subject_primary` → `primary_class_id` → `is_primary`; đảo thứ tự sẽ bị MySQL từ chối.
   Partial rollback chỉ áp dụng cho bảng do draft này tạo (52 không nâng cấp bảng cũ).
 - Nếu đã phát sinh history/dữ liệu mới → **forward-fix**, không rollback.
-- Chi tiết + tên FK/index: `migrations/ROLLBACK.md`.
+- **ABORT giữa chừng:** MySQL DDL implicit commit; 52 không bọc transaction nên khi `SIGNAL` sau
+  5a/5b, DDL và DML đã chạy **vẫn tồn tại**. Không xoá dòng backfill khi chưa chứng minh nguồn gốc;
+  sửa dữ liệu gốc rồi chạy lại pre-check → pre-check data → 52 → post-check. 5a/5b idempotent
+  (PK + `NOT EXISTS` + chỉ set primary khi lớp chưa có).
+- **Index hỗ trợ FK còn sót:** InnoDB tự tạo index non-unique (2 cho `class_subject`, 2 cho
+  `teacher_subject`, 1 cho history, 2 cho `specialty_subject`); không tự mất khi drop FK. Chỉ drop
+  sau khi `information_schema` xác nhận không FK nào còn dùng; **không** drop khi partial rollback
+  còn giữ FK.
+- Chi tiết + tên FK/index: `migrations/ROLLBACK.md` (§2 abort/rerun, bước 8 index hỗ trợ FK).
 
 ---
 
@@ -293,6 +314,9 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
 - TC-LEG-025: `school_class.teacher_id` mồ côi → `BLOCK_MIGRATION` + 5.0 `SIGNAL`, không set NULL.
 - TC-LEG-026: bảng `class_subject` cũ thiếu cấu trúc → schema assert `SIGNAL`, không `ADD COLUMN`;
   `teacher_subject` cũ còn `PENDING` → 52 ABORT.
+- TC-LEG-030…041 (Lượt 4): sai `DATA_TYPE`/`COLUMN_TYPE`/NULL/DEFAULT/collation; sai `DELETE_RULE`/
+  `UPDATE_RULE`; history cascade hoặc thiếu cột snapshot; `specialty_subject` sai schema; index/FK
+  trùng tên nhưng sai định nghĩa (helper 51); ABORT sau 5a/5b rồi chạy lại.
 - E-40…E-43, AC-VAL-17…20.
 
 **Đã thực thi: KHÔNG.** Không chạy Maven, không chạy H2, không chạy migration, không gọi API. Mọi
@@ -312,5 +336,6 @@ tuyên bố "pass" trong tài liệu là **kỳ vọng thiết kế**, không ph
 - Chỉ tạo file draft SQL trong `docs/phase-1/migrations/` và cập nhật tài liệu + H2 test schema.
 - Schema **chưa được xác minh** trên MySQL; migration **chưa được áp dụng**.
 
-**Kết luận:** tài liệu và draft đã sẵn sàng để người dùng review. Trạng thái
-`READY FOR USER REVIEW`; chuyển `APPROVED` chỉ sau khi người dùng duyệt và kiểm staging.
+**Kết luận:** finding P1/P2/P3 đã sửa trong logic SQL thực tế và kiểm static. Trạng thái
+`READY FOR FINAL STATIC REVIEW`; chuyển `APPROVED` chỉ sau khi người dùng duyệt và kiểm trên MySQL
+staging.

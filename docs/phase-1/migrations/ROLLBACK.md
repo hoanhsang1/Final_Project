@@ -147,7 +147,71 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
   ADD INDEX uq_subject_org_code (org_id, code);
 ```
 
-## 2. Dữ liệu có thể mất
+### Bước 8 — Kiểm tra index hỗ trợ FK còn sót sau rollback
+
+Khi MySQL tạo FK mà chưa có index tiền tố trái phù hợp, InnoDB **tự tạo** index non-unique. Các index
+này **không** có trong DDL và **không** tự mất khi drop FK:
+
+| Bảng | Index do InnoDB tự tạo | Sinh ra bởi |
+|---|---|---|
+| `class_subject` | `(class_id, org_id)`, `(subject_id, org_id)` | `fk_class_subject_class`, `fk_class_subject_subject` |
+| `teacher_subject` | `(user_id, org_id)`, `(subject_id, org_id)` | `fk_teacher_subject_teacher`, `fk_teacher_subject_subject` |
+| `class_subject_history` | `(class_id, org_id)` | `fk_csh_class` |
+| `specialty_subject` | `(specialty_id, org_id)`, `(subject_id, org_id)` | 2 FK của bảng |
+
+Sau rollback, liệt kê index còn lại:
+
+```sql
+SELECT table_name, index_name, non_unique,
+       GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
+FROM information_schema.statistics
+WHERE table_schema = 'mems_people_db'
+  AND table_name IN ('class_subject','teacher_subject',
+                     'class_subject_history','specialty_subject')
+GROUP BY table_name, index_name, non_unique
+ORDER BY table_name, index_name;
+```
+
+Quy tắc:
+
+- Index **tên trùng FK** (ví dụ `fk_class_subject_class`) hoặc index non-unique đúng cặp cột ở bảng
+  trên được coi là index hỗ trợ FK. Nếu **không còn FK nào** dùng nó và không còn query nào cần
+  tiền tố đó, có thể drop — nhưng **chỉ sau khi** đã xác nhận bằng `information_schema`
+  (`referential_constraints` + `key_column_usage`) rằng không FK nào còn tham chiếu.
+- **Không drop** index nếu bảng còn FK khác cần tiền tố trái (MySQL sẽ báo lỗi 1553 hoặc tự tạo lại).
+- Nếu partial rollback (giữ `class_subject`), index hỗ trợ FK **phải giữ** vì 4 FK vẫn còn (trừ khi
+  đã drop FK tương ứng ở bước 5).
+
+## 2. Khi 52 ABORT giữa chừng — không có rollback tự động
+
+MySQL DDL gây **implicit commit** và 52 **không** bọc trong một transaction. Vì vậy khi một bước sau
+`SIGNAL SQLSTATE '45000'`:
+
+- Bảng/cột/index đã tạo **vẫn tồn tại** (DDL đã commit).
+- DML của 5a/5b (`INSERT ... source='LEGACY'`, `UPDATE is_primary`) **vẫn tồn tại**; MySQL không tự
+  rollback chúng.
+- Stored procedure có thể chưa bị drop (danh sách `DROP PROCEDURE` nằm cuối file); chạy lại 52 vẫn
+  được vì mỗi procedure đều `DROP PROCEDURE IF EXISTS` ở đầu.
+
+Quy trình khi ABORT sau 5a/5b:
+
+1. **Không xoá dòng backfill** nếu chưa chứng minh được nguồn gốc. Dòng do 5a tạo có
+   `source='LEGACY'`, `teacher_id` = `school_class.teacher_id`, `is_primary=1`, `status='PLANNED'`,
+   `created_at` ≈ thời điểm chạy 52 — nhưng dữ liệu nhập tay có thể trùng hình dạng. Đối chiếu
+   `created_at` với thời điểm chạy migration và log trước khi kết luận.
+2. Đọc thông báo `SIGNAL` và SELECT chẩn đoán ngay trước đó để xác định bước fail.
+3. Sửa **nguyên nhân gốc** (dữ liệu BLOCK_MIGRATION, schema lệch...). Không sửa file 52 đã áp dụng.
+4. Chạy lại `51_52_precheck.sql` → phải `DATA_PRECHECK_READY`; `SKIP_DATA_PRECHECK_NO_TABLE` cũng là
+   dừng (không chạy PART B).
+5. Chạy lại `51_52_precheck_data.sql` → mọi dòng `BLOCK_MIGRATION` phải = 0.
+6. Chạy lại 52. 5a/5b **idempotent**: 5a bỏ qua lớp đã có dòng khớp hoặc đã có primary; 5b chỉ set
+   primary khi lớp chưa có primary; PK `(class_id, subject_id)` chặn dòng trùng.
+7. Chạy `51_52_postcheck.sql`, rồi so số dòng `source='LEGACY'` với lần chạy trước — không được tăng
+   ngoài dự kiến.
+8. Nếu chọn rollback thay vì chạy tiếp: export theo bước 2–4 và ghi rõ dòng LEGACY nào do migration
+   sinh ra.
+
+## 3. Dữ liệu có thể mất
 
 | Đối tượng | Mức mất | Ghi chú |
 |---|---|---|
@@ -159,7 +223,7 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
 | `curriculum*` | Mất template + tiên quyết | — |
 | `school_class.curriculum_id` | Mất liên kết lớp → curriculum | Không suy lại được nếu không có export |
 
-## 3. Điều kiện an toàn để rollback
+## 4. Điều kiện an toàn để rollback
 
 1. Không còn request đổi môn chính/áp curriculum đang chạy (bước 1).
 2. Đã export và **xác minh** `class_subject_history`, `class_subject`, `school_class` và các bảng 51/52.
@@ -168,14 +232,14 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
 5. Có backup toàn DB tại thời điểm trước migration.
 6. Không có migration 53 áp dụng sau 52 (nếu có, rollback phải tính cả 53).
 
-## 4. Khi nào **bắt buộc** forward-fix thay vì rollback
+## 5. Khi nào **bắt buộc** forward-fix thay vì rollback
 
 - Đã phát sinh `class_subject_history` (dù chỉ 1 dòng) — rollback sẽ mất audit không tái tạo được.
 - Người dùng đã cấu hình `class_subject`/`teacher_subject` mới sau migration.
 - Chỉ sai constraint/index/backfill cục bộ → viết migration bổ sung sửa đúng phần sai.
 - Không sửa file 51/52 đã áp dụng; luôn tạo file mới.
 
-## 5. Migration 53
+## 6. Migration 53
 
 Revision 3 **không** tạo migration 53. Chỉ tạo 53 khi có bằng chứng (query `information_schema` trên
 môi trường thật) rằng một bản 52 cũ đã được áp dụng và cần bù phần thiếu.
