@@ -23,11 +23,11 @@ GROUP BY class_id
 HAVING COUNT(*) > 1;
 
 -- 2b) Lớp có class_subject nhưng KHÔNG có primary (UNIQUE không bảo đảm tối thiểu;
---     phải bảo đảm bằng transaction/app + báo cáo nếu khác 0)
+--     phải bảo đảm bằng transaction/app). Chỉ xét lớp có school_class.subject_id NOT NULL.
 SELECT c.id
 FROM school_class c
 JOIN class_subject cs ON cs.class_id = c.id AND cs.org_id = c.org_id
-WHERE c.deleted_at IS NULL
+WHERE c.deleted_at IS NULL AND c.subject_id IS NOT NULL
 GROUP BY c.id
 HAVING SUM(cs.is_primary = 1) = 0;
 
@@ -36,18 +36,18 @@ SELECT c.id, c.subject_id, cs.subject_id AS primary_subject
 FROM school_class c
 JOIN class_subject cs
   ON cs.class_id = c.id AND cs.org_id = c.org_id AND cs.is_primary = 1
-WHERE c.subject_id IS NULL OR c.subject_id <> cs.subject_id;
+WHERE c.deleted_at IS NULL AND c.subject_id IS NOT NULL AND c.subject_id <> cs.subject_id;
 
 -- 2d) Lớp subject_id NULL nhưng lại có primary (phải 0)
 SELECT c.id, cs.subject_id AS primary_subject
 FROM school_class c
 JOIN class_subject cs
   ON cs.class_id = c.id AND cs.org_id = c.org_id AND cs.is_primary = 1
-WHERE c.subject_id IS NULL;
+WHERE c.deleted_at IS NULL AND c.subject_id IS NULL;
 
--- 2e) Lớp có subject_id nhưng KHÔNG có dòng class_subject nào.
---     Đây là danh sách UNRESOLVED (backfill không đoán được) — phải khớp
---     đúng báo cáo manual review từ pre-check, không được phát sinh mới.
+-- 2e) Lớp còn sống có subject_id nhưng KHÔNG có dòng class_subject nào.
+--     Sau backfill 5a phải 0: mọi lớp như vậy đều được tạo dòng LEGACY hoặc đã bị
+--     chặn ở BLOCK_MIGRATION trước khi chạy 52.
 SELECT c.id AS class_id, c.org_id, c.subject_id
 FROM school_class c
 WHERE c.subject_id IS NOT NULL
@@ -76,6 +76,12 @@ FROM class_subject_history h
 LEFT JOIN subject s ON s.id = h.new_subject_id AND s.org_id = h.org_id
 WHERE s.id IS NULL;
 
+-- 4d) class_subject không có school_class tương ứng (orphan class)
+SELECT cs.class_id, cs.subject_id, cs.org_id
+FROM class_subject cs
+LEFT JOIN school_class c ON c.id = cs.class_id AND c.org_id = cs.org_id
+WHERE c.id IS NULL;
+
 -- 5) Index/constraint tồn tại
 SELECT table_name, index_name, non_unique
 FROM information_schema.statistics
@@ -95,8 +101,8 @@ SELECT COUNT(*) AS history_rows_after_migration FROM class_subject_history;
 -- =============================================================================
 -- 7) PHÂN LOẠI SAU MIGRATION — chạy NGAY sau 52, trước mọi thay đổi nghiệp vụ.
 -- Kỳ vọng: BLOCK_MIGRATION = 0, AUTO_BACKFILL_CANDIDATE = 0,
---         NO_ACTION = số lớp còn sống; MANUAL_REVIEW phải khớp đúng danh sách
---         người dùng đã chấp nhận từ pre-check section B (không phát sinh mới).
+--         NO_ACTION = đúng số lớp còn sống. Không có nhãn "chờ duyệt":
+--         mọi mâu thuẫn primary phải được xử lý TRƯỚC 52, không ghi nhận suông.
 -- =============================================================================
 
 -- 7a) Tổng hợp nhãn
@@ -114,7 +120,7 @@ WITH per_class AS (
         AND cs.is_primary = 1 AND cs.subject_id = c.subject_id) AS primary_exact_rows,
     (SELECT COUNT(*) FROM class_subject cs
       LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
-      WHERE cs.class_id = c.id AND cs.org_id = cs.org_id AND s.id IS NULL) AS cs_orphan_rows,
+      WHERE cs.class_id = c.id AND cs.org_id = c.org_id AND s.id IS NULL) AS cs_orphan_rows,
     (SELECT COUNT(*) FROM class_subject cs
       WHERE cs.class_id = c.id AND cs.org_id <> c.org_id) AS cs_org_bad_rows,
     (SELECT COUNT(*) FROM subject s
@@ -128,13 +134,13 @@ FROM (
     WHEN cs_orphan_rows > 0 OR cs_org_bad_rows > 0 THEN 'BLOCK_MIGRATION'
     WHEN subject_id IS NOT NULL AND subject_ok = 0 THEN 'BLOCK_MIGRATION'
     WHEN primary_rows > 1 THEN 'BLOCK_MIGRATION'
-    WHEN subject_id IS NULL AND primary_rows > 0 THEN 'MANUAL_REVIEW'
+    WHEN subject_id IS NULL AND primary_rows > 0 THEN 'BLOCK_MIGRATION'
     WHEN subject_id IS NULL THEN 'NO_ACTION'
-    WHEN exact_rows > 0 AND primary_exact_rows = 1 THEN 'NO_ACTION'
+    WHEN exact_rows > 0 AND primary_rows = 1 AND primary_exact_rows = 1 THEN 'NO_ACTION'
     WHEN exact_rows > 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    WHEN exact_rows > 0 AND primary_rows > 0 THEN 'MANUAL_REVIEW'
+    WHEN exact_rows > 0 AND primary_rows > 0 THEN 'BLOCK_MIGRATION'
     WHEN exact_rows = 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    ELSE 'MANUAL_REVIEW'
+    ELSE 'BLOCK_MIGRATION'
   END AS classification
   FROM per_class
 ) t

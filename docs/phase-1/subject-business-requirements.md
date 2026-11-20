@@ -469,7 +469,7 @@ Audit ghi `classesUsingSubject = 3` (ví dụ C001, C002, C003). Response trả 
 | Môn bị ngừng nhưng lớp đang dạy | Giữ nguyên; chỉ chặn chọn mới; cảnh báo qua `classesUsingSubject` |
 | `school_class.subject_id` NULL | Không backfill vào `class_subject`; lớp không môn vẫn hợp lệ (legacy) |
 | Lớp đã hoạt động trước khi có tính năng | **Không** tạo history hồi tố (không có dữ liệu nguồn). `class_subject_history` bắt đầu rỗng; lần đổi môn chính đầu tiên mới sinh bản ghi |
-| Dòng `class_subject` hiện có | Migration 52 đặt `is_primary = 1` **chỉ** cho dòng khớp chính xác `school_class.subject_id`; lớp chưa có dòng nào thì **không** tự tạo. Bản ghi không khớp/mập mờ vào báo cáo manual review, không đoán |
+| Dòng `class_subject` hiện có | Migration 52 đặt `is_primary = 1` **chỉ** cho dòng khớp chính xác `school_class.subject_id`; lớp chưa có dòng nào được tạo **một** dòng `LEGACY` (5a) khi chưa có primary. Bản ghi không khớp/mập mờ là `BLOCK_MIGRATION` — phải sửa dữ liệu trước khi chạy 52, không đoán |
 
 ---
 

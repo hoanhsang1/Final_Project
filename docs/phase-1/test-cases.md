@@ -240,14 +240,16 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-014 | Tự tiên quyết bị CHECK chặn | INSERT `subject_id = prerequisite_subject_id` | CHECK từ chối | DB |
 | TC-LEG-015 | UNIQUE 3 cột của `curriculum_subject` | kiểm `information_schema.statistics` | Có `uq_curriculum_subject_org(curriculum_id, subject_id, org_id)` | DB |
 | TC-LEG-016 | Backfill primary exact-match | lớp có `subject_id` và dòng `class_subject` khớp | Chỉ dòng khớp nhận `is_primary=1`; lớp không có dòng nào được tạo dòng `LEGACY` | DB |
-| TC-LEG-017 | Báo cáo backfill không khớp/mập mờ | lớp có `subject_id` nhưng không dòng khớp hoặc >1 primary | Dòng xuất hiện trong query pre-check 6.0(d); migration **không** tự sửa | DB |
+| TC-LEG-017 | Báo cáo block: lớp không khớp/mập mờ | lớp có `subject_id` nhưng không dòng khớp, >1 primary, primary lệch, hoặc `subject_id NULL` mà có primary | Dòng xuất hiện trong `51_52_precheck_data.sql` (danh sách `BLOCK_MIGRATION`); migration **không** tự sửa | DB |
 | TC-LEG-018 | MySQL generated column | `INSERT ... (is_primary=1)` | `primary_class_id = class_id`; `is_primary=0` → NULL; không được list `primary_class_id` trong INSERT (errno 3105) | DB |
 | TC-LEG-019 | H2 parity | chạy IT H2 | `primary_class_id` là cột thường, service phải set; ghi rõ H2 **không** chứng minh MySQL generated column | DB |
 | TC-LEG-020 | UNIQUE chỉ chặn >1 primary | INSERT 2 dòng `is_primary=1` cùng lớp trên MySQL | Dòng thứ hai bị UNIQUE từ chối | DB |
-| TC-LEG-021 | Phân loại pre-check đủ 6 trường hợp | staging có: khớp primary; chưa primary; primary lệch; >1 primary; `subject_id NULL` có primary; subject/class khác org | Query 10 trả đúng `reason_code`/nhãn `NO_ACTION`, `AUTO_BACKFILL_CANDIDATE`, `MANUAL_REVIEW`, `BLOCK_MIGRATION`; query 12 chỉ liệt kê block | DB |
-| TC-LEG-022 | Backfill chạy lại idempotent | chạy 5a/5b hai lần trên staging | Lần 2 không tạo dòng mới, không đổi `is_primary`, số dòng `class_subject` giữ nguyên; PK không bị vi phạm | DB |
-| TC-LEG-023 | Backfill không ghi đè/không tạo sai primary | lớp `subject_id NULL` có primary; lớp có primary lệch subject; lớp đã xoá mềm có `subject_id` | 5a không chèn; 5b không đổi primary hiện có và không chạm lớp `deleted_at` khác NULL; dòng thuộc `MANUAL_REVIEW`, migration không tự sửa | DB |
-| TC-LEG-024 | Rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối (cột sinh/index phụ thuộc) | DB |
+| TC-LEG-021 | Phân loại pre-check đủ trường hợp | staging có: khớp primary; chưa primary; primary lệch; >1 primary; `subject_id NULL` có primary; subject/giáo viên/lớp khác org hoặc mồ côi | `51_52_precheck_data.sql` trả đúng `reason_code`/nhãn `NO_ACTION`, `AUTO_BACKFILL_CANDIDATE`, `BLOCK_MIGRATION`; danh sách block liệt kê đủ 9 mã, không có `MANUAL_REVIEW` | DB |
+| TC-LEG-022 | Backfill chạy lại idempotent | chạy 5a/5b hai lần trên staging | Lần 2 không tạo dòng mới, không đổi `is_primary`, số dòng `class_subject` giữ nguyên; PK/UNIQUE không bị vi phạm | DB |
+| TC-LEG-023 | Backfill không ghi đè/không tạo sai primary | lớp `subject_id NULL` có primary; lớp có primary lệch subject; lớp đã xoá mềm có `subject_id` | 5a không chèn; 5b không đổi primary hiện có và không chạm lớp `deleted_at` khác NULL; dòng thuộc `BLOCK_MIGRATION`, migration không tự sửa | DB |
+| TC-LEG-024 | Partial rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `chk_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối | DB |
+| TC-LEG-025 | Giáo viên mồ côi chặn migration | `school_class.teacher_id` hoặc `class_subject.teacher_id` không có trong `staff_profile` cùng org | Pre-check data trả `CLASS_ORPHAN_TEACHER`/`CS_ORPHAN_TEACHER`; 52 `SIGNAL` ở `mems_m52_assert_backfill_safe`; **không** set `teacher_id = NULL` | DB |
+| TC-LEG-026 | Bảng cũ thiếu cấu trúc bị từ chối | (a) tạo `class_subject` chỉ có vài cột (bản nháp cũ) rồi chạy 52; (b) `teacher_subject` cũ có CHECK chứa `PENDING` rồi chạy 52 | (a) `mems_m52_assert_class_subject_schema` `SIGNAL` trước backfill, không tự `ADD COLUMN`; (b) `mems_m52_assert_teacher_subject_schema` `SIGNAL`; không tự sửa CHECK | DB |
 
 ---
 
@@ -298,7 +300,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 - D-06a → TC-TCH-008…011, TC-RBAC-010 là Phase 2; TC-TCH-019 xác nhận `APPROVED` ngay.
 - D-07 → TC-CUR-009/010/019…024, TC-LEG-011…015, TC-CON-006.
 - D-14 → TC-RBAC-011/012.
-- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…024.
+- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…026.
+- D-06a (không duyệt) → TC-TCH-008/009/010 là “không tồn tại”; schema CHECK chỉ `APPROVED/REVOKED` kiểm ở TC-LEG-026 (nhánh (b): bảng cũ còn `PENDING` → 52 ABORT) và ở IT H2 (câu lệnh `INSERT` trạng thái `PENDING` bị CHECK từ chối).
 - D-09 → TC-CLS-046 (fallback chỉ khi chưa có bản ghi `class_subject` tương ứng).
 
 Câu hỏi kỹ thuật còn lại:

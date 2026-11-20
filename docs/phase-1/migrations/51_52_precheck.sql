@@ -1,18 +1,18 @@
 -- =============================================================================
--- DRAFT ONLY — READ-ONLY PRE-CHECK. DO NOT RUN ON PRODUCTION.
--- Run on STAGING before 51/52. Every returned row must go into the manual
--- review report; migrations must NOT guess or auto-fix ambiguous data.
--- Target: MySQL 8.0.16+, mems_people_db.
--- NOTE: queries 4-7 and section B read class_subject; run them only after
---       confirming the table exists (query 0). Skip them on a database that
---       never had class_subject.
+-- DRAFT ONLY — READ-ONLY PRE-CHECK (PART A: SCHEMA). DO NOT RUN ON PRODUCTION.
+-- Run on STAGING before 51/52. Target: MySQL 8.0.16+, mems_people_db.
 --
--- SECTION B CLASSIFIES EVERY LIVE CLASS INTO EXACTLY ONE OF:
---   AUTO_BACKFILL_CANDIDATE — deterministic exact-match backfill (safe for 52)
---   MANUAL_REVIEW           — conflict; migration may run but row must be
---                             resolved by a human, never auto-picked
---   BLOCK_MIGRATION         — 52 cannot run safely; fix data first
---   NO_ACTION               — already consistent
+-- WHY TWO FILES:
+--   This file (PART A) only reads tables that always exist in the base schema
+--   (school_class, subject, staff_profile) plus information_schema. It is safe
+--   on a database that has NEVER had class_subject.
+--   PART B (data pre-check) reads class_subject and is in
+--   `51_52_precheck_data.sql`. Run it ONLY when this file's query 0b returns
+--   next_step = 'DATA_PRECHECK_READY'.
+--
+--   If class_subject exists but is an OLD table missing required columns,
+--   query 0b returns 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'. Do NOT run 52:
+--   draft 52 aborts on an incomplete old table (no silent upgrade).
 -- =============================================================================
 USE mems_people_db;
 
@@ -24,6 +24,97 @@ WHERE table_schema = DATABASE()
                      'class_subject','class_subject_history','specialty_subject','teacher_subject')
 ORDER BY table_name, ordinal_position;
 
+-- 0b) Kết luận bước tiếp theo (điều khiển việc có chạy PART B hay không)
+SELECT
+  (SELECT COUNT(*) FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name = 'class_subject') AS class_subject_exists,
+  (SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+      AND column_name IN ('class_id','subject_id','org_id','is_primary')) AS cs_key_columns,
+  (SELECT COUNT(*) FROM information_schema.tables
+    WHERE table_schema = DATABASE() AND table_name = 'teacher_subject') AS teacher_subject_exists,
+  CASE
+    WHEN (SELECT COUNT(*) FROM information_schema.tables
+           WHERE table_schema = DATABASE() AND table_name = 'class_subject') = 0
+      THEN 'SKIP_DATA_PRECHECK_NO_TABLE'
+    WHEN (SELECT COUNT(*) FROM information_schema.columns
+           WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+             AND column_name IN ('class_id','subject_id','org_id','is_primary')) < 4
+      THEN 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
+    ELSE 'DATA_PRECHECK_READY'
+  END AS next_step;
+
+-- 0c) Cột bắt buộc của class_subject (Revision 3). present = 0 => thiếu.
+--     Bảng không tồn tại => tất cả present = 0 (đúng: sẽ được tạo mới bởi 52).
+SELECT req.name AS required_column, COALESCE(MAX(c.column_name IS NOT NULL), 0) AS present
+FROM (
+  SELECT 'class_id' AS name UNION ALL SELECT 'subject_id' UNION ALL SELECT 'org_id'
+  UNION ALL SELECT 'curriculum_id' UNION ALL SELECT 'source' UNION ALL SELECT 'sequence_no'
+  UNION ALL SELECT 'teacher_id' UNION ALL SELECT 'is_primary' UNION ALL SELECT 'primary_class_id'
+  UNION ALL SELECT 'required_sessions' UNION ALL SELECT 'planned_sessions'
+  UNION ALL SELECT 'theory_sessions' UNION ALL SELECT 'practice_sessions'
+  UNION ALL SELECT 'session_minutes' UNION ALL SELECT 'status' UNION ALL SELECT 'note'
+  UNION ALL SELECT 'created_by' UNION ALL SELECT 'created_at' UNION ALL SELECT 'updated_by'
+  UNION ALL SELECT 'updated_at'
+) req
+LEFT JOIN information_schema.columns c
+  ON c.table_schema = DATABASE() AND c.table_name = 'class_subject' AND c.column_name = req.name
+GROUP BY req.name;
+
+-- 0d) Index bắt buộc của class_subject. present = 0 => thiếu.
+WITH req_idx AS (
+  SELECT 'idx_class_subject_org_subject' AS name UNION ALL
+  SELECT 'idx_class_subject_teacher' UNION ALL
+  SELECT 'idx_class_subject_curriculum' UNION ALL
+  SELECT 'uq_class_subject_primary'
+)
+SELECT req_idx.name AS required_index, COALESCE(MAX(st.index_name IS NOT NULL), 0) AS present
+FROM req_idx
+LEFT JOIN information_schema.statistics st
+  ON st.table_schema = DATABASE() AND st.table_name = 'class_subject' AND st.index_name = req_idx.name
+GROUP BY req_idx.name;
+
+-- 0d2) PRIMARY KEY phải đúng (class_id, subject_id). present = 0 => sai/thiếu.
+SELECT 'PRIMARY(class_id,subject_id)' AS required_pk,
+       (SELECT COUNT(*) FROM (
+          SELECT index_name
+          FROM information_schema.statistics
+          WHERE table_schema = DATABASE() AND table_name = 'class_subject' AND index_name = 'PRIMARY'
+          GROUP BY index_name
+          HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') = 'class_id,subject_id'
+        ) pk) AS present;
+
+-- 0e) FK/CHECK bắt buộc của class_subject. present = 0 => thiếu.
+WITH req_con AS (
+  SELECT 'fk_class_subject_class' AS name UNION ALL
+  SELECT 'fk_class_subject_subject' UNION ALL
+  SELECT 'fk_class_subject_curriculum' UNION ALL
+  SELECT 'fk_class_subject_teacher' UNION ALL
+  SELECT 'chk_class_subject_status' UNION ALL
+  SELECT 'chk_class_subject_source' UNION ALL
+  SELECT 'chk_class_subject_primary' UNION ALL
+  SELECT 'chk_class_subject_sessions' UNION ALL
+  SELECT 'chk_class_subject_sequence'
+)
+SELECT req_con.name AS required_constraint,
+       COALESCE(MAX(tc.constraint_name IS NOT NULL), 0) AS present, MAX(tc.constraint_type) AS type
+FROM req_con
+LEFT JOIN information_schema.table_constraints tc
+  ON tc.table_schema = DATABASE() AND tc.table_name = 'class_subject' AND tc.constraint_name = req_con.name
+GROUP BY req_con.name;
+
+-- 0f) Generated column primary_class_id (MySQL). 0 dòng => thiếu/sai.
+SELECT column_name, extra, generation_expression
+FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'class_subject' AND column_name = 'primary_class_id';
+
+-- 0g) teacher_subject phải theo D-06a: CHECK không chứa PENDING.
+--     has_pending > 0 => bảng cũ, 52 sẽ ABORT (không tự sửa).
+SELECT constraint_name, check_clause,
+       (check_clause LIKE '%PENDING%') AS has_pending
+FROM information_schema.check_constraints
+WHERE constraint_schema = DATABASE() AND constraint_name = 'chk_teacher_subject_status';
+
 -- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE)
 SELECT org_id, code, COUNT(*) AS n
 FROM subject
@@ -31,42 +122,7 @@ WHERE code IS NOT NULL
 GROUP BY org_id, code
 HAVING COUNT(*) > 1;
 
--- 2) Lớp có subject_id nhưng CHƯA có dòng class_subject khớp chính xác.
---    Đây là danh sách backfill LEGACY hợp lệ (khớp ID chính xác, không mập mờ).
-SELECT c.id AS class_id, c.org_id, c.subject_id
-FROM school_class c
-WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM class_subject cs
-    WHERE cs.class_id = c.id AND cs.subject_id = c.subject_id);
-
--- 3) Lớp có subject_id nhưng không có dòng khớp HOẶC đã có >1 primary.
---    d.primary_rows > 1 => mập mờ, dừng lại và xử lý tay.
-SELECT c.id AS class_id, c.subject_id,
-       COALESCE(SUM(cs.subject_id = c.subject_id), 0) AS exact_match_rows,
-       COALESCE(SUM(cs.is_primary = 1), 0)            AS primary_rows
-FROM school_class c
-LEFT JOIN class_subject cs ON cs.class_id = c.id AND cs.org_id = c.org_id
-WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL
-GROUP BY c.id, c.subject_id
-HAVING exact_match_rows = 0 OR primary_rows > 1;
-
--- 4) Trùng khóa (class_id, subject_id) nếu bảng đã tồn tại
-SELECT class_id, subject_id, COUNT(*) AS n
-FROM class_subject
-GROUP BY class_id, subject_id
-HAVING COUNT(*) > 1;
-
--- 5) Org lệch (phải 0)
-SELECT cs.class_id, cs.subject_id, cs.org_id AS cs_org, c.org_id AS class_org
-FROM class_subject cs JOIN school_class c ON c.id = cs.class_id
-WHERE c.org_id <> cs.org_id;
-
-SELECT cs.class_id, cs.subject_id, cs.org_id AS cs_org, s.org_id AS subject_org
-FROM class_subject cs JOIN subject s ON s.id = cs.subject_id
-WHERE s.org_id <> cs.org_id;
-
--- 6) Index/constraint đã có (idempotency + tránh tạo trùng)
+-- 2) Index/constraint 51/52 đã có (idempotency + tránh tạo trùng)
 SELECT table_name, index_name, non_unique, seq_in_index, column_name
 FROM information_schema.statistics
 WHERE table_schema = DATABASE()
@@ -76,22 +132,16 @@ ORDER BY table_name, index_name, seq_in_index;
 SELECT table_name, constraint_name, constraint_type
 FROM information_schema.table_constraints
 WHERE table_schema = DATABASE()
-  AND constraint_name IN ('fk_class_subject_class','fk_csh_class',
-                          'chk_class_subject_primary','chk_csh_subject_change');
+  AND constraint_name IN ('fk_class_subject_class','fk_school_class_curriculum',
+                          'fk_csh_class','chk_class_subject_primary','chk_csh_subject_change');
 
--- 7) Loại dữ liệu subject_id không tồn tại trong subject (sẽ làm FK fail)
-SELECT cs.class_id, cs.subject_id
-FROM class_subject cs
-LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
-WHERE s.id IS NULL;
-
--- 8) Lớp đã kết thúc/huỷ nhưng vẫn có subject_id (backfill vẫn giữ, không đổi trạng thái)
+-- 3) Lớp đã kết thúc/huỷ nhưng vẫn có subject_id (backfill vẫn giữ, không đổi trạng thái)
 SELECT c.id, c.org_id, c.status, c.subject_id
 FROM school_class c
 WHERE c.subject_id IS NOT NULL
   AND c.status IN ('DA_KET_THUC','DA_HUY','CLOSED');
 
--- 9) school_class.subject_id không tồn tại trong subject cùng org
+-- 4) school_class.subject_id không tồn tại trong subject cùng org
 --    (backfill LEGACY sẽ fail FK (subject_id, org_id)) — phải xử lý tay trước 52.
 SELECT c.id AS class_id, c.org_id, c.subject_id
 FROM school_class c
@@ -100,159 +150,21 @@ WHERE c.subject_id IS NOT NULL
   AND c.deleted_at IS NULL
   AND s.id IS NULL;
 
+-- 5) school_class.teacher_id không tồn tại trong staff_profile cùng org (C3).
+--    Ở schema gốc đã có fk_school_class_teacher nên kỳ vọng 0 dòng; nếu có dòng
+--    nghĩa là dữ liệu/FK lệch — 52 sẽ ABORT, KHÔNG tự set teacher_id = NULL.
+SELECT c.id AS class_id, c.org_id, c.teacher_id, c.subject_id
+FROM school_class c
+LEFT JOIN staff_profile sp ON sp.user_id = c.teacher_id AND sp.org_id = c.org_id
+WHERE c.teacher_id IS NOT NULL
+  AND c.deleted_at IS NULL
+  AND sp.user_id IS NULL;
+
 -- =============================================================================
--- SECTION B — PHÂN LOẠI BACKFILL (chạy sau query 0; cần bảng class_subject)
--- Một lớp chỉ thuộc đúng một nhãn, theo thứ tự ưu tiên:
---   BLOCK_MIGRATION > MANUAL_REVIEW > AUTO_BACKFILL_CANDIDATE > NO_ACTION
+-- BƯỚC TIẾP THEO:
+--   next_step = 'DATA_PRECHECK_READY'            -> chạy 51_52_precheck_data.sql
+--   next_step = 'SKIP_DATA_PRECHECK_NO_TABLE'    -> không có class_subject, bỏ qua PART B
+--   next_step = 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
+--       -> KHÔNG chạy 52. Bảng cũ thiếu cột Revision 3; xử lý tay (drop/tạo lại
+--          hoặc forward-fix có kiểm chứng) rồi chạy lại pre-check.
 -- =============================================================================
-
--- 10) Phân loại từng lớp còn sống (một dòng/lớp)
---     BLOCK_MIGRATION:
---       CS_ORPHAN_SUBJECT   — class_subject.subject_id không có trong subject cùng org
---       CS_ORG_MISMATCH     — class_subject.org_id lệch school_class.org_id
---       CLASS_ORPHAN_SUBJECT— school_class.subject_id không có trong subject cùng org
---       MULTI_PRIMARY       — >1 dòng is_primary=1 cho cùng lớp (UNIQUE sẽ fail)
---     MANUAL_REVIEW:
---       PRIMARY_SUBJECT_MISMATCH — có primary nhưng khác school_class.subject_id
---       PRIMARY_WITHOUT_CLASS_SUBJECT — school_class.subject_id NULL nhưng có primary
---     AUTO_BACKFILL_CANDIDATE:
---       INSERT_LEGACY_ROW — chưa có dòng khớp, chưa có primary (5a)
---       MARK_EXACT_PRIMARY — đã có dòng khớp, chưa có primary (5b)
---     NO_ACTION: đã có primary khớp chính xác, hoặc lớp không có môn.
-WITH per_class AS (
-  SELECT
-    c.id AS class_id,
-    c.org_id,
-    c.status,
-    c.subject_id,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id) AS cs_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id
-        AND cs.subject_id = c.subject_id) AS exact_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id
-        AND cs.is_primary = 1) AS primary_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id
-        AND cs.is_primary = 1 AND cs.subject_id = c.subject_id) AS primary_exact_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id AND s.id IS NULL) AS cs_orphan_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id <> c.org_id) AS cs_org_bad_rows,
-    (SELECT COUNT(*) FROM subject s
-      WHERE s.id = c.subject_id AND s.org_id = c.org_id) AS subject_ok
-  FROM school_class c
-  WHERE c.deleted_at IS NULL
-)
-SELECT
-  class_id, org_id, status, subject_id,
-  cs_rows, exact_rows, primary_rows, primary_exact_rows,
-  cs_orphan_rows, cs_org_bad_rows,
-  CASE
-    WHEN cs_orphan_rows > 0 THEN 'BLOCK_MIGRATION'
-    WHEN cs_org_bad_rows > 0 THEN 'BLOCK_MIGRATION'
-    WHEN subject_id IS NOT NULL AND subject_ok = 0 THEN 'BLOCK_MIGRATION'
-    WHEN primary_rows > 1 THEN 'BLOCK_MIGRATION'
-    WHEN subject_id IS NULL AND primary_rows > 0 THEN 'MANUAL_REVIEW'
-    WHEN subject_id IS NULL THEN 'NO_ACTION'
-    WHEN exact_rows > 0 AND primary_exact_rows = 1 THEN 'NO_ACTION'
-    WHEN exact_rows > 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    WHEN exact_rows > 0 AND primary_rows > 0 THEN 'MANUAL_REVIEW'
-    WHEN exact_rows = 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    ELSE 'MANUAL_REVIEW'
-  END AS classification,
-  CASE
-    WHEN cs_orphan_rows > 0 THEN 'CS_ORPHAN_SUBJECT'
-    WHEN cs_org_bad_rows > 0 THEN 'CS_ORG_MISMATCH'
-    WHEN subject_id IS NOT NULL AND subject_ok = 0 THEN 'CLASS_ORPHAN_SUBJECT'
-    WHEN primary_rows > 1 THEN 'MULTI_PRIMARY'
-    WHEN subject_id IS NULL AND primary_rows > 0 THEN 'PRIMARY_WITHOUT_CLASS_SUBJECT'
-    WHEN subject_id IS NULL THEN 'NO_SUBJECT'
-    WHEN exact_rows > 0 AND primary_exact_rows = 1 THEN 'PRIMARY_OK'
-    WHEN exact_rows > 0 AND primary_rows = 0 THEN 'MARK_EXACT_PRIMARY'
-    WHEN exact_rows > 0 AND primary_rows > 0 THEN 'PRIMARY_SUBJECT_MISMATCH'
-    WHEN exact_rows = 0 AND primary_rows = 0 THEN 'INSERT_LEGACY_ROW'
-    ELSE 'PRIMARY_SUBJECT_MISMATCH'
-  END AS reason_code
-FROM per_class
-ORDER BY
-  FIELD(classification, 'BLOCK_MIGRATION', 'MANUAL_REVIEW', 'AUTO_BACKFILL_CANDIDATE', 'NO_ACTION'),
-  org_id, class_id;
-
--- 11) Tổng hợp theo nhãn — 52 chỉ được chạy khi BLOCK_MIGRATION = 0 và
---     MANUAL_REVIEW đã được người dùng xử lý hoặc chấp nhận ghi nhận.
-WITH per_class AS (
-  SELECT
-    c.id AS class_id, c.org_id, c.subject_id,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id AND cs.subject_id = c.subject_id) AS exact_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id AND cs.is_primary = 1) AS primary_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id
-        AND cs.is_primary = 1 AND cs.subject_id = c.subject_id) AS primary_exact_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
-      WHERE cs.class_id = c.id AND cs.org_id = c.org_id AND s.id IS NULL) AS cs_orphan_rows,
-    (SELECT COUNT(*) FROM class_subject cs
-      WHERE cs.class_id = c.id AND cs.org_id <> c.org_id) AS cs_org_bad_rows,
-    (SELECT COUNT(*) FROM subject s
-      WHERE s.id = c.subject_id AND s.org_id = c.org_id) AS subject_ok
-  FROM school_class c
-  WHERE c.deleted_at IS NULL
-)
-SELECT classification, COUNT(*) AS classes
-FROM (
-  SELECT CASE
-    WHEN cs_orphan_rows > 0 OR cs_org_bad_rows > 0 THEN 'BLOCK_MIGRATION'
-    WHEN subject_id IS NOT NULL AND subject_ok = 0 THEN 'BLOCK_MIGRATION'
-    WHEN primary_rows > 1 THEN 'BLOCK_MIGRATION'
-    WHEN subject_id IS NULL AND primary_rows > 0 THEN 'MANUAL_REVIEW'
-    WHEN subject_id IS NULL THEN 'NO_ACTION'
-    WHEN exact_rows > 0 AND primary_exact_rows = 1 THEN 'NO_ACTION'
-    WHEN exact_rows > 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    WHEN exact_rows > 0 AND primary_rows > 0 THEN 'MANUAL_REVIEW'
-    WHEN exact_rows = 0 AND primary_rows = 0 THEN 'AUTO_BACKFILL_CANDIDATE'
-    ELSE 'MANUAL_REVIEW'
-  END AS classification
-  FROM per_class
-) t
-GROUP BY classification;
-
--- 12) Danh sách BLOCK_MIGRATION (phải 0 dòng trước khi chạy 52)
-SELECT 'CS_ORPHAN_SUBJECT' AS block_code, cs.class_id, cs.subject_id, cs.org_id
-FROM class_subject cs
-LEFT JOIN subject s ON s.id = cs.subject_id AND s.org_id = cs.org_id
-WHERE s.id IS NULL
-UNION ALL
-SELECT 'CS_ORG_MISMATCH', cs.class_id, cs.subject_id, cs.org_id
-FROM class_subject cs JOIN school_class c ON c.id = cs.class_id
-WHERE c.org_id <> cs.org_id
-UNION ALL
-SELECT 'CLASS_ORPHAN_SUBJECT', c.id, c.subject_id, c.org_id
-FROM school_class c
-LEFT JOIN subject s ON s.id = c.subject_id AND s.org_id = c.org_id
-WHERE c.subject_id IS NOT NULL AND c.deleted_at IS NULL AND s.id IS NULL
-UNION ALL
-SELECT 'MULTI_PRIMARY', class_id, NULL, org_id
-FROM class_subject
-WHERE is_primary = 1
-GROUP BY class_id, org_id
-HAVING COUNT(*) > 1;
-
--- 13) Danh sách MANUAL_REVIEW (không tự sửa; đưa vào báo cáo duyệt tay)
-SELECT 'PRIMARY_SUBJECT_MISMATCH' AS review_code, c.id AS class_id, c.subject_id,
-       cs.subject_id AS primary_subject_id, c.org_id
-FROM school_class c
-JOIN class_subject cs
-  ON cs.class_id = c.id AND cs.org_id = c.org_id AND cs.is_primary = 1
-WHERE c.subject_id IS NOT NULL AND c.subject_id <> cs.subject_id
-UNION ALL
-SELECT 'PRIMARY_WITHOUT_CLASS_SUBJECT', c.id, NULL, cs.subject_id, c.org_id
-FROM school_class c
-JOIN class_subject cs
-  ON cs.class_id = c.id AND cs.org_id = c.org_id AND cs.is_primary = 1
-WHERE c.subject_id IS NULL;
-

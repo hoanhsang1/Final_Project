@@ -63,34 +63,44 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   2. Tạo `52_people_class_subject.sql` (specialty_subject, teacher_subject, class_subject,
      class_subject_history, backfill).
      `class_subject` dùng FK tổ hợp `(class_id, org_id) → school_class(id, org_id)`, có
-     `is_primary` + cột sinh `primary_class_id` + UNIQUE `uq_class_subject_primary`.
+     `is_primary` + cột sinh `primary_class_id` + UNIQUE `uq_class_subject_primary`, tạo **đầy đủ
+     trong một `CREATE TABLE`**. Nếu bảng đã tồn tại, 52 **chỉ** chấp nhận schema Revision 3 đầy đủ;
+     khác → `SIGNAL` (không tự `ADD COLUMN` cho bảng cũ không rõ nguồn gốc).
+     `teacher_subject` theo D-06a: CHECK `status IN ('APPROVED','REVOKED')`, không `PENDING`.
      `class_subject_history` có `old_source`/`new_source`, `reason`/`operation_id` NOT NULL,
      UNIQUE `(org_id, operation_id)`, FK `(class_id, org_id)` RESTRICT.
      **Không** tạo migration 53 trừ khi xác minh một bản 52 cũ đã chạy.
   3. Đổi `uq_subject_org_code` thành **UNIQUE** sau pre-check trùng (D-04; nhiều NULL hợp lệ).
   4. (Tuỳ chọn D-03) thêm cột default trên `subject` nếu người dùng muốn.
   5. Cập nhật `backend/PeopleService/src/test/resources/people-test-schema.sql` tương ứng
-     (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1).
-  6. Viết script backfill riêng (D-11), chưa chạy production; script báo cáo phần không khớp/mập mờ.
+     (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1; `teacher_subject`
+     CHECK chỉ `APPROVED/REVOKED`).
+  6. Viết script backfill riêng (D-11), chưa chạy production; mọi dòng không khớp/mập mờ là
+     `BLOCK_MIGRATION` (phải sửa dữ liệu), không phải “ghi nhận để rà soát sau”.
      Backfill `class_subject.is_primary = 1` **chỉ** cho dòng khớp chính xác
      `school_class.subject_id`; không đoán, không tạo primary khi `subject_id IS NULL`, không ghi đè
-     primary đang mâu thuẫn, không tạo trùng `(class_id, subject_id)`.
+     primary đang mâu thuẫn, không tạo trùng `(class_id, subject_id)`, không set `teacher_id = NULL`
+     để né FK. `teacher_id` của lớp và của dòng `class_subject` phải tồn tại trong
+     `staff_profile(user_id, org_id)` cùng org (nếu không → BLOCK).
   7. Bảng `class_subject_history` **không** backfill hồi tố (không có dữ liệu nguồn).
-  8. Chạy pre-check `migrations/51_52_precheck.sql` (query 0–9 + **phần B phân loại 10–13**) và
-     post-check `51_52_postcheck.sql` mục 7 trên staging; lưu báo cáo manual review.
-     **Gate:** `BLOCK_MIGRATION = 0` và mọi `MANUAL_REVIEW` đã được người dùng xử lý/chấp nhận.
+  8. Chạy pre-check schema `migrations/51_52_precheck.sql` (query 0b quyết định bước tiếp theo), rồi
+     (nếu `DATA_PRECHECK_READY`) pre-check data `migrations/51_52_precheck_data.sql`, sau đó
+     post-check `51_52_postcheck.sql` mục 7 trên staging; lưu báo cáo.
+     **Gate:** danh sách `BLOCK_MIGRATION` phải **0 dòng** và mọi dòng phải được **sửa dữ liệu**
+     trước 52 — không có nhãn “chấp nhận ghi nhận”.
   9. Trước khi chạy 52 trên dữ liệu thật, xác nhận optimistic locking: `school_class.version` tồn tại
      (dump `DB_11_16.sql:391`, H2 `people-test-schema.sql:147`) và `SchoolClassRepository.update`
-     dùng `version = version + 1 ... AND version = ?` — xem `wp1-readiness-report.md` §6.
+     dùng `version = version + 1 ... AND version = ?` — xem `wp1-readiness-report.md` §3.1.
 - **File:** draft `docs/phase-1/migrations/51_people_curriculum.sql`,
-  `52_people_class_subject.sql`, precheck/postcheck, `ROLLBACK.md`; test schema H2 nêu trên.
-- **Test:** TC-LEG-001…024 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
-  TC-LEG-009…024.
-- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback 7 bước đã ghi;
-  không đổi dữ liệu cũ.
+  `52_people_class_subject.sql`, `51_52_precheck.sql`, `51_52_precheck_data.sql`,
+  `51_52_postcheck.sql`, `ROLLBACK.md`; test schema H2 nêu trên.
+- **Test:** TC-LEG-001…026 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
+  TC-LEG-009…026.
+- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback 7 bước (partial
+  rollback 4 bước đúng dependency) đã ghi; không đổi dữ liệu cũ.
 - **Rollback:** theo `ROLLBACK.md` — quiesce → export history → export class_subject/liên quan →
-  xác minh → drop FK → drop index/cột sinh đúng dependency → drop bảng con → cha. Nếu đã có history
-  hoặc dữ liệu mới: **forward-fix**, không rollback.
+  xác minh → drop FK → partial primary: index → CHECK → cột sinh → `is_primary` → drop bảng con →
+  cha. Nếu đã có history hoặc dữ liệu mới: **forward-fix**, không rollback.
 
 ### WP2 — Hoàn thiện Subject (M)
 

@@ -9,7 +9,7 @@
 | Kiểu | Khi nào | Phạm vi |
 |---|---|---|
 | **Full rollback** | 52 vừa chạy, **chưa** phát sinh `class_subject_history`, chưa cấu hình dữ liệu mới | Bỏ toàn bộ bảng/cột của 51+52 |
-| **Partial rollback** | Chỉ cần bỏ cơ chế primary nhưng **giữ** `class_subject` | Chỉ bỏ `uq_class_subject_primary`, `primary_class_id`, `is_primary` |
+| **Partial rollback** | Chỉ cần bỏ cơ chế primary nhưng **giữ** `class_subject` | Bỏ `uq_class_subject_primary`, `chk_class_subject_primary`, `primary_class_id`, `is_primary` (đúng 4 bước ở §1 bước 6) |
 | **Forward-fix** (khuyến nghị khi đã có dữ liệu) | Đã có history hoặc người dùng đã cấu hình môn/giáo viên | Không drop; viết migration bổ sung |
 
 ## 1. Thứ tự rollback bắt buộc (7 bước)
@@ -98,23 +98,31 @@ Tên lấy từ hai file draft:
 > toàn bộ và drop theo thứ tự con → cha ở bước 7, có thể bỏ qua 5.2–5.6 nhưng **phải** chạy 5.1 và 5.7
 > theo đúng thứ tự nêu trên.
 
-### Bước 6 — Drop index và generated column theo đúng dependency
+### Bước 6 — Partial rollback: bỏ cơ chế primary theo đúng dependency (4 bước)
 
 Chỉ dùng cho **partial rollback** (giữ `class_subject`). DDL trong 52 tạo theo thứ tự:
-`is_primary` → `primary_class_id` (sinh từ `is_primary`) → `uq_class_subject_primary` (trên
-`primary_class_id`). Vì vậy phải bỏ **ngược chiều**:
+`is_primary` → `primary_class_id` (sinh từ `is_primary`) → `uq_class_subject_primary` (index trên
+`primary_class_id`) → `chk_class_subject_primary` (CHECK trên `is_primary`). Vì vậy phải bỏ
+**ngược chiều**, đúng 4 bước:
 
 ```sql
-ALTER TABLE class_subject DROP INDEX uq_class_subject_primary;  -- 6.1 index phụ thuộc cột sinh
-ALTER TABLE class_subject DROP COLUMN primary_class_id;         -- 6.2 cột sinh phụ thuộc is_primary
-ALTER TABLE class_subject DROP COLUMN is_primary;               -- 6.3 cuối cùng
+-- 6.1 index phụ thuộc cột sinh
+ALTER TABLE class_subject DROP INDEX uq_class_subject_primary;
+-- 6.2 CHECK tham chiếu is_primary (MySQL 8.0.16+: DROP CHECK)
+ALTER TABLE class_subject DROP CHECK chk_class_subject_primary;
+-- 6.3 cột sinh phụ thuộc is_primary
+ALTER TABLE class_subject DROP COLUMN primary_class_id;
+-- 6.4 cuối cùng
+ALTER TABLE class_subject DROP COLUMN is_primary;
 ```
 
-Nếu `is_primary`/`primary_class_id` được thêm từ **bản nháp 52 cũ** (không phải draft này), kiểm tra
-`information_schema.columns` trước; không drop cột không tồn tại.
+Tên `uq_class_subject_primary` và `chk_class_subject_primary` lấy trực tiếp từ draft 52 hiện tại.
+Không drop `chk_class_subject_source`/`chk_class_subject_status`/`chk_class_subject_sessions`/
+`chk_class_subject_sequence` khi vẫn giữ bảng — chúng không phụ thuộc cơ chế primary.
 
-Không drop `chk_class_subject_primary`/`chk_class_subject_source` khi vẫn giữ bảng — chúng không
-phụ thuộc cột sinh. Nếu muốn bỏ, drop riêng bằng `ALTER TABLE class_subject DROP CHECK ...`.
+> Draft 52 hiện **không** nâng cấp bảng cũ: nếu `class_subject` tồn tại nhưng khác schema Revision 3,
+> 52 `SIGNAL` và dừng. Vì vậy partial rollback dưới đây chỉ áp dụng cho bảng do đúng draft này tạo.
+> Nếu môi trường có bảng từ bản nháp cũ, xử lý tay trước (xem `wp1-readiness-report.md`).
 
 ### Bước 7 — Drop bảng/cột theo thứ tự phụ thuộc (con → cha)
 

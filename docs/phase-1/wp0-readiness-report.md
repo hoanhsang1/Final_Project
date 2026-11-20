@@ -352,7 +352,8 @@ kiểm DDL + hành vi trên MySQL staging (TC-LEG-008 và nhóm TC-SUB).
    FK `(class_id,org_id)` RESTRICT; snapshot **không** FK tới `subject`/`staff_profile`.
 5. Backfill **exact-match**: chỉ tạo dòng `LEGACY` khi lớp có `subject_id`, chưa có dòng khớp, và
    chưa có primary; sau đó `is_primary = 1` cho dòng khớp chính xác nếu chưa có primary.
-   Lớp 0 khớp hoặc >1 ứng viên → **không** đoán, đưa vào báo cáo rà soát tay.
+   Lớp 0 khớp / >1 primary / primary lệch / subject–giáo viên–lớp mồ côi → `BLOCK_MIGRATION`,
+   phải **sửa dữ liệu** trước 52 (không còn nhánh “ghi nhận rà soát tay”).
 6. `CALL mems_m52_assert_no_duplicate_primary` trước khi thêm UNIQUE.
 7. Chuyển `uq_subject_org_code` từ INDEX → **UNIQUE** — chỉ sau pre-check §10.1 mục 2
    (khối hiện đang comment trong draft, chờ kết quả pre-check).

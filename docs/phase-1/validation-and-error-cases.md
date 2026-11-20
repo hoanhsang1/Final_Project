@@ -422,21 +422,27 @@ khi sửa `ErrorCode.java`. `operationId` lưu **vĩnh viễn** ở Phase 1 (kh�
 ## 10. Cổng dữ liệu trước migration (không phải lỗi HTTP)
 
 Đây **không** phải mã lỗi API và **không** thêm vào `ErrorCode.java`; chúng là nhãn trong
-`migrations/51_52_precheck.sql` (phần B) quyết định 52 có được chạy hay không.
+`migrations/51_52_precheck_data.sql` quyết định 52 có được chạy hay không. Pre-check được tách:
+`51_52_precheck.sql` (schema, an toàn khi chưa có `class_subject`) và `51_52_precheck_data.sql`
+(data, chỉ chạy khi `next_step = DATA_PRECHECK_READY`).
 
 | Nhãn | Trường hợp | Hành động |
 |---|---|---|
 | `AUTO_BACKFILL_CANDIDATE` | `INSERT_LEGACY_ROW`: lớp có `subject_id`, chưa có dòng khớp, chưa primary · `MARK_EXACT_PRIMARY`: đã có dòng khớp, chưa primary | Backfill tự động (5a/5b) |
-| `MANUAL_REVIEW` | `PRIMARY_SUBJECT_MISMATCH`: primary khác `school_class.subject_id` · `PRIMARY_WITHOUT_CLASS_SUBJECT`: `subject_id NULL` mà có primary | Không tự sửa; người dùng quyết định trước/sau migration |
-| `BLOCK_MIGRATION` | `CS_ORPHAN_SUBJECT` · `CS_ORG_MISMATCH` · `CLASS_ORPHAN_SUBJECT` · `MULTI_PRIMARY` | Dừng; sửa dữ liệu rồi chạy lại pre-check |
+| `BLOCK_MIGRATION` | `CS_ORPHAN_SUBJECT`/`CS_ORPHAN_TEACHER`/`CS_ORPHAN_CLASS`: dòng `class_subject` trỏ môn/giáo viên/lớp không tồn tại cùng org · `CS_ORG_MISMATCH` · `CLASS_ORPHAN_SUBJECT`/`CLASS_ORPHAN_TEACHER` · `MULTI_PRIMARY` · `PRIMARY_SUBJECT_MISMATCH` · `PRIMARY_WITHOUT_CLASS_SUBJECT` | **Dừng**; sửa dữ liệu rồi chạy lại pre-check. Ghi nhận suông **không** phải đã xử lý |
 | `NO_ACTION` | Primary khớp chính xác, hoặc lớp không có môn | Không làm gì |
 
-- Migration 52 gọi `mems_m52_assert_backfill_safe` (orphan/org) và
-  `mems_m52_assert_no_duplicate_primary` trước/sau backfill; vi phạm → `SIGNAL 45000`, dừng script.
+> Không còn `MANUAL_REVIEW`: mọi mâu thuẫn primary là `BLOCK_MIGRATION` (C4).
+
+- Migration 52 gọi `mems_m52_assert_class_subject_schema` / `mems_m52_assert_teacher_subject_schema`
+  (ABORT nếu bảng cũ khác Revision 3/D-06a), `mems_m52_assert_backfill_safe` (subject/giáo viên/lớp
+  mồ côi, org lệch, mâu thuẫn primary) và `mems_m52_assert_no_duplicate_primary`; vi phạm →
+  `SIGNAL 45000`, dừng script.
 - Sau migration, `51_52_postcheck.sql` mục 7 phải trả `BLOCK_MIGRATION = 0`,
-  `AUTO_BACKFILL_CANDIDATE = 0`; mọi dòng `MANUAL_REVIEW` phải khớp danh sách đã chấp nhận trước đó.
+  `AUTO_BACKFILL_CANDIDATE = 0`, `NO_ACTION` = đúng số lớp còn sống (không có nhãn “chờ duyệt”).
 - Backfill **không** tạo primary khi `school_class.subject_id IS NULL`, **không** ghi đè primary đang
-  mâu thuẫn, **không** tạo trùng `(class_id, subject_id)`.
+  mâu thuẫn, **không** tạo trùng `(class_id, subject_id)`, **không** set `teacher_id = NULL` để né FK.
 - Phạm vi phân loại/backfill là lớp `deleted_at IS NULL`; lớp đã xoá mềm không bị sửa và không được
-  post-check 7a/7c/7d/7e đánh giá.
+  post-check 7a/7c/7d/7e đánh giá. Riêng các kiểm tra toàn bảng (`class_subject` mồ côi, org lệch,
+  >1 primary) vẫn tính cả dòng của lớp xoá mềm vì UNIQUE/FK áp dụng toàn bảng.
 

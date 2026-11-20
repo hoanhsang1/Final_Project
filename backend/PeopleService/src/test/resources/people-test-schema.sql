@@ -221,7 +221,8 @@ CREATE TABLE IF NOT EXISTS teacher_subject (
  FOREIGN KEY(user_id,org_id) REFERENCES teacher_profile(user_id,org_id) ON DELETE CASCADE,
  FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
  CONSTRAINT chk_teacher_subject_source CHECK(source IN ('SPECIALTY','MANUAL')),
- CONSTRAINT chk_teacher_subject_status CHECK(status IN ('PENDING','APPROVED','REVOKED'))
+ -- D-06a: no approval workflow in Phase 1 -> no PENDING state (migration 52 parity).
+ CONSTRAINT chk_teacher_subject_status CHECK(status IN ('APPROVED','REVOKED'))
 );
 CREATE TABLE IF NOT EXISTS class_close_event (
  id VARCHAR(36) PRIMARY KEY, class_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,

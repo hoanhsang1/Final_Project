@@ -103,14 +103,15 @@ FK `(user_id, org_id) → teacher_profile(user_id, org_id)` ON DELETE CASCADE.
 FK `(subject_id, org_id) → subject(id, org_id)` ON DELETE RESTRICT.
 Index `idx_teacher_subject_org_subject_status(org_id, subject_id, status)`,
 `idx_teacher_subject_org_user(org_id, user_id)`.
-CHECK `status IN ('PENDING','APPROVED','REVOKED')`, `source IN ('SPECIALTY','MANUAL')`.
+CHECK `status IN ('APPROVED','REVOKED')`, `source IN ('SPECIALTY','MANUAL')`.
 
 **Quy tắc nguồn sự thật:** mọi kiểm tra "dạy được môn" đọc `teacher_subject` với
 `status='APPROVED'`; **không** đọc tên.
 
 **Baseline Phase 1 (D-06a, không duyệt):** mọi dòng do API tạo/sinh từ chuyên môn đều ghi
 `status='APPROVED'`; thu hồi ghi `REVOKED`. Không có luồng `PENDING`, không có API approve/reject.
-Cột `status` và CHECK 3 giá trị vẫn khai báo để Phase 2 mới bật duyệt mà không đổi schema.
+CHECK chỉ khai báo **2 giá trị** `APPROVED`/`REVOKED` (khớp migration 52); Phase 2 muốn bật duyệt
+phải thêm giá trị `PENDING` bằng migration mới, không dựa vào CHECK hiện tại.
 
 ### 3.3. Truy vấn thay thế `teachesSubject` (pseudocode)
 

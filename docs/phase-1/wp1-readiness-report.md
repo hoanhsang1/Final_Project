@@ -21,7 +21,7 @@
 | `role-permission-matrix.md` | Giữ nguyên quyền; không thêm mã mới (đã đúng từ Revision 2) |
 | `teacher-subject-design.md` | BR-TCH-18 theo D-09 tinh chỉnh |
 | `validation-and-error-cases.md` | E-40…E-43, AC-VAL-17…20, `expectedVersion` bắt buộc |
-| `test-cases.md` | TC-CLS-039…048, TC-LEG-016…024, ma trận AC |
+| `test-cases.md` | TC-CLS-039…048, TC-LEG-016…026, ma trận AC |
 | `implementation-roadmap.md` | WP1 dùng 51/52 (không 53), WP5 `operationId`/`expectedVersion`, test range 001…048 |
 | `review-report.md` | Viết lại thành Revision 3 (`READY FOR USER REVIEW`) |
 | `wp0-readiness-report.md` | Ghi chú Revision 3 + bỏ migration 53 không bằng chứng |
@@ -31,7 +31,8 @@
 
 - `docs/phase-1/migrations/51_people_curriculum.sql`
 - `docs/phase-1/migrations/52_people_class_subject.sql`
-- `docs/phase-1/migrations/51_52_precheck.sql`
+- `docs/phase-1/migrations/51_52_precheck.sql` (schema — an toàn khi chưa có `class_subject`)
+- `docs/phase-1/migrations/51_52_precheck_data.sql` (data — chỉ chạy khi `DATA_PRECHECK_READY`)
 - `docs/phase-1/migrations/51_52_postcheck.sql`
 - `docs/phase-1/migrations/ROLLBACK.md`
 
@@ -133,25 +134,32 @@ chạy `SHOW COLUMNS FROM school_class LIKE 'version'` trước khi triển khai
 
 ## 5. Pre-check queries
 
-Nằm ở `migrations/51_52_precheck.sql`, gồm:
+Pre-check tách hai file để **không truy vấn bảng chưa tồn tại**:
+
+**`migrations/51_52_precheck.sql` (PART A — schema, luôn chạy được):**
 
 1. Bảng/cột đã tồn tại (migration chạy một phần?).
-2. `subject.code` trùng trong org.
-3. Lớp có `subject_id` nhưng không có dòng `class_subject` khớp.
-4. Lớp không có dòng khớp **hoặc** đã có >1 primary (mập mờ → báo cáo).
-5. Trùng khóa `(class_id, subject_id)`.
-6. Org lệch (`class_subject` vs `school_class`/`subject`).
-7. Index/constraint đã tồn tại.
-8. `class_subject.subject_id` không tồn tại trong `subject` (FK sẽ fail).
-9. Lớp đã kết thúc/huỷ còn `subject_id`.
-10. `school_class.subject_id` không tồn tại trong `subject` cùng org (backfill sẽ fail FK).
-11. **Phân loại từng lớp** (`AUTO_BACKFILL_CANDIDATE` / `MANUAL_REVIEW` / `BLOCK_MIGRATION` /
-    `NO_ACTION` kèm `reason_code`) — query 10.
-12. Tổng hợp số lớp theo nhãn — query 11.
-13. Danh sách `BLOCK_MIGRATION` (query 12) và `MANUAL_REVIEW` (query 13).
+2. Verdict `next_step`: `DATA_PRECHECK_READY` / `SKIP_DATA_PRECHECK_NO_TABLE` /
+   `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`.
+3. Checklist 20 cột bắt buộc, 4 index, PK `(class_id, subject_id)`, 9 FK/CHECK, cột sinh
+   `primary_class_id` của `class_subject` (present = 0 → thiếu/sai).
+4. `teacher_subject` CHECK status chứa `PENDING` hay không (bảng cũ → 52 ABORT).
+5. `subject.code` trùng trong org.
+6. Index/constraint 51/52 đã có.
+7. Lớp đã kết thúc/huỷ còn `subject_id`.
+8. `school_class.subject_id` không tồn tại trong `subject` cùng org.
+9. `school_class.teacher_id` không tồn tại trong `staff_profile` cùng org (C3).
 
-Truy vấn 4–7 và phần B (10–13) chỉ chạy sau khi xác nhận `class_subject` tồn tại (truy vấn 0).
-Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải được đưa vào báo cáo manual review.
+**`migrations/51_52_precheck_data.sql` (PART B — data, chỉ khi `DATA_PRECHECK_READY`):**
+
+10. Trùng khóa `(class_id, subject_id)`; org lệch; `class_subject` mồ côi subject/lớp/giáo viên.
+11. **Phân loại từng lớp** (`AUTO_BACKFILL_CANDIDATE` / `BLOCK_MIGRATION` / `NO_ACTION` kèm
+    `reason_code`).
+12. Tổng hợp số lớp theo nhãn.
+13. Danh sách `BLOCK_MIGRATION` (9 mã) + gate đếm 9 điều kiện.
+
+Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải được đưa vào báo cáo và **sửa dữ liệu**
+trước 52 (không có “ghi nhận suông”).
 
 ---
 
@@ -171,9 +179,11 @@ Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải �
 | Nhãn | `reason_code` | Hành động |
 |---|---|---|
 | `AUTO_BACKFILL_CANDIDATE` | `INSERT_LEGACY_ROW` / `MARK_EXACT_PRIMARY` | Backfill tự động 5a/5b |
-| `MANUAL_REVIEW` | `PRIMARY_SUBJECT_MISMATCH` / `PRIMARY_WITHOUT_CLASS_SUBJECT` | Không tự sửa; người dùng quyết định |
-| `BLOCK_MIGRATION` | `CS_ORPHAN_SUBJECT` / `CS_ORG_MISMATCH` / `CLASS_ORPHAN_SUBJECT` / `MULTI_PRIMARY` | Dừng; sửa dữ liệu trước |
+| `BLOCK_MIGRATION` | 9 mã: `CS_ORPHAN_SUBJECT`, `CS_ORG_MISMATCH`, `CS_ORPHAN_CLASS`, `CS_ORPHAN_TEACHER`, `CLASS_ORPHAN_SUBJECT`, `CLASS_ORPHAN_TEACHER`, `MULTI_PRIMARY`, `PRIMARY_SUBJECT_MISMATCH`, `PRIMARY_WITHOUT_CLASS_SUBJECT` | Dừng; **sửa dữ liệu** trước 52 — không “ghi nhận suông” |
 | `NO_ACTION` | `PRIMARY_OK` / `NO_SUBJECT` | Không làm gì |
+
+`MANUAL_REVIEW` **đã bỏ**: mọi xung đột primary đều chặn migration (`BLOCK_MIGRATION`), vì bất biến
+primary phải giữ được ngay sau 52 — không có trạng thái “chờ duyệt”.
 
 **Bảo đảm của draft 52:**
 
@@ -182,16 +192,22 @@ Kết quả pre-check **chưa được chạy**; mọi dòng trả về phải �
 - 5b dùng bảng tạm `tmp_m52_has_primary` (tránh MySQL 1093), chỉ set primary cho lớp chưa có.
 - 5a/5b **chỉ** tác động lớp `deleted_at IS NULL` (khớp pre-check phần B). Lớp đã xoá mềm không bị
   sửa; nếu có luồng khôi phục lớp phải kiểm primary riêng (ngoài phạm vi migration này).
-- 5.0 `mems_m52_assert_backfill_safe` dừng khi còn subject mồ côi/org lệch;
-  5c `mems_m52_assert_no_duplicate_primary` dừng khi >1 primary/lớp.
+- 5.0 `mems_m52_assert_backfill_safe` dừng khi còn: subject mồ côi/org lệch, `class_subject` mồ côi
+  lớp/giáo viên, `school_class.subject_id`/`teacher_id` mồ côi, primary lệch `subject_id`, primary
+  khi `subject_id IS NULL`; 5c `mems_m52_assert_no_duplicate_primary` dừng khi >1 primary/lớp.
+- Với bảng `class_subject`/`teacher_subject` **đã tồn tại** từ bản nháp cũ: 52 chạy audit schema
+  (20 cột, 4 index, 4 FK, 5 CHECK, PK, cột sinh) và `SIGNAL` ABORT nếu không khớp Revision 3 —
+  **không** tự `ADD COLUMN` để “nâng cấp”, **không** sửa migration đã áp dụng.
 
-**Unresolved rows (phải xử lý tay):**
+**Unresolved rows (phải xử lý tay trước 52):**
 
 - Lớp có `subject_id` nhưng không có dòng `class_subject` nào và không thể tạo do ràng buộc khác.
 - Lớp đã có >1 dòng `is_primary=1` (từ bản nháp cũ) → migration **dừng** (SIGNAL) trước khi thêm UNIQUE.
-- `class_subject` trỏ môn/lớp khác org.
-- `class_subject.subject_id` hoặc `school_class.subject_id` không tồn tại trong `subject` cùng org.
-- Primary lệch `school_class.subject_id`, hoặc `subject_id IS NULL` mà có primary → `MANUAL_REVIEW`.
+- `class_subject` trỏ môn/lớp/giáo viên khác org hoặc không tồn tại.
+- `class_subject.subject_id`, `school_class.subject_id` hoặc `school_class.teacher_id` không tồn tại
+  trong bảng đích cùng org.
+- Primary lệch `school_class.subject_id`, hoặc `subject_id IS NULL` mà có primary → `BLOCK_MIGRATION`
+  (không còn `MANUAL_REVIEW`).
 
 Các trường hợp trên **chưa có dữ liệu thực tế** để kiểm; báo cáo này không khẳng định đã xử lý.
 
@@ -234,8 +250,9 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
 - `class_subject`: mất snapshot môn/giáo viên/số buổi của lớp.
 - `is_primary`: mất dấu primary; có thể suy lại từ `subject_id` nếu dữ liệu nhất quán.
 - Backfill `LEGACY`: xoá sẽ mất dòng môn legacy đã tạo.
-- Partial rollback phải drop **ngược dependency**: `uq_class_subject_primary` → `primary_class_id`
-  → `is_primary`; đảo thứ tự sẽ bị MySQL từ chối.
+- Partial rollback phải drop **ngược dependency** (4 bước): `uq_class_subject_primary` → `DROP CHECK
+  chk_class_subject_primary` → `primary_class_id` → `is_primary`; đảo thứ tự sẽ bị MySQL từ chối.
+  Partial rollback chỉ áp dụng cho bảng do draft này tạo (52 không nâng cấp bảng cũ).
 - Nếu đã phát sinh history/dữ liệu mới → **forward-fix**, không rollback.
 - Chi tiết + tên FK/index: `migrations/ROLLBACK.md`.
 
@@ -266,8 +283,11 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
   retry sau thất bại, D-09 fallback, rollback cập nhật `class_subject`, `subject_id` = primary.
 - TC-LEG-016…020: backfill exact-match, báo cáo mập mờ, MySQL generated column, H2 parity,
   UNIQUE chặn >1 primary.
-- TC-LEG-021…024: phân loại pre-check đủ 6 trường hợp, backfill chạy lại idempotent, backfill không
-  ghi đè/không tạo primary khi `subject_id NULL`, rollback đúng dependency.
+- TC-LEG-021…024: phân loại pre-check đủ trường hợp (3 nhãn + 9 mã chặn), backfill chạy lại
+  idempotent, backfill không ghi đè/không tạo primary khi `subject_id NULL`, rollback đúng dependency.
+- TC-LEG-025: `school_class.teacher_id` mồ côi → `BLOCK_MIGRATION` + 5.0 `SIGNAL`, không set NULL.
+- TC-LEG-026: bảng `class_subject` cũ thiếu cấu trúc → schema assert `SIGNAL`, không `ADD COLUMN`;
+  `teacher_subject` cũ còn `PENDING` → 52 ABORT.
 - E-40…E-43, AC-VAL-17…20.
 
 **Đã thực thi: KHÔNG.** Không chạy Maven, không chạy H2, không chạy migration, không gọi API. Mọi
