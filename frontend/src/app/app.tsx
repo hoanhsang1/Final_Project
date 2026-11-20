@@ -32,11 +32,14 @@ import { MyRequestsPage } from '@/features/workflows/pages/my-requests-page'
 import { TeachersPage } from '@/features/academic/pages/teachers-page'
 import { StudentsPage } from '@/features/academic/pages/students-page'
 import { SubjectsPage } from '@/features/academic/pages/subjects-page'
+import { CurriculaPage } from '@/features/academic/pages/curricula-page'
+import { CurriculumDetailPage } from '@/features/academic/pages/curriculum-detail-page'
 import { ClassesPage } from '@/features/academic/pages/classes-page'
 import { MyClassesPage } from '@/features/academic/pages/my-classes-page'
 import { StudentPortalPage } from '@/features/academic/pages/student-portal-page'
 import { SchedulePage } from '@/features/schedule/pages/schedule-page'
 import { MySchedulePage } from '@/features/schedule/pages/my-schedule-page'
+import { AutoSchedulePage } from '@/features/schedule/pages/auto-schedule-page'
 import { FacilityPage } from '@/features/facility/pages/facility-page'
 import { FacilityIssuesPage } from '@/features/facility/pages/facility-issues-page'
 import { BackendDependencyPage } from '@/routes/backend-dependency-page'
@@ -297,6 +300,26 @@ export function App() {
             }
           />
           <Route
+            path="/dao-tao/chuong-trinh-dao-tao"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard anyOf={[PERM.curriculumView, PERM.curriculumManage]}>
+                  <CurriculaPage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/chuong-trinh-dao-tao/:id"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard anyOf={[PERM.curriculumView, PERM.curriculumManage]}>
+                  <CurriculumDetailPage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
             path="/dao-tao/lop-hoc"
             element={
               <WorkspaceGuard workspaceId="academic">
@@ -322,6 +345,16 @@ export function App() {
               <WorkspaceGuard workspaceId="academic">
                 <PermissionGuard permission={PERM.scheduleView}>
                   <SchedulePage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/tu-dong-xep-lich"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard permission={PERM.scheduleCreate}>
+                  <AutoSchedulePage />
                 </PermissionGuard>
               </WorkspaceGuard>
             }

@@ -1,5 +1,5 @@
 import { api } from '@/services/http'
-import type { RoomSuggestion, ScheduleInput, ScheduleSession } from '@/features/schedule/types'
+import type { AutoScheduleRequest, AutoScheduleResult, RoomSuggestion, ScheduleInput, ScheduleSession } from '@/features/schedule/types'
 
 export const schedulesApi = {
   async list(
@@ -56,6 +56,14 @@ export const schedulesApi = {
 
   async mine(params: { from?: string; to?: string }): Promise<ScheduleSession[]> {
     const { data } = await api.get<ScheduleSession[]>('/api/schedules/me', { params })
+    return data
+  },
+
+  async autoGenerate(departmentId: string, request: AutoScheduleRequest): Promise<AutoScheduleResult> {
+    const { data } = await api.post<AutoScheduleResult>(
+      `/api/departments/${departmentId}/schedules/auto-generate`,
+      request,
+    )
     return data
   },
 }

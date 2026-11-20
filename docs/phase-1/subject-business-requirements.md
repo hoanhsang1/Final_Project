@@ -260,12 +260,13 @@ Curriculum sửa tại chỗ với optimistic `version`; lớp giữ snapshot. K
 4. **Đổi môn chính = một transaction duy nhất**, theo thứ tự:
    1. Khoá lớp (`SELECT … FOR UPDATE`), kiểm trạng thái và `expectedVersion` với
       `school_class.version`.
-   2. Ghi `class_subject_history` (snapshot môn cũ/mới, giáo viên cũ, nguồn cũ/mới, actor, thời
-      điểm, lý do, `operation_id`).
+   2. Ghi `class_subject_history` (snapshot môn cũ/mới, giáo viên cũ **kèm `old_teacher_name`**,
+      nguồn cũ/mới, **`changed_by_name`**, thời điểm, lý do, `operation_id`, **`request_fingerprint`**).
    3. Cập nhật `school_class.subject_id = newSubjectId`, tăng `version` lớp.
    4. Đồng bộ `class_subject`: nếu **môn mới đã có** trong danh sách môn của lớp → **tái dùng** dòng
       đó (đặt `is_primary = 1`); ngược lại tạo dòng mới (`source = MANUAL`, `planned_sessions`/
-      `session_minutes` theo yêu cầu hoặc default của môn). Bỏ `is_primary` của dòng cũ.
+      `session_minutes` = giá trị yêu cầu, không gửi thì `NULL` — `subject` không có default). Bỏ
+      `is_primary` của dòng cũ.
 5. **Không xoá dòng cũ:** dòng `class_subject` của môn cũ được giữ (không còn `is_primary`), không
    xoá history. API thường **không cho xoá** dòng primary hiện tại hoặc dòng `LEGACY` khớp
    `school_class.subject_id` (409 `CLASS_SUBJECT_LEGACY_PROTECTED`).
@@ -279,6 +280,24 @@ Curriculum sửa tại chỗ với optimistic `version`; lớp giữ snapshot. K
    với `old_subject_*`/`old_source` lấy từ `school_class`, đồng bộ, atomic) thay vì chỉ set cột.
 9. **Không xoá cứng lớp đã có history:** `DELETE /classes/{id}` trả 409 `CONFLICT` (BR-SUB-21),
    không để FK RESTRICT biến thành 500.
+
+### 3.16. Findings WP1 đã giải (CONFIRMED 2026-11-20)
+
+> Các quyết định kỹ thuật dưới đây chỉ **bổ sung chi tiết** cho D-08/D-15, không đổi nghiệp vụ.
+> Chi tiết đầy đủ ở `final-wp1-resolution-report.md`.
+
+| Mã | Nội dung |
+|---|---|
+| F-BLK-01 | `class_subject_history.request_fingerprint CHAR(64) NOT NULL` = SHA-256 payload chuẩn hoá (`subjectId`,`reason`,`plannedSessions`,`sessionMinutes`); cùng `operationId` + cùng fingerprint → trả kết quả cũ; khác → 409 `CLASS_SUBJECT_OPERATION_CONFLICT` |
+| F-MAJ-01 | `PRIMARY_REASON_TOO_LONG` (3054) cho `reason` > 500 ở đổi môn chính; `REASON_TOO_LONG` (3018, ≤ 1000) giữ nguyên cho huỷ/đóng lớp |
+| F-MAJ-02 | Áp curriculum yêu cầu đồng thời `class.edit` + `curriculum.view` (ORGANIZATION) |
+| F-MAJ-03 | READ `GET /subjects` chỉ OWNER/`subject.view`/`subject.manage` ORGANIZATION; không kế thừa `class.*`/`student.view`; **thay đổi hành vi** |
+| F-MAJ-04 | Giữ `PUT /classes/{id}`; đổi `subjectId` bắt buộc `reason` + `operationId` (dùng `version` làm `expectedVersion`), cùng luồng history; lệch version → 409 `DATA_CHANGED` (2212) |
+| F-MAJ-05 | History lưu snapshot `old_teacher_name`, `changed_by_name` tại thời điểm đổi; không join sống |
+| F-MAJ-06 | Từ vựng chuẩn: `ACTIVE`, `theorySessions`, `practiceSessions`, `sequenceNo`, `required`, `note`; không alias |
+| F-MAJ-07 | `expectedVersion` bắt buộc cho thêm/sửa/xoá curriculum-subject, khoá ở `curriculum.version` |
+| F-MED-02/03 | `*_NOT_FOUND` → 404; `SUBJECT_MISMATCH` → 409 |
+| F-MED-05 | Bật UNIQUE `subject(org_id, code)` trong migration 52 sau pre-check trùng; nhiều NULL hợp lệ |
 
 ---
 
@@ -338,8 +357,8 @@ Thất bại · Quyền.
 - **Tham số hiện tại:** `q` (tên), `includeInactive` (chỉ có hiệu lực với OWNER/`subject.manage`).
 - **Hợp đồng đã chốt (D-13 = A):** trả **mảng** `[SubjectResponse]`, **không phân trang**,
   không nhận `page`/`size`.
-- **Đề xuất bổ sung (không bắt buộc):** `isActive` (true/false), `q` tìm cả `name_unaccented`
-  và `code`; `sort=name|code|createdAt`.
+- **Đề xuất bổ sung (không bắt buộc):** `active` (true/false — không dùng `isActive`, F-MAJ-06),
+  `q` tìm cả `name_unaccented` và `code`; `sort=name|code|createdAt`.
 - **Sắp xếp hiện tại:** `is_active DESC, name ASC`.
 - **Thất bại:** tham số sai kiểu → `400 VALIDATION_ERROR`.
 - **Quyền:** `READ`.
@@ -469,7 +488,7 @@ Audit ghi `classesUsingSubject = 3` (ví dụ C001, C002, C003). Response trả 
 | Môn bị ngừng nhưng lớp đang dạy | Giữ nguyên; chỉ chặn chọn mới; cảnh báo qua `classesUsingSubject` |
 | `school_class.subject_id` NULL | Không backfill vào `class_subject`; lớp không môn vẫn hợp lệ (legacy) |
 | Lớp đã hoạt động trước khi có tính năng | **Không** tạo history hồi tố (không có dữ liệu nguồn). `class_subject_history` bắt đầu rỗng; lần đổi môn chính đầu tiên mới sinh bản ghi |
-| Dòng `class_subject` hiện có | Migration 52 đặt `is_primary = 1` **chỉ** cho dòng khớp chính xác `school_class.subject_id`; lớp chưa có dòng nào thì **không** tự tạo. Bản ghi không khớp/mập mờ vào báo cáo manual review, không đoán |
+| Dòng `class_subject` hiện có | Migration 52 đặt `is_primary = 1` **chỉ** cho dòng khớp chính xác `school_class.subject_id`; lớp chưa có dòng nào được tạo **một** dòng `LEGACY` (5a) khi chưa có primary. Bản ghi không khớp/mập mờ là `BLOCK_MIGRATION` — phải sửa dữ liệu trước khi chạy 52, không đoán |
 
 ---
 

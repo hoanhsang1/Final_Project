@@ -5,4 +5,10 @@ import java.time.LocalDate;
 /** Bản sao tối thiểu từ PeopleService `GET /internal/classes/{id}`. */
 public record ClassInfo(String id, String orgId, String classCode, String name, String status,
                         String closeState, String teacherId, String teacherName,
-                        LocalDate startDate, LocalDate endDate, String subjectName, int studentCount) {}
+                        LocalDate startDate, LocalDate endDate, String subjectId, String subjectName, int studentCount) {
+    public ClassInfo(String id, String orgId, String classCode, String name, String status,
+                     String closeState, String teacherId, String teacherName,
+                     LocalDate startDate, LocalDate endDate, String subjectName, int studentCount) {
+        this(id, orgId, classCode, name, status, closeState, teacherId, teacherName, startDate, endDate, null, subjectName, studentCount);
+    }
+}

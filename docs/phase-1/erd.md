@@ -111,7 +111,9 @@ Ghi chú môn chính (D-15): `CLASS_SUBJECT.is_primary` đánh dấu môn chính
 là bản sao của dòng primary.
 `CLASS_SUBJECT_HISTORY` là bảng append-only ghi mỗi lần đổi môn chính; snapshot môn/giáo viên
 **không** FK tới `SUBJECT`/`STAFF_PROFILE` để lịch sử không phụ thuộc dữ liệu hiện tại. Mỗi dòng
-lưu cả nguồn cũ/mới (`old_source`, `new_source`), `reason` bắt buộc và `operation_id` bắt buộc.
+lưu cả nguồn cũ/mới (`old_source`, `new_source`), `reason` bắt buộc, `operation_id` bắt buộc và
+`request_fingerprint` (SHA-256 payload chuẩn hoá) bắt buộc phục vụ idempotency. Tên hiển thị
+`old_teacher_name`, `changed_by_name` là snapshot tại thời điểm đổi (nullable, không FK).
 
 Hai đường từ `CURRICULUM_SUBJECT` sang `CURRICULUM_SUBJECT_PREREQUISITE` là **hai FK tổ hợp**
 khác nhau trên cùng bảng nối: một cho môn đang xét, một cho môn tiên quyết.
@@ -176,7 +178,7 @@ Bảng nối `curriculum_subject_prerequisite` có **hai** quan hệ cha tới c
 | `curriculum_subject` | `(curriculum_id, subject_id)` | `(curriculum_id, sequence_no)`, **`(curriculum_id, subject_id, org_id)`** (bắt buộc cho FK của bảng nối) | `(subject_id, org_id)` |
 | `curriculum_subject_prerequisite` | `(curriculum_id, subject_id, prerequisite_subject_id)` | — (PK đã chặn cạnh trùng) | `(org_id, prerequisite_subject_id)`, `(org_id, subject_id)` |
 | `class_subject` | `(class_id, subject_id)` | **`(primary_class_id)`** — tối đa một primary/lớp | `(org_id, subject_id)`, `(teacher_id, org_id)`, `(curriculum_id, org_id)`, `(class_id, org_id)` (cho FK tổ hợp) |
-| `class_subject_history` | `id` | `(org_id, operation_id)` — idempotency, cả hai NOT NULL | `(org_id, class_id, changed_at)`, `(org_id, new_subject_id)` |
+| `class_subject_history` | `id` | `uq_csh_operation (org_id, operation_id)` — idempotency, cả hai NOT NULL; `request_fingerprint` NOT NULL (so khớp payload) | `idx_csh_class_time (org_id, class_id, changed_at)`, `idx_csh_new_subject (org_id, new_subject_id)` |
 | `specialty_subject` | `(specialty_id, subject_id)` | — | `(org_id, subject_id)` |
 | `teacher_subject` | `(user_id, subject_id)` | — | `(org_id, subject_id, status)`, `(org_id, user_id)` |
 | `school_class` (đổi) | `id` | **`(id, org_id)` — bắt buộc thêm**, `(org_id, class_code)` | — |
@@ -190,8 +192,8 @@ Bảng nối `curriculum_subject_prerequisite` có **hai** quan hệ cha tới c
 > tham chiếu tới tập cột là **tiền tố trái của một index/UNIQUE**. `PRIMARY KEY (curriculum_id, subject_id)`
 > không đủ cho FK 3 cột của bảng nối.
 >
-> `subject.(org_id, code)` hiện là **INDEX thường** (migration 42), phải `DROP INDEX` rồi
-> `ADD UNIQUE` sau khi pre-check trùng (D-04).
+> `subject.(org_id, code)` hiện là **INDEX thường** (migration 42); migration 52 bật **UNIQUE** sau
+> khi tự kiểm tra 0 nhóm trùng (D-04, chốt 2026-11-20). Nếu còn trùng, 52 `SIGNAL` và dừng.
 >
 > `class_subject.(primary_class_id)` là cột sinh **STORED** `CASE WHEN is_primary = 1 THEN class_id END`;
 > UNIQUE trên nó ép "tối đa một primary/lớp" mà MySQL không có partial unique index. H2 test khai báo

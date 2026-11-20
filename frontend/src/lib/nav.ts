@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeftRight,
   Bell,
   Blocks,
@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarDays,
   CalendarRange,
+  CalendarCog,
   ClipboardCheck,
   DoorOpen,
   FileBadge,
@@ -128,6 +129,7 @@ const ACADEMIC_PREFIXES = [
   'student.delete',
   'student.view',
   'subject.',
+  'curriculum.',
   'schedule.',
   'facility.',
   'teacher.',
@@ -357,6 +359,15 @@ export const WORKSPACES: Workspace[] = [
             status: 'ready',
           },
           {
+            id: 'curricula',
+            label: 'Chương trình đào tạo',
+            to: '/dao-tao/chuong-trinh-dao-tao',
+            icon: FileBadge,
+            permissions: [PERM.curriculumView, PERM.curriculumManage],
+            modules: ['STUDENT_MANAGEMENT'],
+            status: 'ready',
+          },
+          {
             id: 'classes',
             label: 'Lớp học',
             to: '/dao-tao/lop-hoc',
@@ -389,6 +400,15 @@ export const WORKSPACES: Workspace[] = [
             to: '/dao-tao/lich-hoc',
             icon: CalendarDays,
             permissions: [PERM.scheduleView],
+            modules: ['SCHEDULE_MANAGEMENT'],
+            status: 'ready',
+          },
+          {
+            id: 'auto-schedule',
+            label: 'Tự động xếp lịch',
+            to: '/dao-tao/tu-dong-xep-lich',
+            icon: CalendarCog,
+            permissions: [PERM.scheduleCreate],
             modules: ['SCHEDULE_MANAGEMENT'],
             status: 'ready',
           },

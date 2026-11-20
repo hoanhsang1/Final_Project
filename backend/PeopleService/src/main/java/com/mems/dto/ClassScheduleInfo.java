@@ -5,5 +5,12 @@ import java.time.LocalDate;
 /** Thông tin lớp tối thiểu cho ScheduleService (gọi nội bộ, không lộ dữ liệu nhạy cảm). */
 public record ClassScheduleInfo(String id, String orgId, String classCode, String name,
                                 String status, String closeState, String teacherId, String teacherName,
-                                LocalDate startDate, LocalDate endDate, String subjectName,
-                                int studentCount) {}
+                                LocalDate startDate, LocalDate endDate, String subjectId, String subjectName,
+                                int studentCount) {
+    public ClassScheduleInfo(String id, String orgId, String classCode, String name,
+                             String status, String closeState, String teacherId, String teacherName,
+                             LocalDate startDate, LocalDate endDate, String subjectName,
+                             int studentCount) {
+        this(id, orgId, classCode, name, status, closeState, teacherId, teacherName, startDate, endDate, null, subjectName, studentCount);
+    }
+}

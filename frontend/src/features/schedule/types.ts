@@ -34,3 +34,37 @@ export const SESSION_STATUS_LABELS: Record<string, string> = {
   DANG_DIEN_RA: 'Đang diễn ra',
   DA_HUY: 'Đã huỷ',
 }
+
+// ---- Auto-schedule types ----
+
+export interface TimeSlot {
+  startTime: string // "HH:mm"
+  endTime: string   // "HH:mm"
+}
+
+export interface AutoScheduleRequest {
+  classIds: string[]
+  dateFrom: string   // "YYYY-MM-DD"
+  dateTo: string     // "YYYY-MM-DD"
+  slots: TimeSlot[]
+  sessionDays?: number[] // 1=Mon…7=Sun, null = all
+}
+
+export interface UnscheduledItem {
+  classId: string
+  className: string | null
+  subjectName: string | null
+  reason: string
+}
+
+export interface AutoScheduleSummary {
+  totalRequested: number
+  scheduled: number
+  unscheduled: number
+}
+
+export interface AutoScheduleResult {
+  scheduled: ScheduleSession[]
+  unscheduled: UnscheduledItem[]
+  summary: AutoScheduleSummary
+}

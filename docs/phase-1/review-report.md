@@ -1,14 +1,16 @@
 # Phase 1 — Review Report (Revision 3: D-08 / D-09 / D-15)
 
-> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `bfa9b53`
+> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `f64cea1`
+> (Lượt 4 sửa trên working tree, chưa commit)
 > **Phạm vi:** chỉ tài liệu trong `docs/phase-1/` + SQL migration **draft** trong
 > `docs/phase-1/migrations/` + H2 test schema. Không sửa source Java/React, không chạy SQL, không
 > kết nối database, không đổi cấu hình/deploy, không commit/push/merge.
 
-## TRẠNG THÁI: `READY FOR USER REVIEW` — Revision 3
+## TRẠNG THÁI: `READY FOR FINAL STATIC REVIEW` — Revision 3 + Lượt 4
 
-> **Không phải `APPROVED`.** Bộ tài liệu và migration draft đã đồng bộ nội bộ, nhưng **chưa được
-> người dùng duyệt** và **chưa có migration nào được chạy** trên bất kỳ database nào.
+> **Không phải `APPROVED`.** Finding P1/P2/P3 của Final Static Review đã được sửa trong **logic SQL
+> thực tế** và kiểm static; **chưa chạy** migration/SQL, **chưa** kiểm trên MySQL staging, **chưa**
+> chạy test. Báo cáo chi tiết: `fix-review-findings-report.md`.
 
 Lưu ý trung thực:
 
@@ -35,8 +37,8 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
    một**; **tối thiểu một** do transaction + kiểm tra ứng dụng.
 
 Đồng thời chuẩn hoá: `expectedVersion` **bắt buộc** trên mọi thao tác đổi môn chính; `operationId`
-**bắt buộc** và lưu vĩnh viễn; backfill chỉ khớp **chính xác** (`exact match`), dòng không khớp đi
-báo cáo rà soát tay; **không** tạo migration 53 khi không có bằng chứng.
+**bắt buộc** và lưu vĩnh viễn; backfill chỉ khớp **chính xác** (`exact match`), dòng không khớp là
+`BLOCK_MIGRATION` phải sửa trước 52; **không** tạo migration 53 khi không có bằng chứng.
 
 ### 1.2. Tài liệu / file đã cập nhật
 
@@ -48,18 +50,19 @@ báo cáo rà soát tay; **không** tạo migration 53 khi không có bằng ch�
 | 4 | `erd.md` | Ghi chú "tối đa một primary"; D-09 theo bản ghi |
 | 5 | `api-contract.md` | §4.7 `PUT /classes/{id}` bắt buộc field khi đổi môn; §4.8 field bắt buộc + idempotency; §4.9 response có source/operationId; bảng mã lỗi |
 | 6 | `validation-and-error-cases.md` | E-40…E-43; bảng optimistic locking `expectedVersion` bắt buộc; AC-VAL-17…20 |
-| 7 | `teacher-subject-design.md` | BR-TCH-18 fallback theo bản ghi |
-| 8 | `test-cases.md` | TC-CLS-039…048, TC-LEG-016…024, ma trận cập nhật |
+| 7 | `teacher-subject-design.md` | BR-TCH-18 fallback theo bản ghi; CHECK `status` chỉ `APPROVED/REVOKED` (D-06a, khớp 52) |
+| 8 | `test-cases.md` | TC-CLS-039…048, TC-LEG-016…026, ma trận cập nhật |
 | 9 | `implementation-roadmap.md` | WP1 (52 tên chuẩn, không 53), WP5 (idempotency + `expectedVersion` + source) |
-| 10 | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Fixture H2: `curriculum*`, `class_subject`, `class_subject_history`, `teacher_subject`, `specialty_subject`, `school_class.curriculum_id` |
+| 10 | `backend/PeopleService/src/test/resources/people-test-schema.sql` | Fixture H2: `curriculum*`, `class_subject`, `class_subject_history`, `teacher_subject` (CHECK 2 giá trị), `specialty_subject`, `school_class.curriculum_id` |
 | 11 | `docs/phase-1/migrations/51_people_curriculum.sql` | **Draft** — KHÔNG chạy |
 | 12 | `docs/phase-1/migrations/52_people_class_subject.sql` | **Draft** — KHÔNG chạy |
-| 13 | `docs/phase-1/migrations/51_52_precheck.sql` | Truy vấn chỉ đọc |
-| 14 | `docs/phase-1/migrations/51_52_postcheck.sql` | Truy vấn chỉ đọc |
-| 15 | `docs/phase-1/migrations/ROLLBACK.md` | Kế hoạch rollback có điều kiện |
-| 16 | `review-report.md` | Báo cáo này (Revision 3) |
-| 17 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (READY FOR USER REVIEW) |
-| 18 | `wp0-readiness-report.md` | Gỡ/điều kiện hoá migration 53; D-09/invariant theo Revision 3 |
+| 13 | `docs/phase-1/migrations/51_52_precheck.sql` | Truy vấn chỉ đọc — PART A schema (an toàn khi chưa có `class_subject`) |
+| 14 | `docs/phase-1/migrations/51_52_precheck_data.sql` | Truy vấn chỉ đọc — PART B data, chỉ chạy khi `DATA_PRECHECK_READY` |
+| 15 | `docs/phase-1/migrations/51_52_postcheck.sql` | Truy vấn chỉ đọc |
+| 16 | `docs/phase-1/migrations/ROLLBACK.md` | Kế hoạch rollback có điều kiện |
+| 17 | `review-report.md` | Báo cáo này (Revision 3) |
+| 18 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (`READY FOR FINAL STATIC REVIEW` sau Lượt 4) |
+| 19 | `wp0-readiness-report.md` | Gỡ/điều kiện hoá migration 53; D-09/invariant theo Revision 3 |
 
 ### 1.3. Kết quả kiểm chéo
 
@@ -76,19 +79,78 @@ báo cáo rà soát tay; **không** tạo migration 53 khi không có bằng ch�
 
 ### 1.4. Lượt rà soát kỹ thuật bổ sung (2026-11-20)
 
-Sau khi Viết lại Revision 3, rà thêm các điểm còn thiếu (vẫn **không** chạy SQL/Java/React):
+**Lượt 1 — sau khi viết lại Revision 3** (vẫn **không** chạy SQL/Java/React):
 
-1. **Pre-check/post-check:** thêm phần B phân loại từng lớp `AUTO_BACKFILL_CANDIDATE` /
-   `MANUAL_REVIEW` / `BLOCK_MIGRATION` / `NO_ACTION` kèm `reason_code`; post-check mục 7 xác nhận
-   backfill idempotent, không tạo primary sai, không trùng khóa.
+1. **Pre-check/post-check:** thêm phần B phân loại từng lớp kèm `reason_code`; post-check mục 7 xác
+   nhận backfill idempotent, không tạo primary sai, không trùng khóa.
 2. **Draft 52:** thêm `mems_m52_assert_backfill_safe` (subject mồ côi/org lệch) chạy trước 5a;
    xác nhận 5a/5b không trùng khóa, không ghi đè primary, không tạo primary khi `subject_id NULL`.
 3. **Rollback:** viết lại `ROLLBACK.md` thành 7 bước cố định + bảng tên FK/index đối chiếu draft thật.
 4. **Optimistic locking:** xác minh `school_class.version` trong dump MySQL/H2, repository
    `version = version + 1 ... AND version = ?`, request `@NotNull` — xem `wp1-readiness-report.md` §3.1.
 5. **Test:** thêm TC-LEG-021…024; sửa lại nội dung TC-LEG-020 (UNIQUE primary, không phải opId).
-6. **Phạm vi backfill:** 5a/5b chỉ tác động lớp `deleted_at IS NULL` (khớp phần B); post-check 7c/7d/7e
-   cũng lọc tương ứng để không báo nhầm dữ liệu lớp đã xoá mềm.
+6. **Phạm vi backfill:** 5a/5b chỉ tác động lớp `deleted_at IS NULL`; post-check 7c/7d/7e lọc tương ứng.
+
+**Lượt 2 — sửa lỗi kỹ thuật sau review commit `016e516`** (vẫn không chạy SQL/Java/React):
+
+1. **C1 — pre-check không truy vấn bảng chưa tồn tại.** Tách `51_52_precheck.sql` (PART A: chỉ
+   `information_schema` + bảng gốc, chạy được trên DB chưa có `class_subject`) và file mới
+   `51_52_precheck_data.sql` (PART B). PART A có verdict `next_step` =
+   `DATA_PRECHECK_READY` / `SKIP_DATA_PRECHECK_NO_TABLE` / `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`.
+2. **C2 — bảng `class_subject` cũ.** 52 **không** còn `ADD COLUMN` để "nâng cấp": audit cấu trúc
+   (20 cột, PK, 5 nhóm index, 4 FK đúng cột nguồn→đích, 5 CHECK đúng biểu thức, cột sinh STORED)
+   và `SIGNAL SQLSTATE '45000'` ABORT nếu lệch Revision 3. `teacher_subject` cũ lệch D-06a cũng
+   ABORT. Không sửa migration đã áp dụng.
+3. **C3 — giáo viên mồ côi.** Pre-check thêm truy vấn `school_class.teacher_id` không tồn tại trong
+   `staff_profile(user_id, org_id)`; 5.0 assert chặn; **không** set NULL `teacher_id` để né FK.
+4. **C4 — bỏ `MANUAL_REVIEW`.** Mọi xung đột primary là `BLOCK_MIGRATION`; gate là
+   `BLOCK_MIGRATION = 0`, không có "ghi nhận suông". Post-check 7 kỳ vọng BLOCK = 0, AUTO = 0.
+5. **H1 — D-06a.** CHECK `teacher_subject.status` chỉ còn `APPROVED`/`REVOKED` (migration 52 + H2).
+6. **H2 — partial rollback 4 bước:** drop UNIQUE → `DROP CHECK chk_class_subject_primary` →
+   drop cột sinh `primary_class_id` → drop `is_primary`.
+7. **Post-check sửa lỗi:** 2b/2c/2d chỉ xét lớp `subject_id IS NOT NULL`; 7a sửa tautology
+   `cs.org_id = cs.org_id` → `cs.org_id = c.org_id`; thêm 4d (`class_subject` mồ côi lớp).
+
+**Lượt 3 — siết audit schema (commit `4b2007df`, không chạy SQL):**
+
+1. **Query 0b của pre-check là gate thật:** chỉ trả `DATA_PRECHECK_READY` khi `class_subject` có
+   đúng 20 cột, PK, 5 nhóm index, 4 FK, 5 CHECK và cột sinh STORED — tất cả so khớp theo cấu trúc
+   (cột/thứ tự/biểu thức đã chuẩn hoá), không còn chỉ đếm 4 cột khóa.
+2. **Audit `teacher_subject` đầy đủ:** 10 cột (không thừa), PK, 3 nhóm index, 2 FK đúng bảng/cột
+   đích, CHECK source `SPECIALTY/MANUAL`, CHECK status chỉ `APPROVED/REVOKED` (chặn `PENDING`).
+3. **Audit `class_subject` đầy đủ:** FK cột nguồn→bảng.cột đích + cùng schema, index cột/thứ tự/
+   UNIQUE/không prefix, CHECK đã chuẩn hoá, cột sinh STORED đúng biểu thức, PK đúng thứ tự; mọi
+   lệch ⇒ `SIGNAL 45000`, không tự sửa.
+4. **Index hỗ trợ FK:** InnoDB tự tạo `(class_id, org_id)` và `(subject_id, org_id)` cho 2 FK của
+   `class_subject` (và tương tự ở `teacher_subject`) khi chưa có index tiền tố trái. Audit chấp
+   nhận **đúng** các index non-unique này; index lạ hoặc UNIQUE thừa ⇒ ABORT. Nhờ vậy bảng do
+   chính draft 52 tạo vẫn qua gate, không bị chặn nhầm.
+
+**Lượt 4 — sửa finding của Final Static Review (vẫn không chạy SQL/Java/React):**
+
+1. **P1 — thuộc tính cột.** Query 0b và procedure audit `class_subject` (20 cột) / `teacher_subject`
+   (10 cột) giờ so cả `DATA_TYPE`, `COLUMN_TYPE`, `CHARACTER_MAXIMUM_LENGTH`, `NUMERIC_PRECISION`,
+   `NUMERIC_SCALE`, `IS_NULLABLE`, `COLUMN_DEFAULT` (NULL-safe `<=>`), `COLLATION_NAME`, `EXTRA`.
+   Kiểm DEFAULT `source='MANUAL'`, `status='PLANNED'`/`'APPROVED'`, `is_primary=0`; lệch ⇒
+   `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE` / `SIGNAL 45000`, không tự `MODIFY`.
+2. **P2 — audit bảng đã tồn tại.** Thêm `mems_m52_assert_history_schema` (16 cột + thuộc tính, PK,
+   `uq_csh_operation`, index phụ, FK `ON DELETE RESTRICT`, 3 CHECK) và
+   `mems_m52_assert_specialty_subject_schema` (5 cột, PK, index whitelist, 2 FK, không CHECK lạ),
+   chạy **trước** `CREATE TABLE IF NOT EXISTS`; sai ⇒ `SIGNAL`, không tự `ALTER`.
+3. **P3 — referential action.** 0b, audit 52 và post-check đều kiểm `UPDATE_RULE`/`DELETE_RULE` của
+   cả 9 FK thuộc `class_subject`/`teacher_subject`/`class_subject_history`/`specialty_subject`;
+   history bắt buộc `RESTRICT` (không cascade).
+4. **P3 — H2 parity.** Thêm `chk_class_subject_primary` và `chk_curriculum_subject_sequence` vào
+   fixture; ghi rõ `uq_subject_org_code` UNIQUE ở H2 vs non-unique ở MySQL (D-04 commented) là lệch
+   **có chủ đích** vì service contract 409 và D-04 target; index phụ lược bỏ ở H2.
+5. **P3 — helper 51.** `mems_m51_add_col` / `mems_m51_add_fk` / `mems_m51_add_unique` kiểm định
+   nghĩa object trùng tên (kiểu/null/default; mapping + update/delete rule; unique/cột/prefix) và
+   `SIGNAL` thay vì bỏ qua theo tên; không tự drop/tạo lại.
+6. **Post-check** thêm 5b–5d (số cột, PK/UNIQUE, referential action của 4 bảng).
+7. **ROLLBACK.md** thêm §2 ABORT giữa chừng (implicit commit, DML 5a/5b còn lại, rerun idempotent)
+   và bước 8 kiểm index hỗ trợ FK còn sót, không drop khi còn FK dùng.
+8. **Test:** TC-LEG-030…041 (sai kiểu/độ dài/NULL/DEFAULT/collation, sai DELETE/UPDATE rule, history
+   cascade/thiếu cột, specialty sai schema, trùng tên index/FK, abort sau 5a/5b rồi rerun).
 
 ---
 
@@ -199,10 +261,12 @@ Sau khi Viết lại Revision 3, rà thêm các điểm còn thiếu (vẫn **kh
 | **53** | **Không tạo.** Chỉ tạo khi có bằng chứng một môi trường đã áp một bản 52 cũ cần nâng cấp | Không tồn tại |
 
 - Repo hiện tại: migration cao nhất là **50**; không có file 51/52/53 nào trước Revision 3.
-- `UPDATE` đánh dấu primary chạy **trước** khi thêm UNIQUE; migration 52 gọi
-  `mems_m52_assert_no_duplicate_primary` trước `CALL mems_m52_add_unique(...)`.
-- Backfill chỉ áp cho lớp có **đúng một** dòng legacy khớp chính xác `school_class.subject_id`;
-  lớp 0 khớp hoặc >1 ứng viên → **không** đoán, ghi vào báo cáo rà soát tay.
+- 52 tạo `class_subject` **trọn vẹn** (kèm `is_primary`, cột sinh, `uq_class_subject_primary` trong
+  `CREATE TABLE`). Nếu bảng đã tồn tại từ bản nháp cũ, 52 audit schema và `SIGNAL` ABORT — **không**
+  `ADD COLUMN`, **không** sửa cấu trúc không rõ nguồn gốc.
+- Backfill chỉ áp cho lớp **khớp chính xác** `school_class.subject_id`, chưa có dòng khớp và chưa có
+  primary. Lớp 0 khớp / xung đột primary / mồ côi subject–teacher–lớp → `BLOCK_MIGRATION`, phải sửa
+  dữ liệu trước khi chạy 52 (không còn nhánh "ghi nhận rà soát tay").
 
 ### 3.5. Khác biệt H2 (fixture test)
 
@@ -328,14 +392,19 @@ họ còn giữ chức danh ORGANIZATION. Tài liệu ghi rõ, không tự mở 
 |---|---|
 | TC-LEG-001…015 | Pre-check, backfill idempotent, FK/UNIQUE/CHECK như `database-schema.md` |
 | TC-LEG-016 | Backfill exact-match tạo primary đúng |
-| TC-LEG-017 | Lớp không khớp/mơ hồ → báo cáo rà soát, không tự đoán |
+| TC-LEG-017 | Lớp không khớp/mơ hồ → `BLOCK_MIGRATION`, không tự đoán, không backfill một phần |
 | TC-LEG-018 | MySQL: cột sinh + UNIQUE chặn primary thứ hai |
 | TC-LEG-019 | Khác biệt H2: bất biến tối thiểu **không** kiểm được trên H2 |
 | TC-LEG-020 | UNIQUE `(primary_class_id)` chặn primary thứ hai (không bảo đảm tối thiểu) |
-| TC-LEG-021 | Pre-check phân loại đủ 6 trường hợp (AUTO/MANUAL/BLOCK/NO_ACTION) |
+| TC-LEG-021 | Pre-check phân loại 3 nhãn + 9 mã `BLOCK_MIGRATION` (không còn `MANUAL_REVIEW`) |
 | TC-LEG-022 | Backfill chạy lại idempotent (không trùng, không đổi primary) |
 | TC-LEG-023 | Không tạo primary khi `subject_id NULL`, không ghi đè primary mâu thuẫn |
-| TC-LEG-024 | Partial rollback đúng dependency index → cột sinh → `is_primary` |
+| TC-LEG-024 | Partial rollback 4 bước: UNIQUE → CHECK → cột sinh → `is_primary` |
+| TC-LEG-025 | `school_class.teacher_id` mồ côi → `BLOCK_MIGRATION` + 5.0 SIGNAL, không set NULL |
+| TC-LEG-026 | Bảng `class_subject` cũ thiếu cấu trúc → assert SIGNAL, không `ADD COLUMN`; `teacher_subject` cũ còn `PENDING` → 52 ABORT |
+| TC-LEG-027 | Bảng đủ 20 cột nhưng sai index/FK/CHECK/cột sinh → pre-check 0b BLOCKED + 52 SIGNAL |
+| TC-LEG-028 | Index hỗ trợ FK do InnoDB tự tạo không bị chặn nhầm; index lạ vẫn ABORT |
+| TC-LEG-029 | `teacher_subject` sai cột/PK/FK/CHECK ngoài `PENDING` → 52 SIGNAL |
 
 ### 7.3. Ánh xạ 24 kịch bản yêu cầu
 
@@ -378,7 +447,7 @@ họ còn giữ chức danh ORGANIZATION. Tài liệu ghi rõ, không tự mở 
 | Hai đường ghi (`PUT /classes/{id}` vs `PUT .../subjects/primary`) lệch nhau | **Cao** | Bắt buộc dùng chung `PrimarySubjectChangeService`; TC-CLS-035 |
 | Tài liệu/code hiểu sai UNIQUE là "đúng một primary" | **Cao** | Ghi rõ "tối đa"; kiểm app; TC-CLS-047/048 |
 | Cột sinh khác MySQL vs H2 | Trung bình | Cột thường trong fixture; xác minh staging TC-LEG-018/019 |
-| Backfill gặp dòng không khớp/mơ hồ | Trung bình | Exact-match only; báo cáo rà soát tay; không đoán |
+| Backfill gặp dòng không khớp/mơ hồ | Trung bình | Exact-match only; mọi xung đột là `BLOCK_MIGRATION`, sửa liệu trước khi chạy 52 |
 | `school_class.subject_id` bị ghi trực tiếp ở chỗ khác | **Cao** | Rà mọi chỗ gán `subjectId`; chỉ service được set |
 | `DELETE /classes/{id}` rơi 500 do FK | Trung bình | Kiểm history trước; TC-CLS-037 |
 | FE cũ đổi `subjectId` không gửi field mới → 400 | Trung bình | Ghi rõ trong API contract; phối hợp FE trước khi WP5 |
@@ -446,7 +515,8 @@ Trong toàn bộ Revision 3:
 
 ## 12. Điều kiện chuyển sang `APPROVED`
 
-Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED` khi người dùng đã:
+Trạng thái hiện tại là `READY FOR FINAL STATIC REVIEW` (Revision 3 + Lượt 4, xem
+`fix-review-findings-report.md`). Chỉ chuyển `APPROVED` khi người dùng đã:
 
 1. Duyệt D-08/D-09/D-15 tại `subject-business-requirements.md` (nguồn sự thật).
 2. Duyệt DDL + backfill trong `database-schema.md` §3 và migration draft 51/52.
@@ -454,6 +524,8 @@ Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED
    `operationId`/`expectedVersion` trên `PUT /classes/{id}` khi đổi `subjectId`.
 4. Chấp nhận rằng H2 **không** chứng minh hành vi MySQL và cần xác minh staging.
 5. Quyết định thời điểm chạy migration 51/52 trên staging (ngoài phạm vi tài liệu này).
+6. Review `fix-review-findings-report.md` (P1/P2/P3 đã sửa static) và kiểm lại migration trên MySQL
+   staging — đặc biệt audit thuộc tính cột, referential action và history không cascade.
 
 Nếu một `D-xx` thay đổi, phải cập nhật đồng thời:
 `subject-business-requirements.md` → `curriculum-business-design.md` + `database-schema.md` +

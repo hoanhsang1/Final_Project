@@ -46,6 +46,9 @@ export const PERM = {
   classViewReassign: 'class.view_reassign',
   subjectView: 'subject.view',
   subjectManage: 'subject.manage',
+  // D-14: Quyền Curriculum riêng (scope ORGANIZATION)
+  curriculumView: 'curriculum.view',
+  curriculumManage: 'curriculum.manage',
 
   // Lịch học
   scheduleView: 'schedule.view',
@@ -179,6 +182,8 @@ export const PERMISSION_GROUPS: { label: string; permissions: PermissionMeta[] }
       { code: PERM.classViewReassign, label: 'Xem lớp cần phân công lại', bundle: 'ACADEMIC_MANAGEMENT' },
       { code: PERM.subjectView, label: 'Xem môn học', bundle: 'ACADEMIC_MANAGEMENT' },
       { code: PERM.subjectManage, label: 'Quản lý môn học', bundle: 'ACADEMIC_MANAGEMENT' },
+      { code: PERM.curriculumView, label: 'Xem chương trình đào tạo', bundle: 'ACADEMIC_MANAGEMENT' },
+      { code: PERM.curriculumManage, label: 'Quản lý chương trình đào tạo', bundle: 'ACADEMIC_MANAGEMENT' },
     ],
   },
   {

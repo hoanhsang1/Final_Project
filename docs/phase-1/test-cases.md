@@ -103,7 +103,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CUR-013 | Sửa template không đổi snapshot | đổi số buổi sau khi lớp đã áp | `class_subject` lớp giữ số cũ | IT |
 | TC-CUR-014 | Phân trang | 25 curriculum, page=2 size=10 | 10 item, `total=25` | API |
 | TC-CUR-015 | Clone | clone với code mới | 201, copy đủ môn, version=0 | API |
-| TC-CUR-016 | Thêm môn org khác | subject org B vào curriculum org A | 400 `SUBJECT_NOT_FOUND` | SEC |
+| TC-CUR-016 | Thêm môn org khác | subject org B vào curriculum org A | 404 `SUBJECT_NOT_FOUND` (F-MED-02) | SEC |
 | TC-CUR-017 | Thêm môn inactive | subject active=false | 400 `SUBJECT_INACTIVE` | API |
 | TC-CUR-018 | Xoá môn khỏi template | DELETE | 200/204, version tăng, lớp đã áp không đổi | API |
 | TC-CUR-019 | Tiên quyết ngoài curriculum | một phần tử `prerequisiteSubjectIds` là môn org A nhưng **không** thuộc curriculum này | 404 `CURRICULUM_SUBJECT_NOT_FOUND`, không ghi cạnh | IT |
@@ -113,6 +113,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CUR-023 | Quá nhiều tiên quyết | 51 phần tử | 400 `PREREQUISITE_IDS_TOO_MANY`, không ghi | API |
 | TC-CUR-024 | Thay toàn bộ tiên quyết | PUT với mảng mới `[Vật lý]` | 200; cạnh cũ (Toán) bị xoá, chỉ còn Vật lý; version tăng | IT |
 | TC-CUR-025 | Ngừng curriculum không đổi lớp đã áp | active=false | 200; `class_subject` của lớp đã áp không đổi | IT |
+| TC-CUR-026 | Curriculum-subject thiếu `expectedVersion` | POST/PUT/DELETE không gửi `expectedVersion` | 400 `VALIDATION_ERROR`; không ghi | API |
+| TC-CUR-027 | Curriculum-subject version lệch | `expectedVersion` cũ | 409 `DATA_CHANGED`; không ghi; `curriculum.version` không đổi | IT |
 
 ---
 
@@ -124,7 +126,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-002 | Lớp nhiều môn | sau áp curriculum | GET trả đủ 3 môn, đúng field | IT |
 | TC-CLS-003 | Áp curriculum thành công | C001 `CHUA_BAT_DAU` | 200, tạo 3 `class_subject`, version lớp tăng | IT |
 | TC-CLS-004 | Áp với môn inactive | curriculum chứa môn vừa ngừng | 400 `SUBJECT_INACTIVE`, không ghi | IT |
-| TC-CLS-005 | Áp cho lớp đang học | C002 `DANG_DIEN_RA` | 409 `CLASS_SUBJECT_LOCKED` | API |
+| TC-CLS-005 | Áp cho lớp đang học | C002 `DANG_DIEN_RA` | 409 `CLASS_NOT_EDITABLE` | API |
 | TC-CLS-006 | Version lệch | version sai | 409 `DATA_CHANGED` | API |
 | TC-CLS-007 | Thiếu confirmReplace | lớp đã có curriculum khác, `confirmReplace=false` | 409 `CONFLICT` (api-contract §4.3) | API |
 | TC-CLS-008 | Giữ môn MANUAL | `keepManualSubjects=true` | Môn manual còn, môn curriculum thay đúng | IT |
@@ -132,7 +134,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-010 | Thêm trùng môn | Toán đã có | 409 `CLASS_SUBJECT_EXISTS` | API |
 | TC-CLS-011 | Sửa plannedSessions | 60 → 55 | 200, version tăng | API |
 | TC-CLS-012 | Xoá môn trước khi bắt đầu | C001 | 200, môn biến mất | API |
-| TC-CLS-013 | Xoá môn khi đang học | C002 | 409 `CLASS_SUBJECT_LOCKED` | API |
+| TC-CLS-013 | Xoá môn khi đang học | C002 | 409 `CLASS_NOT_EDITABLE` | API |
 | TC-CLS-014 | Giáo viên không chuyên môn | gán GV Lý cho môn Toán | 409 `SUBJECT_MISMATCH` | IT |
 | TC-CLS-015 | Giáo viên nghỉ | GV `NGHI_VIEC`/`TAM_NGHI` | 409 `TEACHER_NOT_AVAILABLE` | IT |
 | TC-CLS-016 | Cách ly org | class org B với JWT org A | 404 `CLASS_NOT_FOUND` | SEC |
@@ -146,7 +148,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-024 | Môn mới inactive | `subject.is_active = 0` | 400 `SUBJECT_INACTIVE`; không ghi gì | API |
 | TC-CLS-025 | Không xoá dòng primary | DELETE dòng `is_primary = 1` | 409 `CLASS_SUBJECT_LEGACY_PROTECTED`; dòng còn nguyên | API |
 | TC-CLS-026 | Snapshot mã/tên môn cũ | đổi Toán→Lý, sau đó đổi tên/xoá mềm môn Toán | History vẫn hiển thị `old_subject_code/name` gốc | IT |
-| TC-CLS-027 | Lưu `old_teacher_id` + giới hạn `reason` | môn cũ có GV; `reason` 501 ký tự | `reason` 501 → 400 `REASON_TOO_LONG`; `reason` hợp lệ → history lưu `old_teacher_id` đúng, `reason` ≤ 500 | API |
+| TC-CLS-027 | Lưu `old_teacher_id` + giới hạn `reason` | môn cũ có GV; `reason` 501 ký tự | `reason` 501 → 400 `PRIMARY_REASON_TOO_LONG` (3054); `reason` hợp lệ → history lưu `old_teacher_id` đúng, `reason` ≤ 500 | API |
 | TC-CLS-028 | Không chuyển giáo viên | môn cũ có GV A, đổi sang môn mới | Dòng môn mới `teacher_id = NULL`; GV A không xuất hiện ở môn mới | IT |
 | TC-CLS-029 | Môn mới đã có trong lớp | môn Lý đã là dòng `class_subject` của lớp | **Tái dùng** dòng đó (`is_primary=1`), không tạo dòng thứ hai; đúng một primary | IT |
 | TC-CLS-030 | Rollback khi ghi history lỗi | giả lập lỗi DB bước history/`school_class` | 500; không history, `school_class.subject_id` và `class_subject` **không** đổi | IT |
@@ -168,6 +170,9 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CLS-046 | Fallback giáo viên theo D-09 | lớp có dòng `class_subject` nhưng `teacher_id=NULL`; `school_class.teacher_id` có GV | Response `teacherId=null` (không fallback); lớp legacy chưa có dòng → fallback | IT |
 | TC-CLS-047 | Rollback khi cập nhật `class_subject` lỗi | giả lập lỗi sau khi đã insert history/update `school_class` | 500; rollback cả ba; không primary thứ hai | IT |
 | TC-CLS-048 | `school_class.subject_id` = primary | sau đổi môn chính | `subject_id` khớp đúng dòng `is_primary=1`; các dòng khác `is_primary=0` | IT |
+| TC-CLS-049 | Fingerprint lưu đúng | đổi môn chính thành công | `request_fingerprint` là 64 hex lowercase = SHA-256 của `subjectId\|reason\|plannedSessions\|sessionMinutes`; ghi cùng transaction | IT |
+| TC-CLS-050 | Fingerprint độc lập thứ tự key JSON | gửi cùng payload với thứ tự key khác | Cùng fingerprint → 200, cùng `historyId`, không thêm history | API |
+| TC-CLS-051 | Snapshot tên hiển thị | history đổi môn; sau đó đổi tên GV và tài khoản người thực hiện | `GET .../subject-history` vẫn trả `oldTeacherName`/`changedByName` lúc đổi | IT |
 
 ---
 
@@ -217,6 +222,8 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-RBAC-013 | Module guard curriculum (D-10) | `STUDENT_MANAGEMENT` off | GET/POST curriculum → 400 `MODULE_NOT_ENABLED` | SEC |
 | TC-RBAC-014 | Quyền đổi môn chính | user có `class.edit` gọi `PUT .../subjects/primary` | 200; user chỉ có `class.view`/`subject.view` → 403 `FORBIDDEN` | SEC |
 | TC-RBAC-015 | Xem lịch sử đổi môn | user có `class.view` | 200; user không có `class.view` → 403; không vai trò nào sửa/xoá được history | SEC |
+| TC-RBAC-016 | READ subject không kế thừa | user chỉ có `class.view`/`student.view`/`class.assign_teacher` gọi `GET /subjects` | 403 `FORBIDDEN` (F-MAJ-03) | SEC |
+| TC-RBAC-017 | Áp curriculum cần đủ 2 quyền | user có `class.edit` nhưng thiếu `curriculum.view` (và ngược lại) | 403 `FORBIDDEN` (F-MAJ-02) | SEC |
 
 ---
 
@@ -240,14 +247,31 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-LEG-014 | Tự tiên quyết bị CHECK chặn | INSERT `subject_id = prerequisite_subject_id` | CHECK từ chối | DB |
 | TC-LEG-015 | UNIQUE 3 cột của `curriculum_subject` | kiểm `information_schema.statistics` | Có `uq_curriculum_subject_org(curriculum_id, subject_id, org_id)` | DB |
 | TC-LEG-016 | Backfill primary exact-match | lớp có `subject_id` và dòng `class_subject` khớp | Chỉ dòng khớp nhận `is_primary=1`; lớp không có dòng nào được tạo dòng `LEGACY` | DB |
-| TC-LEG-017 | Báo cáo backfill không khớp/mập mờ | lớp có `subject_id` nhưng không dòng khớp hoặc >1 primary | Dòng xuất hiện trong query pre-check 6.0(d); migration **không** tự sửa | DB |
+| TC-LEG-017 | Báo cáo block: lớp không khớp/mập mờ | lớp có `subject_id` nhưng không dòng khớp, >1 primary, primary lệch, hoặc `subject_id NULL` mà có primary | Dòng xuất hiện trong `51_52_precheck_data.sql` (danh sách `BLOCK_MIGRATION`); migration **không** tự sửa | DB |
 | TC-LEG-018 | MySQL generated column | `INSERT ... (is_primary=1)` | `primary_class_id = class_id`; `is_primary=0` → NULL; không được list `primary_class_id` trong INSERT (errno 3105) | DB |
 | TC-LEG-019 | H2 parity | chạy IT H2 | `primary_class_id` là cột thường, service phải set; ghi rõ H2 **không** chứng minh MySQL generated column | DB |
 | TC-LEG-020 | UNIQUE chỉ chặn >1 primary | INSERT 2 dòng `is_primary=1` cùng lớp trên MySQL | Dòng thứ hai bị UNIQUE từ chối | DB |
-| TC-LEG-021 | Phân loại pre-check đủ 6 trường hợp | staging có: khớp primary; chưa primary; primary lệch; >1 primary; `subject_id NULL` có primary; subject/class khác org | Query 10 trả đúng `reason_code`/nhãn `NO_ACTION`, `AUTO_BACKFILL_CANDIDATE`, `MANUAL_REVIEW`, `BLOCK_MIGRATION`; query 12 chỉ liệt kê block | DB |
-| TC-LEG-022 | Backfill chạy lại idempotent | chạy 5a/5b hai lần trên staging | Lần 2 không tạo dòng mới, không đổi `is_primary`, số dòng `class_subject` giữ nguyên; PK không bị vi phạm | DB |
-| TC-LEG-023 | Backfill không ghi đè/không tạo sai primary | lớp `subject_id NULL` có primary; lớp có primary lệch subject; lớp đã xoá mềm có `subject_id` | 5a không chèn; 5b không đổi primary hiện có và không chạm lớp `deleted_at` khác NULL; dòng thuộc `MANUAL_REVIEW`, migration không tự sửa | DB |
-| TC-LEG-024 | Rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối (cột sinh/index phụ thuộc) | DB |
+| TC-LEG-021 | Phân loại pre-check đủ trường hợp | staging có: khớp primary; chưa primary; primary lệch; >1 primary; `subject_id NULL` có primary; subject/giáo viên/lớp khác org hoặc mồ côi | `51_52_precheck_data.sql` trả đúng `reason_code`/nhãn `NO_ACTION`, `AUTO_BACKFILL_CANDIDATE`, `BLOCK_MIGRATION`; danh sách block liệt kê đủ 9 mã, không có `MANUAL_REVIEW` | DB |
+| TC-LEG-022 | Backfill chạy lại idempotent | chạy 5a/5b hai lần trên staging | Lần 2 không tạo dòng mới, không đổi `is_primary`, số dòng `class_subject` giữ nguyên; PK/UNIQUE không bị vi phạm | DB |
+| TC-LEG-023 | Backfill không ghi đè/không tạo sai primary | lớp `subject_id NULL` có primary; lớp có primary lệch subject; lớp đã xoá mềm có `subject_id` | 5a không chèn; 5b không đổi primary hiện có và không chạm lớp `deleted_at` khác NULL; dòng thuộc `BLOCK_MIGRATION`, migration không tự sửa | DB |
+| TC-LEG-024 | Partial rollback đúng dependency | partial rollback giữ `class_subject` | Drop `uq_class_subject_primary` → `chk_class_subject_primary` → `primary_class_id` → `is_primary` thành công; đảo thứ tự bị MySQL từ chối | DB |
+| TC-LEG-025 | Giáo viên mồ côi chặn migration | `school_class.teacher_id` hoặc `class_subject.teacher_id` không có trong `staff_profile` cùng org | Pre-check data trả `CLASS_ORPHAN_TEACHER`/`CS_ORPHAN_TEACHER`; 52 `SIGNAL` ở `mems_m52_assert_backfill_safe`; **không** set `teacher_id = NULL` | DB |
+| TC-LEG-026 | Bảng cũ thiếu cấu trúc bị từ chối | (a) tạo `class_subject` chỉ có vài cột (bản nháp cũ) rồi chạy 52; (b) `teacher_subject` cũ có CHECK chứa `PENDING` rồi chạy 52 | (a) `mems_m52_assert_class_subject_schema` `SIGNAL` trước backfill, không tự `ADD COLUMN`; (b) `mems_m52_assert_teacher_subject_schema` `SIGNAL`; không tự sửa CHECK | DB |
+| TC-LEG-027 | Bảng cũ sai cấu trúc index/FK/CHECK/cột sinh bị từ chối | staging dựng bảng đủ 20 cột nhưng (i) đảo thứ tự cột trong index, (ii) FK trỏ sai bảng/cột, (iii) CHECK thiếu một giá trị, (iv) `primary_class_id` là cột thường hoặc VIRTUAL | (i)–(iv) pre-check 0b trả `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL 45000` ở audit tương ứng; không tự sửa schema | DB |
+| TC-LEG-028 | Index hỗ trợ FK không bị chặn nhầm | bảng `class_subject`/`teacher_subject` do chính draft 52 tạo trên MySQL | `information_schema.statistics` có thêm index non-unique `(class_id, org_id)`/`(subject_id, org_id)` (và `(user_id, org_id)` cho `teacher_subject`); 0b vẫn trả `DATA_PRECHECK_READY`, 52 audit pass; thêm index lạ khác ⇒ ABORT | DB |
+| TC-LEG-029 | `teacher_subject` sai cấu trúc ngoài `PENDING` | staging: thiếu/đổi cột, sai thứ tự PK, FK trỏ `staff_profile` thay vì `teacher_profile`, CHECK source thiếu `SPECIALTY` | `mems_m52_assert_teacher_subject_schema` `SIGNAL 45000`; không tự sửa | DB |
+| TC-LEG-030 | Sai `DATA_TYPE` bị chặn | staging: `class_subject.created_at` đổi `datetime(3)` → `date`; `source` → `int` | `51_52_precheck.sql` query 0b trả `attr_mismatch > 0` ⇒ `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL` trong `mems_m52_assert_class_subject_schema` (`data_type` so với spec); không tự `MODIFY`. Vị trí: 0b `cs_attr`, audit 52 | DB |
+| TC-LEG-031 | Sai `COLUMN_TYPE` (độ dài/độ chính xác) bị chặn | staging: `note varchar(500)` → `varchar(200)`; `sequence_no smallint` → `int`; `is_primary tinyint(1)` → `tinyint(4)` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`column_type`, `numeric_precision`); không tự sửa. Vị trí: 0b `cs_attr`, `mems_m52_assert_class_subject_schema` | DB |
+| TC-LEG-032 | Sai NULL/DEFAULT bị chặn | staging: `status` cho phép NULL hoặc DEFAULT `'ACTIVE'`; `is_primary` bỏ DEFAULT; `created_at` thêm DEFAULT | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`is_nullable`/`column_default` so sánh NULL-safe `<=>`); không tự sửa. Vị trí: 0b `cs_attr`, audit 52 | DB |
+| TC-LEG-033 | Sai collation bị chặn | staging: `subject.name`/`class_subject.note` dùng `utf8mb4_general_ci` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`collation_name` khác `utf8mb4_unicode_ci`); không tự `CONVERT`. Vị trí: `cs_attr`/spec 20 cột | DB |
+| TC-LEG-034 | Sai `DELETE_RULE` bị chặn | staging: `fk_class_subject_class` `ON DELETE RESTRICT` (đúng phải CASCADE); `fk_class_subject_subject` `ON DELETE CASCADE` (đúng phải RESTRICT) | 0b `cs_fk.fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`v_fk_rule_bad <> 0`); không tự drop/tạo lại FK. Vị trí: 0b join `referential_constraints`, audit 52 | DB |
+| TC-LEG-035 | Sai `UPDATE_RULE` bị chặn | staging: một FK của `class_subject`/`teacher_subject` đặt `ON UPDATE CASCADE` thay vì RESTRICT | 0b `fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL`; không tự sửa. Vị trí: 0b `cs_fk`, audit 52 `v_fk_rule_bad` | DB |
+| TC-LEG-036 | History cascade bị từ chối | staging: `class_subject_history.fk_csh_class` đặt `ON DELETE CASCADE` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`'… history must not cascade'`); history **không** bị xoá theo lớp; không tự sửa FK | DB |
+| TC-LEG-037 | History thiếu cột snapshot | staging: bảng `class_subject_history` cũ thiếu `new_subject_name` (còn 15 cột) hoặc thiếu `uq_csh_operation` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`16` cột + index groups + FK + 3 CHECK); 52 không tự `ADD COLUMN`/`CREATE` đè; precheck 0h cảnh báo số cột | DB |
+| TC-LEG-038 | `specialty_subject` sai schema | staging: bảng `specialty_subject` cũ thiếu `idx_specialty_subject_org_subject`, sai PK, hoặc FK trỏ `staff_profile` | `mems_m52_assert_specialty_subject_schema` (52) `SIGNAL` (5 cột, index whitelist, 2 FK + action, không CHECK lạ); không tự `ALTER`; 0h hiển thị column_count/FK rule | DB |
+| TC-LEG-039 | Trùng tên index nhưng sai định nghĩa | staging: đã có `uq_school_class_id_org` nhưng non-unique hoặc đúng cột sai thứ tự/prefix | 51 `mems_m51_add_unique` `SIGNAL` (`'existing index differs from expected (unique/columns/prefix)'`), **không** bỏ qua theo tên; không tự drop index | DB |
+| TC-LEG-040 | Trùng tên FK nhưng sai mapping/action | staging: đã có `fk_school_class_curriculum` nhưng `ON DELETE CASCADE` hoặc trỏ sai cột | 51 `mems_m51_add_fk` `SIGNAL` (`'existing FK differs from expected (mapping/update/delete rule)'`); không tự drop/tạo lại | DB |
+| TC-LEG-041 | ABORT sau 5a/5b rồi chạy lại | staging cố ý để 52 dừng sau 5b (dữ liệu khiến `mems_m52_assert_no_duplicate_primary`/bước sau `SIGNAL`) | DDL và DML 5a/5b **vẫn tồn tại** (implicit commit); sửa dữ liệu gốc → chạy lại precheck (phải `DATA_PRECHECK_READY`), precheck data (block = 0), 52; 5a/5b idempotent nên số dòng `class_subject`/`source='LEGACY'` không tăng; postcheck 2a–2e = 0 dòng. Vị trí: `ROLLBACK.md` §2 | DB |
 
 ---
 
@@ -258,7 +282,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | TC-CON-001 | Tạo trùng mã đồng thời | 2 request song song cùng `code` | 1×201, 1×409 `SUBJECT_CODE_EXISTS` | IT |
 | TC-CON-002 | Áp curriculum đồng thời | 2 request cùng version | 1×200, 1×409 `DATA_CHANGED` | IT |
 | TC-CON-003 | Sửa curriculum đồng thời | 2 PUT cùng version | 1×200, 1×409 | IT |
-| TC-CON-004 | Trạng thái lớp đổi giữa chừng | scheduler chuyển `DANG_DIEN_RA` | Request sửa môn nhận 409 `CLASS_SUBJECT_LOCKED` | IT |
+| TC-CON-004 | Trạng thái lớp đổi giữa chừng | scheduler chuyển `DANG_DIEN_RA` | Request sửa môn nhận 409 `CLASS_NOT_EDITABLE` | IT |
 | TC-CON-005 | Bulk chuyên môn đồng thời | 2 PUT cùng version | 1×200, 1×409 | IT |
 | TC-CON-006 | Thêm cạnh tiên quyết đồng thời | 2 request thêm cùng cạnh | 1×201, 1×409 `PREREQUISITE_DUPLICATE`/`CONFLICT` | IT |
 
@@ -269,12 +293,12 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 | AC | Test case |
 |---|---|
 | AC-SUB-01…08 | TC-SUB-001…021 |
-| AC-CUR-01…10 | TC-CUR-001…025 |
+| AC-CUR-01…16 | TC-CUR-001…027 |
 | AC-TCH-01…09 | TC-TCH-001…020 (TC-TCH-008…011 không thuộc Phase 1) |
-| AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
+| AC-RBAC-01…14 | TC-RBAC-001…017 |
 | AC-VAL-01…11 | E-01…E-29 |
-| AC-VAL-12…20, AC-SUB-15…17 | TC-CLS-021…048, E-30…E-43 |
-| Legacy | TC-LEG-001…024 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency) |
+| AC-VAL-12…25, AC-SUB-15…17 | TC-CLS-021…051, E-30…E-47 |
+| Legacy | TC-LEG-001…041 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency; 030…041: audit thuộc tính cột, referential action, history/specialty_subject, helper 51, abort-rerun) |
 | Concurrency | TC-CON-001…006 |
 
 ---
@@ -298,8 +322,22 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
 - D-06a → TC-TCH-008…011, TC-RBAC-010 là Phase 2; TC-TCH-019 xác nhận `APPROVED` ngay.
 - D-07 → TC-CUR-009/010/019…024, TC-LEG-011…015, TC-CON-006.
 - D-14 → TC-RBAC-011/012.
-- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…024.
+- D-08/D-15 → TC-CLS-019, TC-CLS-021…048, TC-LEG-016…026.
+- D-06a (không duyệt) → TC-TCH-008/009/010 là “không tồn tại”; schema CHECK chỉ `APPROVED/REVOKED` kiểm ở TC-LEG-026 (nhánh (b): bảng cũ còn `PENDING` → 52 ABORT) và ở IT H2 (câu lệnh `INSERT` trạng thái `PENDING` bị CHECK từ chối).
 - D-09 → TC-CLS-046 (fallback chỉ khi chưa có bản ghi `class_subject` tương ứng).
+
+**Chốt bổ sung 2026-11-20 (giải findings WP1):**
+
+- F-BLK-01 → TC-CLS-049/050 (fingerprint; E-44).
+- F-MAJ-01 → TC-CLS-027 (`PRIMARY_REASON_TOO_LONG`; E-35).
+- F-MAJ-02 → TC-RBAC-017 (áp curriculum cần `class.edit` + `curriculum.view`).
+- F-MAJ-03 → TC-RBAC-016 (READ subject không kế thừa `class.*`/`student.view`).
+- F-MAJ-04 → TC-CLS-044 (đổi `subjectId` qua `PUT /classes/{id}` bắt buộc `reason`/`operationId`/`version`).
+- F-MAJ-05 → TC-CLS-051 (`oldTeacherName`/`changedByName` snapshot; E-45).
+- F-MAJ-06 → kiểm response dùng `ACTIVE`/`theorySessions`/`practiceSessions`/`sequenceNo`/`required`/`note`.
+- F-MAJ-07 → TC-CUR-026/027 (`expectedVersion` bắt buộc; E-46/47).
+- F-MED-02/03 → TC-CUR-016 (404) và các E-xx tương ứng.
+- F-MED-05 → TC-LEG (UNIQUE `subject(org_id, code)` bật ở 52; idempotent, NULL nhiều bản ghi).
 
 Câu hỏi kỹ thuật còn lại:
 

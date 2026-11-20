@@ -63,34 +63,60 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   2. Tạo `52_people_class_subject.sql` (specialty_subject, teacher_subject, class_subject,
      class_subject_history, backfill).
      `class_subject` dùng FK tổ hợp `(class_id, org_id) → school_class(id, org_id)`, có
-     `is_primary` + cột sinh `primary_class_id` + UNIQUE `uq_class_subject_primary`.
-     `class_subject_history` có `old_source`/`new_source`, `reason`/`operation_id` NOT NULL,
-     UNIQUE `(org_id, operation_id)`, FK `(class_id, org_id)` RESTRICT.
+     `is_primary` + cột sinh `primary_class_id` + UNIQUE `uq_class_subject_primary`, tạo **đầy đủ
+     trong một `CREATE TABLE`**. Nếu bảng đã tồn tại, 52 **chỉ** chấp nhận schema Revision 3 đầy đủ;
+     khác → `SIGNAL` (không tự `ADD COLUMN` cho bảng cũ không rõ nguồn gốc).
+     `teacher_subject` theo D-06a: CHECK `status IN ('APPROVED','REVOKED')`, không `PENDING`.
+     `class_subject_history` Revision 5 (19 cột) có `old_source`/`new_source`, `reason`/`operation_id`
+     NOT NULL, `request_fingerprint CHAR(64) NOT NULL`, snapshot `old_teacher_name`/`changed_by_name`
+     (nullable), UNIQUE `(org_id, operation_id)`, FK `(class_id, org_id)` RESTRICT.
      **Không** tạo migration 53 trừ khi xác minh một bản 52 cũ đã chạy.
-  3. Đổi `uq_subject_org_code` thành **UNIQUE** sau pre-check trùng (D-04; nhiều NULL hợp lệ).
+  3. Đổi `uq_subject_org_code` thành **UNIQUE** ngay trong 52 (D-04): procedure tự kiểm trùng,
+     `SIGNAL 45000` nếu còn trùng, idempotent nếu UNIQUE đã đúng; nhiều `NULL` hợp lệ.
   4. (Tuỳ chọn D-03) thêm cột default trên `subject` nếu người dùng muốn.
   5. Cập nhật `backend/PeopleService/src/test/resources/people-test-schema.sql` tương ứng
-     (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1).
-  6. Viết script backfill riêng (D-11), chưa chạy production; script báo cáo phần không khớp/mập mờ.
+     (lưu ý: H2 dùng cột thường thay cột sinh — xem `database-schema.md` §9.1; `teacher_subject`
+     CHECK chỉ `APPROVED/REVOKED`).
+  6. Viết script backfill riêng (D-11), chưa chạy production; mọi dòng không khớp/mập mờ là
+     `BLOCK_MIGRATION` (phải sửa dữ liệu), không phải “ghi nhận để rà soát sau”.
      Backfill `class_subject.is_primary = 1` **chỉ** cho dòng khớp chính xác
      `school_class.subject_id`; không đoán, không tạo primary khi `subject_id IS NULL`, không ghi đè
-     primary đang mâu thuẫn, không tạo trùng `(class_id, subject_id)`.
+     primary đang mâu thuẫn, không tạo trùng `(class_id, subject_id)`, không set `teacher_id = NULL`
+     để né FK. `teacher_id` của lớp và của dòng `class_subject` phải tồn tại trong
+     `staff_profile(user_id, org_id)` cùng org (nếu không → BLOCK).
   7. Bảng `class_subject_history` **không** backfill hồi tố (không có dữ liệu nguồn).
-  8. Chạy pre-check `migrations/51_52_precheck.sql` (query 0–9 + **phần B phân loại 10–13**) và
-     post-check `51_52_postcheck.sql` mục 7 trên staging; lưu báo cáo manual review.
-     **Gate:** `BLOCK_MIGRATION = 0` và mọi `MANUAL_REVIEW` đã được người dùng xử lý/chấp nhận.
+  8. Chạy pre-check schema `migrations/51_52_precheck.sql` (query 0b quyết định bước tiếp theo), rồi
+     (nếu `DATA_PRECHECK_READY`) pre-check data `migrations/51_52_precheck_data.sql`, sau đó
+     post-check `51_52_postcheck.sql` mục 7 trên staging; lưu báo cáo.
+     **Gate:** danh sách `BLOCK_MIGRATION` phải **0 dòng** và mọi dòng phải được **sửa dữ liệu**
+     trước 52 — không có nhãn “chấp nhận ghi nhận”.
   9. Trước khi chạy 52 trên dữ liệu thật, xác nhận optimistic locking: `school_class.version` tồn tại
      (dump `DB_11_16.sql:391`, H2 `people-test-schema.sql:147`) và `SchoolClassRepository.update`
-     dùng `version = version + 1 ... AND version = ?` — xem `wp1-readiness-report.md` §6.
+     dùng `version = version + 1 ... AND version = ?` — xem `wp1-readiness-report.md` §3.1.
 - **File:** draft `docs/phase-1/migrations/51_people_curriculum.sql`,
-  `52_people_class_subject.sql`, precheck/postcheck, `ROLLBACK.md`; test schema H2 nêu trên.
-- **Test:** TC-LEG-001…024 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
-  TC-LEG-009…024.
-- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback 7 bước đã ghi;
-  không đổi dữ liệu cũ.
+  `52_people_class_subject.sql`, `51_52_precheck.sql`, `51_52_precheck_data.sql`,
+  `51_52_postcheck.sql`, `ROLLBACK.md`; test schema H2 nêu trên.
+- **Test:** TC-LEG-001…026 trên MySQL staging; test H2 dựng schema không lỗi; TC-CLS-020,
+  TC-LEG-009…026.
+- **DoD:** migration idempotent chạy 2 lần không lỗi; **51 chạy trước 52**; rollback 7 bước (partial
+  rollback 4 bước đúng dependency) đã ghi; không đổi dữ liệu cũ.
 - **Rollback:** theo `ROLLBACK.md` — quiesce → export history → export class_subject/liên quan →
-  xác minh → drop FK → drop index/cột sinh đúng dependency → drop bảng con → cha. Nếu đã có history
-  hoặc dữ liệu mới: **forward-fix**, không rollback.
+  xác minh → drop FK → partial primary: index → CHECK → cột sinh → `is_primary` → drop bảng con →
+  cha. Nếu đã có history hoặc dữ liệu mới: **forward-fix**, không rollback.
+
+### WP1.6 — Gateway wiring (S)
+
+- **Mục tiêu:** FE gọi được qua gateway; **không** đổi hợp đồng API.
+- **Việc:**
+  1. Thêm route `/api/curricula/**` (StripPrefix=1) vào `APIGateway/src/main/resources/application.yml`.
+  2. Thêm route lớp–môn mới `/api/classes/**/subjects`, `/api/classes/**/subject-history` nếu
+     gateway hiện chỉ route `/api/classes/**` chung — kiểm lại để không che route cũ.
+  3. Không đổi CORS/URL backend.
+- **File:** `backend/APIGateway/src/main/resources/application.yml` (người dùng tự sửa).
+- **DoD:** gọi `/api/curricula` và `/api/classes/{id}/subjects` qua gateway trả đúng service,
+  không 404 do thiếu route.
+- **Lưu ý:** công việc này được **tách khỏi WP1**; gate `READY FOR BACKEND IMPLEMENTATION`
+  không phụ thuộc việc route đã thêm hay chưa.
 
 ### WP2 — Hoàn thiện Subject (M)
 
@@ -101,8 +127,15 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   3. `SubjectController`: thêm module guard (D-10), `GET /subjects/check-code`,
      `GET /subjects/{id}/usage`. **Không** thêm `page`/`size` (D-13 = A).
   4. `ErrorCode`: thêm `SUBJECT_CODE_EXISTS`, `SUBJECT_INACTIVE`.
-  5. Map `DuplicateKeyException` theo tên constraint (code vs name).
+  5. Map `DuplicateKeyException` theo **tên index** (`uq_subject_org_code` vs tên) — không dựa
+     chuỗi message; nếu không khớp tên đã biết thì trả `CONFLICT` chung (F-LOW-04).
   6. Audit giữ nguyên; bổ sung `classesUsingSubject` ở status (đã có).
+  7. (F-MAJ-03) `GET /subjects` chỉ `OWNER` hoặc `subject.view`/`subject.manage` scope
+     ORGANIZATION; **bỏ** kế thừa từ `class.view`/`student.view`/`class.create`/
+     `class.assign_teacher`/`class.teacher.reassign`; cập nhật `@PreAuthorize` + test hồi quy.
+  8. (F-LOW-03) `SubjectStatusRequest` đang dùng key `ACTIVE_REQUIRED` không có trong `ErrorCode`
+     (rơi về `INVALID_KEY`): đổi sang key có thật hoặc thêm `ACTIVE_REQUIRED` vào enum + handler
+     map đúng; test lại `PATCH /subjects/{id}/status` thiếu field.
 - **File thật:**
   - `backend/PeopleService/src/main/java/com/mems/controller/SubjectController.java`
   - `.../repository/SubjectRepository.java`
@@ -145,6 +178,8 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   1. `CurriculumRepository`, `CurriculumService`, `CurriculumController`.
   2. DTO create/update/response/subject; trường `prerequisiteSubjectIds` (mảng 0..n).
   3. Validate chuỗi tiên quyết (DFS), sequence, version; **không** kiểm tổng LT + TH bắt buộc.
+     (F-MAJ-07) `expectedVersion` **bắt buộc** cho thêm/sửa/xoá `curriculum_subject`; khoá theo
+     `curriculum.version`; cập nhật dòng con + tăng version cha trong **cùng transaction**.
   4. Ghi/xoá cạnh trong `curriculum_subject_prerequisite` cùng transaction với `curriculum_subject`.
   5. Audit `CURRICULUM_*`; optimistic lock.
   6. (Tuỳ chọn) clone — phải remap `prerequisiteSubjectIds` sang môn của bản clone.
@@ -155,7 +190,7 @@ các lựa chọn cuối, không còn bước "chờ chốt".
   - `.../repository/CurriculumSubjectPrerequisiteRepository.java`
   - `.../dto/CurriculumCreateRequest.java`, `CurriculumUpdateRequest.java`,
     `CurriculumResponse.java`, `CurriculumSubjectRequest.java`, `CurriculumSubjectResponse.java`
-- **Test:** TC-CUR-001…025.
+- **Test:** TC-CUR-001…027.
 - **DoD:** CRUD đầy đủ; lỗi trùng/chu trình/tiên quyết ngoài curriculum đúng mã; nhiều tiên quyết
   hoạt động; version hoạt động.
 - **Rollback:** tắt controller/route; bảng giữ nguyên.
@@ -166,6 +201,7 @@ các lựa chọn cuối, không còn bước "chờ chốt".
 - **Việc:**
   1. `ClassSubjectRepository` (đọc lớp môn, upsert, xoá, suy legacy từ `subject_id`).
   2. `SchoolClassService`: applyCurriculum, add/update/delete subject; kiểm trạng thái + version.
+     Áp curriculum kiểm **đồng thời** `class.edit` + `curriculum.view` (F-MAJ-02).
   3. `SchoolClassController`: 7 endpoint mục 4 `api-contract.md` (gồm đổi môn chính + history).
   4. `SchoolClassResponse` thêm `curriculumId` (field mới, không phá);
      `ClassSubjectResponse` thêm `isPrimary`.
@@ -173,13 +209,16 @@ các lựa chọn cuối, không còn bước "chờ chốt".
      `school_class.teacher_id` khi lớp chưa có bản ghi `class_subject` tương ứng (D-09).
   6. Audit `CLASS_CURRICULUM_APPLIED`, `CLASS_SUBJECT_*`, `CLASS_PRIMARY_SUBJECT_CHANGED`.
   7. (D-15) Đồng bộ môn chính: tách service đổi môn chính (ví dụ `PrimarySubjectChangeService`)
-     gồm một `@Transactional`: kiểm `operationId`/idempotency → khoá lớp → kiểm `expectedVersion`
-     (bắt buộc) → ghi `class_subject_history` (kèm `old_source`/`new_source`) → cập nhật
+     gồm một `@Transactional`: kiểm `operationId` → so `request_fingerprint` (SHA-256 64 hex,
+     chuẩn hoá cố định) → khoá lớp → kiểm `expectedVersion`
+     (bắt buộc) → ghi `class_subject_history` (kèm `old_teacher_name`/`changed_by_name` snapshot
+     + `old_source`/`new_source` + fingerprint) → cập nhật
      `school_class.subject_id` + version → đồng bộ `is_primary` (tái dùng dòng nếu có) → audit.
      Cả `PUT /classes/{id}/subjects/primary` và `PUT /classes/{id}` (khi `subjectId` đổi) phải
      gọi **cùng** service này; `changedBy` lấy từ JWT; API class-subject **không** cho xoá dòng
      primary (409 `CLASS_SUBJECT_LEGACY_PROTECTED`).
-  8. `GET /classes/{id}/subject-history` — chỉ đọc, trả snapshot.
+  8. `GET /classes/{id}/subject-history` — chỉ đọc, trả snapshot (gồm `oldTeacherName`,
+     `changedByName`); phân trang **0-based**.
   9. (D-08/D-15) `DELETE /classes/{id}`: nếu lớp đã có `class_subject_history` → 409 `CONFLICT`
      (message: có lịch sử môn), **không** CASCADE/xoá history; kiểm trước để không rơi lỗi FK 500.
 - **File thật:**
@@ -191,7 +230,7 @@ các lựa chọn cuối, không còn bước "chờ chốt".
     `.../service/PrimarySubjectChangeService.java`, `.../dto/ClassSubject*`,
     `.../dto/ChangePrimarySubjectRequest.java`, `.../dto/SubjectChangeHistoryResponse.java`,
     `.../dto/ApplyCurriculumRequest.java`
-- **Test:** TC-CLS-001…048, TC-RBAC-014/015, TC-CON-002/004.
+- **Test:** TC-CLS-001…051, TC-RBAC-014…017, TC-CON-002/004.
 - **DoD:** lớp legacy đọc được; lớp mới áp curriculum đúng; sửa template không đổi snapshot;
   đổi môn chính (kể cả `DANG_DIEN_RA`) sinh history + đồng bộ `school_class.subject_id`, một
   transaction, không chuyển giáo viên, không tạo primary thứ hai; dòng primary được bảo vệ.
@@ -264,7 +303,7 @@ WP0 ─┬─> WP1 ─┬─> WP4 ──> WP5 ──> WP7
 | Class–Subject | `.../repository/ClassSubjectRepository.java` + DTO | Tạo mới |
 | Teacher–Subject | `.../repository/TeacherSubjectRepository.java` + DTO | Tạo mới |
 | Internal | `.../controller/InternalScheduleLookupController.java` | Sửa/thêm method |
-| Gateway | `backend/APIGateway/src/main/resources/application.yml` | Thêm route `/api/curricula/**` |
+| Gateway | `backend/APIGateway/src/main/resources/application.yml` | WP1.6: thêm route `/api/curricula/**` (+ lớp–môn mới nếu thiếu) |
 | Audit | dùng `PeopleAuditService` hiện có | Không tạo bảng mới |
 
 > Trước khi tạo file, kiểm tra lại repo (tên có thể đã tồn tại). Không đặt tên trùng chức năng.
@@ -299,6 +338,8 @@ Không cần feature flag lâu dài. Nếu dùng dual-read, đặt property tạ
 | FE dùng quyền không có trong catalog | Trung bình | Rà `frontend/src/lib/permissions.ts`; không thêm mã lạ |
 | H2 khác MySQL | Trung bình | Kiểm DDL staging |
 | Áp module guard làm hỏng luồng cũ | Trung bình | Chỉ bật sau khi xác nhận module luôn bật |
+| READ subject thu hẹp (F-MAJ-03) làm 403 người từng xem được | Trung bình | Cấp `subject.view` trước khi deploy; test TC-RBAC-016 |
+| Áp curriculum cần thêm `curriculum.view` (F-MAJ-02) | Trung bình | Cấp quyền D-14 cho Giáo vụ; test TC-RBAC-017 |
 
 ---
 
@@ -318,8 +359,12 @@ Không cần feature flag lâu dài. Nếu dùng dual-read, đặt property tạ
 - [ ] `DELETE /classes/{id}` trả 409 `CONFLICT` khi đã có history (không rơi lỗi FK).
 - [ ] Internal API/outbox hook (khi cần).
 - [ ] Test theo `test-cases.md`.
-- [ ] Gateway route `/api/curricula/**`.
-- [ ] Handoff FE.
+- [ ] WP1.6: Gateway route `/api/curricula/**` (+ route lớp–môn mới nếu thiếu).
+- [ ] Áp module guard `STUDENT_MANAGEMENT` cho Subject **và** Curriculum (D-10).
+- [ ] Xác minh module `TEACHER_ASSIGNMENT` có đăng ký trong Identity hay không; nếu không, ghi
+      UNVERIFIED và không phụ thuộc nó ở gate.
+- [ ] Bật UNIQUE `subject(org_id, code)` qua 52 (F-MED-05) — chỉ sau khi pre-check trùng = 0.
+- [ ] Handoff FE (từ vựng F-MAJ-06; `expectedVersion` F-MAJ-07; snapshot tên F-MAJ-05).
 - [ ] Báo cáo kết quả, nêu rõ phần chưa kiểm được.
 
 ---
@@ -327,12 +372,16 @@ Không cần feature flag lâu dài. Nếu dùng dual-read, đặt property tạ
 ## 9. Definition of Done (Phase 1)
 
 1. Subject: đủ nghiệp vụ, `code` tuỳ chọn + unique khi có giá trị, không phá dữ liệu.
-2. Curriculum: tạo/sửa/ngừng, danh sách môn + thứ tự + số buổi/LT-TH + **nhiều tiên quyết**, version.
+2. Curriculum: tạo/sửa/ngừng, danh sách môn + thứ tự + số buổi/LT-TH + **nhiều tiên quyết**, version;
+   thêm/sửa/xoá môn bắt buộc `expectedVersion` khoá theo `curriculum.version` (F-MAJ-07).
 3. Class–Subject: nhiều môn, snapshot, legacy fallback, giáo viên theo môn, dòng primary được bảo vệ
-   (D-15); đổi môn chính (kể cả `DANG_DIEN_RA`) ghi `class_subject_history` + đồng bộ
-   `school_class.subject_id` trong một transaction, không chuyển giáo viên (D-08/D-15).
+   (D-15); đổi môn chính (kể cả `DANG_DIEN_RA`) ghi `class_subject_history` (fingerprint + snapshot
+   tên) + đồng bộ `school_class.subject_id` trong một transaction, không chuyển giáo viên
+   (D-08/D-15); idempotency theo `operationId` + fingerprint (F-BLK-01).
 4. Teacher–Subject: nguồn sự thật theo ID, backfill đối soát, assignable đúng; không có bước duyệt.
-5. RBAC: `curriculum.view/manage` (D-14) tách khỏi `subject.*`, ORGANIZATION, không tự cấp.
+5. RBAC: `curriculum.view/manage` (D-14) tách khỏi `subject.*`, ORGANIZATION, không tự cấp; READ
+   subject chỉ OWNER/`subject.view`/`subject.manage` (F-MAJ-03); áp curriculum cần thêm
+   `curriculum.view` (F-MAJ-02).
 6. ERD/schema/API/validation/test khớp nhau.
 7. Test xanh; E2E qua gateway; báo cáo trung thực.
 8. Không chạm Phase 2 (xếp lịch).

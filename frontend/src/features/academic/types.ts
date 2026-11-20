@@ -201,6 +201,294 @@ export interface SubjectInput {
   description?: string
 }
 
+// ============================================================================
+// Phase 1 — Academic Setup Types (D-01 to D-15)
+// ============================================================================
+
+/** D-04: Subject Request DTOs */
+export interface SubjectCreateRequest {
+  code?: string | null
+  name: string
+  description?: string | null
+}
+
+export interface SubjectUpdateRequest {
+  code?: string | null
+  name: string
+  description?: string | null
+}
+
+export interface SubjectStatusUpdateRequest {
+  active: boolean
+}
+
+/** Đề xuất kiểm tra mã môn học trùng lặp */
+export interface SubjectCodeCheckResponse {
+  code: string
+  available: boolean
+  existingId: string | null
+}
+
+/** Đề xuất lấy thông tin sử dụng môn học trong các lớp */
+export interface SubjectUsageResponse {
+  subjectId: string
+  classesUsingSubject: number
+  classIds?: string[]
+}
+
+// ----------------------------------------------------------------------------
+// Curriculum Types (D-02, D-03, D-12, D-14)
+// Không có học kỳ (termNo) trong Phase 1 (D-02)
+// ----------------------------------------------------------------------------
+
+export interface Curriculum {
+  id: string
+  orgId: string
+  code: string
+  name: string
+  description: string | null
+  gradeLevel: string | null
+  majorCode: string | null
+  isActive: boolean
+  version: number
+  subjectCount?: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface CurriculumSummary {
+  id: string
+  code: string
+  name: string
+  gradeLevel: string | null
+  isActive: boolean
+  version: number
+  subjectCount: number
+}
+
+export interface CurriculumCreateRequest {
+  code: string
+  name: string
+  description?: string | null
+  gradeLevel?: string | null
+  majorCode?: string | null
+}
+
+export interface CurriculumUpdateRequest {
+  code: string
+  name: string
+  description?: string | null
+  gradeLevel?: string | null
+  majorCode?: string | null
+  version: number
+}
+
+export interface CurriculumStatusUpdateRequest {
+  active: boolean
+}
+
+// ----------------------------------------------------------------------------
+// Curriculum Subject & Prerequisite Types (D-03, D-07)
+// ----------------------------------------------------------------------------
+
+export interface PrerequisiteSubject {
+  subjectId: string
+  subjectCode: string | null
+  subjectName: string
+}
+
+export interface PrerequisiteSubjectIds {
+  prerequisiteSubjectIds: string[]
+}
+
+export interface CurriculumSubject {
+  curriculumId: string
+  subjectId: string
+  subjectCode: string | null
+  subjectName: string
+  sequenceNo: number
+  requiredSessions: number
+  sessionMinutes: number
+  theoryHours: number | null
+  practiceHours: number | null
+  isRequired: boolean
+  notes: string | null
+  prerequisiteSubjectIds: string[]
+  prerequisites?: PrerequisiteSubject[]
+}
+
+export interface CurriculumSubjectCreateRequest {
+  subjectId: string
+  sequenceNo: number
+  requiredSessions: number
+  sessionMinutes: number
+  theoryHours?: number | null
+  practiceHours?: number | null
+  isRequired?: boolean
+  notes?: string | null
+  prerequisiteSubjectIds?: string[]
+}
+
+export interface CurriculumSubjectUpdateRequest {
+  sequenceNo: number
+  requiredSessions: number
+  sessionMinutes: number
+  theoryHours?: number | null
+  practiceHours?: number | null
+  isRequired?: boolean
+  notes?: string | null
+  prerequisiteSubjectIds?: string[]
+}
+
+// ----------------------------------------------------------------------------
+// Teacher Subject & Specialty Subject Types (D-06, D-06a)
+// Teacher Subject mặc định APPROVED, không có luồng PENDING/Approve/Reject
+// ----------------------------------------------------------------------------
+
+export interface TeacherSubject {
+  subjectId: string
+  subjectCode: string | null
+  subjectName: string
+  status: 'APPROVED' | 'REVOKED'
+  source: 'SPECIALTY' | 'MANUAL'
+  createdAt?: string | null
+}
+
+export interface TeacherSubjectListResponse {
+  userId: string
+  version: number // staff_profile.version
+  items: TeacherSubject[]
+}
+
+export interface TeacherSubjectCreateRequest {
+  subjectId: string
+  source?: 'MANUAL' | 'SPECIALTY'
+}
+
+export interface TeacherSubjectUpdateRequest {
+  subjectIds: string[]
+  version: number // staff_profile.version
+  confirmRevokeInUse?: boolean
+}
+
+export interface SpecialtySubject {
+  specialtyId: string
+  subjectIds: string[]
+}
+
+export interface SpecialtySubjectUpdateRequest {
+  subjectIds: string[]
+}
+
+// ----------------------------------------------------------------------------
+// Class Subject Types (D-01, D-08, D-09, D-15)
+// ----------------------------------------------------------------------------
+
+export type ClassSubjectSource = 'CURRICULUM' | 'MANUAL' | 'LEGACY'
+export type ClassSubjectStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+
+export interface ClassSubject {
+  classId: string
+  subjectId: string
+  subjectCode: string | null
+  subjectName: string
+  source: ClassSubjectSource
+  curriculumId: string | null
+  requiredSessions: number | null
+  plannedSessions: number | null
+  sessionMinutes: number | null
+  teacherId: string | null
+  teacherName: string | null
+  isPrimary: boolean
+  status: ClassSubjectStatus
+}
+
+export interface ClassSubjectListResponse {
+  classId: string
+  curriculumId: string | null
+  subjects: ClassSubject[]
+}
+
+export interface ClassSubjectCreateRequest {
+  subjectId: string
+  plannedSessions: number
+  sessionMinutes: number
+  teacherId?: string | null
+}
+
+export interface ClassSubjectUpdateRequest {
+  plannedSessions?: number
+  sessionMinutes?: number
+  teacherId?: string | null
+  version: number // school_class.version
+}
+
+export interface ApplyCurriculumRequest {
+  curriculumId: string
+  confirmReplace?: boolean
+  keepManualSubjects?: boolean
+  version: number // school_class.version
+}
+
+export interface PrimarySubjectChangeRequest {
+  subjectId: string
+  reason: string
+  expectedVersion: number // school_class.version
+  operationId: string // client-generated UUID v4
+  plannedSessions?: number | null
+  sessionMinutes?: number | null
+}
+
+export interface PrimarySubjectChangeResponse {
+  classId: string
+  subjectId: string
+  subjectName: string
+  version: number
+  historyId: string
+  operationId: string
+}
+
+export interface ClassSubjectHistory {
+  id: string
+  classId: string
+  oldSubjectId: string | null
+  oldSubjectCode: string | null
+  oldSubjectName: string | null
+  oldTeacherId: string | null
+  oldTeacherName: string | null
+  oldSource: ClassSubjectSource | null
+  newSubjectId: string
+  newSubjectCode: string | null
+  newSubjectName: string
+  newSource: ClassSubjectSource
+  reason: string
+  operationId: string
+  changedBy: string
+  changedByName?: string | null
+  changedAt: string
+}
+
+export interface ClassSubjectHistoryResponse {
+  items: ClassSubjectHistory[]
+  total: number
+  page: number // 0-based
+  size: number
+  pages?: number
+}
+
+export const CLASS_SUBJECT_SOURCE_LABELS: Record<ClassSubjectSource, string> = {
+  CURRICULUM: 'Chương trình',
+  MANUAL: 'Thủ công',
+  LEGACY: 'Kế thừa',
+}
+
+export const CLASS_SUBJECT_STATUS_LABELS: Record<ClassSubjectStatus, string> = {
+  PLANNED: 'Kế hoạch',
+  IN_PROGRESS: 'Đang diễn ra',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã huỷ',
+}
+
 export const CLASS_STATUS_LABELS: Record<string, string> = {
   CHUA_BAT_DAU: 'Chưa bắt đầu',
   DANG_DIEN_RA: 'Đang diễn ra',

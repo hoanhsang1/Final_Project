@@ -1,0 +1,1593 @@
+diff --git a/backend/PeopleService/src/test/resources/people-test-schema.sql b/backend/PeopleService/src/test/resources/people-test-schema.sql
+index 6ec166a..97bd128 100644
+--- a/backend/PeopleService/src/test/resources/people-test-schema.sql
++++ b/backend/PeopleService/src/test/resources/people-test-schema.sql
+@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS specialty (
+  is_active BOOLEAN NOT NULL DEFAULT TRUE, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
+  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented)
+ );
++-- H2 PARITY NOTE (D-04): uq_subject_org_code is UNIQUE here because the service
++-- contract (409 on duplicate code) and the D-04 target require it. MySQL staging
++-- only has a NON-unique index from migration 42 until the D-04 UNIQUE ALTER in 52
++-- (currently commented) runs after its pre-check. Do not weaken this fixture:
++-- tests would stop proving the intended contract. Verify D-04 on MySQL staging.
+ CREATE TABLE IF NOT EXISTS subject (
+  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
+  code VARCHAR(50), description VARCHAR(500),
+@@ -84,6 +89,10 @@ CREATE TABLE IF NOT EXISTS subject (
+  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)
+ );
+ -- Phase 1 Revision 3: curriculum templates (migration 51 logical schema).
++-- H2 PARITY LIMITATION: secondary indexes of 51/52 (idx_curriculum_subject_subject,
++-- idx_class_subject_*, idx_teacher_subject_*, idx_csh_*, idx_specialty_subject_*) are
++-- omitted here; they do not change query semantics in H2. The MySQL migration audits
++-- them on staging. Constraint/column semantics below mirror 51/52.
+ CREATE TABLE IF NOT EXISTS curriculum (
+  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
+  code VARCHAR(50) NOT NULL, name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
+@@ -103,7 +112,8 @@ CREATE TABLE IF NOT EXISTS curriculum_subject (
+  FOREIGN KEY(curriculum_id,org_id) REFERENCES curriculum(id,org_id) ON DELETE CASCADE,
+  FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id),
+  CONSTRAINT chk_curriculum_subject_sessions CHECK(
+-  required_sessions > 0 AND session_minutes > 0 AND theory_sessions >= 0 AND practice_sessions >= 0)
++  required_sessions > 0 AND session_minutes > 0 AND theory_sessions >= 0 AND practice_sessions >= 0),
++ CONSTRAINT chk_curriculum_subject_sequence CHECK(sequence_no > 0)
+ );
+ CREATE TABLE IF NOT EXISTS curriculum_subject_prerequisite (
+  curriculum_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL,
+@@ -186,6 +196,8 @@ CREATE TABLE IF NOT EXISTS class_subject (
+  FOREIGN KEY(teacher_id,org_id) REFERENCES staff_profile(user_id,org_id),
+  CONSTRAINT chk_class_subject_status CHECK(status IN ('PLANNED','ACTIVE','COMPLETED','CANCELLED')),
+  CONSTRAINT chk_class_subject_source CHECK(source IN ('LEGACY','CURRICULUM','MANUAL')),
++ -- MySQL 52: CHECK (is_primary IN (0,1)); H2 BOOLEAN uses FALSE/TRUE for the same set.
++ CONSTRAINT chk_class_subject_primary CHECK(is_primary IN (FALSE, TRUE)),
+  CONSTRAINT chk_class_subject_sequence CHECK(sequence_no IS NULL OR sequence_no > 0),
+  CONSTRAINT chk_class_subject_sessions CHECK(
+   (planned_sessions IS NULL OR planned_sessions >= 0)
+diff --git a/docs/phase-1/database-schema.md b/docs/phase-1/database-schema.md
+index aca6b81..3e08ded 100644
+--- a/docs/phase-1/database-schema.md
++++ b/docs/phase-1/database-schema.md
+@@ -985,8 +985,10 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
+ | Điểm | MySQL | H2 (test) | Cách xử lý |
+ |---|---|---|---|
+ | Cột sinh | `GENERATED ALWAYS AS (...) STORED` | H2 2.x hỗ trợ `GENERATED ALWAYS AS (...)` nhưng **không** có `STORED` | Khai báo cột thường `primary_class_id char(36)`; service set = `class_id` khi `is_primary=1`, `NULL` khi ngược lại. UNIQUE vẫn giữ |
+-| CHECK constraint | MySQL 8.0.16+ enforce | H2 enforce | Giữ nguyên |
+-| `ON DELETE RESTRICT` trên FK `class_subject_history` | Hỗ trợ | Hỗ trợ | Giữ nguyên |
++| CHECK constraint | MySQL 8.0.16+ enforce toàn bộ Revision 3 (5 CHECK `class_subject`, 3 `class_subject_history`, 2 `teacher_subject`, 1 `curriculum_subject`, 2 `curriculum_subject_prerequisite`) | H2 enforce các CHECK đã khai báo | Fixture H2 **phải khai báo cùng tập CHECK** và được cập nhật theo schema Revision 3; trước lượt 4 thiếu `chk_class_subject_primary` và `chk_curriculum_subject_sequence` — đã bổ sung. `is_primary IN (0,1)` biểu diễn H2 là `IN (FALSE, TRUE)` vì cột `BOOLEAN` |
++| `ON DELETE RESTRICT` trên FK `class_subject_history` | Hỗ trợ | Hỗ trợ | Giữ nguyên; history **không** được cascade |
++| `uq_subject_org_code` | Migration 42 tạo **non-unique**; D-04 (khối commented trong 52) mới đổi sang UNIQUE | Fixture H2 khai báo **UNIQUE** | **Không** đổi D-04 và **không** làm yếu H2: service contract "trùng mã môn → 409" dựa vào `DuplicateKeyException` từ UNIQUE này (`SubjectRepository`), và D-04 là target đã chốt. Đây là **lệch có chủ đích**; MySQL staging phải kiểm D-04 riêng (query 1 PART B = 0 dòng) trước khi tin vào ràng buộc |
++| Index phụ của 51/52 | Đầy đủ; precheck 0b và audit 52 kiểm `information_schema.statistics` | Lược bỏ phần lớn index phụ | Không ảnh hưởng semantics; H2 **không** chứng minh index — audit MySQL là nguồn xác nhận |
+ | `UNIQUE (org_id, operation_id)` với NULL | Cho phép nhiều NULL | Cho phép nhiều NULL | Giữ nguyên; Revision 3 đặt hai cột NOT NULL nên NULL không còn là đường hợp lệ |
+ | `ALTER TABLE … AFTER` | Hỗ trợ | Không hỗ trợ | Không dùng `AFTER` trong draft 51/52; đặt cột ở cuối `ALTER TABLE` |
+ | Composite FK cần index tiền tố trái | Bắt buộc | Bắt buộc | Test schema phải thêm `UNIQUE(id, org_id)` trên `school_class` |
+@@ -999,6 +1001,12 @@ Thứ tự rollback phải ngược với thứ tự tạo: drop FK trước, dr
+ > column. Test H2 phải kiểm service trả 409 khi cố tạo primary thứ hai **và** phải có kiểm thủ công
+ > trên MySQL staging (xem `test-cases.md` TC-CLS-048, TC-LEG-018/019). Tài liệu này **không** tuyên
+ > bố schema đã được xác minh chỉ dựa trên H2.
++>
++> Lượt 4 (fix review findings): `51_52_precheck.sql` (0b) và procedure audit trong 52 kiểm **cả thuộc
++> tính cột** (`COLUMN_TYPE`, `IS_NULLABLE`, `COLUMN_DEFAULT`, độ dài/độ chính xác, collation, `EXTRA`)
++> **và referential action** (`UPDATE_RULE`/`DELETE_RULE`) của từng FK. Bảng đã tồn tại
++> `class_subject_history` và `specialty_subject` cũng được audit đầy đủ **trước** `CREATE TABLE IF NOT
++> EXISTS`; sai ⇒ `SIGNAL`, không tự `ALTER`. H2 không mô phỏng các audit này.
+ 
+ ---
+ 
+diff --git a/docs/phase-1/migrations/51_52_postcheck.sql b/docs/phase-1/migrations/51_52_postcheck.sql
+index 98cf871..42281ab 100644
+--- a/docs/phase-1/migrations/51_52_postcheck.sql
++++ b/docs/phase-1/migrations/51_52_postcheck.sql
+@@ -95,6 +95,76 @@ WHERE table_schema = DATABASE()
+   AND constraint_name IN ('fk_class_subject_class','fk_school_class_curriculum',
+                           'fk_csh_class','chk_class_subject_primary','chk_csh_subject_change');
+ 
++-- 5b) Số cột phải đúng Revision-3: history 16, specialty_subject 5.
++SELECT 'class_subject_history' AS t, COUNT(*) AS cols,
++       (COUNT(*) = 16) AS cols_ok
++FROM information_schema.columns
++WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
++UNION ALL
++SELECT 'specialty_subject', COUNT(*), (COUNT(*) = 5)
++FROM information_schema.columns
++WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
++
++-- 5c) PK + UNIQUE phải đúng cột/thứ tự (0 dòng = đúng).
++SELECT x.table_name, x.index_name, x.cols, e.expect AS expected_cols
++FROM (
++  SELECT table_name, index_name,
++         GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
++  FROM information_schema.statistics
++  WHERE table_schema = DATABASE()
++    AND table_name IN ('class_subject_history','specialty_subject')
++    AND index_name IN ('PRIMARY','uq_csh_operation')
++  GROUP BY table_name, index_name
++) x
++JOIN (
++            SELECT 'class_subject_history' AS table_name, 'PRIMARY' AS index_name,
++                   'id' AS expect
++  UNION ALL SELECT 'class_subject_history', 'uq_csh_operation', 'org_id,operation_id'
++  UNION ALL SELECT 'specialty_subject', 'PRIMARY', 'specialty_id,subject_id'
++) e ON e.table_name = x.table_name AND e.index_name = x.index_name
++WHERE x.cols <> e.expect;
++
++-- 5d) Referential action phải đúng DDL (0 dòng = đúng).
++--     history.fk_csh_class bắt buộc RESTRICT/RESTRICT: xoá lớp KHÔNG được xoá lịch sử.
++SELECT rc.table_name, rc.constraint_name,
++       rc.update_rule, rc.delete_rule,
++       CASE rc.constraint_name
++         WHEN 'fk_class_subject_class'         THEN 'RESTRICT/CASCADE'
++         WHEN 'fk_class_subject_subject'       THEN 'RESTRICT/RESTRICT'
++         WHEN 'fk_class_subject_curriculum'    THEN 'RESTRICT/RESTRICT'
++         WHEN 'fk_class_subject_teacher'       THEN 'RESTRICT/RESTRICT'
++         WHEN 'fk_teacher_subject_teacher'     THEN 'RESTRICT/CASCADE'
++         WHEN 'fk_teacher_subject_subject'     THEN 'RESTRICT/RESTRICT'
++         WHEN 'fk_csh_class'                   THEN 'RESTRICT/RESTRICT'
++         WHEN 'fk_specialty_subject_specialty' THEN 'RESTRICT/CASCADE'
++         WHEN 'fk_specialty_subject_subject'   THEN 'RESTRICT/RESTRICT'
++         ELSE '(ngoài phạm vi WP1)'
++       END AS expected
++FROM information_schema.referential_constraints rc
++WHERE rc.constraint_schema = DATABASE()
++  AND rc.table_name IN ('class_subject','teacher_subject',
++                        'class_subject_history','specialty_subject')
++  AND NOT (
++        (rc.constraint_name = 'fk_class_subject_class'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
++     OR (rc.constraint_name = 'fk_class_subject_subject'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
++     OR (rc.constraint_name = 'fk_class_subject_curriculum'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
++     OR (rc.constraint_name = 'fk_class_subject_teacher'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
++     OR (rc.constraint_name = 'fk_teacher_subject_teacher'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
++     OR (rc.constraint_name = 'fk_teacher_subject_subject'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
++     OR (rc.constraint_name = 'fk_csh_class'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT')
++     OR (rc.constraint_name = 'fk_specialty_subject_specialty'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'CASCADE')
++     OR (rc.constraint_name = 'fk_specialty_subject_subject'
++          AND rc.update_rule = 'RESTRICT' AND rc.delete_rule = 'RESTRICT'))
++ORDER BY rc.table_name, rc.constraint_name;
++
+ -- 6) History phải rỗng ngay sau migration (không backfill hồi tố)
+ SELECT COUNT(*) AS history_rows_after_migration FROM class_subject_history;
+ 
+diff --git a/docs/phase-1/migrations/51_52_precheck.sql b/docs/phase-1/migrations/51_52_precheck.sql
+index 5ba7376..f90175e 100644
+--- a/docs/phase-1/migrations/51_52_precheck.sql
++++ b/docs/phase-1/migrations/51_52_precheck.sql
+@@ -25,9 +25,11 @@ WHERE table_schema = DATABASE()
+ ORDER BY table_name, ordinal_position;
+ 
+ -- 0b) Verdict bước tiếp theo. DATA_PRECHECK_READY CHỈ khi class_subject đã đúng
+---     toàn bộ schema Revision 3: 20 cột (không thiếu/không thừa), PK, 5 index
+---     (PRIMARY + 4), 4 FK đúng bảng/cột đích, 5 CHECK đúng biểu thức, và
+---     primary_class_id là cột sinh STORED đúng biểu thức.
++--     toàn bộ schema Revision 3: 20 cột (không thiếu/không thừa) ĐÚNG thuộc tính
++--     (kiểu, độ dài, precision/scale, NULL, default, collation, generated), PK,
++--     5 nhóm index (PRIMARY + 4), 4 FK đúng bảng/cột đích + đúng ON UPDATE/
++--     ON DELETE, 5 CHECK đúng biểu thức, và primary_class_id là cột sinh STORED
++--     đúng biểu thức.
+ --     Thiếu/sai bất kỳ thành phần nào => BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE.
+ --
+ --     Index: 5 nhóm index Revision 3 phải đúng tên + danh sách cột + thứ tự +
+@@ -51,6 +53,55 @@ WITH cs_cols AS (
+   FROM information_schema.columns
+   WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+ ),
++-- Column attributes must match CREATE TABLE in 52. COLUMN_TYPE is compared
++-- verbatim; length/precision/scale only where applicable. MySQL 8 reports
++-- explicit DEFAULT NULL and "no default" both as NULL, which is semantically
++-- identical here (no NOT NULL column relies on an implicit default).
++cs_attr AS (
++  SELECT COUNT(*) AS bad
++  FROM (
++    SELECT e.column_name
++    FROM (
++      SELECT 'class_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
++             NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
++             'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
++      UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'curriculum_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'sequence_no','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'is_primary','tinyint(1)','NO','0',-1,3,0,'NONE','NONE'
++      UNION ALL SELECT 'primary_class_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','STORED'
++      UNION ALL SELECT 'required_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'planned_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'theory_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'practice_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'session_minutes','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++      UNION ALL SELECT 'status','varchar(20)','NO','PLANNED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'note','varchar(500)','YES',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
++      UNION ALL SELECT 'updated_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++      UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
++    ) e
++    LEFT JOIN information_schema.columns c
++      ON c.table_schema = DATABASE() AND c.table_name = 'class_subject'
++     AND c.column_name = e.column_name
++    WHERE c.column_name IS NULL
++       OR NOT (c.column_type <=> e.column_type)
++       OR NOT (c.is_nullable <=> e.is_nullable)
++       OR NOT (c.column_default <=> e.def_value)
++       OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
++       OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
++       OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
++       OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
++       OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
++       OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
++       OR (e.extra_rule = 'STORED'
++           AND NOT (c.extra LIKE '%GENERATED%' AND c.extra LIKE '%STORED%'))
++  ) d
++),
+ cs_idx AS (
+   SELECT COUNT(*) AS total_idx,
+          COALESCE(SUM(ok), 0) AS ok_idx,
+@@ -100,9 +151,10 @@ cs_idx AS (
+ cs_fk AS (
+   SELECT COUNT(*) AS total_fk,
+          COALESCE(SUM(ok), 0) AS ok_fk,
+-         COALESCE(MAX(wrong_schema), 0) AS fk_wrong_schema
++         COALESCE(MAX(wrong_schema), 0) AS fk_wrong_schema,
++         COALESCE(SUM(bad_rule), 0) AS fk_rule_bad
+   FROM (
+-    SELECT k.constraint_name, k.map, k.wrong_schema,
++    SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
+       CASE
+         WHEN k.constraint_name = 'fk_class_subject_class'
+           AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
+@@ -113,17 +165,34 @@ cs_fk AS (
+         WHEN k.constraint_name = 'fk_class_subject_teacher'
+           AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
+         ELSE 0
+-      END AS ok
++      END AS ok,
++      CASE
++        WHEN k.constraint_name = 'fk_class_subject_class'
++          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
++        WHEN k.constraint_name = 'fk_class_subject_subject'
++          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++        WHEN k.constraint_name = 'fk_class_subject_curriculum'
++          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++        WHEN k.constraint_name = 'fk_class_subject_teacher'
++          AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++        ELSE 1
++      END AS bad_rule
+     FROM (
+-      SELECT constraint_name,
+-             GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+-                                 referenced_column_name)
+-                          ORDER BY ordinal_position SEPARATOR ',') AS map,
+-             MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+-      FROM information_schema.key_column_usage
+-      WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+-        AND referenced_table_name IS NOT NULL
+-      GROUP BY constraint_name
++      SELECT kcu.constraint_name,
++             GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
++                                 kcu.referenced_column_name)
++                          ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
++             MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
++             MAX(rc.update_rule) AS update_rule,
++             MAX(rc.delete_rule) AS delete_rule
++      FROM information_schema.key_column_usage kcu
++      LEFT JOIN information_schema.referential_constraints rc
++        ON rc.constraint_schema = kcu.constraint_schema
++       AND rc.constraint_name = kcu.constraint_name
++       AND rc.table_name = kcu.table_name
++      WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject'
++        AND kcu.referenced_table_name IS NOT NULL
++      GROUP BY kcu.constraint_name
+     ) k
+   ) y
+ ),
+@@ -178,8 +247,9 @@ SELECT
+   (SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'teacher_subject') AS teacher_subject_exists,
+   cs_cols.total_cols, cs_cols.named_cols,
++  cs_attr.bad AS attr_mismatch,
+   cs_idx.ok_idx, cs_idx.idx_prefix, cs_idx.bad_extra, cs_idx.total_idx,
+-  cs_fk.total_fk, cs_fk.ok_fk, cs_fk.fk_wrong_schema,
++  cs_fk.total_fk, cs_fk.ok_fk, cs_fk.fk_wrong_schema, cs_fk.fk_rule_bad,
+   cs_chk.total_chk, cs_chk.ok_chk,
+   cs_gen.n AS gen_rows, cs_gen.ok AS gen_ok,
+   CASE
+@@ -187,14 +257,16 @@ SELECT
+            WHERE table_schema = DATABASE() AND table_name = 'class_subject') = 0
+       THEN 'SKIP_DATA_PRECHECK_NO_TABLE'
+     WHEN cs_cols.total_cols = 20 AND cs_cols.named_cols = 20
++      AND cs_attr.bad = 0
+       AND cs_idx.ok_idx = 5 AND cs_idx.idx_prefix = 0 AND cs_idx.bad_extra = 0
+       AND cs_fk.total_fk = 4 AND cs_fk.ok_fk = 4 AND cs_fk.fk_wrong_schema = 0
++      AND cs_fk.fk_rule_bad = 0
+       AND cs_chk.total_chk = 5 AND cs_chk.ok_chk = 5
+       AND cs_gen.n = 1 AND cs_gen.ok = 1
+       THEN 'DATA_PRECHECK_READY'
+     ELSE 'BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE'
+   END AS next_step
+-FROM cs_cols, cs_idx, cs_fk, cs_chk, cs_gen;
++FROM cs_cols, cs_attr, cs_idx, cs_fk, cs_chk, cs_gen;
+ 
+ -- 0c) Cột bắt buộc của class_subject (Revision 3). present = 0 => thiếu.
+ --     Bảng không tồn tại => tất cả present = 0 (đúng: sẽ được tạo mới bởi 52).
+@@ -326,6 +398,24 @@ SELECT constraint_name, check_clause,
+ FROM information_schema.check_constraints
+ WHERE constraint_schema = DATABASE() AND constraint_name = 'chk_teacher_subject_status';
+ 
++-- 0h) Hai bảng phụ của 52: nếu đã tồn tại, 52 sẽ audit đầy đủ và ABORT khi lệch.
++--     Kỳ vọng: history có FK class kiểu RESTRICT/RESTRICT (không CASCADE);
++--     specialty_subject có specialty CASCADE/RESTRICT và subject RESTRICT/RESTRICT.
++--     0h column_count = 0 => bảng chưa tồn tại (52 sẽ CREATE).
++SELECT 'class_subject_history' AS table_name,
++       (SELECT COUNT(*) FROM information_schema.columns
++         WHERE table_schema = DATABASE() AND table_name = 'class_subject_history') AS column_count
++UNION ALL
++SELECT 'specialty_subject',
++       (SELECT COUNT(*) FROM information_schema.columns
++         WHERE table_schema = DATABASE() AND table_name = 'specialty_subject');
++
++SELECT table_name, constraint_name, update_rule, delete_rule
++FROM information_schema.referential_constraints
++WHERE constraint_schema = DATABASE()
++  AND table_name IN ('class_subject_history', 'specialty_subject')
++ORDER BY table_name, constraint_name;
++
+ -- 1) subject.code trùng trong cùng org (phải 0 trước khi đổi UNIQUE)
+ SELECT org_id, code, COUNT(*) AS n
+ FROM subject
+diff --git a/docs/phase-1/migrations/51_52_precheck_data.sql b/docs/phase-1/migrations/51_52_precheck_data.sql
+index 5f4a31d..497b134 100644
+--- a/docs/phase-1/migrations/51_52_precheck_data.sql
++++ b/docs/phase-1/migrations/51_52_precheck_data.sql
+@@ -3,10 +3,21 @@
+ -- Target: MySQL 8.0.16+, mems_people_db.
+ --
+ -- RUN ONLY IF `51_52_precheck.sql` query 0b returned
+---   next_step = 'DATA_PRECHECK_READY'  (class_subject exists AND has
+---   class_id, subject_id, org_id, is_primary).
+--- This file also assumes class_subject already has the Revision-3 columns/indexes;
+--- if precheck query 0b said BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE, stop here.
++--   next_step = 'DATA_PRECHECK_READY', which requires ALL of:
++--   * class_subject exists with exactly 20 Revision-3 columns and matching
++--     attributes (type/length/precision/scale, NULL, DEFAULT, collation,
++--     generated flag);
++--   * PK (class_id, subject_id); 5 index groups (+ at most 2 InnoDB FK-support
++--     indexes); 4 FKs with exact mappings AND ON UPDATE/ON DELETE rules;
++--   * 5 CHECKs with exact expressions; primary_class_id STORED GENERATED.
++-- Any other verdict (BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE, or
++-- SKIP_DATA_PRECHECK_NO_TABLE when the table does not exist) => STOP: do not
++-- run PART B and do not run 52.
++-- PART B uses only gated class_subject columns (class_id, subject_id, org_id,
++-- is_primary, teacher_id) plus baseline school_class/subject/staff_profile
++-- columns, so it never runs against a table the gate did not validate.
++-- 52 re-audits all four target tables at apply time; READY here means the data
++-- pre-check is meaningful, not that 52 is guaranteed to succeed.
+ --
+ -- Labels (exactly one per live class):
+ --   AUTO_BACKFILL_CANDIDATE — deterministic exact-match backfill (5a/5b)
+diff --git a/docs/phase-1/migrations/51_people_curriculum.sql b/docs/phase-1/migrations/51_people_curriculum.sql
+index 69fe1d0..34f792b 100644
+--- a/docs/phase-1/migrations/51_people_curriculum.sql
++++ b/docs/phase-1/migrations/51_people_curriculum.sql
+@@ -10,29 +10,81 @@ USE mems_people_db;
+ 
+ DELIMITER $
+ 
++-- Helpers are idempotent but never silently accept a same-name object with a
++-- different definition: absent => ADD, present+matching => continue,
++-- present+mismatched => SIGNAL 45000 (no auto-ALTER of an unknown old object).
++
+ DROP PROCEDURE IF EXISTS mems_m51_add_col$
+ CREATE PROCEDURE mems_m51_add_col(IN p_table VARCHAR(64), IN p_col VARCHAR(64),
+-                                  IN p_ddl VARCHAR(500))
++                                  IN p_ddl VARCHAR(500), IN p_type VARCHAR(64),
++                                  IN p_nullable VARCHAR(3), IN p_default VARCHAR(64))
+ BEGIN
+-  IF EXISTS (SELECT 1 FROM information_schema.tables
+-             WHERE table_schema = DATABASE() AND table_name = p_table)
+-     AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+-                     WHERE table_schema = DATABASE() AND table_name = p_table
+-                       AND column_name = p_col) THEN
++  DECLARE v_type VARCHAR(64) DEFAULT NULL;
++  DECLARE v_nullable VARCHAR(3) DEFAULT NULL;
++  DECLARE v_default VARCHAR(64) DEFAULT NULL;
++
++  IF NOT EXISTS (SELECT 1 FROM information_schema.tables
++                 WHERE table_schema = DATABASE() AND table_name = p_table) THEN
++    SIGNAL SQLSTATE '45000'
++      SET MESSAGE_TEXT = 'M51 ABORT: target table for add_col does not exist';
++  END IF;
++
++  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
++                 WHERE table_schema = DATABASE() AND table_name = p_table
++                   AND column_name = p_col) THEN
+     SET @ddl = CONCAT('ALTER TABLE `', p_table, '` ADD COLUMN `', p_col, '` ', p_ddl);
+     PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++  ELSE
++    SELECT column_type, is_nullable, column_default
++      INTO v_type, v_nullable, v_default
++    FROM information_schema.columns
++    WHERE table_schema = DATABASE() AND table_name = p_table
++      AND column_name = p_col;
++    IF NOT (v_type <=> p_type) OR NOT (v_nullable <=> p_nullable)
++       OR NOT (v_default <=> p_default) THEN
++      SIGNAL SQLSTATE '45000'
++        SET MESSAGE_TEXT = 'M51 ABORT: existing column definition differs from expected (type/null/default)';
++    END IF;
+   END IF;
+ END$
+ 
+ DROP PROCEDURE IF EXISTS mems_m51_add_fk$
+ CREATE PROCEDURE mems_m51_add_fk(IN p_table VARCHAR(64), IN p_fk VARCHAR(64),
+-                                 IN p_ddl VARCHAR(500))
++                                 IN p_ddl VARCHAR(500), IN p_map VARCHAR(500),
++                                 IN p_update_rule VARCHAR(16), IN p_delete_rule VARCHAR(16))
+ BEGIN
++  DECLARE v_map VARCHAR(500) DEFAULT NULL;
++  DECLARE v_update VARCHAR(16) DEFAULT NULL;
++  DECLARE v_delete VARCHAR(16) DEFAULT NULL;
++
++  IF NOT EXISTS (SELECT 1 FROM information_schema.tables
++                 WHERE table_schema = DATABASE() AND table_name = p_table) THEN
++    SIGNAL SQLSTATE '45000'
++      SET MESSAGE_TEXT = 'M51 ABORT: target table for add_fk does not exist';
++  END IF;
++
+   IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints
+                  WHERE table_schema = DATABASE() AND table_name = p_table
+                    AND constraint_name = p_fk AND constraint_type = 'FOREIGN KEY') THEN
+     SET @ddl = CONCAT('ALTER TABLE `', p_table, '` ADD CONSTRAINT `', p_fk, '` ', p_ddl);
+     PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++  ELSE
++    SELECT GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
++                               referenced_column_name)
++                        ORDER BY ordinal_position SEPARATOR ',')
++      INTO v_map
++    FROM information_schema.key_column_usage
++    WHERE table_schema = DATABASE() AND table_name = p_table
++      AND constraint_name = p_fk AND referenced_table_name IS NOT NULL;
++    SELECT update_rule, delete_rule INTO v_update, v_delete
++    FROM information_schema.referential_constraints
++    WHERE constraint_schema = DATABASE() AND table_name = p_table
++      AND constraint_name = p_fk;
++    IF NOT (v_map <=> p_map) OR NOT (v_update <=> p_update_rule)
++       OR NOT (v_delete <=> p_delete_rule) THEN
++      SIGNAL SQLSTATE '45000'
++        SET MESSAGE_TEXT = 'M51 ABORT: existing FK differs from expected (mapping/update/delete rule)';
++    END IF;
+   END IF;
+ END$
+ 
+@@ -40,11 +92,33 @@ DROP PROCEDURE IF EXISTS mems_m51_add_unique$
+ CREATE PROCEDURE mems_m51_add_unique(IN p_table VARCHAR(64), IN p_index VARCHAR(64),
+                                      IN p_cols VARCHAR(255))
+ BEGIN
++  DECLARE v_cols VARCHAR(500) DEFAULT NULL;
++  DECLARE v_non_unique INT DEFAULT NULL;
++  DECLARE v_prefix INT DEFAULT NULL;
++
++  IF NOT EXISTS (SELECT 1 FROM information_schema.tables
++                 WHERE table_schema = DATABASE() AND table_name = p_table) THEN
++    SIGNAL SQLSTATE '45000'
++      SET MESSAGE_TEXT = 'M51 ABORT: target table for add_unique does not exist';
++  END IF;
++
+   IF NOT EXISTS (SELECT 1 FROM information_schema.statistics
+                  WHERE table_schema = DATABASE() AND table_name = p_table
+                    AND index_name = p_index) THEN
+     SET @ddl = CONCAT('ALTER TABLE `', p_table, '` ADD UNIQUE KEY `', p_index, '` (', p_cols, ')');
+     PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
++  ELSE
++    SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ','),
++           MAX(non_unique), MAX(sub_part IS NOT NULL)
++      INTO v_cols, v_non_unique, v_prefix
++    FROM information_schema.statistics
++    WHERE table_schema = DATABASE() AND table_name = p_table
++      AND index_name = p_index;
++    IF v_non_unique <> 0 OR v_prefix <> 0
++       OR NOT (v_cols <=> REPLACE(p_cols, ' ', '')) THEN
++      SIGNAL SQLSTATE '45000'
++        SET MESSAGE_TEXT = 'M51 ABORT: existing index differs from expected (unique/columns/prefix)';
++    END IF;
+   END IF;
+ END$
+ 
+@@ -121,9 +195,11 @@ CREATE TABLE IF NOT EXISTS curriculum_subject_prerequisite (
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ 
+ -- 4) school_class.curriculum_id + FK tổ hợp
+-CALL mems_m51_add_col('school_class', 'curriculum_id', 'CHAR(36) DEFAULT NULL');
++CALL mems_m51_add_col('school_class', 'curriculum_id', 'CHAR(36) DEFAULT NULL',
++  'char(36)', 'YES', NULL);
+ CALL mems_m51_add_fk('school_class', 'fk_school_class_curriculum',
+-  'FOREIGN KEY (curriculum_id, org_id) REFERENCES curriculum (id, org_id) ON DELETE RESTRICT');
++  'FOREIGN KEY (curriculum_id, org_id) REFERENCES curriculum (id, org_id) ON DELETE RESTRICT',
++  'curriculum_id->curriculum.id,org_id->curriculum.org_id', 'RESTRICT', 'RESTRICT');
+ 
+ -- 5) UNIQUE bắt buộc để 52 tạo FK (class_id, org_id) -> school_class(id, org_id).
+ --    Không thể fail vì id đã là PK; vẫn kiểm tồn tại để idempotent.
+diff --git a/docs/phase-1/migrations/52_people_class_subject.sql b/docs/phase-1/migrations/52_people_class_subject.sql
+index 9e98a3a..3f039a0 100644
+--- a/docs/phase-1/migrations/52_people_class_subject.sql
++++ b/docs/phase-1/migrations/52_people_class_subject.sql
+@@ -9,9 +9,18 @@
+ -- EXISTING class_subject:
+ --   This script creates the table in full when it does not exist. If it already
+ --   exists, it is accepted ONLY when it already matches the Revision-3 schema
+---   (all columns, indexes, FKs, CHECKs, generated column, PK). Otherwise the
+---   script ABORTS with SIGNAL — it never auto-upgrades an unknown old table and
+---   never rewrites an already-applied migration file.
++--   (all columns and their attributes, indexes, FKs + referential actions,
++--   CHECKs, generated column, PK). Otherwise the script ABORTS with SIGNAL — it
++--   never auto-upgrades an unknown old table and never rewrites an
++--   already-applied migration file. The same rule applies to pre-existing
++--   teacher_subject, class_subject_history and specialty_subject.
++--
++-- ABORT / PARTIAL BACKFILL (see ROLLBACK.md §2):
++--   MySQL DDL causes implicit commits and this script is not wrapped in one
++--   transaction. If a later step SIGNALs after 5a/5b ran, the backfilled rows
++--   REMAIN. 5a/5b are exact-match and idempotent, so after fixing the cause you
++--   must re-run the pre-check, verify data, then re-run 52 and the post-check.
++--   Do not delete backfilled rows manually without proving their origin.
+ -- =============================================================================
+ USE mems_people_db;
+ 
+@@ -21,14 +30,16 @@ DELIMITER $
+ -- Abort if an existing class_subject is not the Revision-3 schema.
+ -- Skips silently when the table does not exist (it will be created below).
+ -- Verifies structure, not just constraint names:
+---   * exactly the 20 Revision-3 columns (no missing, no extra)
++--   * exactly the 20 Revision-3 columns (no missing, no extra) with matching
++--     type/length/precision/scale, NULL, DEFAULT, collation and generated flag
+ --   * PK (class_id, subject_id) in order
+ --   * PRIMARY + 4 indexes with exact column lists/order; unique flags;
+ --     no prefix (SUB_PART) columns. Any extra index is rejected except the
+ --     InnoDB FK-support indexes on (class_id,org_id) and (subject_id,org_id)
+ --     (non-unique, no prefix) that MySQL creates when a FK has no left-prefix
+ --     index of its own.
+---   * 4 FKs with exact source->target column mappings (same schema)
++--   * 4 FKs with exact source->target column mappings (same schema) and exact
++--     ON UPDATE / ON DELETE rules
+ --   * 5 CHECKs with exact normalised expressions
+ --   * primary_class_id = STORED GENERATED with exact CASE expression
+ -- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
+@@ -39,6 +50,7 @@ BEGIN
+   DECLARE v_exists INT DEFAULT 0;
+   DECLARE v_total_cols INT DEFAULT 0;
+   DECLARE v_cols INT DEFAULT 0;
++  DECLARE v_attr_bad INT DEFAULT 0;
+   DECLARE v_idx_total INT DEFAULT 0;
+   DECLARE v_idx_ok INT DEFAULT 0;
+   DECLARE v_idx_prefix INT DEFAULT 0;
+@@ -47,6 +59,7 @@ BEGIN
+   DECLARE v_fk_total INT DEFAULT 0;
+   DECLARE v_fk_ok INT DEFAULT 0;
+   DECLARE v_fk_schema_bad INT DEFAULT 0;
++  DECLARE v_fk_rule_bad INT DEFAULT 0;
+   DECLARE v_chk_total INT DEFAULT 0;
+   DECLARE v_chk_ok INT DEFAULT 0;
+   DECLARE v_gen INT DEFAULT 0;
+@@ -69,6 +82,57 @@ BEGIN
+     FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'class_subject';
+ 
++    -- Column attributes: type/length/precision/scale, nullability, default,
++    -- collation, generated flag must match CREATE TABLE below. Derived
++    -- attributes (character_maximum_length, numeric_precision/scale) are
++    -- checked where they apply; COLUMN_TYPE covers them otherwise.
++    -- MySQL 8 cannot distinguish explicit DEFAULT NULL from "no default":
++    -- both are COLUMN_DEFAULT IS NULL, which is semantically identical here
++    -- (no NOT NULL column relies on an implicit default).
++    SELECT COUNT(*) INTO v_attr_bad
++    FROM (
++      SELECT e.column_name
++      FROM (
++        SELECT 'class_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
++               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
++               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
++        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'curriculum_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'sequence_no','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'is_primary','tinyint(1)','NO','0',-1,3,0,'NONE','NONE'
++        UNION ALL SELECT 'primary_class_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','STORED'
++        UNION ALL SELECT 'required_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'planned_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'theory_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'practice_sessions','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'session_minutes','smallint','YES',NULL,-1,5,0,'NONE','NONE'
++        UNION ALL SELECT 'status','varchar(20)','NO','PLANNED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'note','varchar(500)','YES',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
++        UNION ALL SELECT 'updated_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
++      ) e
++      LEFT JOIN information_schema.columns c
++        ON c.table_schema = DATABASE() AND c.table_name = 'class_subject'
++       AND c.column_name = e.column_name
++      WHERE c.column_name IS NULL
++         OR NOT (c.column_type <=> e.column_type)
++         OR NOT (c.is_nullable <=> e.is_nullable)
++         OR NOT (c.column_default <=> e.def_value)
++         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
++         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
++         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
++         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
++         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
++         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
++         OR (e.extra_rule = 'STORED'
++             AND NOT (c.extra LIKE '%GENERATED%' AND c.extra LIKE '%STORED%'))
++    ) d;
++
+     -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
+     -- Allowed beyond the 5 Revision-3 groups: InnoDB FK-support indexes on
+     -- (class_id,org_id) and (subject_id,org_id), non-unique, no prefix.
+@@ -127,11 +191,13 @@ BEGIN
+              = 'class_id,subject_id'
+     ) pk;
+ 
+-    -- FKs: exact source column -> referenced schema.table.column mapping.
+-    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
+-    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
++    -- FKs: exact source column -> referenced schema.table.column mapping,
++    -- plus ON UPDATE / ON DELETE rules (REFERENTIAL_CONSTRAINTS).
++    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
++           COALESCE(SUM(bad_rule), 0)
++    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
+     FROM (
+-      SELECT k.constraint_name, k.map, k.wrong_schema,
++      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
+         CASE
+           WHEN k.constraint_name = 'fk_class_subject_class'
+             AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
+@@ -142,17 +208,34 @@ BEGIN
+           WHEN k.constraint_name = 'fk_class_subject_teacher'
+             AND k.map = 'teacher_id->staff_profile.user_id,org_id->staff_profile.org_id' THEN 1
+           ELSE 0
+-        END AS ok
++        END AS ok,
++        CASE
++          WHEN k.constraint_name = 'fk_class_subject_class'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
++          WHEN k.constraint_name = 'fk_class_subject_subject'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          WHEN k.constraint_name = 'fk_class_subject_curriculum'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          WHEN k.constraint_name = 'fk_class_subject_teacher'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          ELSE 1
++        END AS bad_rule
+       FROM (
+-        SELECT constraint_name,
+-               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+-                                   referenced_column_name)
+-                            ORDER BY ordinal_position SEPARATOR ',') AS map,
+-               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+-        FROM information_schema.key_column_usage
+-        WHERE table_schema = DATABASE() AND table_name = 'class_subject'
+-          AND referenced_table_name IS NOT NULL
+-        GROUP BY constraint_name
++        SELECT kcu.constraint_name,
++               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
++                                   kcu.referenced_column_name)
++                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
++               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
++               MAX(rc.update_rule) AS update_rule,
++               MAX(rc.delete_rule) AS delete_rule
++        FROM information_schema.key_column_usage kcu
++        LEFT JOIN information_schema.referential_constraints rc
++          ON rc.constraint_schema = kcu.constraint_schema
++         AND rc.constraint_name = kcu.constraint_name
++         AND rc.table_name = kcu.table_name
++        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject'
++          AND kcu.referenced_table_name IS NOT NULL
++        GROUP BY kcu.constraint_name
+       ) k
+     ) y;
+ 
+@@ -199,18 +282,21 @@ BEGIN
+             generation_expression, '`', ''), ' ', ''), '(', ''), ')', ''),
+             '''', ''), CHAR(92), '')) = 'casewhenis_primary=1thenclass_idend';
+ 
+-    IF v_total_cols <> 20 OR v_cols <> 20
++    IF v_total_cols <> 20 OR v_cols <> 20 OR v_attr_bad <> 0
+        OR v_idx_ok <> 5 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+        OR v_pk <> 1
+        OR v_fk_total <> 4 OR v_fk_ok <> 4 OR v_fk_schema_bad <> 0
++       OR v_fk_rule_bad <> 0
+        OR v_chk_total <> 5 OR v_chk_ok <> 5
+        OR v_gen <> 1 THEN
+       SELECT 'class_subject_schema_mismatch' AS issue,
+              v_total_cols AS total_cols_20, v_cols AS named_cols_20,
++             v_attr_bad AS attr_mismatch_0,
+              v_idx_total AS idx_total, v_idx_ok AS idx_ok_5,
+              v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
+              v_pk AS pk_1,
+              v_fk_total AS fk_4, v_fk_ok AS fk_ok_4, v_fk_schema_bad AS fk_schema_0,
++             v_fk_rule_bad AS fk_rule_0,
+              v_chk_total AS chk_5, v_chk_ok AS chk_ok_5,
+              v_gen AS gen_1;
+       SIGNAL SQLSTATE '45000'
+@@ -222,12 +308,14 @@ END$
+ -- ---------------------------------------------------------------------------
+ -- Abort if an existing teacher_subject is not the D-06a schema.
+ -- Verifies structure, not just constraint names:
+---   * exactly the 10 Revision-3 columns (no missing, no extra)
++--   * exactly the 10 Revision-3 columns (no missing, no extra) with matching
++--     type/length/precision/scale, NULL, DEFAULT, collation and generated flag
+ --   * PK (user_id, subject_id); PRIMARY + 2 indexes with exact column lists and
+ --     order, unique flags, no prefix columns. Extra indexes are rejected except
+ --     InnoDB FK-support indexes on (user_id,org_id) and (subject_id,org_id)
+ --     (non-unique, no prefix).
+---   * 2 FKs with exact source->target column mappings (same schema)
++--   * 2 FKs with exact source->target column mappings (same schema) and exact
++--     ON UPDATE / ON DELETE rules
+ --   * CHECK source exactly SPECIALTY/MANUAL
+ --   * CHECK status exactly APPROVED/REVOKED — no PENDING or any other value
+ -- Any mismatch => SIGNAL 45000. It never auto-fixes the table.
+@@ -238,6 +326,7 @@ BEGIN
+   DECLARE v_exists INT DEFAULT 0;
+   DECLARE v_total_cols INT DEFAULT 0;
+   DECLARE v_cols INT DEFAULT 0;
++  DECLARE v_attr_bad INT DEFAULT 0;
+   DECLARE v_idx_total INT DEFAULT 0;
+   DECLARE v_idx_ok INT DEFAULT 0;
+   DECLARE v_idx_prefix INT DEFAULT 0;
+@@ -246,6 +335,7 @@ BEGIN
+   DECLARE v_fk_total INT DEFAULT 0;
+   DECLARE v_fk_ok INT DEFAULT 0;
+   DECLARE v_fk_schema_bad INT DEFAULT 0;
++  DECLARE v_fk_rule_bad INT DEFAULT 0;
+   DECLARE v_chk_total INT DEFAULT 0;
+   DECLARE v_chk_ok INT DEFAULT 0;
+   DECLARE v_pending INT DEFAULT 0;
+@@ -266,6 +356,40 @@ BEGIN
+     FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'teacher_subject';
+ 
++    -- Column attributes: same standard as the class_subject audit.
++    -- status/source defaults are part of D-06a/D-08 behavior and must match.
++    SELECT COUNT(*) INTO v_attr_bad
++    FROM (
++      SELECT e.column_name
++      FROM (
++        SELECT 'user_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
++               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
++               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
++        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'status','varchar(20)','NO','APPROVED',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'source','varchar(20)','NO','MANUAL',20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'approved_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'approved_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
++        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
++        UNION ALL SELECT 'updated_at','datetime(3)','YES',NULL,-1,-1,-1,'NONE','NONE'
++      ) e
++      LEFT JOIN information_schema.columns c
++        ON c.table_schema = DATABASE() AND c.table_name = 'teacher_subject'
++       AND c.column_name = e.column_name
++      WHERE c.column_name IS NULL
++         OR NOT (c.column_type <=> e.column_type)
++         OR NOT (c.is_nullable <=> e.is_nullable)
++         OR NOT (c.column_default <=> e.def_value)
++         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
++         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
++         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
++         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
++         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
++         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
++    ) d;
++
+     -- Indexes: exact name + column list/order + uniqueness; no prefix columns.
+     -- Allowed beyond the 3 Revision-3 groups: InnoDB FK-support indexes on
+     -- (user_id,org_id) and (subject_id,org_id), non-unique, no prefix.
+@@ -318,28 +442,43 @@ BEGIN
+              = 'user_id,subject_id'
+     ) pk;
+ 
+-    -- FKs: exact source column -> referenced schema.table.column mapping.
+-    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0)
+-    INTO v_fk_total, v_fk_ok, v_fk_schema_bad
++    -- FKs: exact source column -> referenced schema.table.column mapping,
++    -- plus ON UPDATE / ON DELETE rules (REFERENTIAL_CONSTRAINTS).
++    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
++           COALESCE(SUM(bad_rule), 0)
++    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
+     FROM (
+-      SELECT k.constraint_name, k.map, k.wrong_schema,
++      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
+         CASE
+           WHEN k.constraint_name = 'fk_teacher_subject_teacher'
+             AND k.map = 'user_id->teacher_profile.user_id,org_id->teacher_profile.org_id' THEN 1
+           WHEN k.constraint_name = 'fk_teacher_subject_subject'
+             AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
+           ELSE 0
+-        END AS ok
++        END AS ok,
++        CASE
++          WHEN k.constraint_name = 'fk_teacher_subject_teacher'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
++          WHEN k.constraint_name = 'fk_teacher_subject_subject'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          ELSE 1
++        END AS bad_rule
+       FROM (
+-        SELECT constraint_name,
+-               GROUP_CONCAT(CONCAT(column_name, '->', referenced_table_name, '.',
+-                                   referenced_column_name)
+-                            ORDER BY ordinal_position SEPARATOR ',') AS map,
+-               MAX(referenced_table_schema <> DATABASE()) AS wrong_schema
+-        FROM information_schema.key_column_usage
+-        WHERE table_schema = DATABASE() AND table_name = 'teacher_subject'
+-          AND referenced_table_name IS NOT NULL
+-        GROUP BY constraint_name
++        SELECT kcu.constraint_name,
++               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
++                                   kcu.referenced_column_name)
++                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
++               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
++               MAX(rc.update_rule) AS update_rule,
++               MAX(rc.delete_rule) AS delete_rule
++        FROM information_schema.key_column_usage kcu
++        LEFT JOIN information_schema.referential_constraints rc
++          ON rc.constraint_schema = kcu.constraint_schema
++         AND rc.constraint_name = kcu.constraint_name
++         AND rc.table_name = kcu.table_name
++        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'teacher_subject'
++          AND kcu.referenced_table_name IS NOT NULL
++        GROUP BY kcu.constraint_name
+       ) k
+     ) y;
+ 
+@@ -377,18 +516,21 @@ BEGIN
+       AND constraint_name = 'chk_teacher_subject_status'
+       AND check_clause LIKE '%PENDING%';
+ 
+-    IF v_total_cols <> 10 OR v_cols <> 10
++    IF v_total_cols <> 10 OR v_cols <> 10 OR v_attr_bad <> 0
+        OR v_idx_ok <> 3 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
+        OR v_pk <> 1
+        OR v_fk_total <> 2 OR v_fk_ok <> 2 OR v_fk_schema_bad <> 0
++       OR v_fk_rule_bad <> 0
+        OR v_chk_total <> 2 OR v_chk_ok <> 2
+        OR v_pending > 0 THEN
+       SELECT 'teacher_subject_schema_mismatch' AS issue,
+              v_total_cols AS total_cols_10, v_cols AS named_cols_10,
++             v_attr_bad AS attr_mismatch_0,
+              v_idx_total AS idx_total, v_idx_ok AS idx_ok_3,
+              v_idx_prefix AS idx_prefix_0, v_idx_extra AS idx_extra_0,
+              v_pk AS pk_1,
+              v_fk_total AS fk_2, v_fk_ok AS fk_ok_2, v_fk_schema_bad AS fk_schema_0,
++             v_fk_rule_bad AS fk_rule_0,
+              v_chk_total AS chk_2, v_chk_ok AS chk_ok_2, v_pending AS pending_0;
+       SIGNAL SQLSTATE '45000'
+         SET MESSAGE_TEXT = 'M52 ABORT: teacher_subject must be D-06a (APPROVED/REVOKED only)';
+@@ -396,6 +538,389 @@ BEGIN
+   END ts_check;
+ END$
+ 
++-- ---------------------------------------------------------------------------
++-- Abort if an existing class_subject_history is not the Revision-3 schema.
++-- History is append-only audit data: a same-name table with ON DELETE CASCADE
++-- (or any other structural drift) must never be accepted, because it would let
++-- history rows disappear with a class. Never auto-ALTER; SIGNAL instead.
++-- ---------------------------------------------------------------------------
++DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema$
++CREATE PROCEDURE mems_m52_assert_history_schema()
++BEGIN
++  DECLARE v_exists INT DEFAULT 0;
++  DECLARE v_total_cols INT DEFAULT 0;
++  DECLARE v_cols INT DEFAULT 0;
++  DECLARE v_attr_bad INT DEFAULT 0;
++  DECLARE v_idx_ok INT DEFAULT 0;
++  DECLARE v_idx_prefix INT DEFAULT 0;
++  DECLARE v_idx_extra INT DEFAULT 0;
++  DECLARE v_pk INT DEFAULT 0;
++  DECLARE v_fk_total INT DEFAULT 0;
++  DECLARE v_fk_ok INT DEFAULT 0;
++  DECLARE v_fk_schema_bad INT DEFAULT 0;
++  DECLARE v_fk_rule_bad INT DEFAULT 0;
++  DECLARE v_chk_total INT DEFAULT 0;
++  DECLARE v_chk_ok INT DEFAULT 0;
++
++  h_check: BEGIN
++    SELECT COUNT(*) INTO v_exists FROM information_schema.tables
++      WHERE table_schema = DATABASE() AND table_name = 'class_subject_history';
++    IF v_exists = 0 THEN
++      LEAVE h_check;
++    END IF;
++
++    -- Columns: exact set of 16.
++    SELECT COUNT(*),
++           COALESCE(SUM(column_name IN (
++             'id','org_id','class_id','old_subject_id','old_subject_code',
++             'old_subject_name','old_teacher_id','old_source','new_subject_id',
++             'new_subject_code','new_subject_name','new_source','reason',
++             'operation_id','changed_by','changed_at')), 0)
++    INTO v_total_cols, v_cols
++    FROM information_schema.columns
++    WHERE table_schema = DATABASE() AND table_name = 'class_subject_history';
++
++    -- Column attributes (same standard as class_subject/teacher_subject).
++    SELECT COUNT(*) INTO v_attr_bad
++    FROM (
++      SELECT e.column_name
++      FROM (
++        SELECT 'id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
++               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
++               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
++        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'class_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'old_subject_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'old_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'old_subject_name','varchar(200)','YES',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'old_teacher_id','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'old_source','varchar(20)','YES',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'new_subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'new_subject_code','varchar(50)','YES',NULL,50,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'new_subject_name','varchar(200)','NO',NULL,200,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'new_source','varchar(20)','NO',NULL,20,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'reason','varchar(500)','NO',NULL,500,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'operation_id','varchar(64)','NO',NULL,64,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'changed_by','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'changed_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
++      ) e
++      LEFT JOIN information_schema.columns c
++        ON c.table_schema = DATABASE() AND c.table_name = 'class_subject_history'
++       AND c.column_name = e.column_name
++      WHERE c.column_name IS NULL
++         OR NOT (c.column_type <=> e.column_type)
++         OR NOT (c.is_nullable <=> e.is_nullable)
++         OR NOT (c.column_default <=> e.def_value)
++         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
++         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
++         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
++         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
++         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
++         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
++    ) d;
++
++    -- Indexes: PRIMARY + uq_csh_operation + 2 secondary; the InnoDB FK-support
++    -- index on (class_id, org_id) is the only allowed extra.
++    SELECT COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0), COALESCE(SUM(bad_extra), 0)
++    INTO v_idx_ok, v_idx_prefix, v_idx_extra
++    FROM (
++      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
++        CASE
++          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
++            AND i.cols = 'id' THEN 1
++          WHEN i.index_name = 'uq_csh_operation' AND i.non_unique = 0
++            AND i.cols = 'org_id,operation_id' THEN 1
++          WHEN i.index_name = 'idx_csh_class_time' AND i.non_unique = 1
++            AND i.cols = 'org_id,class_id,changed_at' THEN 1
++          WHEN i.index_name = 'idx_csh_new_subject' AND i.non_unique = 1
++            AND i.cols = 'org_id,new_subject_id' THEN 1
++          ELSE 0
++        END AS ok,
++        CASE
++          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0 AND i.cols = 'id')
++            OR (i.index_name = 'uq_csh_operation' AND i.non_unique = 0
++                AND i.cols = 'org_id,operation_id')
++            OR (i.index_name = 'idx_csh_class_time' AND i.non_unique = 1
++                AND i.cols = 'org_id,class_id,changed_at')
++            OR (i.index_name = 'idx_csh_new_subject' AND i.non_unique = 1
++                AND i.cols = 'org_id,new_subject_id')
++            OR (i.non_unique = 1 AND i.has_prefix = 0 AND i.cols = 'class_id,org_id')
++            THEN 0
++          ELSE 1
++        END AS bad_extra
++      FROM (
++        SELECT index_name, non_unique,
++               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
++               MAX(sub_part IS NOT NULL) AS has_prefix
++        FROM information_schema.statistics
++        WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
++        GROUP BY index_name, non_unique
++      ) i
++    ) x;
++
++    SELECT COUNT(*) INTO v_pk
++    FROM (
++      SELECT index_name FROM information_schema.statistics
++      WHERE table_schema = DATABASE() AND table_name = 'class_subject_history'
++        AND index_name = 'PRIMARY'
++      GROUP BY index_name
++      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') = 'id'
++    ) pk;
++
++    -- FK + referential actions: history must NEVER cascade-delete.
++    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
++           COALESCE(SUM(bad_rule), 0)
++    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
++    FROM (
++      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
++        CASE
++          WHEN k.constraint_name = 'fk_csh_class'
++            AND k.map = 'class_id->school_class.id,org_id->school_class.org_id' THEN 1
++          ELSE 0
++        END AS ok,
++        CASE
++          WHEN k.constraint_name = 'fk_csh_class'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          ELSE 1
++        END AS bad_rule
++      FROM (
++        SELECT kcu.constraint_name,
++               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
++                                   kcu.referenced_column_name)
++                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
++               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
++               MAX(rc.update_rule) AS update_rule,
++               MAX(rc.delete_rule) AS delete_rule
++        FROM information_schema.key_column_usage kcu
++        LEFT JOIN information_schema.referential_constraints rc
++          ON rc.constraint_schema = kcu.constraint_schema
++         AND rc.constraint_name = kcu.constraint_name
++         AND rc.table_name = kcu.table_name
++        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'class_subject_history'
++          AND kcu.referenced_table_name IS NOT NULL
++        GROUP BY kcu.constraint_name
++      ) k
++    ) y;
++
++    -- CHECKs: exact normalised expression per constraint.
++    SELECT COUNT(*), COALESCE(SUM(ok), 0)
++    INTO v_chk_total, v_chk_ok
++    FROM (
++      SELECT tc.constraint_name, cc.norm,
++        CASE
++          WHEN tc.constraint_name = 'chk_csh_subject_change'
++            AND cc.norm = 'old_subject_idisnullorold_subject_id<>new_subject_id' THEN 1
++          WHEN tc.constraint_name = 'chk_csh_old_source'
++            AND cc.norm = 'old_sourceisnullorold_sourceinlegacy,curriculum,manual' THEN 1
++          WHEN tc.constraint_name = 'chk_csh_new_source'
++            AND cc.norm = 'new_sourceinlegacy,curriculum,manual' THEN 1
++          ELSE 0
++        END AS ok
++      FROM information_schema.table_constraints tc
++      JOIN (
++        SELECT constraint_schema, constraint_name,
++               LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
++                 check_clause, '`', ''), '_utf8mb4', ''), ' ', ''), '''', ''),
++                 '(', ''), ')', '')) AS norm
++        FROM information_schema.check_constraints
++        WHERE constraint_schema = DATABASE()
++      ) cc
++        ON cc.constraint_schema = tc.constraint_schema
++       AND cc.constraint_name = tc.constraint_name
++      WHERE tc.table_schema = DATABASE() AND tc.table_name = 'class_subject_history'
++        AND tc.constraint_type = 'CHECK'
++    ) z;
++
++    IF v_total_cols <> 16 OR v_cols <> 16 OR v_attr_bad <> 0
++       OR v_idx_ok <> 4 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
++       OR v_pk <> 1
++       OR v_fk_total <> 1 OR v_fk_ok <> 1 OR v_fk_schema_bad <> 0
++       OR v_fk_rule_bad <> 0
++       OR v_chk_total <> 3 OR v_chk_ok <> 3 THEN
++      SELECT 'class_subject_history_schema_mismatch' AS issue,
++             v_total_cols AS total_cols_16, v_cols AS named_cols_16,
++             v_attr_bad AS attr_mismatch_0,
++             v_idx_ok AS idx_ok_4, v_idx_prefix AS idx_prefix_0,
++             v_idx_extra AS idx_extra_0, v_pk AS pk_1,
++             v_fk_total AS fk_1, v_fk_ok AS fk_ok_1,
++             v_fk_schema_bad AS fk_schema_0, v_fk_rule_bad AS fk_rule_0,
++             v_chk_total AS chk_3, v_chk_ok AS chk_ok_3;
++      SIGNAL SQLSTATE '45000'
++        SET MESSAGE_TEXT = 'M52 ABORT: existing class_subject_history is not Revision-3; history must not cascade';
++    END IF;
++  END h_check;
++END$
++
++-- ---------------------------------------------------------------------------
++-- Abort if an existing specialty_subject is not the Revision-3 schema.
++-- ---------------------------------------------------------------------------
++DROP PROCEDURE IF EXISTS mems_m52_assert_specialty_subject_schema$
++CREATE PROCEDURE mems_m52_assert_specialty_subject_schema()
++BEGIN
++  DECLARE v_exists INT DEFAULT 0;
++  DECLARE v_total_cols INT DEFAULT 0;
++  DECLARE v_cols INT DEFAULT 0;
++  DECLARE v_attr_bad INT DEFAULT 0;
++  DECLARE v_idx_ok INT DEFAULT 0;
++  DECLARE v_idx_prefix INT DEFAULT 0;
++  DECLARE v_idx_extra INT DEFAULT 0;
++  DECLARE v_pk INT DEFAULT 0;
++  DECLARE v_fk_total INT DEFAULT 0;
++  DECLARE v_fk_ok INT DEFAULT 0;
++  DECLARE v_fk_schema_bad INT DEFAULT 0;
++  DECLARE v_fk_rule_bad INT DEFAULT 0;
++  DECLARE v_chk_total INT DEFAULT 0;
++  DECLARE v_chk_ok INT DEFAULT 0;
++
++  ss_check: BEGIN
++    SELECT COUNT(*) INTO v_exists FROM information_schema.tables
++      WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
++    IF v_exists = 0 THEN
++      LEAVE ss_check;
++    END IF;
++
++    SELECT COUNT(*),
++           COALESCE(SUM(column_name IN (
++             'specialty_id','subject_id','org_id','created_by','created_at')), 0)
++    INTO v_total_cols, v_cols
++    FROM information_schema.columns
++    WHERE table_schema = DATABASE() AND table_name = 'specialty_subject';
++
++    SELECT COUNT(*) INTO v_attr_bad
++    FROM (
++      SELECT e.column_name
++      FROM (
++        SELECT 'specialty_id' AS column_name, 'char(36)' AS column_type, 'NO' AS is_nullable,
++               NULL AS def_value, 36 AS char_len, -1 AS num_precision, -1 AS num_scale,
++               'utf8mb4_unicode_ci' AS collation_rule, 'NONE' AS extra_rule
++        UNION ALL SELECT 'subject_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'org_id','char(36)','NO',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'created_by','char(36)','YES',NULL,36,-1,-1,'utf8mb4_unicode_ci','NONE'
++        UNION ALL SELECT 'created_at','datetime(3)','NO',NULL,-1,-1,-1,'NONE','NONE'
++      ) e
++      LEFT JOIN information_schema.columns c
++        ON c.table_schema = DATABASE() AND c.table_name = 'specialty_subject'
++       AND c.column_name = e.column_name
++      WHERE c.column_name IS NULL
++         OR NOT (c.column_type <=> e.column_type)
++         OR NOT (c.is_nullable <=> e.is_nullable)
++         OR NOT (c.column_default <=> e.def_value)
++         OR (e.char_len > -1 AND NOT (c.character_maximum_length <=> e.char_len))
++         OR (e.num_precision > -1 AND NOT (c.numeric_precision <=> e.num_precision))
++         OR (e.num_scale > -1 AND NOT (c.numeric_scale <=> e.num_scale))
++         OR (e.collation_rule = 'NONE' AND c.collation_name IS NOT NULL)
++         OR (e.collation_rule <> 'NONE' AND NOT (c.collation_name <=> e.collation_rule))
++         OR (e.extra_rule = 'NONE' AND c.extra LIKE '%GENERATED%')
++    ) d;
++
++    -- PRIMARY + idx_specialty_subject_org_subject; the two InnoDB FK-support
++    -- indexes on (specialty_id,org_id) / (subject_id,org_id) are the only extras.
++    SELECT COALESCE(SUM(ok), 0), COALESCE(MAX(has_prefix), 0), COALESCE(SUM(bad_extra), 0)
++    INTO v_idx_ok, v_idx_prefix, v_idx_extra
++    FROM (
++      SELECT i.index_name, i.non_unique, i.cols, i.has_prefix,
++        CASE
++          WHEN i.index_name = 'PRIMARY' AND i.non_unique = 0
++            AND i.cols = 'specialty_id,subject_id' THEN 1
++          WHEN i.index_name = 'idx_specialty_subject_org_subject' AND i.non_unique = 1
++            AND i.cols = 'org_id,subject_id' THEN 1
++          ELSE 0
++        END AS ok,
++        CASE
++          WHEN (i.index_name = 'PRIMARY' AND i.non_unique = 0
++                AND i.cols = 'specialty_id,subject_id')
++            OR (i.index_name = 'idx_specialty_subject_org_subject' AND i.non_unique = 1
++                AND i.cols = 'org_id,subject_id')
++            OR (i.non_unique = 1 AND i.has_prefix = 0
++                AND i.cols IN ('specialty_id,org_id', 'subject_id,org_id'))
++            THEN 0
++          ELSE 1
++        END AS bad_extra
++      FROM (
++        SELECT index_name, non_unique,
++               GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols,
++               MAX(sub_part IS NOT NULL) AS has_prefix
++        FROM information_schema.statistics
++        WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
++        GROUP BY index_name, non_unique
++      ) i
++    ) x;
++
++    SELECT COUNT(*) INTO v_pk
++    FROM (
++      SELECT index_name FROM information_schema.statistics
++      WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
++        AND index_name = 'PRIMARY'
++      GROUP BY index_name
++      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')
++             = 'specialty_id,subject_id'
++    ) pk;
++
++    SELECT COUNT(*), COALESCE(SUM(ok), 0), COALESCE(MAX(wrong_schema), 0),
++           COALESCE(SUM(bad_rule), 0)
++    INTO v_fk_total, v_fk_ok, v_fk_schema_bad, v_fk_rule_bad
++    FROM (
++      SELECT k.constraint_name, k.map, k.wrong_schema, k.update_rule, k.delete_rule,
++        CASE
++          WHEN k.constraint_name = 'fk_specialty_subject_specialty'
++            AND k.map = 'specialty_id->specialty.id,org_id->specialty.org_id' THEN 1
++          WHEN k.constraint_name = 'fk_specialty_subject_subject'
++            AND k.map = 'subject_id->subject.id,org_id->subject.org_id' THEN 1
++          ELSE 0
++        END AS ok,
++        CASE
++          WHEN k.constraint_name = 'fk_specialty_subject_specialty'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'CASCADE' THEN 0
++          WHEN k.constraint_name = 'fk_specialty_subject_subject'
++            AND k.update_rule = 'RESTRICT' AND k.delete_rule = 'RESTRICT' THEN 0
++          ELSE 1
++        END AS bad_rule
++      FROM (
++        SELECT kcu.constraint_name,
++               GROUP_CONCAT(CONCAT(kcu.column_name, '->', kcu.referenced_table_name, '.',
++                                   kcu.referenced_column_name)
++                            ORDER BY kcu.ordinal_position SEPARATOR ',') AS map,
++               MAX(kcu.referenced_table_schema <> DATABASE()) AS wrong_schema,
++               MAX(rc.update_rule) AS update_rule,
++               MAX(rc.delete_rule) AS delete_rule
++        FROM information_schema.key_column_usage kcu
++        LEFT JOIN information_schema.referential_constraints rc
++          ON rc.constraint_schema = kcu.constraint_schema
++         AND rc.constraint_name = kcu.constraint_name
++         AND rc.table_name = kcu.table_name
++        WHERE kcu.table_schema = DATABASE() AND kcu.table_name = 'specialty_subject'
++          AND kcu.referenced_table_name IS NOT NULL
++        GROUP BY kcu.constraint_name
++      ) k
++    ) y;
++
++    -- No CHECK constraints by design; any CHECK is drift.
++    SELECT COUNT(*) INTO v_chk_total
++    FROM information_schema.table_constraints
++    WHERE table_schema = DATABASE() AND table_name = 'specialty_subject'
++      AND constraint_type = 'CHECK';
++    SET v_chk_ok = 0;
++
++    IF v_total_cols <> 5 OR v_cols <> 5 OR v_attr_bad <> 0
++       OR v_idx_ok <> 2 OR v_idx_prefix <> 0 OR v_idx_extra <> 0
++       OR v_pk <> 1
++       OR v_fk_total <> 2 OR v_fk_ok <> 2 OR v_fk_schema_bad <> 0
++       OR v_fk_rule_bad <> 0
++       OR v_chk_total <> 0 THEN
++      SELECT 'specialty_subject_schema_mismatch' AS issue,
++             v_total_cols AS total_cols_5, v_cols AS named_cols_5,
++             v_attr_bad AS attr_mismatch_0,
++             v_idx_ok AS idx_ok_2, v_idx_prefix AS idx_prefix_0,
++             v_idx_extra AS idx_extra_0, v_pk AS pk_1,
++             v_fk_total AS fk_2, v_fk_ok AS fk_ok_2,
++             v_fk_schema_bad AS fk_schema_0, v_fk_rule_bad AS fk_rule_0,
++             v_chk_total AS chk_0;
++      SIGNAL SQLSTATE '45000'
++        SET MESSAGE_TEXT = 'M52 ABORT: existing specialty_subject is not Revision-3 schema; fix manually';
++    END IF;
++  END ss_check;
++END$
++
+ DROP PROCEDURE IF EXISTS mems_m52_assert_no_duplicate_primary$
+ CREATE PROCEDURE mems_m52_assert_no_duplicate_primary()
+ BEGIN
+@@ -457,8 +982,11 @@ END$
+ DELIMITER ;
+ 
+ -- 1) Existing tables must already match Revision 3 / D-06a, else abort.
++--    Absent table => create below; present+matching => continue; present+wrong => SIGNAL.
+ CALL mems_m52_assert_class_subject_schema();
+ CALL mems_m52_assert_teacher_subject_schema();
++CALL mems_m52_assert_history_schema();
++CALL mems_m52_assert_specialty_subject_schema();
+ 
+ -- 2) specialty_subject (D-06)
+ CREATE TABLE IF NOT EXISTS specialty_subject (
+@@ -627,6 +1155,8 @@ CREATE TABLE IF NOT EXISTS class_subject_history (
+ 
+ DROP PROCEDURE IF EXISTS mems_m52_assert_class_subject_schema;
+ DROP PROCEDURE IF EXISTS mems_m52_assert_teacher_subject_schema;
++DROP PROCEDURE IF EXISTS mems_m52_assert_history_schema;
++DROP PROCEDURE IF EXISTS mems_m52_assert_specialty_subject_schema;
+ DROP PROCEDURE IF EXISTS mems_m52_assert_no_duplicate_primary;
+ DROP PROCEDURE IF EXISTS mems_m52_assert_backfill_safe;
+ 
+diff --git a/docs/phase-1/migrations/ROLLBACK.md b/docs/phase-1/migrations/ROLLBACK.md
+index d4e885f..aba64fc 100644
+--- a/docs/phase-1/migrations/ROLLBACK.md
++++ b/docs/phase-1/migrations/ROLLBACK.md
+@@ -147,7 +147,71 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
+   ADD INDEX uq_subject_org_code (org_id, code);
+ ```
+ 
+-## 2. Dữ liệu có thể mất
++### Bước 8 — Kiểm tra index hỗ trợ FK còn sót sau rollback
++
++Khi MySQL tạo FK mà chưa có index tiền tố trái phù hợp, InnoDB **tự tạo** index non-unique. Các index
++này **không** có trong DDL và **không** tự mất khi drop FK:
++
++| Bảng | Index do InnoDB tự tạo | Sinh ra bởi |
++|---|---|---|
++| `class_subject` | `(class_id, org_id)`, `(subject_id, org_id)` | `fk_class_subject_class`, `fk_class_subject_subject` |
++| `teacher_subject` | `(user_id, org_id)`, `(subject_id, org_id)` | `fk_teacher_subject_teacher`, `fk_teacher_subject_subject` |
++| `class_subject_history` | `(class_id, org_id)` | `fk_csh_class` |
++| `specialty_subject` | `(specialty_id, org_id)`, `(subject_id, org_id)` | 2 FK của bảng |
++
++Sau rollback, liệt kê index còn lại:
++
++```sql
++SELECT table_name, index_name, non_unique,
++       GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS cols
++FROM information_schema.statistics
++WHERE table_schema = 'mems_people_db'
++  AND table_name IN ('class_subject','teacher_subject',
++                     'class_subject_history','specialty_subject')
++GROUP BY table_name, index_name, non_unique
++ORDER BY table_name, index_name;
++```
++
++Quy tắc:
++
++- Index **tên trùng FK** (ví dụ `fk_class_subject_class`) hoặc index non-unique đúng cặp cột ở bảng
++  trên được coi là index hỗ trợ FK. Nếu **không còn FK nào** dùng nó và không còn query nào cần
++  tiền tố đó, có thể drop — nhưng **chỉ sau khi** đã xác nhận bằng `information_schema`
++  (`referential_constraints` + `key_column_usage`) rằng không FK nào còn tham chiếu.
++- **Không drop** index nếu bảng còn FK khác cần tiền tố trái (MySQL sẽ báo lỗi 1553 hoặc tự tạo lại).
++- Nếu partial rollback (giữ `class_subject`), index hỗ trợ FK **phải giữ** vì 4 FK vẫn còn (trừ khi
++  đã drop FK tương ứng ở bước 5).
++
++## 2. Khi 52 ABORT giữa chừng — không có rollback tự động
++
++MySQL DDL gây **implicit commit** và 52 **không** bọc trong một transaction. Vì vậy khi một bước sau
++`SIGNAL SQLSTATE '45000'`:
++
++- Bảng/cột/index đã tạo **vẫn tồn tại** (DDL đã commit).
++- DML của 5a/5b (`INSERT ... source='LEGACY'`, `UPDATE is_primary`) **vẫn tồn tại**; MySQL không tự
++  rollback chúng.
++- Stored procedure có thể chưa bị drop (danh sách `DROP PROCEDURE` nằm cuối file); chạy lại 52 vẫn
++  được vì mỗi procedure đều `DROP PROCEDURE IF EXISTS` ở đầu.
++
++Quy trình khi ABORT sau 5a/5b:
++
++1. **Không xoá dòng backfill** nếu chưa chứng minh được nguồn gốc. Dòng do 5a tạo có
++   `source='LEGACY'`, `teacher_id` = `school_class.teacher_id`, `is_primary=1`, `status='PLANNED'`,
++   `created_at` ≈ thời điểm chạy 52 — nhưng dữ liệu nhập tay có thể trùng hình dạng. Đối chiếu
++   `created_at` với thời điểm chạy migration và log trước khi kết luận.
++2. Đọc thông báo `SIGNAL` và SELECT chẩn đoán ngay trước đó để xác định bước fail.
++3. Sửa **nguyên nhân gốc** (dữ liệu BLOCK_MIGRATION, schema lệch...). Không sửa file 52 đã áp dụng.
++4. Chạy lại `51_52_precheck.sql` → phải `DATA_PRECHECK_READY`; `SKIP_DATA_PRECHECK_NO_TABLE` cũng là
++   dừng (không chạy PART B).
++5. Chạy lại `51_52_precheck_data.sql` → mọi dòng `BLOCK_MIGRATION` phải = 0.
++6. Chạy lại 52. 5a/5b **idempotent**: 5a bỏ qua lớp đã có dòng khớp hoặc đã có primary; 5b chỉ set
++   primary khi lớp chưa có primary; PK `(class_id, subject_id)` chặn dòng trùng.
++7. Chạy `51_52_postcheck.sql`, rồi so số dòng `source='LEGACY'` với lần chạy trước — không được tăng
++   ngoài dự kiến.
++8. Nếu chọn rollback thay vì chạy tiếp: export theo bước 2–4 và ghi rõ dòng LEGACY nào do migration
++   sinh ra.
++
++## 3. Dữ liệu có thể mất
+ 
+ | Đối tượng | Mức mất | Ghi chú |
+ |---|---|---|
+@@ -159,7 +223,7 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
+ | `curriculum*` | Mất template + tiên quyết | — |
+ | `school_class.curriculum_id` | Mất liên kết lớp → curriculum | Không suy lại được nếu không có export |
+ 
+-## 3. Điều kiện an toàn để rollback
++## 4. Điều kiện an toàn để rollback
+ 
+ 1. Không còn request đổi môn chính/áp curriculum đang chạy (bước 1).
+ 2. Đã export và **xác minh** `class_subject_history`, `class_subject`, `school_class` và các bảng 51/52.
+@@ -168,14 +232,14 @@ ALTER TABLE subject DROP INDEX uq_subject_org_code,
+ 5. Có backup toàn DB tại thời điểm trước migration.
+ 6. Không có migration 53 áp dụng sau 52 (nếu có, rollback phải tính cả 53).
+ 
+-## 4. Khi nào **bắt buộc** forward-fix thay vì rollback
++## 5. Khi nào **bắt buộc** forward-fix thay vì rollback
+ 
+ - Đã phát sinh `class_subject_history` (dù chỉ 1 dòng) — rollback sẽ mất audit không tái tạo được.
+ - Người dùng đã cấu hình `class_subject`/`teacher_subject` mới sau migration.
+ - Chỉ sai constraint/index/backfill cục bộ → viết migration bổ sung sửa đúng phần sai.
+ - Không sửa file 51/52 đã áp dụng; luôn tạo file mới.
+ 
+-## 5. Migration 53
++## 6. Migration 53
+ 
+ Revision 3 **không** tạo migration 53. Chỉ tạo 53 khi có bằng chứng (query `information_schema` trên
+ môi trường thật) rằng một bản 52 cũ đã được áp dụng và cần bù phần thiếu.
+diff --git a/docs/phase-1/review-report.md b/docs/phase-1/review-report.md
+index 62dfc0e..8f54690 100644
+--- a/docs/phase-1/review-report.md
++++ b/docs/phase-1/review-report.md
+@@ -1,14 +1,16 @@
+ # Phase 1 — Review Report (Revision 3: D-08 / D-09 / D-15)
+ 
+-> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `bfa9b53`
++> **Ngày:** 2026-11-20 · **Branch:** `fixFlowCreateEmployee` · **Baseline source:** `f64cea1`
++> (Lượt 4 sửa trên working tree, chưa commit)
+ > **Phạm vi:** chỉ tài liệu trong `docs/phase-1/` + SQL migration **draft** trong
+ > `docs/phase-1/migrations/` + H2 test schema. Không sửa source Java/React, không chạy SQL, không
+ > kết nối database, không đổi cấu hình/deploy, không commit/push/merge.
+ 
+-## TRẠNG THÁI: `READY FOR USER REVIEW` — Revision 3
++## TRẠNG THÁI: `READY FOR FINAL STATIC REVIEW` — Revision 3 + Lượt 4
+ 
+-> **Không phải `APPROVED`.** Bộ tài liệu và migration draft đã đồng bộ nội bộ, nhưng **chưa được
+-> người dùng duyệt** và **chưa có migration nào được chạy** trên bất kỳ database nào.
++> **Không phải `APPROVED`.** Finding P1/P2/P3 của Final Static Review đã được sửa trong **logic SQL
++> thực tế** và kiểm static; **chưa chạy** migration/SQL, **chưa** kiểm trên MySQL staging, **chưa**
++> chạy test. Báo cáo chi tiết: `fix-review-findings-report.md`.
+ 
+ Lưu ý trung thực:
+ 
+@@ -59,7 +61,7 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
+ | 15 | `docs/phase-1/migrations/51_52_postcheck.sql` | Truy vấn chỉ đọc |
+ | 16 | `docs/phase-1/migrations/ROLLBACK.md` | Kế hoạch rollback có điều kiện |
+ | 17 | `review-report.md` | Báo cáo này (Revision 3) |
+-| 18 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (READY FOR USER REVIEW) |
++| 18 | `wp1-readiness-report.md` | Báo cáo sẵn sàng WP1 (`READY FOR FINAL STATIC REVIEW` sau Lượt 4) |
+ | 19 | `wp0-readiness-report.md` | Gỡ/điều kiện hoá migration 53; D-09/invariant theo Revision 3 |
+ 
+ ### 1.3. Kết quả kiểm chéo
+@@ -124,6 +126,32 @@ Revision 2 đã chốt D-08/D-15 nhưng còn ba điểm chưa đủ chặt, ngư
+    nhận **đúng** các index non-unique này; index lạ hoặc UNIQUE thừa ⇒ ABORT. Nhờ vậy bảng do
+    chính draft 52 tạo vẫn qua gate, không bị chặn nhầm.
+ 
++**Lượt 4 — sửa finding của Final Static Review (vẫn không chạy SQL/Java/React):**
++
++1. **P1 — thuộc tính cột.** Query 0b và procedure audit `class_subject` (20 cột) / `teacher_subject`
++   (10 cột) giờ so cả `DATA_TYPE`, `COLUMN_TYPE`, `CHARACTER_MAXIMUM_LENGTH`, `NUMERIC_PRECISION`,
++   `NUMERIC_SCALE`, `IS_NULLABLE`, `COLUMN_DEFAULT` (NULL-safe `<=>`), `COLLATION_NAME`, `EXTRA`.
++   Kiểm DEFAULT `source='MANUAL'`, `status='PLANNED'`/`'APPROVED'`, `is_primary=0`; lệch ⇒
++   `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE` / `SIGNAL 45000`, không tự `MODIFY`.
++2. **P2 — audit bảng đã tồn tại.** Thêm `mems_m52_assert_history_schema` (16 cột + thuộc tính, PK,
++   `uq_csh_operation`, index phụ, FK `ON DELETE RESTRICT`, 3 CHECK) và
++   `mems_m52_assert_specialty_subject_schema` (5 cột, PK, index whitelist, 2 FK, không CHECK lạ),
++   chạy **trước** `CREATE TABLE IF NOT EXISTS`; sai ⇒ `SIGNAL`, không tự `ALTER`.
++3. **P3 — referential action.** 0b, audit 52 và post-check đều kiểm `UPDATE_RULE`/`DELETE_RULE` của
++   cả 9 FK thuộc `class_subject`/`teacher_subject`/`class_subject_history`/`specialty_subject`;
++   history bắt buộc `RESTRICT` (không cascade).
++4. **P3 — H2 parity.** Thêm `chk_class_subject_primary` và `chk_curriculum_subject_sequence` vào
++   fixture; ghi rõ `uq_subject_org_code` UNIQUE ở H2 vs non-unique ở MySQL (D-04 commented) là lệch
++   **có chủ đích** vì service contract 409 và D-04 target; index phụ lược bỏ ở H2.
++5. **P3 — helper 51.** `mems_m51_add_col` / `mems_m51_add_fk` / `mems_m51_add_unique` kiểm định
++   nghĩa object trùng tên (kiểu/null/default; mapping + update/delete rule; unique/cột/prefix) và
++   `SIGNAL` thay vì bỏ qua theo tên; không tự drop/tạo lại.
++6. **Post-check** thêm 5b–5d (số cột, PK/UNIQUE, referential action của 4 bảng).
++7. **ROLLBACK.md** thêm §2 ABORT giữa chừng (implicit commit, DML 5a/5b còn lại, rerun idempotent)
++   và bước 8 kiểm index hỗ trợ FK còn sót, không drop khi còn FK dùng.
++8. **Test:** TC-LEG-030…041 (sai kiểu/độ dài/NULL/DEFAULT/collation, sai DELETE/UPDATE rule, history
++   cascade/thiếu cột, specialty sai schema, trùng tên index/FK, abort sau 5a/5b rồi rerun).
++
+ ---
+ 
+ ## 2. Nội dung D-08 / D-09 / D-15 bản Revision 3
+@@ -487,7 +515,8 @@ Trong toàn bộ Revision 3:
+ 
+ ## 12. Điều kiện chuyển sang `APPROVED`
+ 
+-Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED` khi người dùng đã:
++Trạng thái hiện tại là `READY FOR FINAL STATIC REVIEW` (Revision 3 + Lượt 4, xem
++`fix-review-findings-report.md`). Chỉ chuyển `APPROVED` khi người dùng đã:
+ 
+ 1. Duyệt D-08/D-09/D-15 tại `subject-business-requirements.md` (nguồn sự thật).
+ 2. Duyệt DDL + backfill trong `database-schema.md` §3 và migration draft 51/52.
+@@ -495,6 +524,8 @@ Trạng thái hiện tại là `READY FOR USER REVIEW`. Chỉ chuyển `APPROVED
+    `operationId`/`expectedVersion` trên `PUT /classes/{id}` khi đổi `subjectId`.
+ 4. Chấp nhận rằng H2 **không** chứng minh hành vi MySQL và cần xác minh staging.
+ 5. Quyết định thời điểm chạy migration 51/52 trên staging (ngoài phạm vi tài liệu này).
++6. Review `fix-review-findings-report.md` (P1/P2/P3 đã sửa static) và kiểm lại migration trên MySQL
++   staging — đặc biệt audit thuộc tính cột, referential action và history không cascade.
+ 
+ Nếu một `D-xx` thay đổi, phải cập nhật đồng thời:
+ `subject-business-requirements.md` → `curriculum-business-design.md` + `database-schema.md` +
+diff --git a/docs/phase-1/test-cases.md b/docs/phase-1/test-cases.md
+index e29edef..1cf0133 100644
+--- a/docs/phase-1/test-cases.md
++++ b/docs/phase-1/test-cases.md
+@@ -253,6 +253,18 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
+ | TC-LEG-027 | Bảng cũ sai cấu trúc index/FK/CHECK/cột sinh bị từ chối | staging dựng bảng đủ 20 cột nhưng (i) đảo thứ tự cột trong index, (ii) FK trỏ sai bảng/cột, (iii) CHECK thiếu một giá trị, (iv) `primary_class_id` là cột thường hoặc VIRTUAL | (i)–(iv) pre-check 0b trả `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL 45000` ở audit tương ứng; không tự sửa schema | DB |
+ | TC-LEG-028 | Index hỗ trợ FK không bị chặn nhầm | bảng `class_subject`/`teacher_subject` do chính draft 52 tạo trên MySQL | `information_schema.statistics` có thêm index non-unique `(class_id, org_id)`/`(subject_id, org_id)` (và `(user_id, org_id)` cho `teacher_subject`); 0b vẫn trả `DATA_PRECHECK_READY`, 52 audit pass; thêm index lạ khác ⇒ ABORT | DB |
+ | TC-LEG-029 | `teacher_subject` sai cấu trúc ngoài `PENDING` | staging: thiếu/đổi cột, sai thứ tự PK, FK trỏ `staff_profile` thay vì `teacher_profile`, CHECK source thiếu `SPECIALTY` | `mems_m52_assert_teacher_subject_schema` `SIGNAL 45000`; không tự sửa | DB |
++| TC-LEG-030 | Sai `DATA_TYPE` bị chặn | staging: `class_subject.created_at` đổi `datetime(3)` → `date`; `source` → `int` | `51_52_precheck.sql` query 0b trả `attr_mismatch > 0` ⇒ `BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; 52 `SIGNAL` trong `mems_m52_assert_class_subject_schema` (`data_type` so với spec); không tự `MODIFY`. Vị trí: 0b `cs_attr`, audit 52 | DB |
++| TC-LEG-031 | Sai `COLUMN_TYPE` (độ dài/độ chính xác) bị chặn | staging: `note varchar(500)` → `varchar(200)`; `sequence_no smallint` → `int`; `is_primary tinyint(1)` → `tinyint(4)` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`column_type`, `numeric_precision`); không tự sửa. Vị trí: 0b `cs_attr`, `mems_m52_assert_class_subject_schema` | DB |
++| TC-LEG-032 | Sai NULL/DEFAULT bị chặn | staging: `status` cho phép NULL hoặc DEFAULT `'ACTIVE'`; `is_primary` bỏ DEFAULT; `created_at` thêm DEFAULT | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`is_nullable`/`column_default` so sánh NULL-safe `<=>`); không tự sửa. Vị trí: 0b `cs_attr`, audit 52 | DB |
++| TC-LEG-033 | Sai collation bị chặn | staging: `subject.name`/`class_subject.note` dùng `utf8mb4_general_ci` | 0b `attr_mismatch > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`collation_name` khác `utf8mb4_unicode_ci`); không tự `CONVERT`. Vị trí: `cs_attr`/spec 20 cột | DB |
++| TC-LEG-034 | Sai `DELETE_RULE` bị chặn | staging: `fk_class_subject_class` `ON DELETE RESTRICT` (đúng phải CASCADE); `fk_class_subject_subject` `ON DELETE CASCADE` (đúng phải RESTRICT) | 0b `cs_fk.fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL` (`v_fk_rule_bad <> 0`); không tự drop/tạo lại FK. Vị trí: 0b join `referential_constraints`, audit 52 | DB |
++| TC-LEG-035 | Sai `UPDATE_RULE` bị chặn | staging: một FK của `class_subject`/`teacher_subject` đặt `ON UPDATE CASCADE` thay vì RESTRICT | 0b `fk_rule_bad > 0` ⇒ BLOCKED; 52 audit `SIGNAL`; không tự sửa. Vị trí: 0b `cs_fk`, audit 52 `v_fk_rule_bad` | DB |
++| TC-LEG-036 | History cascade bị từ chối | staging: `class_subject_history.fk_csh_class` đặt `ON DELETE CASCADE` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`'… history must not cascade'`); history **không** bị xoá theo lớp; không tự sửa FK | DB |
++| TC-LEG-037 | History thiếu cột snapshot | staging: bảng `class_subject_history` cũ thiếu `new_subject_name` (còn 15 cột) hoặc thiếu `uq_csh_operation` | `mems_m52_assert_history_schema` (52) `SIGNAL` (`16` cột + index groups + FK + 3 CHECK); 52 không tự `ADD COLUMN`/`CREATE` đè; precheck 0h cảnh báo số cột | DB |
++| TC-LEG-038 | `specialty_subject` sai schema | staging: bảng `specialty_subject` cũ thiếu `idx_specialty_subject_org_subject`, sai PK, hoặc FK trỏ `staff_profile` | `mems_m52_assert_specialty_subject_schema` (52) `SIGNAL` (5 cột, index whitelist, 2 FK + action, không CHECK lạ); không tự `ALTER`; 0h hiển thị column_count/FK rule | DB |
++| TC-LEG-039 | Trùng tên index nhưng sai định nghĩa | staging: đã có `uq_school_class_id_org` nhưng non-unique hoặc đúng cột sai thứ tự/prefix | 51 `mems_m51_add_unique` `SIGNAL` (`'existing index differs from expected (unique/columns/prefix)'`), **không** bỏ qua theo tên; không tự drop index | DB |
++| TC-LEG-040 | Trùng tên FK nhưng sai mapping/action | staging: đã có `fk_school_class_curriculum` nhưng `ON DELETE CASCADE` hoặc trỏ sai cột | 51 `mems_m51_add_fk` `SIGNAL` (`'existing FK differs from expected (mapping/update/delete rule)'`); không tự drop/tạo lại | DB |
++| TC-LEG-041 | ABORT sau 5a/5b rồi chạy lại | staging cố ý để 52 dừng sau 5b (dữ liệu khiến `mems_m52_assert_no_duplicate_primary`/bước sau `SIGNAL`) | DDL và DML 5a/5b **vẫn tồn tại** (implicit commit); sửa dữ liệu gốc → chạy lại precheck (phải `DATA_PRECHECK_READY`), precheck data (block = 0), 52; 5a/5b idempotent nên số dòng `class_subject`/`source='LEGACY'` không tăng; postcheck 2a–2e = 0 dòng. Vị trí: `ROLLBACK.md` §2 | DB |
+ 
+ ---
+ 
+@@ -279,7 +291,7 @@ Curriculum mẫu: `c0000000-0000-4000-8000-000000000001` (`CT-K10-2026`), 3 môn
+ | AC-RBAC-01…06 | TC-RBAC-001…009, TC-RBAC-011…013 |
+ | AC-VAL-01…11 | E-01…E-29 |
+ | AC-VAL-12…20, AC-SUB-15…17 | TC-CLS-021…048, E-30…E-43 |
+-| Legacy | TC-LEG-001…024 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency) |
++| Legacy | TC-LEG-001…041 (021…024: phân loại pre-check, backfill idempotent/an toàn, rollback dependency; 030…041: audit thuộc tính cột, referential action, history/specialty_subject, helper 51, abort-rerun) |
+ | Concurrency | TC-CON-001…006 |
+ 
+ ---
+diff --git a/docs/phase-1/wp1-readiness-report.md b/docs/phase-1/wp1-readiness-report.md
+index 1b9fe89..36eab63 100644
+--- a/docs/phase-1/wp1-readiness-report.md
++++ b/docs/phase-1/wp1-readiness-report.md
+@@ -1,9 +1,11 @@
+-# WP1 Readiness Report — Phase 1 Revision 3
++# WP1 Readiness Report — Phase 1 Revision 3 + Lượt 4
+ 
+-> **Trạng thái: `READY FOR USER REVIEW` — KHÔNG phải `APPROVED`.**
+-> Báo cáo này mô tả công việc tài liệu/schema draft cho WP1. Không có migration nào được chạy,
+-> không có Java/React nào bị sửa, không kết nối DB production/staging, không test nào được thực thi.
+-> Ngày: 2026-11-20. Nhánh: `fixFlowCreateEmployee`.
++> **Trạng thái: `READY FOR FINAL STATIC REVIEW` — KHÔNG phải `APPROVED`.**
++> Báo cáo này mô tả công việc tài liệu/schema draft cho WP1. Finding P1/P2/P3 của Final Static
++> Review đã sửa trong logic SQL thực tế (chi tiết: `fix-review-findings-report.md`). Không có
++> migration nào được chạy, không có Java/React nào bị sửa, không kết nối DB production/staging,
++> không test nào được thực thi. Ngày: 2026-11-20. Nhánh: `fixFlowCreateEmployee` (working tree trên
++> HEAD `f64cea1`).
+ 
+ ---
+ 
+@@ -92,9 +94,17 @@ Năm bất biến primary (tài liệu hoá + test):
+ 4. Không quá một primary/lớp.
+ 5. Tạo lớp/đổi môn/backfill giữ các bất biến trên.
+ 
++**Audit schema (Lượt 4):** pre-check 0b và procedure audit trong 52 là **cùng một hợp đồng** cho
++`class_subject` (20 cột) / `teacher_subject` (10 cột): tên cột, `DATA_TYPE`, `COLUMN_TYPE`, độ dài/
++độ chính xác, NULL, DEFAULT, collation, `EXTRA` (generated STORED); PK; index + whitelist index hỗ
++trợ FK; mapping FK + `UPDATE_RULE`/`DELETE_RULE`; CHECK đã chuẩn hoá. `class_subject_history` (16
++cột) và `specialty_subject` (5 cột) được audit đầy đủ trước `CREATE TABLE IF NOT EXISTS`. Lệch ⇒
++`SIGNAL 45000`/`BLOCKED_SCHEMA_INCOMPLETE_OLD_TABLE`; **không** tự `ALTER`.
++
+ ### 3.1. Xác minh optimistic locking (`school_class.version`)
+ 
+-Đọc source tại HEAD `bfa9b53` + dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
++Đọc source tại HEAD `f64cea1` (xác minh ban đầu tại `bfa9b53`; không file Java nào bị sửa) +
++dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
+ 
+ | Hạng mục | Bằng chứng | Kết luận |
+ |---|---|---|
+@@ -241,6 +251,9 @@ Không thêm permission ID mới; dùng `class.edit`/`class.view` hiện có.
+ | `is_primary` | `tinyint(1)` | `BOOLEAN` | Test map true/false |
+ | `ALTER TABLE … AFTER` | Hỗ trợ | Không | Draft không dùng `AFTER` |
+ | Composite FK | Cần index tiền tố trái | Cần tương tự | H2 schema thêm `UNIQUE(id, org_id)` |
++| CHECK constraint | Revision 3 đầy đủ | Thiếu `chk_class_subject_primary` + `chk_curriculum_subject_sequence` trước Lượt 4 | Đã bổ sung; `is_primary IN (0,1)` viết H2 là `IN (FALSE, TRUE)` |
++| `uq_subject_org_code` | Non-unique (migration 42); D-04 commented đổi UNIQUE | UNIQUE | Lệch **có chủ đích**: giữ UNIQUE để test contract 409 (`SubjectRepository` bắt `DuplicateKeyException`) và đúng D-04 target; **không** sửa D-04; MySQL staging phải kiểm D-04 riêng |
++| Index phụ 51/52 | Đầy đủ, audit qua `information_schema` | Lược bỏ phần lớn | H2 không chứng minh index; audit MySQL là nguồn xác nhận. Pre-check 0b/52 audit kiểm cả thuộc tính cột + `UPDATE_RULE`/`DELETE_RULE` |
+ 
+ **Không** tuyên bố schema đã được xác minh chỉ dựa trên H2. Không có test H2 nào được chạy.
+ 
+@@ -259,7 +272,15 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
+   chk_class_subject_primary` → `primary_class_id` → `is_primary`; đảo thứ tự sẽ bị MySQL từ chối.
+   Partial rollback chỉ áp dụng cho bảng do draft này tạo (52 không nâng cấp bảng cũ).
+ - Nếu đã phát sinh history/dữ liệu mới → **forward-fix**, không rollback.
+-- Chi tiết + tên FK/index: `migrations/ROLLBACK.md`.
++- **ABORT giữa chừng:** MySQL DDL implicit commit; 52 không bọc transaction nên khi `SIGNAL` sau
++  5a/5b, DDL và DML đã chạy **vẫn tồn tại**. Không xoá dòng backfill khi chưa chứng minh nguồn gốc;
++  sửa dữ liệu gốc rồi chạy lại pre-check → pre-check data → 52 → post-check. 5a/5b idempotent
++  (PK + `NOT EXISTS` + chỉ set primary khi lớp chưa có).
++- **Index hỗ trợ FK còn sót:** InnoDB tự tạo index non-unique (2 cho `class_subject`, 2 cho
++  `teacher_subject`, 1 cho history, 2 cho `specialty_subject`); không tự mất khi drop FK. Chỉ drop
++  sau khi `information_schema` xác nhận không FK nào còn dùng; **không** drop khi partial rollback
++  còn giữ FK.
++- Chi tiết + tên FK/index: `migrations/ROLLBACK.md` (§2 abort/rerun, bước 8 index hỗ trợ FK).
+ 
+ ---
+ 
+@@ -293,6 +314,9 @@ Kế hoạch đầy đủ ở `migrations/ROLLBACK.md` (7 bước: quiesce → e
+ - TC-LEG-025: `school_class.teacher_id` mồ côi → `BLOCK_MIGRATION` + 5.0 `SIGNAL`, không set NULL.
+ - TC-LEG-026: bảng `class_subject` cũ thiếu cấu trúc → schema assert `SIGNAL`, không `ADD COLUMN`;
+   `teacher_subject` cũ còn `PENDING` → 52 ABORT.
++- TC-LEG-030…041 (Lượt 4): sai `DATA_TYPE`/`COLUMN_TYPE`/NULL/DEFAULT/collation; sai `DELETE_RULE`/
++  `UPDATE_RULE`; history cascade hoặc thiếu cột snapshot; `specialty_subject` sai schema; index/FK
++  trùng tên nhưng sai định nghĩa (helper 51); ABORT sau 5a/5b rồi chạy lại.
+ - E-40…E-43, AC-VAL-17…20.
+ 
+ **Đã thực thi: KHÔNG.** Không chạy Maven, không chạy H2, không chạy migration, không gọi API. Mọi
+@@ -312,5 +336,6 @@ tuyên bố "pass" trong tài liệu là **kỳ vọng thiết kế**, không ph
+ - Chỉ tạo file draft SQL trong `docs/phase-1/migrations/` và cập nhật tài liệu + H2 test schema.
+ - Schema **chưa được xác minh** trên MySQL; migration **chưa được áp dụng**.
+ 
+-**Kết luận:** tài liệu và draft đã sẵn sàng để người dùng review. Trạng thái
+-`READY FOR USER REVIEW`; chuyển `APPROVED` chỉ sau khi người dùng duyệt và kiểm staging.
++**Kết luận:** finding P1/P2/P3 đã sửa trong logic SQL thực tế và kiểm static. Trạng thái
++`READY FOR FINAL STATIC REVIEW`; chuyển `APPROVED` chỉ sau khi người dùng duyệt và kiểm trên MySQL
++staging.

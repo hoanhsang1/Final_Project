@@ -3,6 +3,7 @@ package com.mems.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mems.dto.ClassMismatch;
+import com.mems.dto.EligibleTeacherInfo;
 import com.mems.dto.SpecialtyResponse;
 import com.mems.dto.TeacherAssignableItem;
 import com.mems.dto.TeacherClassResponse;
@@ -74,12 +75,39 @@ public class TeacherRepository {
     public boolean teachesSubject(String userId, String orgId, String subjectId) {
         Integer count = jdbc.queryForObject("""
             SELECT COUNT(*)
-            FROM teacher_specialty ts
-            JOIN specialty s ON s.id=ts.specialty_id AND s.org_id=ts.org_id AND s.is_active=TRUE
-            JOIN subject sub ON sub.id=? AND sub.org_id=ts.org_id AND sub.is_active=TRUE
-            WHERE ts.user_id=? AND ts.org_id=? AND s.name_unaccented=sub.name_unaccented
-            """, Integer.class, subjectId, userId, orgId);
+            FROM teacher_subject ts
+            JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+            WHERE ts.user_id=? AND ts.org_id=? AND ts.subject_id=? AND ts.status='APPROVED'
+            """, Integer.class, userId, orgId, subjectId);
         return count != null && count > 0;
+    }
+
+    /**
+     * Danh sách giáo viên đang dạy (DANG_DAY) trong org, đủ điều kiện dạy subjectId.
+     * Nguồn dữ liệu chuẩn theo D-06: bảng `teacher_subject` với status = 'APPROVED'.
+     * Loại bỏ hoàn toàn fallback tên chuyên môn để tránh sai phân quyền nghiệp vụ.
+     * Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
+     */
+    public List<EligibleTeacherInfo> eligibleForSubject(String orgId, String subjectId) {
+        return jdbc.query("""
+            SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
+            FROM staff_profile sp
+            JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
+            JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
+            WHERE sp.org_id=?
+              AND sp.status='ACTIVE'
+              AND tp.teaching_status='DANG_DAY'
+              AND EXISTS (
+                SELECT 1 FROM teacher_subject ts
+                JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
+                WHERE ts.user_id=sp.user_id AND ts.org_id=sp.org_id
+                  AND ts.subject_id=? AND ts.status='APPROVED'
+              )
+            ORDER BY sp.full_name
+            """,
+            (rs, n) -> new EligibleTeacherInfo(
+                rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
+            orgId, subjectId);
     }
 
     public boolean hasProfile(String userId, String orgId) {
