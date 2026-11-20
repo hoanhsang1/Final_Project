@@ -2,10 +2,24 @@
 
 > **Trạng thái: `READY FOR FINAL STATIC REVIEW` — KHÔNG phải `APPROVED`.**
 > Báo cáo này mô tả công việc tài liệu/schema draft cho WP1. Finding P1/P2/P3 của Final Static
-> Review đã sửa trong logic SQL thực tế (chi tiết: `fix-review-findings-report.md`). Không có
-> migration nào được chạy, không có Java/React nào bị sửa, không kết nối DB production/staging,
-> không test nào được thực thi. Ngày: 2026-11-20. Nhánh: `fixFlowCreateEmployee` (working tree trên
-> HEAD `f64cea1`).
+> Review đã sửa trong logic SQL thực tế (chi tiết: `fix-review-findings-report.md`) và **đã được
+> xác minh static trên commit đã push `67d7641`**. Không có migration nào được chạy, không có
+> Java/React nào bị sửa, không kết nối DB production/staging, không test nào được thực thi ngày
+> 2026-11-20. Nhánh: `fixFlowCreateEmployee`, HEAD `67d7641` (**đã push** — không phải working tree).
+> Bước kế tiếp sau review này: `READY FOR STAGING VALIDATION`.
+>
+> Bốn giới hạn **chưa xác minh** (xem §12): (1) chưa chạy migration trên MySQL staging;
+> (2) chưa chạy test H2/Maven; (3) schema staging thực tế chưa được xác nhận; (4) hành vi runtime
+> chưa được kiểm chứng.
+
+### 0.1. Lịch sử review (đồng bộ theo GitHub HEAD)
+
+| Mốc | Commit | Nội dung |
+|---|---|---|
+| Final Static Review (baseline) | `f64cea1` (working tree) | Báo cáo `BLOCKED` với P1/P2/P3: thiếu audit thuộc tính cột, thiếu audit bảng history/specialty, thiếu kiểm `UPDATE_RULE`/`DELETE_RULE`, H2 lệch CHECK, helper 51 chưa chặn định nghĩa trùng tên |
+| Revision 4 (fix) | `67d7641` (đã push) | P1/P2/P3 sửa trong SQL thực tế: precheck 0b + 4 procedure audit 52 kiểm đủ 20/10/16/5 cột; kiểm FK mapping + referential action; H2 thêm 2 CHECK; helper 51 chặn lệch định nghĩa |
+| Final Static Review (xác minh) | `67d7641` (đã push) | Xác minh lại trên commit đã push: **cả 3 finding P1/P2/P3 PASS**, không phát sinh finding static mới. Không đánh giá runtime/DB |
+| Đồng bộ báo cáo | `67d7641` | Chỉ cập nhật `fix-review-findings-report.md` + file này để phản ánh HEAD đã push; không commit/push/migration |
 
 ---
 
@@ -25,7 +39,7 @@
 | `validation-and-error-cases.md` | E-40…E-43, AC-VAL-17…20, `expectedVersion` bắt buộc |
 | `test-cases.md` | TC-CLS-039…048, TC-LEG-016…026, ma trận AC |
 | `implementation-roadmap.md` | WP1 dùng 51/52 (không 53), WP5 `operationId`/`expectedVersion`, test range 001…048 |
-| `review-report.md` | Viết lại thành Revision 3 (`READY FOR USER REVIEW`) |
+| `review-report.md` | Revision 3 + Lượt 4, trạng thái `READY FOR FINAL STATIC REVIEW` |
 | `wp0-readiness-report.md` | Ghi chú Revision 3 + bỏ migration 53 không bằng chứng |
 | `wp1-readiness-report.md` | File này |
 
@@ -103,7 +117,7 @@ cột) và `specialty_subject` (5 cột) được audit đầy đủ trước `C
 
 ### 3.1. Xác minh optimistic locking (`school_class.version`)
 
-Đọc source tại HEAD `f64cea1` (xác minh ban đầu tại `bfa9b53`; không file Java nào bị sửa) +
+Đọc source tại HEAD `67d7641` (xác minh ban đầu tại `bfa9b53`; không file Java nào bị sửa) +
 dump `DB_11_16.sql` + H2 fixture (chỉ đọc, không sửa Java/DB):
 
 | Hạng mục | Bằng chứng | Kết luận |
@@ -332,10 +346,21 @@ tuyên bố "pass" trong tài liệu là **kỳ vọng thiết kế**, không ph
 - **Không** kết nối production/staging DB.
 - **Không** deploy/restart service.
 - **Không** sửa `.env`, CORS, `vercel.json`, backend URL.
-- **Không** commit/push/merge/reset/force-push.
+- **Không** commit/push/merge/reset/force-push trong lượt đồng bộ báo cáo này. Commit `67d7641`
+  đã được push từ lượt trước; lượt này chỉ sửa tài liệu.
 - Chỉ tạo file draft SQL trong `docs/phase-1/migrations/` và cập nhật tài liệu + H2 test schema.
 - Schema **chưa được xác minh** trên MySQL; migration **chưa được áp dụng**.
 
-**Kết luận:** finding P1/P2/P3 đã sửa trong logic SQL thực tế và kiểm static. Trạng thái
-`READY FOR FINAL STATIC REVIEW`; chuyển `APPROVED` chỉ sau khi người dùng duyệt và kiểm trên MySQL
-staging.
+**Bốn giới hạn chưa xác minh (không được suy diễn là đã sẵn sàng staging):**
+
+1. **Chưa chạy migration** 51/52 trên MySQL staging — mọi kết luận schema chỉ là static.
+2. **Chưa chạy test H2/Maven** — fixture H2 và logic Java mới chỉ được đọc/thiết kế.
+3. **Schema staging thực tế chưa xác nhận** — chưa đối chiếu `information_schema` với
+   `DB_11_16.sql`.
+4. **Hành vi runtime chưa kiểm chứng** — backfill, generated column, abort/rerun chỉ là kỳ vọng
+   thiết kế.
+
+**Kết luận:** finding P1/P2/P3 đã sửa trong logic SQL thực tế, kiểm static trên commit đã push
+`67d7641`. Trạng thái `READY FOR FINAL STATIC REVIEW`; bước tiếp theo là `READY FOR STAGING
+VALIDATION`, **không phải `APPROVED`**. Chỉ chuyển `APPROVED` sau khi người dùng duyệt và kiểm trên
+MySQL staging.

@@ -1,16 +1,19 @@
 # Fix Final Static Review Findings — WP1 Revision 3
 
-> **Ngày:** 2026-11-20 · **Nhánh:** `fixFlowCreateEmployee` · **HEAD:** `f64cea1`
+> **Ngày:** 2026-11-20 · **Nhánh:** `fixFlowCreateEmployee` · **HEAD:** `67d7641` (đã push)
 > **Phạm vi:** chỉ SQL draft trong `docs/phase-1/migrations/`, tài liệu `docs/phase-1/` và H2
-> **test fixture**. Không sửa Java business logic, không sửa React, không chạy SQL/migration, không
-> kết nối MySQL/H2, không chạy Maven, không commit/push/merge/reset, không deploy, không tạo
-> migration 53.
+> **test fixture**. Lượt sửa finding đã được commit trong `67d7641` và push lên
+> `origin/fixFlowCreateEmployee`; lần đồng bộ báo cáo này **không** commit/push. Không sửa Java
+> business logic, không sửa React, không chạy SQL/migration, không kết nối MySQL/H2, không chạy
+> Maven, không deploy, không tạo migration 53.
 
 ## TRẠNG THÁI: `READY FOR FINAL STATIC REVIEW`
 
-> **Không phải `APPROVED`.** P1/P2/P3 đã được sửa trong **logic SQL thực tế** và kiểm bằng phân
-> tích static. Chưa chạy trên MySQL/H2, chưa chạy test, chưa xác minh runtime. Việc chuyển
-> `APPROVED` thuộc về người dùng sau khi review và kiểm staging.
+> **Không phải `APPROVED`.** Final Static Review đã kiểm tra commit `67d7641` (đã push) và xác nhận
+> 3 finding đã sửa. P1/P2/P3 được sửa trong **logic SQL thực tế** và kiểm bằng phân tích static.
+> **Giai đoạn kế tiếp:** `READY FOR STAGING VALIDATION` — nhưng **chưa** chạy migration trên MySQL
+> staging, **chưa** chạy H2/Maven tests, **chưa** xác nhận schema thực tế của staging, **chưa** kiểm
+> runtime behavior. Việc chuyển `APPROVED` thuộc về người dùng sau staging validation.
 
 ---
 
@@ -19,22 +22,33 @@
 | Hạng mục | Giá trị |
 |---|---|
 | Branch | `fixFlowCreateEmployee` |
-| HEAD | `f64cea1` (`fix flox class managment`) |
-| Commit trong lượt này | **Không** (working tree) |
-| Push/merge/reset | **Không** |
-| Staging area | Trống; mọi thay đổi là unstaged |
-| File tracked bị sửa | 11 (liệt kê ở E.1) |
-| File mới | `docs/phase-1/fix-review-findings-report.md` (báo cáo này), `docs/phase-1/fix-review-findings.diff` (full diff) |
-| File ngoài phạm vi bị sửa | **Không**: `git status` chỉ có 11 file dự kiến; không có `.java` business logic, không có React, không có `.env`/`vercel.json`/CORS |
+| HEAD | `67d7641` (`fix flox class managment`) — **đã push** |
+| Commit chứa các sửa đổi | `67d7641`, parent `f64cea1` — không còn ở working tree |
+| Push/merge/reset trong lượt đồng bộ | **Không** (commit đã được push trước đó) |
+| Staging area / working tree | Trống / sạch tại thời điểm đồng bộ |
+| File thay đổi trong commit | 13: 11 file sửa + 2 file mới (báo cáo này và file `.diff`) |
+| Final Static Review | **PASS (static)** trên `67d7641`: 3/3 finding được xác nhận |
+| File ngoài phạm vi bị sửa | **Không**: chỉ tài liệu, SQL draft và H2 test fixture; không `.java` business logic, không React, không `.env`/`vercel.json`/CORS |
 | Migration 53 | **Không tạo** |
 | SQL/DB execution | **Không**: không chạy file `.sql`, không kết nối MySQL/H2, không chạy Maven |
 
 Lệnh kiểm chứng:
 
 ```bash
+git branch --show-current
+git rev-parse HEAD
 git status --short
-git diff --numstat
+git diff f64cea1 67d7641 --stat
 ```
+
+### A.1. Lịch sử review
+
+| Mốc | Commit | Kết quả |
+|---|---|---|
+| Final Static Review Revision 3 (Lượt 3) | `4b2007d` | `READY FOR USER REVIEW`; phát hiện P1/P2/P3 |
+| Lượt 4 sửa finding (P1/P2/P3) | working tree trên `f64cea1` → commit `67d7641` | `READY FOR FINAL STATIC REVIEW` |
+| Final Static Review trên HEAD mới | `67d7641` (đã push) | **PASS static**: (1) pre-check kiểm đủ thuộc tính 20 cột `class_subject`; (2) pre-check kiểm FK mapping + `UPDATE_RULE`/`DELETE_RULE`; (3) H2 fixture bổ sung 2 CHECK. Không finding mới trong phạm vi static. |
+| Đồng bộ báo cáo với HEAD | `67d7641` | Chỉ cập nhật 2 file báo cáo; không chạy staging/runtime |
 
 ---
 
@@ -142,7 +156,7 @@ source).
 | FK/action thống nhất 52 ↔ precheck ↔ postcheck | So 9 FK và expected rule ở 3 file | Khớp: class CASCADE, 3 FK còn lại RESTRICT; teacher CASCADE/RESTRICT; history RESTRICT/RESTRICT; specialty CASCADE/RESTRICT |
 | Index group ↔ DDL | So tên/cột/thứ tự/unique ở audit và `CREATE TABLE` | Khớp 5 + 2 hỗ trợ (class), 3 + 2 (teacher), 4 + 1 (history), 2 + 2 (specialty) |
 | Không DML ngoài 5a/5b | `grep` trong 52 | `INSERT/UPDATE` chỉ ở 5a/5b (`:1085`, `:1102-1112`); D-04 commented |
-| Phạm vi file | `git status --short` | 11 tracked file + 2 file mới; không Java/React business logic; không migration 53 |
+| Phạm vi file | `git show --stat 67d7641` + `git status --short` | Commit `67d7641` gồm 13 file (11 sửa + 2 mới); working tree sạch; không Java/React business logic; không migration 53 |
 
 ### D.2. Chưa kiểm (giới hạn trung thực)
 
@@ -163,12 +177,14 @@ source).
 Full unified diff (không rút gọn) nằm tại:
 
 - `docs/phase-1/fix-review-findings.diff`
-- Sinh bằng: `git diff > docs/phase-1/fix-review-findings.diff`
+- Sinh bằng `git diff` trên working tree trước khi commit. Sau commit `67d7641`, nội dung artifact
+  khớp **chính xác** với `git diff f64cea1 67d7641` giới hạn 11 file sửa (đã đối chiếu SHA-256).
 - **1593 dòng**, SHA-256: `7dcd94f814e7b56fb704b766782c4fe4d252d258226d64a175c513d2470fbbfc`
-- Bao gồm **toàn bộ hunk** của 11 file tracked bị sửa. Hai file mới (báo cáo này và file `.diff`)
-  là untracked nên không nằm trong `git diff`; nội dung báo cáo chính là phần còn lại của deliverable.
+- Bao gồm **toàn bộ hunk** của 11 file được sửa. Hai file mới (báo cáo này và file `.diff`) không
+  nằm trong artifact; cả hai đã nằm trong commit `67d7641`. Working tree tại HEAD hiện **sạch**.
+- Toàn bộ commit `67d7641`: **13 file, 2868 insertions(+), 90 deletions(-)**.
 
-`git diff --stat`:
+Thống kê 11 file sửa trong artifact:
 
 ```text
  backend/PeopleService/src/test/resources/people-test-schema.sql |  14 +-
@@ -185,7 +201,7 @@ Full unified diff (không rút gọn) nằm tại:
  11 files changed, 1019 insertions(+), 90 deletions(-)
 ```
 
-`git diff --numstat` (insertions/deletions):
+Numstat của 11 file sửa (insertions/deletions):
 
 ```text
 13   1   backend/PeopleService/src/test/resources/people-test-schema.sql
@@ -242,6 +258,9 @@ Full unified diff (không rút gọn) nằm tại:
    cho `curriculum_id` nullable nên không ảnh hưởng.
 8. **Audit theo tên constraint**: đổi tên FK/index dù cấu trúc đúng vẫn bị chặn. Đây là lựa chọn có
    chủ đích (Revision 3 cố định tên), không phải bug.
+9. **Schema staging chưa xác nhận**: chưa đọc `information_schema` trên môi trường thật; chỉ đối
+   chiếu tài liệu và `DB_11_16.sql` trong repo. Chưa chạy migration, H2/Maven tests hay kiểm runtime
+   behavior.
 
 ---
 
@@ -249,8 +268,10 @@ Full unified diff (không rút gọn) nằm tại:
 
 - P1 (thuộc tính cột), P2 (history + specialty_subject), P3 (referential action, H2 parity, helper 51,
   runbook, test cases) đã được sửa **trong logic SQL thực tế**, có dẫn chứng file:line.
+- Final Static Review trên commit `67d7641` (đã push) xác nhận 3 finding cũ đã được sửa.
 - D-01…D-15, API contract, permission matrix, quy tắc history, teacher-subject và backfill
   exact-match **không thay đổi**. Không sửa Java business logic/React. Không tạo migration 53.
-- Chưa chạy SQL/DB/test; các rủi ro còn lại ghi ở F.
+- Chưa chạy SQL/DB/test, chưa xác nhận schema staging; các rủi ro còn lại ghi ở F.
 
-**Trạng thái: `READY FOR FINAL STATIC REVIEW`**
+**Trạng thái: `READY FOR FINAL STATIC REVIEW`** — đã PASS static trên `67d7641`; bước tiếp theo là
+`READY FOR STAGING VALIDATION`, **không phải `APPROVED`**.
