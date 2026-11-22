@@ -1,6 +1,7 @@
 package com.mems.service;
 
 import com.mems.client.ClassInfo;
+import com.mems.client.ClassSubjectInfo;
 import com.mems.client.EligibleTeacherInfo;
 import com.mems.client.FacilityClient;
 import com.mems.client.PeopleClient;
@@ -12,7 +13,6 @@ import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
 import org.springframework.stereotype.Service;
 
-import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -21,21 +21,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Thuật toán xếp lịch tự động – Greedy + kiểm tra ràng buộc cứng.
  *
+ * Hỗ trợ quét toàn bộ môn học của lớp (cả môn chính và môn thêm thủ công / CTĐT).
  * Ưu tiên xếp môn khó trước (ít giáo viên đủ điều kiện nhất).
- * Mỗi lần thử phân bổ đều gọi ScheduleService.create() — đảm bảo
- * kiểm tra conflict teacher / room / class ngay trên DB, không giả lập.
- *
- * Ràng buộc cứng:
- *  1. Không trùng lịch giáo viên.
- *  2. Không trùng lịch phòng.
- *  3. Không trùng lịch lớp.
- *  4. Giáo viên phải đủ điều kiện dạy môn (nguồn chuẩn D-06: teacher_subject.status='APPROVED').
- *  5. Phòng phải active, không có thiết bị hỏng, đủ sức chứa.
+ * Mỗi lần phân bổ đều gọi ScheduleService.create() — kiểm tra conflict giáo viên / phòng / lớp trên DB.
  */
 @Service
 public class AutoScheduleService {
@@ -51,18 +43,15 @@ public class AutoScheduleService {
     }
 
     /**
-     * Chạy thuật toán xếp lịch tự động.
-     *
-     * @param orgId        ID tổ chức (từ JWT)
-     * @param departmentId ID phòng ban (xác định phạm vi lịch)
-     * @param request      Yêu cầu xếp lịch
+     * Chạy thuật toán xếp lịch tự động cho các môn của từng lớp.
      */
     public AutoScheduleResult generate(String orgId, String departmentId, AutoScheduleRequest request) {
         List<ScheduleResponse> scheduled = new ArrayList<>();
         List<AutoScheduleResult.UnscheduledItem> unscheduled = new ArrayList<>();
 
-        // ---- 1. Thu thập thông tin lớp + giáo viên đủ điều kiện ----
-        List<ClassCandidate> candidates = new ArrayList<>();
+        // ---- 1. Thu thập thông tin các môn học cần xếp của từng lớp ----
+        List<ClassSubjectCandidate> candidates = new ArrayList<>();
+
         for (String classId : request.classIds()) {
             ClassInfo info = people.classInfo(orgId, classId);
             if (info == null) {
@@ -76,38 +65,68 @@ public class AutoScheduleService {
                 continue;
             }
 
-            // Tìm eligible teachers theo D-06:
-            //   Ưu tiên 1: lớp có assigned teacher → chỉ dùng teacher đó (đã được BM xác nhận).
-            //   Ưu tiên 2: lớp có subjectId → gọi people.eligibleTeachers() (nguồn chuẩn teacher_subject).
-            //   Fallback : không có cả hai → unscheduled với lý do rõ ràng.
+            // Lấy danh sách tất cả môn học của lớp (từ bảng class_subject)
+            List<ClassSubjectInfo> subjects = people.classSubjects(orgId, classId);
 
-            List<EligibleTeacherInfo> eligibleTeachers;
-            String subjectId = info.subjectId();
+            // Fallback nếu lớp chưa dùng bảng class_subject: lấy môn chính từ school_class
+            if ((subjects == null || subjects.isEmpty()) && (info.subjectId() != null || info.subjectName() != null)) {
+                subjects = List.of(new ClassSubjectInfo(
+                    info.id(), info.subjectId(), null, info.subjectName(),
+                    "LEGACY", null, null, 1, 90, info.teacherId(), info.teacherName(), true, "PLANNED"
+                ));
+            }
 
-            if (info.teacherId() != null && !info.teacherId().isBlank()) {
-                // Lớp đã có giáo viên được assign → ưu tiên dùng teacher đó
-                eligibleTeachers = List.of(new EligibleTeacherInfo(info.teacherId(), info.teacherName(), departmentId));
-            } else if (subjectId != null && !subjectId.isBlank()) {
-                // Chưa assign teacher nhưng biết subjectId → tìm eligible qua teacher_subject (D-06)
-                eligibleTeachers = people.eligibleTeachers(orgId, subjectId);
-                if (eligibleTeachers.isEmpty()) {
-                    unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
-                        info.subjectName(), "Không có giáo viên đủ điều kiện dạy môn " + info.subjectName()
-                            + ". Hãy phân công giáo viên cho môn học này."));
-                    continue;
-                }
-            } else {
-                // Không có assigned teacher và không có subjectId → không thể xác định eligible teachers
+            if (subjects == null || subjects.isEmpty()) {
                 unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
-                    info.subjectName(), "Lớp chưa có giáo viên được phân công và chưa có môn học. "
+                    null, "Lớp chưa có giáo viên được phân công và chưa có môn học. "
                         + "Hãy gán giáo viên hoặc môn học trước khi xếp lịch tự động."));
                 continue;
             }
 
-            candidates.add(new ClassCandidate(info, eligibleTeachers));
+            for (ClassSubjectInfo subj : subjects) {
+                String subjectId = subj.subjectId();
+                String subjectName = subj.subjectName();
+
+                List<EligibleTeacherInfo> eligibleTeachers;
+
+                if (subj.teacherId() != null && !subj.teacherId().isBlank()) {
+                    eligibleTeachers = List.of(new EligibleTeacherInfo(subj.teacherId(), subj.teacherName(), departmentId));
+                } else if (subjectId != null && !subjectId.isBlank()) {
+                    eligibleTeachers = people.eligibleTeachers(orgId, subjectId);
+                    if (eligibleTeachers.isEmpty()) {
+                        // Fallback kiểm tra giáo viên chủ nhiệm / lớp
+                        if (info.teacherId() != null && !info.teacherId().isBlank()) {
+                            eligibleTeachers = List.of(new EligibleTeacherInfo(info.teacherId(), info.teacherName(), departmentId));
+                        } else {
+                            unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
+                                subjectName, "Không có giáo viên đủ điều kiện dạy môn " + subjectName
+                                    + ". Hãy phân công giáo viên cho môn học này."));
+                            continue;
+                        }
+                    }
+                } else if (info.teacherId() != null && !info.teacherId().isBlank()) {
+                    eligibleTeachers = List.of(new EligibleTeacherInfo(info.teacherId(), info.teacherName(), departmentId));
+                } else {
+                    unscheduled.add(new AutoScheduleResult.UnscheduledItem(classId, info.name(),
+                        subjectName, "Lớp chưa có giáo viên được phân công và chưa có môn học. "
+                            + "Hãy gán giáo viên hoặc môn học trước khi xếp lịch tự động."));
+                    continue;
+                }
+
+                int planned = subj.plannedSessions() != null ? subj.plannedSessions() : 1;
+                int existing = scheduleService.countScheduledSessions(orgId, classId, subjectName);
+                int needed = Math.max(0, planned - existing);
+
+                if (needed == 0) {
+                    // Môn này đã đủ số buổi theo kế hoạch
+                    continue;
+                }
+
+                candidates.add(new ClassSubjectCandidate(info, subj, eligibleTeachers, needed));
+            }
         }
 
-        // ---- 2. Ưu tiên lớp ít giáo viên đủ điều kiện nhất (khó xếp nhất trước) ----
+        // ---- 2. Ưu tiên môn ít giáo viên đủ điều kiện nhất (khó xếp nhất trước) ----
         candidates.sort(Comparator.comparingInt(c -> c.eligibleTeachers().size()));
 
         // ---- 3. Lấy phòng khả dụng theo department ----
@@ -116,10 +135,9 @@ public class AutoScheduleService {
             .toList();
 
         if (availableRooms.isEmpty()) {
-            // Không có phòng → toàn bộ unscheduled
-            for (ClassCandidate c : candidates) {
-                unscheduled.add(new AutoScheduleResult.UnscheduledItem(c.info().id(), c.info().name(),
-                    c.info().subjectName(), "Không có phòng học khả dụng trong phòng ban"));
+            for (ClassSubjectCandidate c : candidates) {
+                unscheduled.add(new AutoScheduleResult.UnscheduledItem(c.classInfo().id(), c.classInfo().name(),
+                    c.subjectInfo().subjectName(), "Không có phòng học khả dụng trong phòng ban"));
             }
             return buildResult(scheduled, unscheduled, request.classIds().size());
         }
@@ -131,51 +149,70 @@ public class AutoScheduleService {
         List<LocalDate> candidateDates = buildDateList(request.dateFrom(), request.dateTo(), allowedDays);
 
         if (candidateDates.isEmpty()) {
-            for (ClassCandidate c : candidates) {
-                unscheduled.add(new AutoScheduleResult.UnscheduledItem(c.info().id(), c.info().name(),
-                    c.info().subjectName(), "Không có ngày hợp lệ trong khoảng thời gian đã chọn"));
+            for (ClassSubjectCandidate c : candidates) {
+                unscheduled.add(new AutoScheduleResult.UnscheduledItem(c.classInfo().id(), c.classInfo().name(),
+                    c.subjectInfo().subjectName(), "Không có ngày hợp lệ trong khoảng thời gian đã chọn"));
             }
             return buildResult(scheduled, unscheduled, request.classIds().size());
         }
 
-        // ---- 5. Greedy: lần lượt xếp từng lớp ----
-        for (ClassCandidate candidate : candidates) {
-            ClassInfo info = candidate.info();
-            boolean classScheduled = false;
+        // ---- 5. Greedy: lần lượt xếp từng môn của từng lớp ----
+        for (ClassSubjectCandidate candidate : candidates) {
+            ClassInfo info = candidate.classInfo();
+            ClassSubjectInfo subj = candidate.subjectInfo();
+            int sessionsToSchedule = candidate.sessionsNeeded();
+            int sessionsScheduled = 0;
             String lastFailReason = "Không tìm được slot phù hợp";
 
-            outer:
+            outerSlot:
             for (LocalDate date : candidateDates) {
                 for (AutoScheduleRequest.TimeSlot slot : request.slots()) {
                     Instant start = toInstant(date, slot.startTime());
                     Instant end   = toInstant(date, slot.endTime());
 
-                    for (EligibleTeacherInfo teacher : candidate.eligibleTeachers()) {
-                        // Tìm phòng đủ sức chứa
-                        RoomInfo room = findRoom(availableRooms, info.studentCount());
-                        if (room == null) {
-                            lastFailReason = "Không có phòng đủ sức chứa cho " + info.studentCount() + " học sinh";
-                            continue;
-                        }
+                    List<RoomInfo> suitableRooms = availableRooms.stream()
+                        .filter(r -> r.capacity() >= info.studentCount())
+                        .sorted(Comparator.comparingInt(RoomInfo::capacity))
+                        .toList();
 
-                        ScheduleRequest req = new ScheduleRequest(
-                            info.id(), teacher.userId(), room.id(), start, end);
-                        try {
-                            ScheduleResponse session = scheduleService.create(orgId, departmentId, req);
-                            scheduled.add(session);
-                            classScheduled = true;
-                            break outer;
-                        } catch (AppException ex) {
-                            // Conflict → thử slot khác/giáo viên khác/phòng khác
-                            lastFailReason = mapConflictReason(ex);
+                    if (suitableRooms.isEmpty()) {
+                        lastFailReason = "Không có phòng đủ sức chứa cho " + info.studentCount() + " học sinh";
+                        continue;
+                    }
+
+                    boolean sessionScheduledInThisSlot = false;
+                    for (EligibleTeacherInfo teacher : candidate.eligibleTeachers()) {
+                        for (RoomInfo room : suitableRooms) {
+                            ScheduleRequest req = new ScheduleRequest(
+                                info.id(), teacher.userId(), teacher.fullName(), subj.subjectName(), room.id(), start, end);
+                            try {
+                                ScheduleResponse session = scheduleService.create(orgId, departmentId, req);
+                                scheduled.add(session);
+                                sessionsScheduled++;
+                                sessionScheduledInThisSlot = true;
+                                if (sessionsScheduled >= sessionsToSchedule) {
+                                    break outerSlot;
+                                }
+                                break; // Buổi này đã xếp thành công vào phòng, chuyển sang slot tiếp theo
+                            } catch (AppException ex) {
+                                lastFailReason = mapConflictReason(ex);
+                                if (!"ROOM_SCHEDULE_CONFLICT".equals(ex.getErrorCode().name())) {
+                                    // Nếu xung đột do giáo viên hoặc lớp, thử phòng khác không có tác dụng với giáo viên này
+                                    break;
+                                }
+                                // Nếu là ROOM_SCHEDULE_CONFLICT, tiếp tục vòng lặp thử phòng tiếp theo!
+                            }
+                        }
+                        if (sessionScheduledInThisSlot) {
+                            break; // Xong slot này, chuyển sang slot tiếp theo
                         }
                     }
                 }
             }
 
-            if (!classScheduled) {
+            if (sessionsScheduled == 0) {
                 unscheduled.add(new AutoScheduleResult.UnscheduledItem(
-                    info.id(), info.name(), info.subjectName(), lastFailReason));
+                    info.id(), info.name(), subj.subjectName(), lastFailReason));
             }
         }
 
@@ -202,7 +239,7 @@ public class AutoScheduleService {
     private RoomInfo findRoom(List<RoomInfo> rooms, int requiredCapacity) {
         return rooms.stream()
             .filter(r -> r.capacity() >= requiredCapacity)
-            .min(Comparator.comparingInt(RoomInfo::capacity)) // phòng vừa đủ → ít lãng phí nhất
+            .min(Comparator.comparingInt(RoomInfo::capacity))
             .orElse(null);
     }
 
@@ -223,5 +260,10 @@ public class AutoScheduleService {
             new AutoScheduleResult.Summary(total, scheduled.size(), unscheduled.size()));
     }
 
-    private record ClassCandidate(ClassInfo info, List<EligibleTeacherInfo> eligibleTeachers) {}
+    private record ClassSubjectCandidate(
+        ClassInfo classInfo,
+        ClassSubjectInfo subjectInfo,
+        List<EligibleTeacherInfo> eligibleTeachers,
+        int sessionsNeeded
+    ) {}
 }

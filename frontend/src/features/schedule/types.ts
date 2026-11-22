@@ -3,7 +3,10 @@ export interface ScheduleSession {
   classId: string
   className: string | null
   teacherId: string | null
+  teacherName?: string | null
   roomId: string | null
+  roomCode?: string | null
+  subjectName?: string | null
   startTime: string
   endTime: string
   status: string

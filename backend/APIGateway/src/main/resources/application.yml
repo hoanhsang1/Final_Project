@@ -122,6 +122,18 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: people-subjects
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/subjects/**,/subjects,/subjects/
+
+        - id: people-curricula-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/curricula/**,/api/curricula
+          filters:
+            - StripPrefix=1
+
         - id: people-classes-api
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:

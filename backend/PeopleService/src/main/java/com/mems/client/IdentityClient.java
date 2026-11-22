@@ -31,6 +31,7 @@ public class IdentityClient {
     private final RestTemplate http;
     private final ConcurrentHashMap<String, CacheEntry> metadataCache = new ConcurrentHashMap<>();
 
+    @org.springframework.beans.factory.annotation.Autowired
     public IdentityClient(RestTemplateBuilder builder, Environment env) {
         String baseUrl = env.getProperty("IDENTITY_SERVICE_URL", "http://localhost:8081");
         log.info("IdentityService base URL: {}", baseUrl);

@@ -282,10 +282,33 @@ export function SchedulePage() {
   const columns: DataColumn<ScheduleSession>[] = [
     {
       id: 'class',
-      header: 'Lớp',
+      header: 'Lớp & Môn học',
       cell: (row) => (
         <div className="min-w-0">
           <p className="truncate font-medium text-ink-900">{className(row.classId)}</p>
+          {row.subjectName ? (
+            <p className="truncate text-xs font-medium text-brand-600">{row.subjectName}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: 'teacher',
+      header: 'Giáo viên',
+      cell: (row) => (
+        <span className="text-sm text-ink-800">
+          {row.teacherName ?? (row.teacherId ? `${row.teacherId.slice(0, 8)}…` : '—')}
+        </span>
+      ),
+    },
+    {
+      id: 'room',
+      header: 'Phòng học',
+      cell: (row) => (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-ink-900">
+            {row.roomCode ?? (row.roomId ? `${row.roomId.slice(0, 8)}…` : '—')}
+          </p>
           <p className="truncate text-xs text-ink-500">{row.roomId ? 'Đã xếp phòng' : 'Chưa có phòng'}</p>
         </div>
       ),

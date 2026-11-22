@@ -201,7 +201,10 @@ const ACADEMIC_PERMISSIONS = [
   PERM.classViewReassign,
   PERM.subjectView,
   PERM.subjectManage,
+  PERM.curriculumView,
+  PERM.curriculumManage,
   PERM.scheduleView,
+  PERM.scheduleCreate,
 ]
 
 const FACILITY_PERMISSIONS = [

@@ -31,20 +31,222 @@ import {
   useClassMutations,
   useClasses,
   useClassStudents,
+  useClassSubjectMutations,
+  useClassSubjects,
   useStudents,
   useSubjects,
+  useTeachers,
 } from '@/features/academic/hooks'
 import {
   CANCEL_STATE_LABELS,
   CLASS_STATUS_LABELS,
+  CLASS_SUBJECT_SOURCE_LABELS,
   CLOSE_STATE_LABELS,
   type ClassInput,
+  type ClassSubject,
+  type ClassSubjectCreateRequest,
   type SchoolClass,
 } from '@/features/academic/types'
 import { usePermission } from '@/features/auth/hooks'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { PERM } from '@/lib/permissions'
+
+// ─── Class Subjects Section ───────────────────────────────────────────────────
+
+function ClassSubjectsSection({ classId, classStatus }: { classId: string; classStatus: string }) {
+  const { data, isLoading, isError, error } = useClassSubjects(classId)
+  const subjects = useSubjects({ includeInactive: false })
+  const teachers = useTeachers({ size: 100 })
+  const mutations = useClassSubjectMutations(classId)
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [addSubjectId, setAddSubjectId] = useState('')
+  const [addTeacherId, setAddTeacherId] = useState('')
+  const [addPlannedSessions, setAddPlannedSessions] = useState('30')
+  const [addSessionMinutes, setAddSessionMinutes] = useState('45')
+  const [addError, setAddError] = useState<string | null>(null)
+  const [deletingSubject, setDeletingSubject] = useState<ClassSubject | null>(null)
+
+  const canEdit = classStatus === 'CHUA_BAT_DAU'
+  const existingSubjectIds = (data?.subjects ?? []).map((s) => s.subjectId)
+  const availableToAdd = (subjects.data ?? []).filter((s) => !existingSubjectIds.includes(s.id))
+
+  const handleAdd = async () => {
+    if (!addSubjectId) { setAddError('Vui lòng chọn môn học'); return }
+    setAddError(null)
+    try {
+      const req: ClassSubjectCreateRequest = {
+        subjectId: addSubjectId,
+        plannedSessions: parseInt(addPlannedSessions) || 30,
+        sessionMinutes: parseInt(addSessionMinutes) || 45,
+        teacherId: (addTeacherId && addTeacherId !== 'none') ? addTeacherId : undefined,
+      }
+      await mutations.addSubject.mutateAsync(req)
+      toast.success('Đã thêm môn học vào lớp')
+      setAddOpen(false)
+      setAddSubjectId('')
+      setAddTeacherId('')
+    } catch (err) {
+      setAddError(ApiError.from(err).message || 'Không thể thêm môn học')
+    }
+  }
+
+  const handleRemove = async () => {
+    if (!deletingSubject) return
+    try {
+      await mutations.removeSubject.mutateAsync(deletingSubject.subjectId)
+      toast.success('Đã xoá môn học khỏi lớp')
+      setDeletingSubject(null)
+    } catch (err) {
+      toast.error(ApiError.from(err).message || 'Không thể xoá môn học')
+    }
+  }
+
+  if (isLoading) return <Spinner label="Đang tải môn học…" />
+  if (isError) return <p className="text-sm text-danger-600">{ApiError.from(error).message}</p>
+
+  const list = data?.subjects ?? []
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-ink-900">Môn học của lớp ({list.length})</h3>
+        {canEdit && (
+          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+            <Plus className="size-3.5 mr-1" />
+            Thêm môn
+          </Button>
+        )}
+      </div>
+
+      {!canEdit && classStatus !== 'CHUA_BAT_DAU' && (
+        <p className="text-xs text-ink-500">
+          Chỉ có thể thêm/xoá môn học khi lớp ở trạng thái <strong>Chưa bắt đầu</strong>.
+        </p>
+      )}
+
+      {list.length === 0 ? (
+        <p className="text-sm text-ink-500">Lớp chưa được gán môn học nào.</p>
+      ) : (
+        <ul className="divide-y divide-line-100 rounded-md border border-line-200 text-sm">
+          {list.map((cs) => (
+            <li key={cs.subjectId} className="flex items-center justify-between gap-2 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-ink-900 truncate">{cs.subjectName}</span>
+                  {cs.isPrimary && <Badge tone="success" className="text-xs">Môn chính</Badge>}
+                  <Badge tone="outline" className="text-xs">{CLASS_SUBJECT_SOURCE_LABELS[cs.source] ?? cs.source}</Badge>
+                </div>
+                <div className="text-xs text-ink-500 mt-0.5 flex gap-3">
+                  {cs.plannedSessions != null && <span>{cs.plannedSessions} buổi</span>}
+                  {cs.sessionMinutes != null && <span>{cs.sessionMinutes} phút/buổi</span>}
+                  {cs.teacherName && <span>GV: {cs.teacherName}</span>}
+                </div>
+              </div>
+              {canEdit && !cs.isPrimary && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger-600 hover:text-danger-700 shrink-0"
+                  onClick={() => setDeletingSubject(cs)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Add Subject Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Thêm môn học vào lớp</DialogTitle>
+            <DialogDescription>Chọn môn học và cấu hình số buổi học.</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            {addError && <Alert tone="danger">{addError}</Alert>}
+            <Field label="Môn học *">
+              <Select value={addSubjectId} onValueChange={setAddSubjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn môn học" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableToAdd.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}{s.code ? ` (${s.code})` : ''}
+                    </SelectItem>
+                  ))}
+                  {availableToAdd.length === 0 && (
+                    <div className="px-2 py-3 text-xs text-ink-500 text-center">
+                      Tất cả môn học đã được thêm vào lớp
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Giáo viên phụ trách (tùy chọn)">
+              <Select value={addTeacherId} onValueChange={setAddTeacherId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tự động phân bổ khi xếp lịch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Tự động phân bổ khi xếp lịch --</SelectItem>
+                  {(teachers.data?.items ?? []).map((t) => (
+                    <SelectItem key={t.userId} value={t.userId}>
+                      {t.fullName} {t.staffCode ? `(${t.staffCode})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Số buổi học">
+                <Input
+                  type="number"
+                  min="1"
+                  value={addPlannedSessions}
+                  onChange={(e) => setAddPlannedSessions(e.target.value)}
+                />
+              </Field>
+              <Field label="Thời lượng (phút)">
+                <Input
+                  type="number"
+                  min="1"
+                  value={addSessionMinutes}
+                  onChange={(e) => setAddSessionMinutes(e.target.value)}
+                />
+              </Field>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Huỷ</Button>
+            <Button
+              onClick={handleAdd}
+              isLoading={mutations.addSubject.isPending}
+              disabled={!addSubjectId}
+            >
+              Thêm môn học
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deletingSubject)}
+        onOpenChange={(v) => !v && setDeletingSubject(null)}
+        title="Xoá môn học khỏi lớp?"
+        description={`Môn học "${deletingSubject?.subjectName}" sẽ bị xoá khỏi lớp này. Không thể xoá môn chính.`}
+        confirmLabel="Xoá"
+        tone="danger"
+        onConfirm={handleRemove}
+        isLoading={mutations.removeSubject.isPending}
+      />
+    </section>
+  )
+}
 
 type ClassForm = {
   classCode: string
@@ -513,6 +715,8 @@ function ClassDetailDialog({
                   ) : null}
                 </section>
               ) : null}
+
+              <ClassSubjectsSection classId={schoolClass.id} classStatus={schoolClass.status} />
 
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-ink-900">Quy trình trạng thái</h3>

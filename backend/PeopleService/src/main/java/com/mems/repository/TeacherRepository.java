@@ -89,13 +89,12 @@ public class TeacherRepository {
      * Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
      */
     public List<EligibleTeacherInfo> eligibleForSubject(String orgId, String subjectId) {
-        return jdbc.query("""
+        List<EligibleTeacherInfo> specific = jdbc.query("""
             SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
             FROM staff_profile sp
             JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
             JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
             WHERE sp.org_id=?
-              AND sp.status='ACTIVE'
               AND tp.teaching_status='DANG_DAY'
               AND EXISTS (
                 SELECT 1 FROM teacher_subject ts
@@ -108,6 +107,25 @@ public class TeacherRepository {
             (rs, n) -> new EligibleTeacherInfo(
                 rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
             orgId, subjectId);
+
+        if (!specific.isEmpty()) {
+            return specific;
+        }
+
+        // Fallback: nếu môn học chưa được phân công giáo viên cụ thể trong teacher_subject,
+        // lấy tất cả giáo viên đang dạy (DANG_DAY) trong tổ chức để tự động tìm người rảnh lịch.
+        return jdbc.query("""
+            SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
+            FROM staff_profile sp
+            JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
+            JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
+            WHERE sp.org_id=?
+              AND tp.teaching_status='DANG_DAY'
+            ORDER BY sp.full_name
+            """,
+            (rs, n) -> new EligibleTeacherInfo(
+                rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
+            orgId);
     }
 
     public boolean hasProfile(String userId, String orgId) {

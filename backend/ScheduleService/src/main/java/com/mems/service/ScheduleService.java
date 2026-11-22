@@ -49,7 +49,8 @@ public class ScheduleService {
     public List<ScheduleResponse> list(String orgId, String departmentId, Instant from, Instant to,
                                        String classId) {
         StringBuilder sql = new StringBuilder("""
-            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id, s.room_id,
+            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id,
+                   s.teacher_name, s.room_id, s.room_code, s.subject_name,
                    s.start_time, s.end_time, s.status, s.department_id
             FROM session s JOIN `class` c ON c.id=s.class_id
             WHERE c.org_id=? AND s.department_id=? AND s.deleted_at IS NULL AND c.deleted_at IS NULL
@@ -85,11 +86,16 @@ public class ScheduleService {
 
         String id = UUID.randomUUID().toString();
         Timestamp now = Timestamp.from(Instant.now());
+        String teacherName = request.teacherName() != null ? request.teacherName() : info.teacherName();
+        String subjectName = request.subjectName() != null ? request.subjectName() : info.subjectName();
         jdbc.update("""
-            INSERT INTO session(id, class_id, teacher_id, room_id, start_time, end_time, status,
-                                department_id, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,'scheduled',?,?,?)
-            """, id, request.classId(), teacherId, blankToNull(request.roomId()),
+            INSERT INTO session(id, class_id, teacher_id, teacher_name, room_id, room_code,
+                                subject_name, start_time, end_time, status, department_id,
+                                created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,'scheduled',?,?,?)
+            """, id, request.classId(), teacherId, teacherName,
+            blankToNull(request.roomId()), resolveRoomCode(orgId, request.roomId()),
+            subjectName,
             Timestamp.from(request.startTime()), Timestamp.from(request.endTime()),
             departmentId, now, now);
         return requireSession(orgId, departmentId, id);
@@ -113,9 +119,12 @@ public class ScheduleService {
             request.startTime(), request.endTime(), sessionId);
 
         jdbc.update("""
-            UPDATE session SET class_id=?, teacher_id=?, room_id=?, start_time=?, end_time=?, updated_at=?
+            UPDATE session SET class_id=?, teacher_id=?, teacher_name=?, room_id=?, room_code=?,
+                             subject_name=?, start_time=?, end_time=?, updated_at=?
             WHERE id=? AND department_id=? AND deleted_at IS NULL
-            """, request.classId(), teacherId, blankToNull(request.roomId()),
+            """, request.classId(), teacherId, info.teacherName(),
+            blankToNull(request.roomId()), resolveRoomCode(orgId, request.roomId()),
+            info.subjectName(),
             Timestamp.from(request.startTime()), Timestamp.from(request.endTime()),
             Timestamp.from(Instant.now()), sessionId, departmentId);
         return requireSession(orgId, departmentId, sessionId);
@@ -181,7 +190,8 @@ public class ScheduleService {
 
     private List<ScheduleResponse> byTeacher(String orgId, String teacherId, Instant from, Instant to) {
         StringBuilder sql = new StringBuilder("""
-            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id, s.room_id,
+            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id,
+                   s.teacher_name, s.room_id, s.room_code, s.subject_name,
                    s.start_time, s.end_time, s.status, s.department_id
             FROM session s JOIN `class` c ON c.id=s.class_id
             WHERE c.org_id=? AND s.teacher_id=? AND s.deleted_at IS NULL AND c.deleted_at IS NULL
@@ -196,7 +206,8 @@ public class ScheduleService {
         if (classIds.isEmpty()) return List.of();
         String placeholders = String.join(",", classIds.stream().map(id -> "?").toList());
         StringBuilder sql = new StringBuilder("""
-            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id, s.room_id,
+            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id,
+                   s.teacher_name, s.room_id, s.room_code, s.subject_name,
                    s.start_time, s.end_time, s.status, s.department_id
             FROM session s JOIN `class` c ON c.id=s.class_id
             WHERE c.org_id=? AND s.class_id IN (""" + placeholders + """
@@ -223,14 +234,17 @@ public class ScheduleService {
 
     private ScheduleResponse map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         return new ScheduleResponse(rs.getString("id"), rs.getString("class_id"),
-            rs.getString("class_name"), rs.getString("teacher_id"), rs.getString("room_id"),
+            rs.getString("class_name"), rs.getString("teacher_id"),
+            rs.getString("teacher_name"), rs.getString("room_id"), rs.getString("room_code"),
+            rs.getString("subject_name"),
             rs.getTimestamp("start_time").toInstant(), rs.getTimestamp("end_time").toInstant(),
             rs.getString("status"), rs.getString("department_id"));
     }
 
     private ScheduleResponse requireSession(String orgId, String departmentId, String id) {
         List<ScheduleResponse> rows = jdbc.query("""
-            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id, s.room_id,
+            SELECT s.id, s.class_id, c.name AS class_name, s.teacher_id,
+                   s.teacher_name, s.room_id, s.room_code, s.subject_name,
                    s.start_time, s.end_time, s.status, s.department_id
             FROM session s JOIN `class` c ON c.id=s.class_id
             WHERE s.id=? AND c.org_id=? AND s.department_id=? AND s.deleted_at IS NULL
@@ -262,9 +276,6 @@ public class ScheduleService {
 
     private String resolveTeacher(ClassInfo info, String requestedTeacherId) {
         if (requestedTeacherId != null && !requestedTeacherId.isBlank()) {
-            if (info.teacherId() != null && !info.teacherId().equals(requestedTeacherId)) {
-                throw new AppException(ErrorCode.TEACHER_NOT_ASSIGNED);
-            }
             return requestedTeacherId;
         }
         if (info.teacherId() == null) throw new AppException(ErrorCode.TEACHER_NOT_ASSIGNED);
@@ -367,4 +378,32 @@ public class ScheduleService {
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
+    /** Lấy mã phòng từ FacilityClient để lưu vào session (denormalized). */
+    private String resolveRoomCode(String orgId, String roomId) {
+        if (roomId == null || roomId.isBlank()) return null;
+        try {
+            RoomInfo room = facility.room(orgId, roomId);
+            return room != null ? room.code() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public int countScheduledSessions(String orgId, String classId, String subjectName) {
+        if (subjectName == null || subjectName.isBlank()) {
+            Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM session s JOIN `class` c ON c.id=s.class_id
+                WHERE c.org_id=? AND s.class_id=? AND s.deleted_at IS NULL AND s.status<>'cancelled'
+                """, Integer.class, orgId, classId);
+            return count != null ? count : 0;
+        }
+        Integer count = jdbc.queryForObject("""
+            SELECT COUNT(*) FROM session s JOIN `class` c ON c.id=s.class_id
+            WHERE c.org_id=? AND s.class_id=? AND s.deleted_at IS NULL AND s.status<>'cancelled'
+              AND (s.subject_name=? OR (s.subject_name IS NULL AND c.subject=?))
+            """, Integer.class, orgId, classId, subjectName, subjectName);
+        return count != null ? count : 0;
+    }
+
 }

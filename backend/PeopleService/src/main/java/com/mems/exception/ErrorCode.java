@@ -89,6 +89,16 @@ public enum ErrorCode {
     CLASS_APPROVER_NOT_ALLOWED(2221, HttpStatus.FORBIDDEN,
         "Only the head of the department responsible for class management can approve"),
     SUBJECT_CODE_EXISTS(2222, HttpStatus.CONFLICT, "Subject code already exists in organization"),
+    CURRICULUM_NOT_FOUND(2223, HttpStatus.NOT_FOUND, "Curriculum not found"),
+    CURRICULUM_CODE_EXISTS(2224, HttpStatus.CONFLICT, "Curriculum code already exists in organization"),
+    CURRICULUM_SUBJECT_EXISTS(2225, HttpStatus.CONFLICT, "Subject already added to this curriculum"),
+    CURRICULUM_SUBJECT_NOT_FOUND(2226, HttpStatus.NOT_FOUND, "Curriculum subject not found"),
+    CLASS_SUBJECT_EXISTS(2227, HttpStatus.CONFLICT, "Subject already assigned to this class"),
+    CLASS_SUBJECT_NOT_FOUND(2228, HttpStatus.NOT_FOUND, "Class subject not found"),
+    CLASS_SUBJECT_PRIMARY_DELETE(2229, HttpStatus.CONFLICT, "Cannot delete primary subject via subject list endpoint"),
+    CLASS_NOT_MODIFIABLE(2230, HttpStatus.CONFLICT, "Class in this state does not allow subject changes"),
+    VERSION_MISMATCH(2231, HttpStatus.CONFLICT, "Class was modified by another request; refresh and retry"),
+    OPERATION_ALREADY_APPLIED(2232, HttpStatus.CONFLICT, "Operation was already applied (idempotency key conflict)"),
 
     // Ủy quyền / Tổng quản lý (quy tắc 3, 7)
     DELEGATION_NOT_FOUND(2401, HttpStatus.NOT_FOUND, "Delegation not found"),
