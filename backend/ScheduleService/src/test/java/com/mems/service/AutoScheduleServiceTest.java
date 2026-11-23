@@ -61,8 +61,10 @@ class AutoScheduleServiceTest {
     @DisplayName("TC-AUTO-001: Xếp lịch thành công cho lớp hợp lệ")
     void testAutoScheduleSuccess() {
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
-            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "subj-1", "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
 
         RoomInfo room = new RoomInfo("room-1", "R101", "Phòng 101", 30, "active", DEPT, 0);
         when(facility.rooms(ORG, DEPT)).thenReturn(List.of(room));
@@ -163,8 +165,10 @@ class AutoScheduleServiceTest {
     @DisplayName("TC-AUTO-004: Không có phòng học khả dụng -> unscheduled")
     void testNoAvailableRooms() {
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
-            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "subj-1", "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
         when(facility.rooms(ORG, DEPT)).thenReturn(List.of());
 
         AutoScheduleResult result = autoScheduleService.generate(ORG, DEPT, sampleRequest);
@@ -178,8 +182,10 @@ class AutoScheduleServiceTest {
     @DisplayName("TC-AUTO-005: Xung đột lịch giáo viên -> unscheduled với giải thích cụ thể")
     void testTeacherScheduleConflict() {
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
-            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "subj-1", "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
 
         RoomInfo room = new RoomInfo("room-1", "R101", "Phòng 101", 30, "active", DEPT, 0);
         when(facility.rooms(ORG, DEPT)).thenReturn(List.of(room));
@@ -198,8 +204,10 @@ class AutoScheduleServiceTest {
     @DisplayName("TC-AUTO-006: Xung đột lịch phòng -> unscheduled với giải thích cụ thể")
     void testRoomScheduleConflict() {
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
-            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "subj-1", "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
 
         RoomInfo room = new RoomInfo("room-1", "R101", "Phòng 101", 30, "active", DEPT, 0);
         when(facility.rooms(ORG, DEPT)).thenReturn(List.of(room));
@@ -218,8 +226,10 @@ class AutoScheduleServiceTest {
     @DisplayName("TC-AUTO-007: Xung đột lịch lớp -> unscheduled với giải thích cụ thể")
     void testClassScheduleConflict() {
         ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
-            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "Toán", 20);
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "subj-1", "Toán", 20);
         when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
 
         RoomInfo room = new RoomInfo("room-1", "R101", "Phòng 101", 30, "active", DEPT, 0);
         when(facility.rooms(ORG, DEPT)).thenReturn(List.of(room));

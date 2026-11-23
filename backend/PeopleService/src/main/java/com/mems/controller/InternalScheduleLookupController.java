@@ -1,9 +1,11 @@
 package com.mems.controller;
 
 import com.mems.dto.ClassScheduleInfo;
+import com.mems.dto.ClassSubjectResponse;
 import com.mems.dto.EligibleTeacherInfo;
 import com.mems.dto.SchoolClassResponse;
 import com.mems.dto.StudentClassResponse;
+import com.mems.repository.ClassSubjectRepository;
 import com.mems.repository.SchoolClassRepository;
 import com.mems.repository.StudentRepository;
 import com.mems.repository.TeacherRepository;
@@ -22,12 +24,14 @@ public class InternalScheduleLookupController {
     private final SchoolClassRepository classes;
     private final StudentRepository students;
     private final TeacherRepository teachers;
+    private final ClassSubjectRepository classSubjects;
 
     public InternalScheduleLookupController(SchoolClassRepository classes, StudentRepository students,
-                                            TeacherRepository teachers) {
+                                            TeacherRepository teachers, ClassSubjectRepository classSubjects) {
         this.classes = classes;
         this.students = students;
         this.teachers = teachers;
+        this.classSubjects = classSubjects;
     }
 
     @GetMapping("/classes/{classId}")
@@ -38,6 +42,12 @@ public class InternalScheduleLookupController {
             info.status(), info.closeState(), info.teacher() == null ? null : info.teacher().id(),
             info.teacher() == null ? null : info.teacher().fullName(),
             info.startDate(), info.endDate(), info.subjectId(), info.subjectName(), info.studentCount());
+    }
+
+    @GetMapping("/classes/{classId}/subjects")
+    @Transactional(readOnly = true)
+    public List<ClassSubjectResponse> classSubjects(@PathVariable String classId, @RequestParam String orgId) {
+        return classSubjects.list(classId).subjects();
     }
 
     @GetMapping("/students/{studentId}/classes")

@@ -41,7 +41,7 @@ public class DefaultPositionSeeder {
         // Academic (class.approve_close intentionally absent per DEC-02)
         "student.view", "student.create", "student.edit", "student.delete",
         "student.create_account",
-        "subject.view", "subject.manage",
+        "subject.view", "subject.manage", "curriculum.view", "curriculum.manage",
         "class.view", "class.create", "class.edit", "class.delete",
         "class.assign_teacher", "class.teacher.reassign",
         "class.cancel", "class.request_close", "class.reopen",
@@ -66,8 +66,9 @@ public class DefaultPositionSeeder {
             "ORGANIZATION", Set.of(
                 "class.view", "class.create", "class.edit", "class.assign_teacher", "class.cancel",
                 "class.request_close", "student.view", "student.create", "student.edit", "student.delete",
-                "subject.view", "subject.manage"),
-            Set.of("ACADEMIC_MANAGEMENT")),
+                "subject.view", "subject.manage", "curriculum.view", "curriculum.manage",
+                "schedule.view", "schedule.create"),
+            Set.of("ACADEMIC_MANAGEMENT", "SCHEDULE_MANAGEMENT")),
         new DefaultPosition("Giáo viên", null, "Giáo viên giảng dạy", "TEACHER",
             "DEPARTMENT", Set.of("class.self_view", "schedule.self_view"), Set.of()),
         new DefaultPosition("Trưởng phòng ban", PositionSystemCodes.DEPT_HEAD,

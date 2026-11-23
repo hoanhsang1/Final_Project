@@ -21,12 +21,13 @@ import { PageHeader } from '@/components/ui/page-header'
 import { SearchInput } from '@/components/ui/search-input'
 import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
+import { subjectsApi } from '@/features/academic/api'
 import { useSubjectMutations, useSubjects } from '@/features/academic/hooks'
 import type { Subject, SubjectInput } from '@/features/academic/types'
 import { usePermission } from '@/features/auth/hooks'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { canWriteModule, moduleState } from '@/lib/nav'
+import { moduleState } from '@/lib/nav'
 import { PERM } from '@/lib/permissions'
 
 type SubjectForm = {
@@ -64,14 +65,26 @@ function SubjectDialog({
     setError(undefined)
   }, [open, subject])
 
-  const submit = () => {
+  const submit = async () => {
     setError(undefined)
     if (!form.name.trim()) {
       setError('Vui lòng nhập tên môn học.')
       return
     }
+    const code = form.code.trim()
+    if (code) {
+      try {
+        const check = await subjectsApi.checkCode(code, subject?.id)
+        if (!check.available) {
+          setError('Mã môn học đã tồn tại trong tổ chức.')
+          return
+        }
+      } catch (cause: unknown) {
+        // Nếu lỗi 403/500 bỏ qua để backend validate khi submit
+      }
+    }
     const input: SubjectInput = {
-      code: form.code.trim() || undefined,
+      code: code || undefined,
       name: form.name.trim(),
       description: form.description.trim() || undefined,
     }
@@ -143,9 +156,8 @@ export function SubjectsPage() {
 
   const canView = can(PERM.subjectView) || can(PERM.subjectManage)
   const canManage = can(PERM.subjectManage)
-  const moduleWritable = canWriteModule(session, 'STUDENT_MANAGEMENT')
   const moduleDisabled = ['disabled', 'locked'].includes(moduleState(session, 'STUDENT_MANAGEMENT'))
-  const writable = canManage && moduleWritable
+  const writable = canManage && !moduleDisabled
 
   const subjects = useSubjects({
     q: deferredSearch || undefined,

@@ -48,8 +48,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, ConstraintViolationException.class})
     ResponseEntity<ApiResponse<Void>> invalid(Exception ex) {
+        log.error("Invalid request caught in invalid(): ", ex);
         return ResponseEntity.badRequest()
-            .body(ApiResponse.failure(ErrorCode.VALIDATION_ERROR.name(), "Invalid request"));
+            .body(ApiResponse.failure(ErrorCode.VALIDATION_ERROR.name(), "Invalid request: " + ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

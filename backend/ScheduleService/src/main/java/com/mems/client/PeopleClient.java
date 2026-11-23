@@ -62,4 +62,17 @@ public class PeopleClient {
             throw new AppException(ErrorCode.PEOPLE_UNAVAILABLE);
         }
     }
+
+    /** Danh sách tất cả môn học của lớp (cả môn chính và môn thêm thủ công / CTĐT). */
+    public List<ClassSubjectInfo> classSubjects(String orgId, String classId) {
+        try {
+            var response = http.exchange(
+                "/internal/classes/{classId}/subjects?orgId={orgId}",
+                HttpMethod.GET, null, new ParameterizedTypeReference<List<ClassSubjectInfo>>() {},
+                classId, orgId);
+            return response.getBody() == null ? List.of() : response.getBody();
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
 }

@@ -1,5 +1,6 @@
 import { AlertCircle, CalendarCog, CheckCircle2, ChevronDown, ChevronUp, Loader2, Plus, Trash2, XCircle } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,6 @@ import { useAutoSchedule, useSchedules } from '@/features/schedule/hooks'
 import type { AutoScheduleResult, TimeSlot, UnscheduledItem } from '@/features/schedule/types'
 import { SESSION_STATUS_LABELS, type ScheduleSession } from '@/features/schedule/types'
 import { ApiError } from '@/lib/api-error'
-import { formatDateTime } from '@/lib/format'
 import { PERM } from '@/lib/permissions'
 import { usePermission } from '@/features/auth/hooks'
 
@@ -133,20 +133,53 @@ export function AutoSchedulePage() {
   const scheduledColumns: DataColumn<ScheduleSession>[] = [
     { id: 'className', header: 'Lớp', cell: (r: ScheduleSession) => r.className ?? r.classId },
     {
-      id: 'startTime',
-      header: 'Bắt đầu',
-      cell: (r: ScheduleSession) => formatDateTime(r.startTime),
+      id: 'subjectName',
+      header: 'Môn học',
+      cell: (r: ScheduleSession) => {
+        if (r.subjectName) return r.subjectName
+        const cls = ((classes.data as { items?: { id: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
+          c => c.id === r.classId
+        )
+        return cls?.subjectName ?? '—'
+      },
     },
     {
-      id: 'endTime',
-      header: 'Kết thúc',
-      cell: (r: ScheduleSession) => formatDateTime(r.endTime),
+      id: 'teacher',
+      header: 'Giáo viên',
+      cell: (r: ScheduleSession) => (
+        <span className="text-xs">
+          {r.teacherName ?? (r.teacherId ? <span className="font-mono">{r.teacherId.slice(0, 8)}…</span> : '—')}
+        </span>
+      ),
+    },
+    {
+      id: 'room',
+      header: 'Phòng',
+      cell: (r: ScheduleSession) => (
+        <span className="text-xs font-medium">
+          {r.roomCode ?? (r.roomId ? <span className="font-mono">{r.roomId.slice(0, 8)}…</span> : '—')}
+        </span>
+      ),
+    },
+    {
+      id: 'date',
+      header: 'Ngày',
+      cell: (r: ScheduleSession) => new Date(r.startTime).toLocaleDateString('vi-VN'),
+    },
+    {
+      id: 'time',
+      header: 'Giờ',
+      cell: (r: ScheduleSession) => {
+        const start = new Date(r.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        const end = new Date(r.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        return `${start} - ${end}`
+      },
     },
     {
       id: 'status',
       header: 'Trạng thái',
       cell: (r: ScheduleSession) => (
-        <Badge tone="neutral">
+        <Badge tone="success">
           {SESSION_STATUS_LABELS[r.status] ?? r.status}
         </Badge>
       ),
@@ -312,6 +345,56 @@ export function AutoSchedulePage() {
             </div>
           )}
         </div>
+
+        {/* Selected classes subject review (Step 2) */}
+        {selectedClassIds.length > 0 && (
+          <div className="lg:col-span-2 rounded-xl border border-line-200 bg-surface p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-ink-900">
+                Môn học sẽ được xếp lịch theo từng lớp ({selectedClassIds.length} lớp)
+              </p>
+              <span className="text-xs text-ink-500">Theo môn học đã gán cho lớp</span>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {selectedClassIds.map((id) => {
+                const cls = ((classes.data as { items?: { id: string; name: string; classCode?: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
+                  (c) => c.id === id,
+                )
+                if (!cls) return null
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center justify-between rounded-lg border border-line-100 bg-ink-50/50 p-2.5 text-sm"
+                  >
+                    <div>
+                      <span className="font-medium text-ink-900">{cls.name}</span>
+                      {cls.classCode && (
+                        <span className="ml-1 text-xs text-ink-500 font-mono">({cls.classCode})</span>
+                      )}
+                    </div>
+                    {cls.subjectName ? (
+                      <Badge tone="success">{cls.subjectName}</Badge>
+                    ) : (
+                      <Badge tone="warning">Chưa gán môn</Badge>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {selectedClassIds.some((id) => {
+              const cls = ((classes.data as { items?: { id: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
+                (c) => c.id === id,
+              )
+              return !cls?.subjectName
+            }) && (
+              <p className="text-xs text-warning-600">
+                Lưu ý: Lớp chưa gán môn học có thể không tìm được giáo viên đủ điều kiện để xếp lịch. Hãy vào trang Quản lý Lớp học để gán môn học trước khi xếp lịch.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ---- Run button ---- */}
@@ -345,20 +428,29 @@ export function AutoSchedulePage() {
       {result && (
         <div className="mt-8 space-y-6">
           {/* Summary banner */}
-          <div className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4">
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4">
             <div className="flex items-center gap-2 text-green-700">
               <CheckCircle2 className="size-5" />
               <span className="font-semibold">{result.summary.scheduled}</span>
-              <span className="text-sm">lớp đã xếp</span>
+              <span className="text-sm">buổi học đã xếp</span>
             </div>
             <div className="h-5 w-px bg-zinc-300" />
             <div className="flex items-center gap-2 text-red-600">
               <AlertCircle className="size-5" />
               <span className="font-semibold">{result.summary.unscheduled}</span>
-              <span className="text-sm">lớp chưa xếp được</span>
+              <span className="text-sm">mục chưa xếp được</span>
             </div>
             <div className="h-5 w-px bg-zinc-300" />
             <span className="text-sm text-ink-500">Tổng: {result.summary.totalRequested} lớp</span>
+
+            {result.summary.scheduled > 0 && (
+              <Link
+                to="/dao-tao/lich-hoc"
+                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline"
+              >
+                Xem chi tiết trên trang Lịch học →
+              </Link>
+            )}
           </div>
 
           {/* Scheduled sessions */}
@@ -398,7 +490,7 @@ export function AutoSchedulePage() {
                 <DataTable
                   columns={unscheduledColumns}
                   data={result.unscheduled}
-                  rowKey={r => r.classId}
+                  rowKey={(r: UnscheduledItem) => `${r.classId}-${r.subjectName ?? ''}`}
                   initialPageSize={20}
                 />
               )}
