@@ -56,10 +56,10 @@ it('line-height rơi đúng lưới 4px và weight đúng 3 mức', () => {
   expect(token('--text-heading-1-weight')).toBe('var(--font-weight-semibold)');
 });
 
-it('màu MEMS đã chốt vẫn là nửa sáng của cặp light-dark', () => {
+it('màu MEMS (phương án A) vẫn là nửa sáng của cặp light-dark', () => {
   expect(token('--color-text-primary')).toBe('light-dark(#101828, #DFE2E5)');
   expect(token('--color-text-secondary')).toBe('light-dark(#475467, #AAAFB5)');
-  expect(token('--color-background-body')).toBe('light-dark(#F2F4F7, #111112)');
+  expect(token('--color-background-body')).toBe('light-dark(#F1F4F8, #111112)');
   expect(token('--color-background-card')).toBe('light-dark(#FFFFFF, #1F1F22)');
   expect(token('--color-border')).toBe('light-dark(#E4E7EC, #F2F4F619)');
   // Viền field phải đủ 3:1 trên cả trắng lẫn canvas (WCAG 1.4.11).
@@ -91,8 +91,8 @@ it('chữ trong Banner trùng màu với chữ trạng thái cùng nghĩa', () =
 it('icon, nền phụ và skeleton không còn mang sắc xanh do HCT sinh', () => {
   expect(token('--color-icon-primary')).toBe(token('--color-text-primary'));
   expect(token('--color-icon-secondary')).toBe(token('--color-text-secondary'));
-  // Nền hàng hover / kẻ sọc của bảng = `surfaceSunken` đã chốt trong theme.ts.
-  expect(token('--color-background-muted')).toBe('light-dark(#F7F8FA, #1111127F)');
+  // Nền hàng hover / kẻ sọc của bảng = `surfaceSunken` trong theme.ts.
+  expect(token('--color-background-muted')).toBe('light-dark(#F6F8FB, #1111127F)');
   expect(token('--color-skeleton')).toBe('light-dark(#EAECF0, #434653)');
   expect(token('--color-track')).toBe('light-dark(#EAECF0, #434653)');
 });

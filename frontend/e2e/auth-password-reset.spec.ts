@@ -115,8 +115,7 @@ test.describe('Quên / đặt lại mật khẩu', () => {
     await expect(page.getByText('Vui lòng nhập mật khẩu mới')).toBeVisible();
 
     await page.getByLabel('Mật khẩu mới').fill('123');
-    // Thông báo lỗi do chính `TextInput` render (qua `status.message`), không phải
-    // khối `.ant-form-item-explain-error` của antd.
+    // Thông báo lỗi do chính `TextInput` render (qua `status.message`).
     await expect(page.getByText('Mật khẩu cần ít nhất 8 ký tự')).toBeVisible();
 
     await page.getByLabel('Mật khẩu mới').fill(NEW_PASSWORD);

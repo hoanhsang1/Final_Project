@@ -22,7 +22,7 @@ import { organizationStatusLabel, orgTypeLabel } from '../../features/admin/stat
 import type { PendingOrganization } from '../../features/admin/types';
 import { usePendingOrganizations } from './use-pending-organizations';
 
-/** Số dòng / trang — bản antd cũ dùng `pageSize: 10`, `showSizeChanger: false`. */
+/** Số dòng mỗi trang. */
 const PAGE_SIZE = 10;
 
 /**
@@ -52,13 +52,13 @@ export default function PendingOrganizationsPage() {
   const { sortedData, sortConfig } = useTableSortableState<PendingOrgRow, 'name'>({
     data: rows,
     comparators: {
-      // Khớp bản antd cũ: `localeCompare(..., 'vi')` để "Đ" xếp đúng chỗ.
+      // Sắp xếp theo locale tiếng Việt để "Đ" xếp đúng chỗ.
       name: (a, b) => a.name.localeCompare(b.name, 'vi'),
     },
   });
   const sortPlugin = useTableSortable<PendingOrgRow, 'name'>(sortConfig);
 
-  // antd cũ dùng `showSizeChanger: false` + tự ẩn thanh phân trang khi chỉ 1 trang.
+  // Chỉ một trang thì không hiện thanh phân trang.
   const totalPages = Math.max(1, Math.ceil(sortedData.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 
@@ -121,8 +121,8 @@ export default function PendingOrganizationsPage() {
 
   return (
     <Stack direction="vertical" gap={4}>
-      {/* Giữ header cả ở nhánh lỗi (khác bản antd cũ vốn bỏ header) để người
-          dùng luôn biết mình đang ở màn nào — theo mẫu `DepartmentsPage`. */}
+      {/* Giữ header cả ở nhánh lỗi để người dùng luôn biết mình đang ở màn nào
+          — theo mẫu `DepartmentsPage`. */}
       <PageHeader title={MSG_ORG.LIST_TITLE} subtitle={MSG_ORG.LIST_SUBTITLE} />
 
       {query.isError ? (

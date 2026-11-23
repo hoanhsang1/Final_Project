@@ -72,7 +72,7 @@ function BrandPanel() {
  * - `variant='card'` (mặc định): panel brand trái (≥1024px) + Card trắng phải — Register/Forgot/Reset.
  * - `variant='split'`: hero trái + nội dung phải full-viewport, không bọc Card — Login.
  *
- * `useMediaQuery` thay cho `Grid.useBreakpoint` của antd: cùng một query
+ * `useMediaQuery` thay cho cơ chế breakpoint trước đây: cùng một query
  * `min-width: 1024px` với breakpoint `lg` của Astryx, và ở jsdom (không có
  * `matchMedia`) nó trả `false` nên panel thương hiệu không render trong unit test.
  */

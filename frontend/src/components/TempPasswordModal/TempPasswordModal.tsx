@@ -13,8 +13,7 @@ interface TempPasswordModalProps {
  * Hộp thoại hiện mật khẩu tạm **một lần** sau khi tạo nhân viên.
  *
  * Không có nút đóng: `DialogHeader` cố ý KHÔNG nhận `onOpenChange` nên Astryx
- * không render nút X (khớp `closable={false}` của bản antd). `purpose="form"`
- * chặn bấm ra ngoài nhưng vẫn cho ESC — đúng như `keyboard` mặc định của antd.
+ * không render nút X. `purpose="form"` chặn bấm ra ngoài nhưng vẫn cho ESC.
  * Lối thoát duy nhất là nút "Tôi đã lưu mật khẩu".
  */
 export default function TempPasswordModal({
@@ -68,8 +67,7 @@ export default function TempPasswordModal({
           />
         </HStack>
 
-        {/* Bản antd dùng `Text type="danger"`; Astryx `Text` không có màu `danger`
-            nên cảnh báo "chỉ hiện một lần" đi qua `Banner` — vẫn kèm CHỮ (BR-08). */}
+        {/* Cảnh báo "chỉ hiện một lần" hiển thị qua `Banner` để luôn kèm CHỮ (BR-08). */}
         <Banner status="warning" title={MSG_MEM.TEMP_PASSWORD_HINT} collapsible={false} />
 
         <HStack justify="end">

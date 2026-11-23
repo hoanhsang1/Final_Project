@@ -104,14 +104,14 @@ export default function DepartmentsPage() {
     } catch (error) {
       setActionError(ownerErrorMessage(error));
     } finally {
-      // `AlertDialog` KHÔNG tự đóng (khác `Popconfirm` của antd): đóng sau khi
-      // yêu cầu kết thúc, dù thành công hay lỗi — lỗi đã hiện ở `Banner` trên bảng.
+      // `AlertDialog` KHÔNG tự đóng: đóng sau khi yêu cầu kết thúc, dù thành công
+      // hay lỗi — lỗi đã hiện ở `Banner` trên bảng.
       setPendingDelete(null);
     }
   };
 
   const rows = (list.data ?? []) as DepartmentRow[];
-  // antd cũ dùng `hideOnSinglePage`: chỉ một trang thì không hiện thanh phân trang.
+  // Chỉ một trang thì không hiện thanh phân trang.
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 

@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import { ConfigProvider } from 'antd';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAuthStore } from '../../stores/authStore';
@@ -21,11 +20,7 @@ function renderGuard() {
     { initialEntries: ['/to-chuc'] },
   );
 
-  render(
-    <ConfigProvider>
-      <RouterProvider router={router} />
-    </ConfigProvider>,
-  );
+  render(<RouterProvider router={router} />);
 
   return router;
 }

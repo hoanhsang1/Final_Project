@@ -86,8 +86,7 @@ const ASSIGN_PAGE_SIZE = 10;
  * buộc mà **không** nới lỏng DTO — xem `docs/ui-conventions.md` mục 6.9.
  *
  * `rowKey` là field tổng hợp `${at}-${index}`: `idKey` của Astryx không nhận
- * index (antd `rowKey(record, index)` thì có), mà 2 tab lịch sử không có id ổn
- * định trong dữ liệu.
+ * tham số chỉ số dòng, mà 2 tab lịch sử không có id ổn định trong dữ liệu.
  */
 type StatusLogRow = StatusLogItem & Record<string, unknown> & { rowKey: string };
 type CloseEventRow = CloseEventItem & Record<string, unknown> & { rowKey: string };
@@ -788,7 +787,7 @@ export default function ClassDetailPage() {
       {/* §6.3 — gán/đổi giáo viên: chỉ giáo viên DANG_DAY, có tìm kiếm + phân trang.
           Astryx `Table` không có chọn-hàng-đơn, nên danh sách dùng `RadioList`
           (chọn đúng 1) + `Pagination` riêng. `purpose="form"`: bấm ra ngoài KHÔNG
-          đóng để không mất lựa chọn; ESC vẫn đóng như bản antd. */}
+          đóng để không mất lựa chọn; ESC vẫn có thể đóng hộp thoại. */}
       <Dialog
         isOpen={modal === 'assign'}
         onOpenChange={(open) => {

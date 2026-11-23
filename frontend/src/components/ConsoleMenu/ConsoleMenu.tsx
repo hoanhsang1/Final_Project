@@ -16,12 +16,11 @@ interface ConsoleMenuProps {
 /**
  * Menu điều hướng của khung console.
  *
- * Dùng CHUNG cho cả cột bên (≥1024px) và `Drawer` (<1024px) để hai chỗ không
+ * Dùng CHUNG cho cả cột bên (>=1024px) và `Drawer` (<1024px) để hai chỗ không
  * bao giờ lệch nhau — cả hai đều nhận cùng một mảng `items`.
  *
- * Đây là danh sách liên kết thật (`nav > ul > li > a`), không phải `Menu` của
- * antd: mỗi mục dẫn tới một URL nên `aria-current="page"` đúng ngữ nghĩa, còn
- * `role="menu"` của antd chỉ dành cho menu lệnh.
+ * Đây là danh sách liên kết thật (`nav > ul > li > a`): mỗi mục dẫn tới một URL
+ * nên `aria-current="page"` đúng ngữ nghĩa.
  *
  * Màu/kích thước lấy từ CSS variable của theme — xem `ConsoleMenu.css`.
  */
@@ -42,9 +41,7 @@ export default function ConsoleMenu({
                 to={item.path}
                 className="mems-console-menu__link"
                 hasUnderline={false}
-                // `Text` bên trong `Link` luôn tự đặt màu + độ đậm, nên phải
-                // truyền qua prop thay vì ép bằng CSS — CSS của mình chỉ lo nền
-                // và kích thước.
+                // Màu/độ đậm do Link tự đặt; CSS lo nền, nhấn và khoảng cách.
                 color={isSelected ? 'accent' : 'primary'}
                 weight={isSelected ? 'semibold' : 'medium'}
                 aria-current={isSelected ? 'page' : undefined}

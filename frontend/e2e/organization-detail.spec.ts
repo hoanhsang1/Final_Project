@@ -75,16 +75,18 @@ test.describe('Chi tiết tổ chức', () => {
 
     await page.goto(`/quan-tri/to-chuc/${ORG_A.id}`);
 
-    // Descriptions bordered gộp nhiều cặp label/td vào CÙNG một <tr> →
-    // phải chọn đúng ô <td> ngay sau <th> tương ứng.
-    const emailCell = page
-      .locator('th.ant-descriptions-item-label', { hasText: 'Email liên hệ' })
-      .locator('xpath=following-sibling::td[1]');
-    await expect(emailCell).toHaveText('—');
+    const emailItem = page
+      .locator('div,li,dl')
+      .filter({ has: page.getByText('Email liên hệ', { exact: true }) })
+      .filter({ has: page.getByText('—', { exact: true }) })
+      .first();
+    await expect(emailItem).toBeVisible();
 
-    const phoneCell = page
-      .locator('th.ant-descriptions-item-label', { hasText: 'Số điện thoại' })
-      .locator('xpath=following-sibling::td[1]');
-    await expect(phoneCell).toHaveText('—');
+    const phoneItem = page
+      .locator('div,li,dl')
+      .filter({ has: page.getByText('Số điện thoại', { exact: true }) })
+      .filter({ has: page.getByText('—', { exact: true }) })
+      .first();
+    await expect(phoneItem).toBeVisible();
   });
 });

@@ -124,7 +124,7 @@ export const MSG_ORG = {
   ALL_STATUSES: 'Tất cả trạng thái',
   /** Giá trị mặc định của bộ lọc loại. */
   ALL_TYPES: 'Tất cả loại',
-  /** Nút bấm tìm kiếm (Astryx tách ô nhập và nút, khác `Input.Search` của antd). */
+  /** Nút bấm tìm kiếm (ô nhập và nút tách riêng). */
   SEARCH_ACTION: 'Tìm',
   /** Tên cho `nav` phân trang màn chờ duyệt — không trùng landmark giữa các màn. */
   PAGINATION_LABEL: 'Phân trang danh sách tổ chức chờ duyệt',
@@ -303,7 +303,7 @@ export const MSG_ACC = {
   FILTER_STATUS: 'Trạng thái',
   /** Ô tìm kiếm. */
   SEARCH: 'Tìm kiếm',
-  /** Nút bấm tìm kiếm (Astryx tách ô nhập và nút, khác `Input.Search` của antd). */
+  /** Nút bấm tìm kiếm (ô nhập và nút tách riêng). */
   SEARCH_ACTION: 'Tìm',
   /** Tên cho `nav` phân trang màn Quản lý tài khoản — không trùng landmark giữa các màn. */
   PAGINATION_LABEL: 'Phân trang danh sách tài khoản',
@@ -436,13 +436,14 @@ export function msgReactivated(orgName: string): string {
 }
 
 /**
- * Thông báo "tính năng đang chờ backend" — kèm mã `D-nn` để Vy đối chiếu
- * với danh sách endpoint trong đặc tả.
+ * Thông báo khi endpoint dạng **collection** chưa sẵn sàng trên BE.
  *
- * Dùng khi endpoint dạng **collection** trả 404 (BE chưa làm endpoint).
+ * Trước đây kèm mã nội bộ (D-nn) để đối chiếu đặc tả, nhưng mã đó là chi tiết
+ * kỹ thuật — không hiển thị cho người dùng cuối để thông điệp dễ hiểu.
+ * Tham số `code` giữ lại để caller không phải đổi chữ ký khi chưa cần.
  */
-export function msgBackendPending(code: string): string {
-  return `Tính năng đang chờ backend (${code}).`;
+export function msgBackendPending(_code?: string): string {
+  return 'Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.';
 }
 
 /** `MSG-ACC-09` — cập nhật trạng thái tài khoản thành công (có tên đăng nhập). */

@@ -39,6 +39,8 @@ export const memsTheme = defineTheme({
     // Chốt đúng mã brand; `--color-text-accent` v.v. tự trỏ về đây.
     '--color-accent': color.brand,
     '--color-on-accent': color.onBrand,
+    // Nền/nhấn phụ bám brand để tạo nhịp màu xanh dịu, nhất quán.
+    '--color-accent-muted': pair(color.brandSoft, '#112842'),
 
     // --- Chữ ----------------------------------------------------------------
     '--color-text-primary': pair(color.text, '#DFE2E5'),
@@ -94,7 +96,7 @@ export const memsTheme = defineTheme({
     '--color-warning-muted': pair('#B5470833', '#E2A4003F'),
 
     // --- Thông tin (info) ---------------------------------------------------
-    // MEMS không có "xanh thông tin" riêng — antd cũ đặt `colorInfo = brand`.
+    // MEMS không có "xanh thông tin" riêng — bản giao diện trước dùng màu thông tin trùng brand.
     // Giữ đúng tinh thần đó: info là brand, không phải xanh Meta `#0064E0`.
     // `Banner status="info"` lấy nền từ `--color-info-muted` và chữ từ
     // `--color-on-info-muted`, nên phải pin cả hai; chỉ pin `--color-info` thì

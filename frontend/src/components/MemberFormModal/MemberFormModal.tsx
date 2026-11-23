@@ -82,7 +82,7 @@ export default function MemberFormModal({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Chưa có chức vụ thì không gửi — khớp nút Lưu bị khoá của bản antd.
+    // Chưa có chức vụ thì không gửi — khớp trạng thái nút Lưu bị khoá.
     if (!hasPositions) return;
     if (!form.validate()) return;
     onSubmit({

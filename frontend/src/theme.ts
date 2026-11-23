@@ -1,11 +1,12 @@
-﻿import type { ThemeConfig } from 'antd';
-
-/**
+﻿/**
  * Token thiết kế — MEMS (Layer 1+2), hướng "mực xanh học vụ".
  *
  * Đích: phần mềm quản lý giáo dục chuyên ngành, đáng tin (tham chiếu SMAS/VNEdu).
  * Nguồn duy nhất màu/bo góc/font/nhịp cho toàn repo — component KHÔNG hardcode
  * hex/rgba/px (xem `docs/ui-conventions.md`). Đổi giao diện tại đây.
+ *
+ * Phối màu (phương án A): giữ brand `#0E4A8B`, tăng nhịp nhấn (tông xanh nhạt)
+ * và nhịp neutral (lớp canvas/bề mặt/viền) ở mức an toàn, giữ UI tổng thể tương tự.
  *
  * Tương phản (AA): brand #0E4A8B trên trắng ≈ 8.8:1; text phụ #475467 ≈ 8.6:1;
  * borderInput #667085 đủ 3:1 trên trắng và trên canvas (WCAG 1.4.11).
@@ -19,25 +20,29 @@
  * và `boxShadow` của bề mặt nội dung = `none`.
  */
 export const color = {
-  /** Brand chủ đạo (mực xanh) — CTA, link, mục đang chọn. */
+  /** Brand chủ đạo (mực xanh) — CTA, link, mục đang chọn. Giữ nguyên #0E4A8B. */
   brand: '#0E4A8B',
   /** Pressed. */
   brandActive: '#0A3A6E',
   /** Hover. */
   brandHover: '#1359A5',
-  /** Nền nhấn nhẹ — mục chọn, row hover, tag nhẹ. */
-  brandSoft: '#E9F0F8',
+  /** Nền nhấn nhẹ — mục chọn, row hover, tag nhẹ (nhịp xanh dịu). */
+  brandSoft: '#E7F0FA',
+  /** Nền nhấn phụ — nhịp xanh rõ hơn một bậc cho điểm nhấn/hover chọn. */
+  brandSoftStrong: '#DBE8F6',
   /** Text chính. */
   text: '#101828',
   /** Text phụ — nhãn, mô tả, header bảng. */
   textSecondary: '#475467',
-  /** Canvas nền trang (xám lạnh, không phải trắng ngà). */
-  canvas: '#F2F4F7',
+  /** Canvas nền trang (xám lạnh, tạo lớp nền tách khỏi bề mặt trắng). */
+  canvas: '#F1F4F8',
   surface: '#FFFFFF',
   /** Hairline — card, divider, bảng. Trang trí, không dùng cho field. */
   border: '#E4E7EC',
-  /** Nền header bảng / hover row. */
-  surfaceSunken: '#F7F8FA',
+  /** Viền nhấn nhẹ — phân tách khối rõ hơn một nhịp nhưng vẫn dịu. */
+  borderSubtle: '#E9EDF2',
+  /** Nền header bảng / khối lún nhẹ. */
+  surfaceSunken: '#F6F8FB',
   /** Viền field: đủ 3:1 trên nền trắng/canvas. */
   borderInput: '#667085',
   error: '#B42318',
@@ -46,9 +51,9 @@ export const color = {
   /** Chữ gợi ý trong field — nhạt hơn text phụ nhưng vẫn đọc được. */
   placeholder: '#98A2B3',
   /** Hover row/mục menu — xám trung tính, không ngả xanh để không tranh với row đang chọn. */
-  hoverSurface: '#F5F7FA',
+  hoverSurface: '#F4F7FA',
   /** Hover của mục đang chọn. */
-  brandSoftHover: '#DCE8F5',
+  brandSoftHover: '#DBE8F6',
   /** Chữ trên nền brand (panel đăng nhập). */
   onBrand: '#FFFFFF',
   /** Chữ phụ trên nền brand — vẫn ≥4.5:1 trên #0E4A8B. */
@@ -59,8 +64,8 @@ export const color = {
 
 /**
  * Font của design system. Tách `fontPrimary`/`fontFallbacks` vì Astryx nhận font
- * theo hai tham số riêng (`typography.body.family` + `.fallbacks`), còn antd nhận
- * cả chuỗi. `fontFamily` vẫn là nguồn duy nhất để hai bên không lệch nhau.
+ * theo hai tham số riêng (`typography.body.family` + `.fallbacks`). `fontFamily`
+ * là chuỗi đầy đủ dùng thống nhất trong hệ thống.
  */
 export const fontPrimary = 'Inter';
 export const fontFallbacks =
@@ -106,212 +111,10 @@ export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
 /** Số liệu cần thẳng cột (sĩ số, mã, thời gian) — đặt lên ô hiển thị số. */
 export const numericStyle = { fontVariantNumeric: 'tabular-nums' } as const;
 
-export const themeToken: ThemeConfig['token'] = {
-  colorPrimary: color.brand,
-  colorPrimaryHover: color.brandHover,
-  colorPrimaryActive: color.brandActive,
-  colorPrimaryBg: color.brandSoft,
-  colorLink: color.brand,
-  colorLinkHover: color.brandHover,
-  colorInfo: color.brand,
-  colorSuccess: color.success,
-  colorWarning: color.warning,
-  colorError: color.error,
 
-  colorText: color.text,
-  colorTextHeading: color.text,
-  colorTextSecondary: color.textSecondary,
-  colorTextDescription: color.textSecondary,
-  colorTextPlaceholder: color.placeholder,
 
-  colorBgLayout: color.canvas,
-  colorBgContainer: color.surface,
-  colorBgElevated: color.surface,
-  /** Viền field (3:1). Viền trang trí dùng `colorBorderSecondary`. */
-  colorBorder: color.borderInput,
-  colorBorderSecondary: color.border,
-
-  fontFamily,
-  fontSize: typeScale.body,
-  lineHeight: 1.55,
-  fontWeightStrong: weight.strong,
-
-  fontSizeHeading1: typeScale.h1,
-  fontSizeHeading2: typeScale.section,
-  fontSizeHeading3: typeScale.body,
-  fontSizeHeading4: typeScale.body,
-  fontSizeHeading5: typeScale.caption,
-  lineHeightHeading1: 1.3,
-  lineHeightHeading2: 1.35,
-
-  borderRadius: 6,
-  borderRadiusLG: 8,
-  borderRadiusSM: 4,
-  borderRadiusXS: 2,
-
-  controlHeight: 36,
-  controlHeightLG: 44,
-  controlHeightSM: 28,
-  controlOutline: color.brandSoft,
-  controlOutlineWidth: 3,
-
-  sizeUnit: 4,
-  sizeStep: 4,
-  sizeXXS: 4,
-  sizeXS: 8,
-  sizeSM: 12,
-  size: 16,
-  sizeMD: 20,
-  sizeLG: 24,
-  sizeXL: 32,
-
-  /**
-   * Bề mặt nội dung **không đổ bóng**: đo được ở Khan chỉ 1.2% element có bóng,
-   * và toàn bộ số đó là menu nổi/overlay. Bóng trên card/bảng là thứ tạo cảm
-   * giác "SaaS nhựa". Phân cấp bằng hairline + khoảng trắng.
-   */
-  boxShadow: 'none',
-  /** Chỉ dùng cho lớp nổi thật (dropdown, popover, modal) — nơi cần tách khỏi nền. */
-  boxShadowSecondary: '0 8px 24px rgba(16, 24, 40, 0.12)',
-
-  // Motion tinh tế; vẫn tôn trọng prefers-reduced-motion (index.css).
-  motion: true,
-  motionDurationFast: '0.1s',
-  motionDurationMid: '0.15s',
-  motionDurationSlow: '0.2s',
-};
-
-/** Token riêng của component — mật độ cao, viền mảnh, không đổ bóng. */
-export const themeComponents: ThemeConfig['components'] = {
-  Button: {
-    controlHeight: 36,
-    controlHeightLG: 44,
-    controlHeightSM: 28,
-    borderRadius: 6,
-    fontWeight: weight.medium,
-    paddingInline: 14,
-    primaryShadow: 'none',
-    defaultShadow: 'none',
-    dangerShadow: 'none',
-    defaultBorderColor: color.borderInput,
-    defaultColor: color.text,
-  },
-  Input: {
-    controlHeight: 36,
-    borderRadius: 6,
-    paddingInline: 12,
-    activeShadow: `0 0 0 3px ${color.brandSoft}`,
-    hoverBorderColor: color.brandHover,
-    activeBorderColor: color.brand,
-  },
-  InputNumber: {
-    controlHeight: 36,
-    borderRadius: 6,
-  },
-  Select: {
-    controlHeight: 36,
-    borderRadius: 6,
-    optionSelectedBg: color.brandSoft,
-    optionSelectedColor: color.brand,
-  },
-  DatePicker: {
-    controlHeight: 36,
-    borderRadius: 6,
-  },
-  Card: {
-    borderRadiusLG: 8,
-    paddingLG: 20,
-    headerBg: 'transparent',
-    headerFontSize: 15,
-    headerHeight: 48,
-    boxShadowTertiary: 'none',
-  },
-  Modal: {
-    borderRadiusLG: 8,
-    titleFontSize: 17,
-  },
-  Table: {
-    headerBg: color.surfaceSunken,
-    headerColor: color.textSecondary,
-    headerSplitColor: 'transparent',
-    headerBorderRadius: 0,
-    rowHoverBg: color.hoverSurface,
-    rowSelectedBg: color.brandSoft,
-    rowSelectedHoverBg: color.brandSoftHover,
-    borderColor: color.border,
-    /** 10 thay vì 11 → hàng ≈ 42px, mật độ đo được của bảng Khan (~40). */
-    cellPaddingBlock: 10,
-    cellPaddingInline: 16,
-    footerBg: color.surfaceSunken,
-  },
-  Menu: {
-    itemBorderRadius: 6,
-    itemHeight: 36,
-    itemMarginInline: 8,
-    itemMarginBlock: 2,
-    itemColor: color.textSecondary,
-    itemSelectedBg: color.brandSoft,
-    itemSelectedColor: color.brand,
-    itemHoverBg: color.hoverSurface,
-    itemHoverColor: color.text,
-    activeBarBorderWidth: 0,
-    iconSize: 16,
-    subMenuItemBg: 'transparent',
-  },
-  Layout: {
-    headerBg: color.surface,
-    siderBg: color.surface,
-    bodyBg: color.canvas,
-    headerHeight: 56,
-    headerPadding: '0 24px',
-    triggerBg: color.surfaceSunken,
-  },
-  Tabs: {
-    itemSelectedColor: color.brand,
-    inkBarColor: color.brand,
-    titleFontSize: 14,
-    horizontalItemGutter: 24,
-    horizontalItemPadding: '10px 0',
-  },
-  Alert: {
-    borderRadiusLG: 6,
-  },
-  Tag: {
-    borderRadiusSM: 4,
-    defaultBg: color.canvas,
-    defaultColor: color.textSecondary,
-  },
-  Divider: {
-    colorSplit: color.border,
-  },
-  Form: {
-    labelColor: color.text,
-    labelFontSize: typeScale.body,
-    labelHeight: 20,
-    verticalLabelPadding: '0 0 6px',
-    itemMarginBottom: 20,
-  },
-  Breadcrumb: {
-    fontSize: typeScale.caption,
-    itemColor: color.textSecondary,
-    linkColor: color.textSecondary,
-    linkHoverColor: color.brand,
-    separatorColor: color.placeholder,
-  },
-  Drawer: {
-    paddingLG: 20,
-  },
-  Descriptions: {
-    labelBg: color.surfaceSunken,
-    titleMarginBottom: 12,
-  },
-  Pagination: {
-    itemSize: 32,
-  },
-};
-
-/** Nền trang. Lấy từ token để chỉ có một nguồn sự thật. */
-export const layoutBackground = themeToken.colorBgLayout;
+/** Nền trang. Dùng chung cho các màn cần canvas nền (trạng thái, xem thử vai trò). */
+export const layoutBackground = color.canvas;
 
 /** Thẻ trắng canh giữa — chỉ dùng cho màn đăng nhập / xem thử vai trò. */
 export const cardStyle = {

@@ -102,7 +102,7 @@ export interface OrganizationListItem {
 /**
  * Envelope phân trang — quy ước chung cho các endpoint list (`D-20`, `D-22`, `D-24`).
  *
- * `page` là **1-based** (khớp `Table.current` của antd), `total` là tổng **sau khi lọc**.
+ * `page` là **1-based**, `total` là tổng **sau khi lọc**.
  */
 export interface PageResponse<T> {
   items: T[];

@@ -11,7 +11,7 @@ import './ConsoleShell.css';
 /** `id` của vùng nội dung chính — đích nhảy của skip link (WCAG 2.4.1). */
 const MAIN_CONTENT_ID = 'noi-dung-chinh';
 
-/** Độ rộng cột bên ở desktop — khớp `SIDEBAR_WIDTH` của bản antd. */
+/** Độ rộng cột bên ở desktop — khớp độ rộng cột bên ở bản trước. */
 const SIDEBAR_WIDTH = 248;
 /** Chiều rộng `Drawer` ở màn hình nhỏ. */
 const DRAWER_WIDTH = 300;
@@ -79,15 +79,13 @@ interface ConsoleShellProps {
  * cảnh khu vực/module + phiên người dùng + đăng xuất; điều hướng bên
  * (desktop ≥1024px, mobile `Drawer` <1024px) dùng chung `ConsoleMenu`.
  *
- * Giữ hành vi/cấu trúc của bản antd: skip link (WCAG 2.4.1), `#noi-dung-chinh`,
+ * Giữ hành vi/cấu trúc của bản trước: skip link (WCAG 2.4.1), `#noi-dung-chinh`,
  * logout gọi API rồi xoá phiên + chuyển `/dang-nhap` kể cả khi API lỗi,
  * `aria-label`/`aria-current`, responsive, render `<Outlet/>`.
  *
- * Vì sao bỏ `Layout/Header/Sider` của antd: ba component đó kéo theo
- * `breakpoint` dựa vào CSS + `matchMedia` riêng của antd, và header/sider tự đặt
- * kích thước bằng style inline. Ở đây bố cục là hai khối flex + một media query
- * trong `ConsoleShell.css`, cùng đúng một nguồn breakpoint là `useMediaQuery` của
- * Astryx — nên không còn cảnh JS nghĩ desktop còn CSS nghĩ mobile.
+ * Bố cục dùng hai khối flex + một media query trong `ConsoleShell.css`, cùng
+ * một nguồn breakpoint là `useMediaQuery` của Astryx — tránh lệch giữa logic JS
+ * và CSS khi xác định desktop/mobile.
  */
 export default function ConsoleShell({
   title,

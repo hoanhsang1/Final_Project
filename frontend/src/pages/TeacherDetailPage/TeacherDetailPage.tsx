@@ -355,10 +355,9 @@ export default function TeacherDetailPage() {
   );
 
   /**
-   * Lịch sử thay đổi — bản Astryx của `Timeline`. Astryx không có component
-   * timeline, nên dựng bằng `VStack` + hairline giữa các mục: mỗi mục là một
-   * khối "nhật ký" (hành động → ai/lúc nào → các thay đổi), đọc rõ hơn cả dấu
-   * chấm nối tiếp của antd.
+   * Lịch sử thay đổi — thay cho dạng timeline. Mỗi mục là một khối "nhật ký"
+   * (hành động → ai/lúc nào → các thay đổi), hiển thị bằng `VStack` + hairline
+   * giữa các mục để dễ đọc.
    */
   const historyRows = useMemo(
     () =>
@@ -698,8 +697,7 @@ export default function TeacherDetailPage() {
       </div>
 
       {/* §5.1 — xác nhận khi đổi chuyên môn làm lệch môn lớp đang phụ trách.
-          `purpose="form"`: bấm ra ngoài KHÔNG đóng (không mất ngữ cảnh), ESC vẫn
-          đóng như bản antd `maskClosable={false}`. */}
+          `purpose="form"`: bấm ra ngoài KHÔNG đóng để không mất ngữ cảnh. */}
       <Dialog
         isOpen={!!mismatch}
         onOpenChange={(open) => {

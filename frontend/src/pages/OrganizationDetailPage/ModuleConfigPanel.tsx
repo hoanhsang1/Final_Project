@@ -311,7 +311,7 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
                         `BR-06`: module lõi đang bật bị khoá. `disabledMessage` của
                         Astryx vừa khoá vừa hiện tooltip lý do, và giữ ô trong
                         tab order (`aria-disabled`) để trình đọc màn hình đọc được
-                        lý do — không cần bọc `Tooltip` quanh `<span>` như antd.
+                        lý do mà không cần bọc `Tooltip` thủ công.
                       */}
                       <CheckboxInput
                         label={row.name}
@@ -334,9 +334,9 @@ export default function ModuleConfigPanel({ orgId, modules, editable }: ModuleCo
       </DetailSection>
 
       {/*
-        Rời trang khi còn thay đổi chưa lưu — `AlertDialog` của Astryx thay cho
-        `modal.confirm` của antd. Điều khiển trực tiếp bằng `blocker.state` nên
-        không cần `useEffect` mở hộp thoại (bớt một nguồn trạng thái trùng).
+        Rời trang khi còn thay đổi chưa lưu — dùng `AlertDialog` và điều khiển
+        trực tiếp bằng `blocker.state` nên không cần `useEffect` mở hộp thoại
+        (bớt một nguồn trạng thái trùng).
       */}
       <AlertDialog
         isOpen={blocker.state === 'blocked'}

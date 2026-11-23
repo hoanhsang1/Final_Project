@@ -78,12 +78,12 @@ export function getAuthErrorMessage(error: unknown): string {
       return serverMessage;
     }
     // Message tiếng Anh chưa biết → không hiện thẳng cho người dùng cuối.
-    return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+    return 'Không thể thực hiện yêu cầu lúc này. Vui lòng thử lại.';
   }
 
   // Không có response → lỗi mạng / backend chưa chạy.
   if (err?.request) {
-    return 'Không kết nối được máy chủ. Vui lòng thử lại.';
+    return 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.';
   }
 
   return 'Đã xảy ra lỗi. Vui lòng thử lại.';
@@ -127,12 +127,11 @@ function getRegisterErrorMessage(error: unknown): string {
     // Tiếng Việt từ backend → giữ nguyên
     if (/[àáảãạăâđêôơư]/i.test(serverMessage)) return serverMessage;
     if (serverMessage.startsWith('Invalid module:')) {
-      const mod = serverMessage.replace('Invalid module:', '').trim();
-      return `Module "${mod}" không hợp lệ hoặc chưa được kích hoạt.`;
+      return 'Một số tính năng bạn chọn hiện chưa khả dụng. Vui lòng tải lại trang và thử chọn lại.';
     }
-    return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+    return 'Không thể gửi đăng ký lúc này. Vui lòng thử lại.';
   }
-  if (err?.request) return 'Không kết nối được máy chủ. Vui lòng thử lại.';
+  if (err?.request) return 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.';
   return 'Đã xảy ra lỗi. Vui lòng thử lại.';
 }
 
@@ -206,7 +205,7 @@ function toPasswordResetError(error: unknown): PasswordResetError {
   // Message lạ (tiếng Anh chưa đối chiếu) → không hiện thẳng cho người dùng cuối.
   return new PasswordResetError(
     'unknown',
-    'Đã xảy ra lỗi. Vui lòng thử lại.',
+    'Không thể thực hiện yêu cầu lúc này. Vui lòng thử lại.',
   );
 }
 

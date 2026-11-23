@@ -106,12 +106,12 @@ describe('getAuthErrorMessage', () => {
       message: 'Something exploded in the server',
       data: null,
     });
-    expect(getAuthErrorMessage(err)).toBe('Đã xảy ra lỗi. Vui lòng thử lại.');
+    expect(getAuthErrorMessage(err)).toBe('Không thể thực hiện yêu cầu lúc này. Vui lòng thử lại.');
   });
 
   it('trả về thông báo mặc định khi lỗi mạng (không có response)', () => {
     const err = { isAxiosError: true, request: {} };
-    expect(getAuthErrorMessage(err)).toBe('Không kết nối được máy chủ. Vui lòng thử lại.');
+    expect(getAuthErrorMessage(err)).toBe('Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.');
   });
 
   it('trả về thông báo mặc định khi response không có body lỗi', () => {

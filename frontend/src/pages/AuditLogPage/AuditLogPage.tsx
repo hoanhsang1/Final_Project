@@ -28,8 +28,8 @@ const ACTION_OPTIONS = [...AUDIT_ACTION_OPTIONS];
 /**
  * Dựng `DateRange` cho `DateRangeInput` từ 2 tham số URL.
  *
- * `DateRangeInput` bắt buộc CẢ hai đầu — trong khi URL có thể chỉ có một đầu
- * (`allowEmpty` của antd cũ). Chỉ dựng khoảng khi cả `from` và `to` hợp lệ.
+ * `DateRangeInput` bắt buộc CẢ hai đầu — trong khi URL có thể chỉ có một đầu.
+ * Chỉ dựng khoảng khi cả `from` và `to` hợp lệ.
  */
 function toDateRange(from: string | null, to: string | null): DateRange | null {
   if (!from || !to || !ISO_DATE_PATTERN.test(from) || !ISO_DATE_PATTERN.test(to)) {

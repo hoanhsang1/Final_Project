@@ -24,24 +24,14 @@ const ORG_ACTIVE: FakeOrg = {
   ],
 };
 
-/** Modal antd đang hiện — trang có nhiều modal mount sẵn (`forceRender`) nên phải scope. */
+/** Dialog đang mở — Astryx `Dialog` không render khi đóng nên `dialog[open]` là đủ. */
 function visibleModal(page: Page) {
-  return page.locator('.ant-modal-content:visible').first();
+  return page.locator('dialog[open]').last();
 }
 
-/**
- * Chọn 1 mục trong dropdown `Select` của antd đang mở.
- *
- * KHÔNG dùng `getByRole('option')`: rc-select render node ARIA riêng (chỉ để đọc
- * bằng screen reader), bấm vào đó không đổi giá trị. Phần tử bấm được là
- * `.ant-select-item-option`.
- */
+/** Chọn 1 mục trong danh sách tuỳ chọn đang mở (Selector/combobox). */
 async function selectAntdOption(page: Page, label: string) {
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-    .filter({ hasText: label })
-    .first()
-    .click();
+  await page.getByRole('option', { name: label, exact: true }).first().click();
 }
 
 test.describe('Khung menu mở rộng (Q-28)', () => {
@@ -71,8 +61,7 @@ test.describe('Khung menu mở rộng (Q-28)', () => {
     await expect(page.getByRole('button', { name: 'Mở menu quản trị' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Mở menu quản trị' }).click();
-    // `Drawer` là `<dialog>` có `aria-label` = tên khu vực, nên scope theo role
-    // thay vì class `.ant-drawer-open` (menu cột bên không render ở mobile).
+    // `Drawer` là `<dialog>` có `aria-label` = tên khu vực, nên scope theo role dialog.
     await page
       .getByRole('dialog', { name: 'Khu vực quản trị' })
       .getByRole('link', { name: 'Nhật ký hệ thống' })
@@ -187,7 +176,7 @@ test.describe('Màn Tất cả tổ chức', () => {
 
     await page.goto('/quan-tri/to-chuc/tat-ca');
 
-    await expect(page.getByText('Tính năng đang chờ backend (D-20).')).toBeVisible();
+    await expect(page.getByText('Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Thử lại' })).toBeVisible();
     await expect(page.getByText('Không có tổ chức nào')).toHaveCount(0);
   });
@@ -306,7 +295,7 @@ test.describe('Màn Quản lý tài khoản', () => {
 
     await page.goto('/quan-tri/tai-khoan');
 
-    await expect(page.getByText('Tính năng đang chờ backend (D-24).')).toBeVisible();
+    await expect(page.getByText('Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.')).toBeVisible();
     await expect(page.getByText('Không có tài khoản nào')).toHaveCount(0);
   });
 
@@ -486,9 +475,7 @@ test.describe('Màn Chi tiết tài khoản', () => {
     await expect(modal.getByText('Vai trò mới phải khác vai trò hiện tại.')).toBeVisible();
 
     // Đổi sang vai trò khác thì lưu được, màn chi tiết refetch theo.
-    // Bấm vào `.ant-select-selector` (không phải combobox) — khi đã có giá trị,
-    // span `ant-select-selection-item` phủ lên và chặn click vào combobox.
-    await modal.locator('.ant-select-selector').click();
+    await modal.getByRole('combobox', { name: 'Vai trò' }).click();
     await selectAntdOption(page, 'Quản trị tổ chức');
     await modal.getByRole('button', { name: 'Đổi vai trò' }).click();
 
@@ -551,7 +538,7 @@ test.describe('Màn Nhật ký hệ thống', () => {
 
     await page.goto('/quan-tri/nhat-ky');
 
-    await expect(page.getByText('Tính năng đang chờ backend (D-22).')).toBeVisible();
+    await expect(page.getByText('Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.')).toBeVisible();
     await expect(page.getByText('Chưa có sự kiện nào')).toHaveCount(0);
   });
 
@@ -590,7 +577,7 @@ test.describe('Lịch sử duyệt tổ chức', () => {
 
     await page.goto(`/quan-tri/to-chuc/${ORG_A.id}/lich-su`);
 
-    await expect(page.getByText('Tính năng đang chờ backend (D-22).')).toBeVisible();
+    await expect(page.getByText('Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.')).toBeVisible();
   });
 });
 

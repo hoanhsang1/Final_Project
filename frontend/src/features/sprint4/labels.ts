@@ -2,8 +2,8 @@
  * Nhãn hiển thị + định dạng ngày cho Sprint 4.
  *
  * Một nguồn duy nhất cho §7 (nhãn trạng thái) để 4 màn hình không lệch nhau.
- * Không hardcode màu hex — mỗi trạng thái có một *biến thể* (`Badge` của Astryx
- * hoặc tên màu preset của antd `Tag`) để hai bên không lệch nhau trong lúc port.
+ * Không hardcode màu hex — mỗi trạng thái có một *biến thể* (`Badge` của Astryx)
+ * để hiển thị nhất quán.
  */
 import type { BadgeVariant } from '@astryxdesign/core';
 import dayjs from 'dayjs';

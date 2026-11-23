@@ -19,8 +19,8 @@ export interface DetailSectionProps {
  * khối nào quan trọng hơn khối nào. Hairline + khoảng trắng phân cấp rẻ hơn và
  * đọc nhanh hơn, đúng quy ước `docs/ui-conventions.md` mục 4.
  *
- * `Heading level={2}` = 20px theo thang v2. Bản antd cũ dùng `typeScale.section`
- * = **16px** — mốc không còn tồn tại trong hợp đồng, nên port này sửa luôn.
+ * `Heading level={2}` = 20px theo thang v2 (bản trước dùng cỡ 16px cho tiêu đề
+ * khối — mốc không còn trong thang hiện tại, nên giữ theo thang mới).
  */
 export default function DetailSection({
   title,

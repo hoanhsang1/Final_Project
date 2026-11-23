@@ -1,23 +1,21 @@
-import { Spin, Typography, theme } from 'antd';
+import { Spinner, Text } from '@astryxdesign/core';
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
+import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
+import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import AdminConsoleLayout from './components/AdminConsoleLayout/AdminConsoleLayout';
 import AdminGuard from './components/AdminGuard/AdminGuard';
 import DocumentTitle from './components/DocumentTitle/DocumentTitle';
 import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayout';
 import OwnerGuard from './components/OwnerGuard/OwnerGuard';
-import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
-import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
+import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import LoginPage from './pages/LoginPage/LoginPage';
 import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage/ForgotPasswordPage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage/ResetPasswordPage';
 import RolePreviewPage from './pages/RolePreviewPage/RolePreviewPage';
-
-const { Text } = Typography;
 
 /**
  * 9 màn console tách chunk riêng bằng `React.lazy`.
@@ -25,12 +23,12 @@ const { Text } = Typography;
  * Trước đây toàn bộ 13 màn nằm chung một chunk → mở trang đăng nhập cũng tải
  * đủ mã console. Sau khi tách, cách đo: cộng gzip của các file nằm trong
  * `modulepreload` của `dist/index.html` (payload chính) rồi so với phần còn
- * lại của `dist/assets` (phải tải theo yêu cầu). Phần tách ra chủ yếu là antd
- * `Table` + màn `AuditLogPage` — chỉ tải khi vào đúng màn đó.
+ * lại của `dist/assets` (phải tải theo yêu cầu). Phần tách ra chủ yếu là các
+ * màn/bảng dữ liệu nặng — chỉ tải khi vào đúng màn đó.
  *
  * Màn đăng nhập / đăng ký / xem thử / 404 giữ **static**: chúng là cửa vào đầu
  * tiên nên nạp sẵn trong payload chính — tách `lazy` chỉ thêm 1 nhịp waterfall
- * mà vẫn phải tải antd `Input`/`Form` mà trang đăng nhập dùng. `react-router`
+ * không cần thiết. `react-router`
  * cũng cần phần tử đồng bộ cho các test render `routes` (`router.test`,
  * `LoginPage.test`, `RolePreviewPage.test`).
  */
@@ -61,20 +59,22 @@ const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPa
 
 /** Màn chờ trong lúc tải chunk của route — chữ kết bằng "…" (quy ước loading). */
 function RouteFallback() {
-  const { token } = theme.useToken();
   return (
     <div
       role="status"
+      aria-live="polite"
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: token.paddingSM,
-        paddingBlock: token.paddingLG,
+        gap: 'var(--spacing-3, 12px)',
+        paddingBlock: 'var(--spacing-6, 24px)',
       }}
     >
-      <Spin />
-      <Text type="secondary">Đang tải màn hình…</Text>
+      <Spinner size="md" aria-label="Đang tải" />
+      <Text type="body" color="secondary">
+        Đang tải màn hình…
+      </Text>
     </div>
   );
 }

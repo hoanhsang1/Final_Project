@@ -14,9 +14,9 @@ import { ORG_C, loginAs, mockAdminApi } from './helpers';
  * `TC-MOD-*` / `TC-ALL-*` ghi BLOCKED.
  */
 
-/** Modal antd đang hiện — trang có nhiều modal mount sẵn (`forceRender`). */
+/** Dialog đang mở (Astryx Dialog/AlertDialog). */
 function visibleModal(page: Page) {
-  return page.locator('.ant-modal-content:visible').first();
+  return page.locator('dialog[open]').last();
 }
 
 test.describe('Trải nghiệm người dùng cốt lõi', () => {
@@ -84,11 +84,10 @@ test.describe('Trải nghiệm người dùng cốt lõi', () => {
 
     await page.getByRole('link', { name: 'Nhật ký hệ thống' }).click();
 
-    // `Modal.confirm` của antd render title ở 2 chỗ (`.ant-modal-title` +
-    // `.ant-modal-confirm-title`) → phải scope theo hộp thoại.
-    const confirmDialog = page.locator('.ant-modal-confirm:visible');
-    await expect(confirmDialog).toContainText('Có thay đổi chưa lưu');
-    await page.getByRole('button', { name: 'Ở lại' }).click();
+    // `AlertDialog` xác nhận rời trang khi còn thay đổi chưa lưu.
+    const confirmDialog = page.getByRole('dialog', { name: /Có thay đổi chưa lưu/ });
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole('button', { name: 'Ở lại' }).click();
 
     // Vẫn ở màn cấu hình, lựa chọn chưa lưu còn nguyên.
     await expect(page).toHaveURL(`/quan-tri/to-chuc/${ORG_C.id}`);
@@ -104,7 +103,7 @@ test.describe('Trải nghiệm người dùng cốt lõi', () => {
     await page.getByRole('checkbox', { name: 'Quản lý thiết bị' }).uncheck();
 
     await page.getByRole('link', { name: 'Nhật ký hệ thống' }).click();
-    await page.getByRole('button', { name: 'Rời trang' }).click();
+    await page.getByRole('dialog', { name: /Có thay đổi chưa lưu/ }).getByRole('button', { name: 'Rời trang' }).click();
     await expect(page).toHaveURL('/quan-tri/nhat-ky');
 
     // Quay lại: bản nháp còn đó và khôi phục đúng lựa chọn cũ.

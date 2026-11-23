@@ -396,3 +396,15 @@ Nguồn: `dumps/_index.md` (87 file).
 3. **Nhiều khoảng trống trạng thái** (Phụ lục A) → các kết luận về error/loading/empty chỉ đúng với những màn đã dump.
 4. **Hai câu hỏi đang chờ Sang (BE) trả lời:** (a) có thêm `actorName` không; (b) mã module là `STUDENT_MANAGEMENT` hay `CLASS_MANAGEMENT`. Không ảnh hưởng kết luận UX ở trên.
 5. **Đã thực hiện:** 7 lỗi + 2 mục không-hợp-lý (P1: R-01, R-03, R-05; P2: R-04, R-07; P3: R-06, R-08; **P4: N-01, N-02**) — xem mục "✅ Đã sửa". **Chờ port (P5):** R-02 (nhãn icon antd — không sửa sạch được khi còn antd; xem mục R-02).
+
+
+---
+
+## Cập nhật P5-D — Gỡ Ant Design khỏi frontend (2026-11-19, chưa commit)
+
+- **Kết quả gỡ phụ thuộc trong mã nguồn:** `git grep -n "from 'antd'" -- frontend/src` = 0; `git grep -n "@ant-design" -- frontend/src` = 0. Đã bỏ `antd`, `@ant-design/v5-patch-for-react-19`, `@ant-design/icons` khỏi `frontend/package.json` và loại bỏ import/usage antd khỏi `main.tsx`, `router.tsx`, `theme.ts`, `OverviewPage`, `OwnerGuard.test.tsx`, `test/setup.ts` và các menu (`consoleMenu.ts`, `ownerMenu.ts`, `academicMenu.ts` — icon SVG nội bộ, không thêm dependency).
+- **E2E/probe:** đã cập nhật selector E2E để không phụ thuộc `.ant-*`/DOM antd (`admin-console.spec.ts`, `admin-console-extended.spec.ts`, `approve-reject.spec.ts`, `ux-console.spec.ts`, `module-config.spec.ts`, `organization-detail.spec.ts`, `auth-password-reset.spec.ts`); `ux-review/probe-a11y-names.mjs` được viết lại để kiểm tra R-02 theo DOM hiện tại. **Chưa chạy probe/E2E trên môi trường dev server trong phiên này** (probe/E2E dùng mock `page.route`, không gọi API thật ghi dữ liệu).
+- **R-02 (tên truy cập icon/nút/ô tìm kiếm/phân trang):** chuyển sang DOM Astryx nên không còn phụ thuộc nhãn hardcode của antd; **cần xác minh thực tế** khi có dev server (chạy lại `probe-a11y-names.mjs` và/hoặc E2E liên quan) vì tên truy cập phụ thuộc cách component Astryx render.
+- **`AccountStatusModal`:** nút xác nhận dùng nhãn trạng thái đích (`targetLabel.label`, ví dụ "Vô hiệu hoá"/"Khoá"/"Kích hoạt"…) thay vì nhãn chung chung; giữ tiếng Việt, phù hợp ngữ cảnh thao tác (không đổi nghiệp vụ/phân quyền).
+- **Xác minh tự động (frontend, Node Playwright driver):** `tsc -b` pass, `eslint . --max-warnings=0` pass, `vitest run --no-file-parallelism` pass (**25 file / 169 test**), `vite build` pass.
+- **Còn lại / cần xác minh:** `frontend/package-lock.json` vẫn còn tham chiếu `antd` (2 vị trí chuỗi `"antd"`), **chưa dọn tự động** vì không có `npm`/`pnpm`/`yarn` trong PATH — tránh chỉnh tay lock rủi ro. Cần BE/nghiệp vụ xác nhận như đã nêu (Q-01 BR-04, `actorName`, module code, approve/reject reason/notifyEmail, payload member, `audit_log.entity_type/action`, CORS/gateway, mail) — không đoán/không đổi.

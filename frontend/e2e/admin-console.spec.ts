@@ -167,10 +167,17 @@ test.describe('Khung console quản trị', () => {
 
     await expect(page.getByRole('table')).toBeVisible();
     const overflowX = await page.evaluate(() => {
-      const el = document.querySelector('.ant-table-content') as HTMLElement | null;
-      return el ? getComputedStyle(el).overflowX : null;
+      const table = document.querySelector('table') as HTMLElement | null;
+      if (!table) return null;
+      let el: HTMLElement | null = table.parentElement;
+      while (el) {
+        const cs = getComputedStyle(el);
+        if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') return cs.overflowX;
+        el = el.parentElement;
+      }
+      return null;
     });
-    expect(overflowX).toBe('auto');
+    expect(['auto', 'scroll']).toContain(overflowX);
     // Nút hành động vẫn bấm được ở màn hình hẹp.
     await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
   });

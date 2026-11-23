@@ -2,7 +2,11 @@ import { Button, Heading, Text, VStack } from '@astryxdesign/core';
 import { layoutBackground } from '../../theme';
 
 export interface StatusScreenProps {
-  /** Mã trạng thái hiển thị nhỏ phía trên tiêu đề — ví dụ `"403"`, `"404"`. */
+  /**
+   * Nhãn trạng thái hiển thị phía trên tiêu đề (ví dụ "Không tìm thấy",
+   * "Không có quyền truy cập"). Truyền mã HTTP (403/404) vẫn được hỗ trợ và sẽ
+   * được chuyển thành nhãn tiếng Việt dễ hiểu cho người dùng.
+   */
   code: string;
   /** Tiêu đề chính, render bằng `h1` để màn luôn có heading cấp 1. */
   title: string;
@@ -18,14 +22,25 @@ export interface StatusScreenProps {
   fullHeight?: boolean;
 }
 
+/** Nhãn thân thiện thay cho mã kỹ thuật (HTTP/…) để người dùng dễ hiểu. */
+const FRIENDLY_CODE_LABEL: Record<string, string> = {
+  '401': 'Phiên đăng nhập',
+  '403': 'Truy cập bị hạn chế',
+  '404': 'Không tìm thấy',
+  '500': 'Đã xảy ra lỗi',
+};
+
+function displayCode(code: string): string {
+  return FRIENDLY_CODE_LABEL[code] ?? code;
+}
+
 /**
- * Màn trạng thái 403/404 dùng chung.
+ * Màn trạng thái 403/404/lỗi dùng chung.
  *
- * Vì sao KHÔNG dùng `Result` của antd: hình minh hoạ của `Result` là một SVG có
- * `<title>` **tiếng Anh** ("Unauthorized", "No Found") nằm trong cây trợ năng →
- * trình đọc màn hình đọc chữ tiếng Anh trước nội dung tiếng Việt (WCAG 3.1.1,
- * 4.1.2); ngoài ra `Result` không tạo heading nào. Ở đây chỉ có chữ: một `h1`
- * tiếng Việt + mô tả + nút — không SVG, không chữ tiếng Anh.
+ * Không dùng thành phần trạng thái có hình minh hoạ SVG kèm nhãn tiếng Anh
+ * trong cây trợ năng, vì trình đọc màn hình có thể đọc nhãn tiếng Anh trước nội
+ * dung tiếng Việt (WCAG 3.1.1, 4.1.2). Ở đây chỉ có chữ: một `h1` tiếng Việt +
+ * mô tả + nút — không SVG, không nhãn tiếng Anh.
  */
 export default function StatusScreen({
   code,
@@ -37,7 +52,7 @@ export default function StatusScreen({
   const block = (
     <VStack gap={3} align="center" maxWidth={420}>
       <Text type="supporting" color="secondary" justify="center">
-        {code}
+        {displayCode(code)}
       </Text>
       <Heading level={1} justify="center">
         {title}

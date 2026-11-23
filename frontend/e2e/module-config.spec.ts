@@ -38,8 +38,9 @@ test.describe('Cấu hình module', () => {
     await expect(coreCheckbox).toBeDisabled();
     await expect(coreCheckbox).toBeChecked();
 
-    // Tooltip chỉ hiện khi rê chuột vào ô đã khoá.
-    await page.locator('label.ant-checkbox-wrapper', { hasText: 'Quản lý học sinh' }).hover();
+    // Tooltip/lý do chỉ hiện khi rê chuột hoặc focus vào ô đã khoá.
+    const coreLabel = page.getByText('Quản lý học sinh', { exact: true }).first();
+    await coreLabel.hover();
     await expect(page.getByText('Module lõi, không thể bỏ: Quản lý học sinh')).toBeVisible();
   });
 

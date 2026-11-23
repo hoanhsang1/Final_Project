@@ -45,10 +45,18 @@ function toOwnerApiError(error: unknown): OwnerApiError {
     const status = error.response?.status ?? null;
     const body = error.response?.data as { code?: unknown; message?: unknown } | undefined;
     const code = typeof body?.code === 'string' ? body.code : null;
-    const message = typeof body?.message === 'string' ? body.message : '';
-    return new OwnerApiError(status, code, message || 'Owner API error');
+    const rawMessage = typeof body?.message === 'string' ? body.message : '';
+    // Giữ message gốc để suy ra một số ca đặc biệt (vd tự xoá quyền), nhưng không
+    // dùng làm thông điệp hiển thị trực tiếp — `ownerErrorMessage` sẽ chuẩn hoá.
+    return new OwnerApiError(status, code, rawMessage);
   }
-  return new OwnerApiError(null, null, error instanceof Error ? error.message : 'Owner API error');
+  if (error instanceof Error) {
+    const msg = /[àáảãạăâđêôơư]/i.test(error.message)
+      ? error.message
+      : 'Không thể thực hiện thao tác lúc này. Vui lòng thử lại.';
+    return new OwnerApiError(null, null, msg);
+  }
+  return new OwnerApiError(null, null, 'Không thể thực hiện thao tác lúc này. Vui lòng thử lại.');
 }
 
 /** Bọc một lời gọi HTTP: lỗi luôn thành `OwnerApiError`. */

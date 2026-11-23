@@ -102,7 +102,7 @@ export default function PositionsPage() {
   };
 
   const rows = (list.data ?? []) as PositionRow[];
-  // antd cũ dùng `hideOnSinglePage`: chỉ một trang thì không hiện thanh phân trang.
+  // Chỉ một trang thì không hiện thanh phân trang.
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 

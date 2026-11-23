@@ -15,11 +15,10 @@ export interface Notify {
 }
 
 /**
- * Thay `App.useApp().message` của antd ở các màn Sprint 4.
+ * Thông báo toast dùng chung cho các màn Sprint 4.
  *
  * `useToast` của Astryx tự đọc nội dung qua live region (lỗi là `assertive`),
- * nên không cần thêm `LiveAnnouncer`/`role="status"` riêng như bản antd — bản
- * antd phải tự dựng vùng ẩn vì `message` chỉ là toast hình ảnh.
+ * nên không cần thêm vùng ẩn riêng cho trình đọc màn hình.
  */
 export function useNotify(): Notify {
   const toast = useToast();

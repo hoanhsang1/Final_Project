@@ -23,7 +23,7 @@ export default function NotFoundPage() {
     <StatusScreen
       code="404"
       title="Không tìm thấy trang"
-      description="Đường dẫn không tồn tại hoặc đã bị di chuyển."
+      description="Đường dẫn bạn truy cập không tồn tại hoặc đã được chuyển sang nơi khác. Bạn có thể quay lại trang quen thuộc để tiếp tục."
       action={{
         label: isAdmin ? 'Về trang tổng quan' : 'Về trang đăng nhập',
         onClick: () => navigate(isAdmin ? '/quan-tri' : '/dang-nhap'),

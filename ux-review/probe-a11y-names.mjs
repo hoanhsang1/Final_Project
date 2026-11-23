@@ -1,12 +1,13 @@
 /**
- * ux-review/probe-a11y-names.mjs — CHẨN ĐOÁN: các nút chỉ có icon trong console
- * antd có "tên truy cập" (accessible name) không?
+ * ux-review/probe-a11y-names.mjs — CHẨN ĐOÁN R-02: tên truy cập của nút icon-only,
+ * ô tìm kiếm và phân trang trong console (DOM hiện tại, không phụ thuộc antd).
  *
- * Dump text (`ux-dump.mjs`) suy tên nút từ aria-label/aria-labelledby/textContent/title.
- * Nó in `button ""` cho một số nút → cần xác minh bằng công cụ thật của Playwright
- * (`ariaSnapshot`, tính tên theo chuẩn ARIA) trước khi kết luận là lỗi.
+ * Chạy:
+ *   & $node "ux-review\\probe-a11y-names.mjs"
  *
- * Chạy: & $node "ux-review\probe-a11y-names.mjs"
+ * Yêu cầu: dev server frontend đang chạy (mặc định http://127.0.0.1:5173) và
+ * Playwright browser channel khả dụng (mặc định msedge). Script mock API bằng
+ * `page.route` nên không cần BE thật.
  */
 
 import { createRequire } from 'node:module';
@@ -19,6 +20,7 @@ const CHANNEL = process.env.UX_CHANNEL || 'msedge';
 function b64url(obj) {
   return Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url');
 }
+
 const token = `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({
   userId: '11111111-1111-4111-8111-111111111111',
   username: 'admin.he.thong',
@@ -40,83 +42,118 @@ const accounts = Array.from({ length: 25 }, (_, i) => ({
   last_login_at: '2026-11-10T07:45:00',
 }));
 
-const browser = await chromium.launch({ channel: CHANNEL, headless: true });
-const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: 'vi-VN' });
-await context.addInitScript(
-  ([access]) => {
-    localStorage.setItem('mems.accessToken', access);
-    localStorage.setItem('mems.refreshToken', 'fake-refresh');
-  },
-  [token],
-);
-
-const page = await context.newPage();
-await page.route('**/api/v1/**', async (route, request) => {
-  const url = new URL(request.url());
-  const p = url.pathname;
-  const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-  if (p === '/api/v1/modules') return json([{ code: 'STUDENT_MANAGEMENT', name: 'Quản lý sinh viên' }]);
-  if (p === '/api/v1/organizations/options') return json([{ id: 'org-1', name: 'Trường THPT Nguyễn Du' }]);
-  if (p === '/api/v1/accounts') return json({ items: accounts, total: accounts.length, page: 1, size: 20, pages: 2 });
-  if (p === '/api/v1/audit-logs') return json({ items: [], total: 0, page: 1, size: 20, pages: 1 });
-  return json({});
-});
-
-/** In tên truy cập + HTML ngoài của các nút icon trên trang. */
-async function inspect(route, label) {
+async function inspect(page, route, label) {
   await page.goto(BASE + route, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(900);
-  const out = { route, label };
+  await page.waitForTimeout(1200);
 
-  // 1) Nút "icon-only": có <span role="img"> nhưng không có chữ.
-  out.iconOnlyButtons = await page.evaluate(() => {
-    const res = [];
-    for (const b of document.querySelectorAll('button')) {
-      const hasIcon = b.querySelector('[role="img"], svg');
-      const text = (b.textContent || '').replace(/\s+/g, ' ').trim();
-      if (hasIcon && !text) {
-        res.push({
-          ariaLabel: b.getAttribute('aria-label'),
-          title: b.getAttribute('title'),
-          cls: b.className.slice(0, 80),
-          outerHTML: b.outerHTML.slice(0, 220),
-        });
-      }
+  const iconOnlyButtons = await page.evaluate(() => {
+    const nodes = Array.from(document.querySelectorAll('button, [role="button"], a'));
+    const results = [];
+    for (const el of nodes) {
+      const hasIcon = Boolean(el.querySelector('svg, [aria-hidden="true"] svg, img'));
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!hasIcon || text) continue;
+      const ariaLabel = el.getAttribute('aria-label') || '';
+      const title = el.getAttribute('title') || '';
+      const labelledBy = el.getAttribute('aria-labelledby') || '';
+      results.push({
+        tag: el.tagName.toLowerCase(),
+        ariaLabel,
+        title,
+        ariaLabelledBy: labelledBy,
+        outerHTML: (el.outerHTML || '').slice(0, 220),
+      });
     }
-    return res;
+    return results;
   });
 
-  // 2) Tên truy cập THẬT (chuẩn ARIA) của cả nhóm pagination.
-  const pag = page.locator('ul.ant-pagination');
-  if ((await pag.count()) > 0) {
-    try {
-      out.paginationAria = await pag.first().ariaSnapshot();
-    } catch (e) {
-      out.paginationAria = 'LỖI ariaSnapshot: ' + String(e).slice(0, 160);
+  const searchControls = await page.evaluate(() => {
+    const inputs = Array.from(
+      document.querySelectorAll('input[type="search"], input[placeholder*="Tìm" i], [role="search"] input, [role="searchbox"]'),
+    );
+    return inputs.map((el) => ({
+      tag: el.tagName.toLowerCase(),
+      type: el.getAttribute('type') || '',
+      placeholder: el.getAttribute('placeholder') || '',
+      ariaLabel: el.getAttribute('aria-label') || '',
+      ariaLabelledBy: el.getAttribute('aria-labelledby') || '',
+      name: el.getAttribute('name') || '',
+    }));
+  });
+
+  const pagination = await page.evaluate(() => {
+    const navs = Array.from(
+      document.querySelectorAll('nav, [role="navigation"]'),
+    ).filter((el) => /phân trang|pagination|page/i.test(el.getAttribute('aria-label') || '') || el.querySelector('button[aria-current], [aria-label*="Trang" i], [aria-label*="page" i]'));
+    if (navs.length === 0) return null;
+    const nav = navs[0];
+    const controls = Array.from(nav.querySelectorAll('button, a, [role="button"]')).map((el) => ({
+      text: (el.textContent || '').replace(/\s+/g, ' ').trim(),
+      ariaLabel: el.getAttribute('aria-label') || '',
+      title: el.getAttribute('title') || '',
+      disabled: el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true',
+      current: el.getAttribute('aria-current') || '',
+    }));
+    return {
+      ariaLabel: nav.getAttribute('aria-label') || '',
+      controls,
+    };
+  });
+
+  let mainAriaSnapshot = null;
+  try {
+    const main = page.getByRole('main').first();
+    if ((await main.count()) > 0 && typeof main.ariaSnapshot === 'function') {
+      mainAriaSnapshot = await main.ariaSnapshot();
     }
-  } else {
-    out.paginationAria = '(không có ul.ant-pagination)';
+  } catch (e) {
+    mainAriaSnapshot = `LỖI ariaSnapshot: ${String(e).slice(0, 160)}`;
   }
 
-  // 3) Tên truy cập của ô tìm kiếm (input + nút icon) — cùng chuẩn ARIA.
-  const search = page.locator('.ant-input-search, .ant-input-group-wrapper');
-  if ((await search.count()) > 0) {
-    try {
-      out.searchAria = await search.first().ariaSnapshot();
-    } catch (e) {
-      out.searchAria = 'LỖI ariaSnapshot: ' + String(e).slice(0, 160);
-    }
-  } else {
-    out.searchAria = '(không có ô tìm kiếm)';
-  }
-
-  return out;
+  return { route, label, iconOnlyButtons, searchControls, pagination, mainAriaSnapshot };
 }
 
-const results = [];
-results.push(await inspect('/quan-tri/tai-khoan', 'Quản lý tài khoản'));
-results.push(await inspect('/quan-tri/module', 'Danh mục module'));
-results.push(await inspect('/quan-tri/nhat-ky', 'Nhật ký hệ thống'));
+const browser = await chromium.launch({ channel: CHANNEL, headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, locale: 'vi-VN' });
+  await context.addInitScript(
+    ([access]) => {
+      localStorage.setItem('mems.accessToken', access);
+      localStorage.setItem('mems.refreshToken', 'fake-refresh');
+    },
+    [token],
+  );
 
-console.log(JSON.stringify(results, null, 2));
-await browser.close();
+  const page = await context.newPage();
+  await page.route('**/api/v1/**', async (route, request) => {
+    const url = new URL(request.url());
+    const p = url.pathname;
+    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (p === '/api/v1/modules') {
+      return json([
+        { code: 'STUDENT_MANAGEMENT', name: 'Quản lý sinh viên', is_core: true },
+        { code: 'CLASS_MANAGEMENT', name: 'Quản lý lớp học', is_core: true },
+      ]);
+    }
+    if (p === '/api/v1/organizations/options') {
+      return json([{ id: 'org-1', name: 'Trường THPT Nguyễn Du' }]);
+    }
+    if (p === '/api/v1/accounts') {
+      return json({ items: accounts, total: accounts.length, page: 1, size: 20, pages: 2 });
+    }
+    if (p === '/api/v1/audit-logs') {
+      return json({ items: [], total: 0, page: 1, size: 20, pages: 1 });
+    }
+    return json({});
+  });
+
+  const results = [];
+  results.push(await inspect(page, '/quan-tri/tai-khoan', 'Quản lý tài khoản'));
+  results.push(await inspect(page, '/quan-tri/module', 'Danh mục module'));
+  results.push(await inspect(page, '/quan-tri/nhat-ky', 'Nhật ký hệ thống'));
+
+  console.log(JSON.stringify(results, null, 2));
+} finally {
+  await browser.close();
+}

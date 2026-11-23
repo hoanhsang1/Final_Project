@@ -30,9 +30,8 @@ export interface PageHeaderProps {
  * Header trang dùng chung (Layer 1) — ngữ cảnh + tiêu đề H1 + hành động.
  *
  * Chỉ dùng token của Astryx: `Heading level={1}` = 24px (thang 12/14/17/20/24),
- * `Text type="body" color="secondary"` cho phụ đề. Không còn `theme.useToken()`
- * nên component này không cần `ConfigProvider` — nhờ vậy dùng được ở cả trang
- * đã port lẫn trang còn antd trong lúc chuyển tiếp.
+ * `Text type="body" color="secondary"` cho phụ đề. Component không phụ thuộc
+ * cấu hình theme cục bộ nên có thể dùng thống nhất trên các trang.
  *
  * Breadcrumb cuối cùng là `isCurrent`: nó không phải liên kết, đúng ngữ nghĩa
  * "bạn đang ở đây" thay vì một link trỏ về chính trang hiện tại.

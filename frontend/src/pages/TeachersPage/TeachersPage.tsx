@@ -564,7 +564,7 @@ export default function TeachersPage() {
       )}
 
       {/* Màn 2 — tạo giáo viên (§4). `purpose="form"`: bấm ra ngoài KHÔNG đóng
-          để không mất dữ liệu đang nhập; ESC vẫn đóng như bản antd. */}
+          để không mất dữ liệu đang nhập. */}
       <Dialog
         isOpen={createOpen}
         onOpenChange={(open) => {

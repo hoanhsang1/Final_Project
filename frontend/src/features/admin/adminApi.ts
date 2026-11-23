@@ -35,6 +35,37 @@ export class AdminApiError extends Error {
   }
 }
 
+/**
+ * Chuẩn hoá thông điệp lỗi từ BE thành tiếng Việt dễ hiểu cho người dùng.
+ * BE có thể trả message tiếng Anh/kỹ thuật — không hiển thị thẳng cho người dùng cuối.
+ */
+function normalizeServerMessage(message: string, status: number | null): string {
+  // Đã là tiếng Việt (có dấu) → giữ nguyên.
+  if (/[àáảãạăâđêôơư]/i.test(message)) {
+    return message;
+  }
+
+  // Một số mã/câu tiếng Anh đã biết → dịch thân thiện.
+  const known: Record<string, string> = {
+    'Invalid username or password': 'Sai tên đăng nhập hoặc mật khẩu.',
+    'Organization not found': 'Không tìm thấy tổ chức.',
+    'Account not found': 'Không tìm thấy tài khoản.',
+  };
+  if (known[message]) {
+    return known[message];
+  }
+
+  // Fallback theo mã trạng thái để tránh lộ chi tiết kỹ thuật.
+  if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (status === 404) return 'Không tìm thấy dữ liệu yêu cầu.';
+  if (status === 409) return 'Dữ liệu đã được thay đổi. Vui lòng tải lại và thử lại.';
+  if (status !== null && status >= 500) {
+    return 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau ít phút.';
+  }
+  return 'Không thể thực hiện thao tác lúc này. Vui lòng thử lại.';
+}
+
 /** Chuyển lỗi axios về `AdminApiError` để caller đọc được `status`. */
 function toAdminError(error: unknown): AdminApiError {
   const err = error as {
@@ -44,12 +75,13 @@ function toAdminError(error: unknown): AdminApiError {
   const status = err?.response?.status ?? null;
   const serverMessage = err?.response?.data?.message;
   if (typeof serverMessage === 'string' && serverMessage.length > 0) {
-    return new AdminApiError(serverMessage, status);
+    return new AdminApiError(normalizeServerMessage(serverMessage, status), status);
   }
+  // Không có response → lỗi mạng / không kết nối được máy chủ / timeout.
   if (err?.request) {
-    return new AdminApiError('Không kết nối được máy chủ.', status);
+    return new AdminApiError('Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.', status);
   }
-  return new AdminApiError('Đã xảy ra lỗi.', status);
+  return new AdminApiError('Đã xảy ra lỗi. Vui lòng thử lại.', status);
 }
 
 /**

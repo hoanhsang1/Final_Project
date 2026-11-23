@@ -1,0 +1,165 @@
+{
+  "base": "http://127.0.0.1:4173",
+  "capturedAt": "2026-11-19T03:19:21.719Z",
+  "total": 26,
+  "ok": 26,
+  "failed": [],
+  "captures": [
+    {
+      "file": "01-dang-nhap.png",
+      "route": "/dang-nhap",
+      "url": "http://127.0.0.1:4173/dang-nhap",
+      "ok": true
+    },
+    {
+      "file": "02-dang-ky.png",
+      "route": "/dang-ky",
+      "url": "http://127.0.0.1:4173/dang-ky",
+      "ok": true
+    },
+    {
+      "file": "03-quen-mat-khau.png",
+      "route": "/quen-mat-khau",
+      "url": "http://127.0.0.1:4173/quen-mat-khau",
+      "ok": true
+    },
+    {
+      "file": "04-dat-lai-mat-khau-thieu-token.png",
+      "route": "/dat-lai-mat-khau",
+      "url": "http://127.0.0.1:4173/dat-lai-mat-khau",
+      "ok": true
+    },
+    {
+      "file": "05-xem-thu-vai-tro-khong-hop-le.png",
+      "route": "/xem-thu/nope",
+      "url": "http://127.0.0.1:4173/xem-thu/nope",
+      "ok": true
+    },
+    {
+      "file": "06-khong-tim-thay-trang.png",
+      "route": "/duong-dan-khong-ton-tai",
+      "url": "http://127.0.0.1:4173/duong-dan-khong-ton-tai",
+      "ok": true
+    },
+    {
+      "file": "10-admin-tong-quan.png",
+      "route": "/quan-tri",
+      "url": "http://127.0.0.1:4173/quan-tri",
+      "ok": true
+    },
+    {
+      "file": "11-admin-to-chuc-cho-duyet.png",
+      "route": "/quan-tri/to-chuc",
+      "url": "http://127.0.0.1:4173/quan-tri/to-chuc",
+      "ok": true
+    },
+    {
+      "file": "12-admin-tat-ca-to-chuc.png",
+      "route": "/quan-tri/to-chuc/tat-ca",
+      "url": "http://127.0.0.1:4173/quan-tri/to-chuc/tat-ca",
+      "ok": true
+    },
+    {
+      "file": "13-admin-chi-tiet-to-chuc.png",
+      "route": "/quan-tri/to-chuc/org-p1",
+      "url": "http://127.0.0.1:4173/quan-tri/to-chuc/org-p1",
+      "ok": true
+    },
+    {
+      "file": "14-admin-lich-su-duyet-to-chuc.png",
+      "route": "/quan-tri/to-chuc/org-p1/lich-su",
+      "url": "http://127.0.0.1:4173/quan-tri/to-chuc/org-p1/lich-su",
+      "ok": true
+    },
+    {
+      "file": "15-admin-danh-muc-module.png",
+      "route": "/quan-tri/module",
+      "url": "http://127.0.0.1:4173/quan-tri/module",
+      "ok": true
+    },
+    {
+      "file": "16-admin-quan-ly-tai-khoan.png",
+      "route": "/quan-tri/tai-khoan",
+      "url": "http://127.0.0.1:4173/quan-tri/tai-khoan",
+      "ok": true
+    },
+    {
+      "file": "17-admin-chi-tiet-tai-khoan.png",
+      "route": "/quan-tri/tai-khoan/acc-1",
+      "url": "http://127.0.0.1:4173/quan-tri/tai-khoan/acc-1",
+      "ok": true
+    },
+    {
+      "file": "18-admin-nhat-ky-he-thong.png",
+      "route": "/quan-tri/nhat-ky",
+      "url": "http://127.0.0.1:4173/quan-tri/nhat-ky",
+      "ok": true
+    },
+    {
+      "file": "20-owner-phong-ban.png",
+      "route": "/to-chuc",
+      "url": "http://127.0.0.1:4173/to-chuc",
+      "ok": true
+    },
+    {
+      "file": "21-owner-chi-tiet-phong-ban.png",
+      "route": "/to-chuc/phong-ban/d-1",
+      "url": "http://127.0.0.1:4173/to-chuc/phong-ban/d-1",
+      "ok": true
+    },
+    {
+      "file": "22-owner-chuc-vu.png",
+      "route": "/to-chuc/chuc-vu",
+      "url": "http://127.0.0.1:4173/to-chuc/chuc-vu",
+      "ok": true
+    },
+    {
+      "file": "30-dao-tao-giao-vien.png",
+      "route": "/dao-tao/giao-vien",
+      "url": "http://127.0.0.1:4173/dao-tao/giao-vien",
+      "ok": true
+    },
+    {
+      "file": "31-dao-tao-chi-tiet-giao-vien.png",
+      "route": "/dao-tao/giao-vien/t-1",
+      "url": "http://127.0.0.1:4173/dao-tao/giao-vien/t-1",
+      "ok": true
+    },
+    {
+      "file": "32-dao-tao-lop-hoc.png",
+      "route": "/dao-tao/lop-hoc",
+      "url": "http://127.0.0.1:4173/dao-tao/lop-hoc",
+      "ok": true
+    },
+    {
+      "file": "33-dao-tao-chi-tiet-lop-hoc.png",
+      "route": "/dao-tao/lop-hoc/c-1",
+      "url": "http://127.0.0.1:4173/dao-tao/lop-hoc/c-1",
+      "ok": true
+    },
+    {
+      "file": "40-khong-co-quyen-truy-cap.png",
+      "route": "/dao-tao/giao-vien",
+      "url": "http://127.0.0.1:4173/dao-tao/giao-vien",
+      "ok": true
+    },
+    {
+      "file": "90-mobile-dang-nhap.png",
+      "route": "/dang-nhap",
+      "url": "http://127.0.0.1:4173/dang-nhap",
+      "ok": true
+    },
+    {
+      "file": "91-mobile-admin-tong-quan.png",
+      "route": "/quan-tri",
+      "url": "http://127.0.0.1:4173/quan-tri",
+      "ok": true
+    },
+    {
+      "file": "92-mobile-owner-phong-ban.png",
+      "route": "/to-chuc",
+      "url": "http://127.0.0.1:4173/to-chuc",
+      "ok": true
+    }
+  ]
+}

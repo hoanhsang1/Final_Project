@@ -139,8 +139,8 @@ export default function AccountStatusModal({
             value={form.values.statusReason}
             onChange={(value) => form.setValue('statusReason', value)}
             rows={3}
-            // `maxLength` = hiện bộ đếm; `htmlMaxLength` = chặn cứng như `maxLength`
-            // của antd (`showCount` + `maxLength` trước đây).
+            // `maxLength` = hiện bộ đếm; `htmlMaxLength` = chặn cứng nhập liệu
+            // (tương đương `showCount` + `maxLength` ở bản trước).
             maxLength={MAX_REASON_LENGTH}
             htmlMaxLength={MAX_REASON_LENGTH}
             isDisabled={loading}
@@ -155,7 +155,7 @@ export default function AccountStatusModal({
           <HStack justify="end" gap={2}>
             <Button variant="secondary" size="lg" label={MSG_ORG.CANCEL} onClick={onCancel} />
             {/* Nhãn nút = trạng thái đích ("Vô hiệu hoá" / "Khoá" / "Kích hoạt"…) —
-                khớp `okText={targetLabel.label}` của bản antd (e2e TC-ACC-05 bám tên này). */}
+                khớp nhãn xác nhận theo trạng thái đích ở bản trước (e2e TC-ACC-05 bám tên này). */}
             <Button
               type="submit"
               variant={isDangerous ? 'destructive' : 'primary'}

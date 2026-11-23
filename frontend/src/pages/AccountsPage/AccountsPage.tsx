@@ -285,8 +285,8 @@ export default function AccountsPage() {
   if (result.isError) {
     return (
       <Stack direction="vertical" gap={4}>
-        {/* Giữ header cả ở nhánh lỗi (khác bản antd cũ vốn bỏ header) để người
-            dùng luôn biết mình đang ở màn nào — theo mẫu `PendingOrganizationsPage`. */}
+        {/* Giữ header cả ở nhánh lỗi để người dùng luôn biết mình đang ở màn nào
+            — theo mẫu `PendingOrganizationsPage`. */}
         <PageHeader title={MSG_ACC.LIST_TITLE} subtitle={MSG_ACC.LIST_SUBTITLE} />
         <Banner
           status="error"
