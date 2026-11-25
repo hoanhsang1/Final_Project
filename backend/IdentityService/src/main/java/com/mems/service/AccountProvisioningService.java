@@ -43,7 +43,7 @@ public class AccountProvisioningService {
         String password=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
             encoder.encode(password),id,orgId);
-        if(updated!=1) throw new ApiException(HttpStatus.NOT_FOUND,"ACCOUNT_NOT_FOUND","Account not found");
+        if(updated!=1) throw new ApiException(HttpStatus.NOT_FOUND,"Account not found");
         revokeSessions(id);
         return Map.of("temporaryPassword",password);
     }

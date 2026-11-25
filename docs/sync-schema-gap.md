@@ -25,9 +25,20 @@
 - Chưa chốt DB local, chưa có JDK để chạy ứng dụng → **không tạo/sửa schema lúc này**.
 - Không đổi `docs/phase-1/migrations/*`; các file này chỉ để đối chiếu.
 
-## 5. Việc cần làm khi chốt môi trường
+## 5. Column-level gap đã phát hiện (2026-11-25)
 
-1. Tách riêng phần `CREATE TABLE` từ `db.sql` cho 29 bảng thiếu (bỏ `DROP`/`INSERT`), đối chiếu kiểu cột/khoá với schema hiện có.
+Ngoài 29 bảng thiếu, **bảng có sẵn cũng khác cột**:
+
+| Bảng | HEAD (`01_identity_db.sql`) | `db.sql` (main) | Ảnh hưởng |
+|---|---|---|---|
+| `module` | `code, name, is_active` | + `is_core` | `InternalOrganizationController` query `m.is_core` → lỗi SQL với schema HEAD |
+| `organization_module` | `status ENUM('requested','active','rejected')` | `status VARCHAR(20)` + `disabled_at`, `locked_by_admin`, `locked_reason`, `locked_at`, `status_before_lock` | Controller/guard cần trạng thái `locked`/`disabled`; HEAD không lưu được |
+
+→ Slice IdentityService vừa port **compile được nhưng chưa chạy được** với schema HEAD. Không tự ALTER DB, không tự đổi query (sẽ đổi logic module guard); để **Cần xác minh** khi chốt schema.
+
+## 6. Việc cần làm khi chốt môi trường
+
+1. Tách riêng phần `CREATE TABLE` từ `db.sql` cho 29 bảng thiếu (bỏ `DROP`/`INSERT`), đối chiếu kiểu cột/khoá với schema hiện có; đồng thời upgrade 2 bảng ở mục 5.
 2. Quyết định bảng legacy (`student_legacy_20261106`) có cần thiết cho slice hiện tại không.
 3. Tạo DB local mới (hoặc migration expand-only) rồi mới chạy backend + test.
 4. Chỉ sau khi schema khớp mới xác minh runtime 5 state lớp, 409 mismatch, outbox relay, module guard.

@@ -30,11 +30,12 @@
 
 - Quét 62 file Java (main + test) của IdentityService: **0 import `com.mems.*` bị thiếu**.
 - `SecurityConfig` đã `requestMatchers("/internal/**").permitAll()` + `InternalApiFilter` kiểm tra `X-Internal-Api-Key` → không đổi security.
-- `01_identity_db.sql` đã có `module`, `organization_module`, `refresh_token.revoked_at` → không cần đổi schema cho slice này.
+- `01_identity_db.sql` đã có bảng `module`, `organization_module`, `refresh_token.revoked_at`, **nhưng cột chưa khớp main** (xem mục 4) → code compile được nhưng chạy với schema HEAD sẽ lỗi SQL.
 - **Không đổi** `PermissionCatalog.ENTRIES`, không đổi FE, không đổi build/lint/CI.
 
 ## 4. Cần xác minh / chưa làm
 
+- **Schema chưa khớp (Cần xác minh, bắt buộc trước runtime)**: `InternalOrganizationController` query `module.is_core` — HEAD `module` **không có cột này**. HEAD `organization_module.status` là `ENUM('requested','active','rejected')`, trong khi controller/main cần `locked`/`disabled` và các cột `disabled_at`, `locked_by_admin`, `locked_reason`, `locked_at`, `status_before_lock`. Không tự đổi query (đổi logic module guard) cũng không tự ALTER DB; xem `docs/sync-schema-gap.md` mục 5.
 - **`/internal/permissions/bundles`**: `IdentityClient.permissionBundles()` của main gọi endpoint này và `DefaultPositionSeeder` dùng bundle. HEAD IdentityService chỉ có `PermissionCatalog.ENTRIES` (5 mã cũ), thiếu `BundleDefinition`/`BUNDLES`. Port endpoint này bắt buộc phải định nghĩa lại danh mục bundle — tức là đổi logic nghiệp vụ/phân quyền. **Không tự làm**; để `Cần xác minh`, chờ chốt catalog. Xem `docs/sync-permission-code-conflict.md`.
 - **Không có JDK/JAVA_HOME/Maven**: chưa compile, chưa chạy test IdentityService. Lệnh cần chạy khi có toolchain: `./mvnw -q -DskipTests compile` rồi `./mvnw test`.
 - Runtime: cần kiểm tra seeder có fail khi `/internal/permissions/bundles` trả 404 không (có thể fallback/cache của `IdentityClient` xử lý, chưa xác minh được).
