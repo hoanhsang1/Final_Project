@@ -6,12 +6,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.security.SecureRandom;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 
 @Service
 public class AccountProvisioningService {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
+    private final SecureRandom random = new SecureRandom();
     public AccountProvisioningService(JdbcTemplate jdbc,PasswordEncoder encoder) { this.jdbc=jdbc;this.encoder=encoder; }
     @Transactional(timeout=15)
     public Map<String,String> create(ProvisionAccountRequest request) {
@@ -32,6 +37,33 @@ public class AccountProvisioningService {
         if(assigned!=1) throw new IllegalStateException("Department roles have not been seeded");
         return Map.of("userId",request.userId());
     }
+    @Transactional
+    public Map<String,String> resetPassword(String id,String orgId) {
+        byte[] bytes=new byte[24]; random.nextBytes(bytes);
+        String password=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        int updated=jdbc.update("UPDATE account SET password_hash=?,must_change_password=TRUE WHERE id=? AND org_id=?",
+            encoder.encode(password),id,orgId);
+        if(updated!=1) throw new ApiException(HttpStatus.NOT_FOUND,"ACCOUNT_NOT_FOUND","Account not found");
+        revokeSessions(id);
+        return Map.of("temporaryPassword",password);
+    }
+
+    @Transactional
+    public void disable(String id,String orgId) {
+        jdbc.update("UPDATE account SET status='disabled' WHERE id=? AND org_id=?",id,orgId);
+        revokeSessions(id);
+    }
+
+    @Transactional
+    public void enable(String id,String orgId) {
+        jdbc.update("UPDATE account SET status='active' WHERE id=? AND org_id=?",id,orgId);
+    }
+
+    private void revokeSessions(String accountId) {
+        jdbc.update("UPDATE refresh_token SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL",
+            Timestamp.from(Instant.now()),accountId);
+    }
+
     @Transactional
     public void compensate(String id,String orgId) {
         var rows=jdbc.queryForList("SELECT provisioned_by,last_login_at FROM account WHERE id=? AND org_id=? FOR UPDATE",id,orgId);
