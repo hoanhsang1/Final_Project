@@ -1,0 +1,89 @@
+package com.mems.controller;
+
+import com.mems.dto.*;
+import com.mems.service.TeacherService;
+import jakarta.validation.Valid;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/teachers")
+public class TeacherController {
+    private final TeacherService service;
+
+    public TeacherController(TeacherService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('employee.create')")
+    public ResponseEntity<CreatedTeacherResponse> create(@Valid @RequestBody TeacherCreateRequest request) {
+        var created = service.create(request);
+        // HR-02: mật khẩu tạm trong body ⇒ cấm cache.
+        return ResponseEntity.created(URI.create("/teachers/" + created.userId()))
+            .headers(noStore()).body(created);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
+    public Map<String, Object> list(@RequestParam(defaultValue = "1") int page,
+                                    @RequestParam(defaultValue = "20") int size,
+                                    @RequestParam(required = false) String q,
+                                    @RequestParam(required = false) String specialtyId,
+                                    @RequestParam(required = false) String teachingStatus) {
+        return service.list(page, size, q, specialtyId, teachingStatus);
+    }
+
+    @GetMapping("/assignable")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('class.assign_teacher')")
+    public Map<String, Object> assignable(@RequestParam(defaultValue = "1") int page,
+                                          @RequestParam(defaultValue = "20") int size,
+                                          @RequestParam(required = false) String q) {
+        return service.assignable(q, page, size);
+    }
+
+    /** Self contract: hồ sơ + lớp của chính giáo viên đang đăng nhập. */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public TeacherDetailResponse me() {
+        return service.me();
+    }
+
+    @GetMapping("/me/classes")
+    @PreAuthorize("isAuthenticated()")
+    public java.util.List<TeacherClassResponse> myClasses() {
+        return service.myClasses();
+    }
+
+    @GetMapping("/{staffId}")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
+    public TeacherDetailResponse get(@PathVariable String staffId) {
+        return service.get(staffId);
+    }
+
+    @PutMapping("/{staffId}")
+    @PreAuthorize("hasAuthority('employee.edit')")
+    public TeacherDetailResponse update(@PathVariable String staffId,
+                                        @Valid @RequestBody TeacherUpdateRequest request) {
+        return service.update(staffId, request);
+    }
+
+    /** Đổi trạng thái giảng dạy — quyền riêng, không dùng employee.edit. */
+    @PutMapping("/{staffId}/teaching-status")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('teacher.change_status')")
+    public TeacherDetailResponse changeTeachingStatus(@PathVariable String staffId,
+                                                      @Valid @RequestBody TeacherStatusRequest request) {
+        return service.changeTeachingStatus(staffId, request);
+    }
+
+    private HttpHeaders noStore() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.setPragma("no-cache");
+        return headers;
+    }
+}

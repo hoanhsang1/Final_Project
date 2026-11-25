@@ -1,6 +1,10 @@
 package com.mems.security;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mems.dto.ApiError;
+import com.mems.dto.ApiResponse;
+import com.mems.exception.ErrorCode;
+import com.mems.service.EffectivePermissionsService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -17,17 +21,20 @@ import java.util.*;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper, @Value("${INTERNAL_API_KEY:}") String internalKey) throws Exception {
+    @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper, @Value("${INTERNAL_API_KEY:}") String internalKey,
+                                                   ObjectProvider<EffectivePermissionsService> effectivePermissions) throws Exception {
+        var bearer = org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class;
+        EffectivePermissionsService effective = effectivePermissions.getIfAvailable();
+        if (effective != null) http.addFilterAfter(new DelegatedAuthorityFilter(effective), bearer);
         http.cors(org.springframework.security.config.Customizer.withDefaults())
             .csrf(c -> c.disable())
-            .addFilterBefore(new InternalApiFilter(internalKey,mapper),
-                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
-            .addFilterAfter(new PasswordChangeRequiredFilter(mapper,Set.of()),
-                org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class)
+            .addFilterBefore(new InternalApiFilter(internalKey,mapper), bearer)
+            .addFilterAfter(new PasswordChangeRequiredFilter(mapper,Set.of()), bearer)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/students/**", "/classes/**").authenticated()
                 .anyRequest().authenticated())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();
@@ -41,11 +48,13 @@ public class SecurityConfig {
                 return new JwtAuthenticationToken(jwt, authorities);
             })).authenticationEntryPoint((req,res,ex) -> {
                 res.setStatus(401); res.setContentType("application/json");
-                mapper.writeValue(res.getOutputStream(), new ApiError("UNAUTHENTICATED", "Valid Bearer token required"));
+                mapper.writeValue(res.getOutputStream(), ApiResponse.failure(
+                    ErrorCode.UNAUTHENTICATED.name(), ErrorCode.UNAUTHENTICATED.getMessage()));
             }))
             .exceptionHandling(e -> e.accessDeniedHandler((req,res,ex) -> {
                 res.setStatus(403); res.setContentType("application/json");
-                mapper.writeValue(res.getOutputStream(), new ApiError("FORBIDDEN", "Access denied"));
+                mapper.writeValue(res.getOutputStream(), ApiResponse.failure(
+                    ErrorCode.FORBIDDEN.name(), ErrorCode.FORBIDDEN.getMessage()));
             }));
         return http.build();
     }

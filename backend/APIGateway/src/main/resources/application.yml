@@ -46,13 +46,19 @@ spring:
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/teachers/**,/api/teachers
+          filters:
+            - StripPrefix=1
 
         - id: people-specialties
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/specialties/**,/api/specialties
+          filters:
+            - StripPrefix=1
 
         - id: people-classes
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/api/classes/**,/api/classes
+          filters:
+            - StripPrefix=1

@@ -1,9 +1,9 @@
 package com.mems.controller;
 import com.mems.dto.*;
+import com.mems.security.RequirePermission;
 import com.mems.service.MemberService;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -12,17 +12,42 @@ import java.util.List;
 public class DepartmentMemberController {
     private final MemberService service;
     public DepartmentMemberController(MemberService service) { this.service=service; }
-    @GetMapping @PreAuthorize("hasRole('OWNER') or hasAuthority('PEOPLE_VIEW')")
+    @GetMapping @RequirePermission(value="employee.view", department="departmentId")
     public List<MemberResponse> list(@PathVariable String departmentId) { return service.list(departmentId); }
-    @PostMapping @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
+    @GetMapping("/{userId}") @RequirePermission(value="employee.view", department="departmentId")
+    public MemberDetailResponse detail(@PathVariable String departmentId,@PathVariable String userId) {
+        return service.detail(departmentId,userId);
+    }
+    @GetMapping("/{userId}/assignments")
+    @RequirePermission(value="employee.view", department="departmentId")
+    public List<AssignmentHistoryResponse> assignments(@PathVariable String departmentId,
+                                                       @PathVariable String userId) {
+        return service.assignmentHistory(departmentId,userId);
+    }
+    @PostMapping @RequirePermission(value="employee.create", department="departmentId")
     public ResponseEntity<CreatedMemberResponse> create(@PathVariable String departmentId,@Valid @RequestBody MemberRequest request) {
         var result=service.create(departmentId,request);
-        return ResponseEntity.created(java.net.URI.create("/departments/"+departmentId+"/members/"+result.member().userId())).body(result);
+        return ResponseEntity.created(java.net.URI.create("/departments/"+departmentId+"/members/"+result.member().userId()))
+            .headers(noStore()).body(result);
     }
-    @PutMapping("/{userId}/positions") @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
+    @PutMapping("/{userId}/positions")
+    @RequirePermission(value="employee.assign_position", department="departmentId")
     public MemberResponse positions(@PathVariable String departmentId,@PathVariable String userId,
             @Valid @RequestBody MemberPositionsRequest request) { return service.updatePositions(departmentId,userId,request); }
-    @DeleteMapping("/{userId}") @PreAuthorize("hasRole('OWNER') or (hasRole('MANAGER') and hasAuthority('PEOPLE_EDIT'))")
+    @PostMapping("/{userId}/reset-password")
+    @RequirePermission(value="employee.reset_password", department="departmentId")
+    public ResponseEntity<ResetPasswordResponse> resetPassword(@PathVariable String departmentId,@PathVariable String userId) {
+        return ResponseEntity.ok().headers(noStore()).body(service.resetPassword(departmentId,userId));
+    }
+    @DeleteMapping("/{userId}") @RequirePermission(value="employee.delete", department="departmentId")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String departmentId,@PathVariable String userId) { service.remove(departmentId,userId); }
+
+    /** HR-02: response chứa mật khẩu tạm không được cache ở trình duyệt/proxy. */
+    private HttpHeaders noStore() {
+        HttpHeaders headers=new HttpHeaders();
+        headers.setCacheControl("no-store");
+        headers.setPragma("no-cache");
+        return headers;
+    }
 }
