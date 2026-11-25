@@ -104,3 +104,11 @@
 3. Chạy local DB schema mới, kiểm tra 5 state của lớp + 409 mismatch + permission 403.
 4. Chỉ sửa FE Astryx nếu contract runtime khác `sprint4Api.ts`; **không** port FE main.
 5. Giữ P4 (xếp lịch tự động) **BLOCKED** theo `docs/scope-can-chot-xep-lich.md`.
+
+## 7. Phát hiện thêm (2026-11-25): outbox relay chưa có đầu nhận
+
+- `PeopleService/outbox/EventRelayClient.java` (`POST /internal/events`) đã được port; `OutboxPublisher` sẽ gọi endpoint này khi có event lifecycle lớp.
+- Trên `origin/main`, đầu nhận là `ScheduleService/InternalEventController.java` (`@RequestMapping("/internal")` + `POST /events`), dùng `EventEnvelope` và `ScheduleEventConsumer`.
+- **HEAD ScheduleService không có** `InternalEventController`, `EventEnvelope`, `ScheduleEventConsumer`, `InboxRepository`, `ConsumerStateRepository` (diff main có ~30 file mới cho cả auto-schedule).
+- Port head nhận event kéo theo inbox/consumer/session-impact — thuộc phạm vi P4/xếp lịch tự động đang **BLOCKED**. **Không port lúc này**; ghi **Cần xác minh**: khi nào bật outbox publisher thì cần ScheduleService tương ứng, nếu không event lớp sẽ không được tiêu thụ.
+- `EventRelayClient` trong main cũng tồn tại ở FacilityService và cũng không có đầu nhận trong HEAD → vấn đề chung của hạ tầng outbox, không riêng slice Lớp/Giáo viên.
