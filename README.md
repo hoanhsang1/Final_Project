@@ -333,9 +333,8 @@ service; không dùng POM chung trong thư mục backend.
 - `frontend/docs/superpowers/plans/2026-10-14-dang-nhap-dang-ky.md` — kế hoạch Sprint 1 (đăng nhập/đăng ký).
 - `frontend/README.md` — hướng dẫn riêng cho phần frontend.
 - `docs/api.md` — tài liệu API của backend (đã cập nhật endpoint Sprint 2).
-- Các tài liệu dự án khác (SRS, ADR, đặc tả Sprint 1 & 2, biên bản họp, từ điển thuật ngữ kỹ
-  thuật) **không** nằm trong repo này — nằm ở thư mục tài liệu dự án
-  (`../Đồ án tốt nghiệp/Tài liệu liên quan dự án/`).
+- `docs/sprint4-fe-handoff.md`, `docs/du-lieu-nen-tang-thiet-lap-MEMS.md`, `docs/be-fe-open-questions.md` — bản làm việc trong repo cho contract UI Sprint 4, dữ liệu nền tảng và các điểm FE chờ BE xác nhận.
+- Các tài liệu **nộp/báo cáo** (SRS, ADR, đặc tả Sprint 1 & 2 dạng `.docx`, biên bản họp, Excel test case + evidence) vẫn nằm ngoài repo tại `../Đồ án tốt nghiệp/Tài liệu liên quan dự án/`. Khi cập nhật tài liệu kỹ thuật dùng hằng ngày, sửa bản trong `docs/` trước rồi đồng bộ ra bản ngoài.
 
 ---
 

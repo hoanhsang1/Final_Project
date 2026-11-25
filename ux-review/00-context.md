@@ -106,7 +106,7 @@ Câu chữ chờ BE: `msgBackendPending(code)` → `"Tính năng đang chờ bac
 - `docs/api.md` (contract + mã `D-xx`/`Q-xx`).
 - `docs/ui-conventions.md` (hợp đồng UI v2: 5 trạng thái, BR-04/BR-08/NFR-REL-001, trạng thái lai).
 - `docs/bao-cao-be-sprint4-giao-vien-lop.md` (lỗi BE Sprint 4 — do FE ghi cho BE).
-- Đặc tả Sprint: `D:\Đồ án tốt nghiệp\Tài liệu liên quan dự án\Sprint-van-hanh\Dac-ta\sprint4-fe-handoff.md` (ngoài repo, theo ngữ cảnh đã chốt).
+- Đặc tả Sprint: `docs/sprint4-fe-handoff.md` (bản làm việc trong repo; bản gốc ngoài repo chỉ để nộp).
 - Code: `frontend/src/**`.
 
 ---

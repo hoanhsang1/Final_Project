@@ -258,7 +258,7 @@ Không chạy git push/merge.
 
 ## 9) Ghi chú về nguồn tài liệu ngoài repo
 
-README có nhắc tài liệu dự án (SRS, ADR, đặc tả Sprint 1 & 2, biên bản họp, từ điển thuật ngữ) nằm ngoài repo tại: `../Đồ án tốt nghiệp/Tài liệu liên quan dự án/`. Workspace `D:\mems-frontend` cũng có `AGENTS.md` tham chiếu `Frontend_Stack_MEMS.md` (ADR-FE-001..003). Khi có tài liệu cập nhật, cần đồng bộ lại ngữ cảnh/rule/code.
+README có nhắc tài liệu dự án nằm ngoài repo tại `../Đồ án tốt nghiệp/Tài liệu liên quan dự án/`. Phân chia hiện tại: **bản làm việc kỹ thuật** nằm trong `docs/` (`api.md`, `ui-conventions.md`, `sprint4-fe-handoff.md`, `du-lieu-nen-tang-thiet-lap-MEMS.md`, `be-fe-open-questions.md`, `sync-*.md`, `scope-*.md`, `e2e-*.md`); **hồ sơ nộp/báo cáo** (SRS, ADR, `.docx`, biên bản, Excel test case + evidence) giữ ngoài repo. Workspace `D:\mems-frontend` cũng có `AGENTS.md` tham chiếu `Frontend_Stack_MEMS.md` (ADR-FE-001..003), nhưng file đó còn hướng dẫn antd/Tailwind — **không copy nguyên vào repo** khi FE đã chuyển Astryx. Khi có cập nhật, sửa bản trong repo trước rồi đồng bộ ra bản ngoài.
 
 ---
 
