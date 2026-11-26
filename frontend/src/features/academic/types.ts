@@ -185,6 +185,13 @@ export interface ClassCloseEvent {
   createdAt: string
 }
 
+export type RoomRequirement = 'ANY' | 'COMPUTER'
+
+export const ROOM_REQUIREMENT_LABELS: Record<RoomRequirement, string> = {
+  ANY: 'Bất kỳ',
+  COMPUTER: 'Phòng máy',
+}
+
 export interface Subject {
   id: string
   code: string | null
@@ -193,12 +200,27 @@ export interface Subject {
   active: boolean
   createdAt: string | null
   updatedAt: string | null
+  categoryId?: string | null
+  categoryName?: string | null
+  roomRequirement?: RoomRequirement
+}
+
+export interface SubjectCategory {
+  id: string
+  name: string
+  active: boolean
+  subjectCount: number
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface SubjectInput {
   code?: string
   name: string
   description?: string
+  categoryId?: string | null
+  roomRequirement?: RoomRequirement
+  confirm?: boolean
 }
 
 // ============================================================================
@@ -210,12 +232,18 @@ export interface SubjectCreateRequest {
   code?: string | null
   name: string
   description?: string | null
+  categoryId?: string | null
+  roomRequirement?: RoomRequirement
+  confirm?: boolean
 }
 
 export interface SubjectUpdateRequest {
   code?: string | null
   name: string
   description?: string | null
+  categoryId?: string | null
+  roomRequirement?: RoomRequirement
+  confirm?: boolean
 }
 
 export interface SubjectStatusUpdateRequest {
@@ -234,6 +262,15 @@ export interface SubjectUsageResponse {
   subjectId: string
   classesUsingSubject: number
   classIds?: string[]
+  classSubjectsUsingSubject?: number
+  classSubjects?: {
+    classId: string
+    classCode: string
+    name: string
+    status: string
+  }[]
+  curriculaUsingSubject?: number
+  curricula?: { curriculumId: string; code: string; name: string }[]
 }
 
 // ----------------------------------------------------------------------------

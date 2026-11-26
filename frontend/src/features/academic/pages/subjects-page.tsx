@@ -1,4 +1,4 @@
-import { Pencil, Plus, Power } from 'lucide-react'
+import { FolderTree, Pencil, Plus, Power } from 'lucide-react'
 import { useDeferredValue, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,11 +19,23 @@ import { Alert } from '@/components/ui/feedback'
 import { Field, Input, Textarea } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { SearchInput } from '@/components/ui/search-input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
 import { subjectsApi } from '@/features/academic/api'
-import { useSubjectMutations, useSubjects } from '@/features/academic/hooks'
-import type { Subject, SubjectInput } from '@/features/academic/types'
+import {
+  useSubjectCategories,
+  useSubjectMutations,
+  useSubjects,
+  useSubjectUsage,
+} from '@/features/academic/hooks'
+import {
+  ROOM_REQUIREMENT_LABELS,
+  type RoomRequirement,
+  type Subject,
+  type SubjectInput,
+} from '@/features/academic/types'
+import { SubjectCategoriesDialog } from '@/features/academic/subject-categories-dialog'
 import { usePermission } from '@/features/auth/hooks'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -34,9 +46,45 @@ type SubjectForm = {
   code: string
   name: string
   description: string
+  categoryId: string
+  roomRequirement: RoomRequirement
 }
 
-const EMPTY_FORM: SubjectForm = { code: '', name: '', description: '' }
+type SubjectWarning = {
+  classes: { id: string; name: string }[]
+  curricula: { code: string; name: string }[]
+}
+
+const EMPTY_FORM: SubjectForm = {
+  code: '',
+  name: '',
+  description: '',
+  categoryId: '',
+  roomRequirement: 'ANY',
+}
+
+function readWarning(details: unknown): SubjectWarning | null {
+  if (!details || typeof details !== 'object') return null
+  const record = details as Record<string, unknown>
+  const classes = Array.isArray(record.classes)
+    ? record.classes.flatMap((item) => {
+        const value = item as { id?: unknown; name?: unknown } | null
+        return typeof value?.id === 'string' && typeof value?.name === 'string'
+          ? [{ id: value.id, name: value.name }]
+          : []
+      })
+    : []
+  const curricula = Array.isArray(record.curricula)
+    ? record.curricula.flatMap((item) => {
+        const value = item as { code?: unknown; name?: unknown } | null
+        return typeof value?.code === 'string' && typeof value?.name === 'string'
+          ? [{ code: value.code, name: value.name }]
+          : []
+      })
+    : []
+  if (classes.length === 0 && curricula.length === 0) return null
+  return { classes, curricula }
+}
 
 function SubjectDialog({
   open,
@@ -48,8 +96,11 @@ function SubjectDialog({
   subject: Subject | null
 }) {
   const mutations = useSubjectMutations()
+  const categories = useSubjectCategories(true)
+  const usage = useSubjectUsage(subject?.id, open && Boolean(subject))
   const [form, setForm] = useState<SubjectForm>(EMPTY_FORM)
   const [error, setError] = useState<string>()
+  const [warning, setWarning] = useState<SubjectWarning | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -59,13 +110,16 @@ function SubjectDialog({
             code: subject.code ?? '',
             name: subject.name,
             description: subject.description ?? '',
+            categoryId: subject.categoryId ?? '',
+            roomRequirement: subject.roomRequirement ?? 'ANY',
           }
         : EMPTY_FORM,
     )
     setError(undefined)
+    setWarning(null)
   }, [open, subject])
 
-  const submit = async () => {
+  const submit = async (confirm = false) => {
     setError(undefined)
     if (!form.name.trim()) {
       setError('Vui lòng nhập tên môn học.')
@@ -79,7 +133,7 @@ function SubjectDialog({
           setError('Mã môn học đã tồn tại trong tổ chức.')
           return
         }
-      } catch (cause: unknown) {
+      } catch {
         // Nếu lỗi 403/500 bỏ qua để backend validate khi submit
       }
     }
@@ -88,16 +142,32 @@ function SubjectDialog({
       name: form.name.trim(),
       description: form.description.trim() || undefined,
     }
+    if (form.categoryId) input.categoryId = form.categoryId
+    if (form.roomRequirement !== 'ANY') input.roomRequirement = form.roomRequirement
+    if (confirm) input.confirm = true
+
     const handlers = {
       onSuccess: () => {
         toast.success(subject ? 'Đã cập nhật môn học.' : 'Đã thêm môn học.')
         onOpenChange(false)
       },
-      onError: (cause: unknown) => setError(ApiError.from(cause).message || 'Không lưu được môn học.'),
+      onError: (cause: unknown) => {
+        const apiError = ApiError.from(cause)
+        if (!confirm && apiError.code === 'SUBJECT_USAGE_CONFIRMATION_REQUIRED') {
+          const parsed = readWarning(apiError.details)
+          if (parsed) {
+            setWarning(parsed)
+            return
+          }
+        }
+        setError(apiError.message || 'Không lưu được môn học.')
+      },
     }
     if (subject) mutations.update.mutate({ id: subject.id, input }, handlers)
     else mutations.create.mutate(input, handlers)
   }
+
+  const categoryOptions = categories.data ?? []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -105,7 +175,7 @@ function SubjectDialog({
         <DialogHeader>
           <DialogTitle>{subject ? 'Cập nhật môn học' : 'Thêm môn học'}</DialogTitle>
           <DialogDescription>
-            Môn học dùng khi tạo lớp. Mã môn không bắt buộc nhưng phải không trùng trong tổ chức.
+            Môn học dùng khi tạo lớp. Danh mục giúp nhóm môn; yêu cầu phòng dùng khi xếp lịch.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
@@ -124,21 +194,112 @@ function SubjectDialog({
               />
             </Field>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Danh mục">
+              <Select
+                value={form.categoryId || 'NONE'}
+                onValueChange={(value) =>
+                  setForm({ ...form, categoryId: value === 'NONE' ? '' : value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Không phân loại</SelectItem>
+                  {categoryOptions.map((category) => (
+                    <SelectItem
+                      key={category.id}
+                      value={category.id}
+                      disabled={!category.active && category.id !== subject?.categoryId}
+                    >
+                      {category.name}
+                      {category.active ? '' : ' (đã ngừng)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Yêu cầu phòng">
+              <Select
+                value={form.roomRequirement}
+                onValueChange={(value) =>
+                  setForm({ ...form, roomRequirement: value as RoomRequirement })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ANY">{ROOM_REQUIREMENT_LABELS.ANY}</SelectItem>
+                  <SelectItem value="COMPUTER">{ROOM_REQUIREMENT_LABELS.COMPUTER}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
           <Field label="Mô tả">
             <Textarea
               value={form.description}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
             />
           </Field>
+          {subject && usage.data ? (
+            <p className="text-xs text-ink-500">
+              Lớp đang dùng: {usage.data.classesUsingSubject} · Chương trình:{' '}
+              {usage.data.curriculaUsingSubject ?? 0}
+            </p>
+          ) : null}
+          {warning ? (
+            <Alert tone="warning" title="Môn học đang được sử dụng">
+              <p>
+                Thay đổi danh mục hoặc yêu cầu phòng sẽ không tự cập nhật các buổi học đã xếp.
+              </p>
+              {warning.classes.length > 0 ? (
+                <div className="mt-2">
+                  <p className="font-medium">Lớp đang dùng ({warning.classes.length}):</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {warning.classes.slice(0, 10).map((item) => (
+                      <li key={item.id}>{item.name}</li>
+                    ))}
+                  </ul>
+                  {warning.classes.length > 10 ? (
+                    <p className="mt-1">… và {warning.classes.length - 10} lớp khác.</p>
+                  ) : null}
+                </div>
+              ) : null}
+              {warning.curricula.length > 0 ? (
+                <p className="mt-2">
+                  Chương trình đang dùng: {warning.curricula.map((item) => item.name).join(', ')}
+                </p>
+              ) : null}
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setWarning(null)}>
+                  Quay lại
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void submit(true)}
+                  isLoading={mutations.update.isPending}
+                >
+                  Vẫn lưu
+                </Button>
+              </div>
+            </Alert>
+          ) : null}
           {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Huỷ
           </Button>
-          <Button onClick={submit} isLoading={mutations.create.isPending || mutations.update.isPending}>
-            {subject ? 'Lưu thay đổi' : 'Tạo môn học'}
-          </Button>
+          {warning ? null : (
+            <Button
+              onClick={() => void submit()}
+              isLoading={mutations.create.isPending || mutations.update.isPending}
+            >
+              {subject ? 'Lưu thay đổi' : 'Tạo môn học'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -153,6 +314,7 @@ export function SubjectsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Subject | null>(null)
   const [toggling, setToggling] = useState<Subject | null>(null)
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
 
   const canView = can(PERM.subjectView) || can(PERM.subjectManage)
   const canManage = can(PERM.subjectManage)
@@ -178,6 +340,18 @@ export function SubjectsPage() {
         </div>
       ),
       sortValue: (row) => row.name,
+    },
+    {
+      id: 'category',
+      header: 'Danh mục',
+      hideBelow: 'md',
+      cell: (row) => row.categoryName || '—',
+    },
+    {
+      id: 'room',
+      header: 'Yêu cầu phòng',
+      hideBelow: 'lg',
+      cell: (row) => ROOM_REQUIREMENT_LABELS[row.roomRequirement ?? 'ANY'],
     },
     {
       id: 'description',
@@ -256,16 +430,22 @@ export function SubjectsPage() {
         description="Danh mục môn học của tổ chức, dùng khi tạo và cập nhật lớp."
         actions={
           writable ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditing(null)
-                setFormOpen(true)
-              }}
-            >
-              <Plus aria-hidden="true" />
-              Thêm môn học
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
+                <FolderTree aria-hidden="true" />
+                Danh mục
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditing(null)
+                  setFormOpen(true)
+                }}
+              >
+                <Plus aria-hidden="true" />
+                Thêm môn học
+              </Button>
+            </div>
           ) : null
         }
         meta={
@@ -327,6 +507,8 @@ export function SubjectsPage() {
       </div>
 
       <SubjectDialog open={formOpen} onOpenChange={setFormOpen} subject={editing} />
+
+      <SubjectCategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
 
       <ConfirmDialog
         open={Boolean(toggling)}

@@ -28,6 +28,7 @@ import type {
   StudentClass,
   StudentInput,
   Subject,
+  SubjectCategory,
   SubjectCodeCheckResponse,
   SubjectCreateRequest,
   SubjectInput,
@@ -298,6 +299,32 @@ export const subjectsApi = {
   /** Đề xuất lấy thông tin sử dụng môn học trong các lớp (Phase 1) */
   async usage(id: string): Promise<SubjectUsageResponse> {
     const { data } = await api.get<SubjectUsageResponse>(`/api/subjects/${id}/usage`)
+    return data
+  },
+}
+
+export const subjectCategoriesApi = {
+  async list(params?: { includeInactive?: boolean }): Promise<SubjectCategory[]> {
+    const { data } = await api.get<SubjectCategory[]>('/api/subject-categories', {
+      params: { includeInactive: params?.includeInactive || undefined },
+    })
+    return data
+  },
+
+  async create(name: string): Promise<SubjectCategory> {
+    const { data } = await api.post<SubjectCategory>('/api/subject-categories', { name })
+    return data
+  },
+
+  async update(id: string, name: string): Promise<SubjectCategory> {
+    const { data } = await api.put<SubjectCategory>(`/api/subject-categories/${id}`, { name })
+    return data
+  },
+
+  async setActive(id: string, active: boolean): Promise<SubjectCategory> {
+    const { data } = await api.patch<SubjectCategory>(`/api/subject-categories/${id}/status`, {
+      active,
+    })
     return data
   },
 }

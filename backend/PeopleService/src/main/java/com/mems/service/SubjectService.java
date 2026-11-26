@@ -3,14 +3,18 @@ package com.mems.service;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.exception.SubjectUsageWarningException;
 import com.mems.repository.SubjectRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -54,16 +58,13 @@ public class SubjectService {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, MODULE_STUDENT_MANAGEMENT);
 
-        String code = request.code() == null ? null : request.code().trim();
-        if (code != null && !code.isEmpty()) {
-            Optional<SubjectResponse> existing = repository.findByCode(orgId, code);
-            if (existing.isPresent()) {
-                throw new AppException(ErrorCode.SUBJECT_CODE_EXISTS, "Mã môn học đã tồn tại trong tổ chức");
-            }
-        }
+        String code = normalizeCode(request.code());
+        requireUniqueCode(orgId, code, null);
+        String categoryId = resolveCategory(orgId, request.categoryId(), null);
+        String roomRequirement = normalizeRoomRequirement(request.roomRequirement());
 
         SubjectResponse created = repository.create(orgId, code, request.name(),
-            request.description(), actor.userId());
+            request.description(), categoryId, roomRequirement, actor.userId());
         audit.record(orgId, actor.userId(), "SUBJECT_CREATED", created.id(), created);
         return created;
     }
@@ -75,16 +76,24 @@ public class SubjectService {
 
         SubjectResponse before = repository.require(id, orgId);
 
-        String code = request.code() == null ? null : request.code().trim();
-        if (code != null && !code.isEmpty()) {
-            Optional<SubjectResponse> existing = repository.findByCode(orgId, code);
-            if (existing.isPresent() && !existing.get().id().equals(id)) {
-                throw new AppException(ErrorCode.SUBJECT_CODE_EXISTS, "Mã môn học đã tồn tại trong tổ chức");
+        String code = normalizeCode(request.code());
+        requireUniqueCode(orgId, code, id);
+        String categoryId = resolveCategory(orgId, request.categoryId(), before);
+        String roomRequirement = normalizeRoomRequirement(request.roomRequirement());
+
+        boolean classificationChanged =
+            !Objects.equals(before.categoryId(), categoryId)
+                || !Objects.equals(before.roomRequirement(), roomRequirement);
+        if (classificationChanged && !Boolean.TRUE.equals(request.confirm())) {
+            SubjectUsageResponse usage = repository.getUsage(id, orgId);
+            List<ClassMismatch> classes = affectedClasses(usage.classSubjects());
+            if (!classes.isEmpty() || !usage.curricula().isEmpty()) {
+                throw new SubjectUsageWarningException(classes, usage.curricula());
             }
         }
 
         SubjectResponse updated = repository.update(id, orgId, code, request.name(),
-            request.description(), actor.userId());
+            request.description(), categoryId, roomRequirement, actor.userId());
         audit.record(orgId, actor.userId(), "SUBJECT_UPDATED", id,
             Map.of("before", before, "after", updated));
         return updated;
@@ -128,5 +137,53 @@ public class SubjectService {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, MODULE_STUDENT_MANAGEMENT);
         return repository.getUsage(id, orgId);
+    }
+
+    private String normalizeCode(String code) {
+        if (code == null) return null;
+        String trimmed = code.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void requireUniqueCode(String orgId, String code, String excludeId) {
+        if (code == null) return;
+        Optional<SubjectResponse> existing = repository.findByCode(orgId, code);
+        if (existing.isPresent() && !existing.get().id().equals(excludeId)) {
+            throw new AppException(ErrorCode.SUBJECT_CODE_EXISTS, "Mã môn học đã tồn tại trong tổ chức");
+        }
+    }
+
+    /**
+     * Category phải cùng tổ chức và đang hoạt động. Khi sửa môn, giữ nguyên category
+     * hiện tại (dù đã ngừng) thì không bắt đổi — tránh khoá dữ liệu cũ.
+     */
+    private String resolveCategory(String orgId, String categoryId, SubjectResponse current) {
+        if (categoryId == null || categoryId.isBlank()) return null;
+        String trimmed = categoryId.trim();
+        if (current != null && trimmed.equals(current.categoryId())) return trimmed;
+        if (repository.activeCategoryName(orgId, trimmed) == null) {
+            throw new AppException(ErrorCode.SUBJECT_CATEGORY_INVALID);
+        }
+        return trimmed;
+    }
+
+    private String normalizeRoomRequirement(String value) {
+        if (value == null || value.isBlank()) return "ANY";
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.equals("ANY") && !normalized.equals("COMPUTER")) {
+            throw new AppException(ErrorCode.ROOM_REQUIREMENT_INVALID);
+        }
+        return normalized;
+    }
+
+    private List<ClassMismatch> affectedClasses(
+        List<SubjectUsageResponse.SubjectClassUsageItem> items) {
+        Map<String, String> byId = new LinkedHashMap<>();
+        for (SubjectUsageResponse.SubjectClassUsageItem item : items) {
+            byId.putIfAbsent(item.classId(), item.name());
+        }
+        return byId.entrySet().stream()
+            .map(entry -> new ClassMismatch(entry.getKey(), entry.getValue()))
+            .toList();
     }
 }

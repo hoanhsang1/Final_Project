@@ -36,3 +36,10 @@ if (!window.ResizeObserver) {
     disconnect() {}
   }
 }
+
+// jsdom thiếu Pointer Capture API mà Radix Select gọi khi mở danh sách.
+if (!window.Element.prototype.hasPointerCapture) {
+  window.Element.prototype.hasPointerCapture = () => false
+  window.Element.prototype.setPointerCapture = () => {}
+  window.Element.prototype.releasePointerCapture = () => {}
+}

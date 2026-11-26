@@ -99,6 +99,15 @@ public enum ErrorCode {
     CLASS_NOT_MODIFIABLE(2230, HttpStatus.CONFLICT, "Class in this state does not allow subject changes"),
     VERSION_MISMATCH(2231, HttpStatus.CONFLICT, "Class was modified by another request; refresh and retry"),
     OPERATION_ALREADY_APPLIED(2232, HttpStatus.CONFLICT, "Operation was already applied (idempotency key conflict)"),
+    SUBJECT_CATEGORY_NOT_FOUND(2233, HttpStatus.NOT_FOUND, "Subject category not found"),
+    SUBJECT_CATEGORY_EXISTS(2234, HttpStatus.CONFLICT,
+        "Subject category already exists in organization"),
+    SUBJECT_CATEGORY_INVALID(2235, HttpStatus.BAD_REQUEST,
+        "categoryId: must reference an active subject category of the organization"),
+    ROOM_REQUIREMENT_INVALID(2236, HttpStatus.BAD_REQUEST,
+        "roomRequirement must be ANY or COMPUTER"),
+    SUBJECT_USAGE_CONFIRMATION_REQUIRED(2237, HttpStatus.CONFLICT,
+        "Subject is in use; resend with confirm=true to apply the change"),
 
     // Ủy quyền / Tổng quản lý (quy tắc 3, 7)
     DELEGATION_NOT_FOUND(2401, HttpStatus.NOT_FOUND, "Delegation not found"),

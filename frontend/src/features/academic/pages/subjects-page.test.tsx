@@ -2,10 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { subjectsApi } from '@/features/academic/api'
+import { subjectsApi, subjectCategoriesApi } from '@/features/academic/api'
 import type * as AcademicApi from '@/features/academic/api'
 import { SubjectsPage } from '@/features/academic/pages/subjects-page'
-import type { Subject } from '@/features/academic/types'
+import type { Subject, SubjectCategory } from '@/features/academic/types'
+import { ApiError } from '@/lib/api-error'
 import { PERM } from '@/lib/permissions'
 import { renderPage, signInAs } from '@/tests/render-page'
 
@@ -19,6 +20,12 @@ vi.mock('@/features/academic/api', async (importOriginal) => {
       create: vi.fn(),
       update: vi.fn(),
       setActive: vi.fn(),
+      checkCode: vi.fn(),
+      usage: vi.fn(),
+    },
+    subjectCategoriesApi: {
+      ...actual.subjectCategoriesApi,
+      list: vi.fn(),
     },
   }
 })
@@ -43,12 +50,32 @@ const retired: Subject = {
   updatedAt: null,
 }
 
+const programmingCategory: SubjectCategory = {
+  id: 'cat-1',
+  name: 'Lập trình',
+  active: true,
+  subjectCount: 1,
+  createdAt: null,
+  updatedAt: null,
+}
+
 beforeEach(() => {
   vi.mocked(subjectsApi.list).mockReset()
   vi.mocked(subjectsApi.list).mockResolvedValue([math])
   vi.mocked(subjectsApi.create).mockReset()
   vi.mocked(subjectsApi.update).mockReset()
   vi.mocked(subjectsApi.setActive).mockReset()
+  vi.mocked(subjectsApi.checkCode).mockReset()
+  vi.mocked(subjectsApi.checkCode).mockResolvedValue({ code: 'TOAN10', available: true, existingId: null })
+  vi.mocked(subjectsApi.usage).mockReset()
+  vi.mocked(subjectsApi.usage).mockResolvedValue({
+    subjectId: 'sub-1',
+    classesUsingSubject: 1,
+    classSubjectsUsingSubject: 1,
+    curriculaUsingSubject: 0,
+  })
+  vi.mocked(subjectCategoriesApi.list).mockReset()
+  vi.mocked(subjectCategoriesApi.list).mockResolvedValue([programmingCategory])
   signInAs({
     permissions: [PERM.subjectView, PERM.subjectManage],
     moduleStates: { STUDENT_MANAGEMENT: 'active' },
@@ -154,5 +181,73 @@ describe('SubjectsPage — danh mục môn học', () => {
 
     expect(screen.queryByRole('button', { name: 'Thêm môn học' })).not.toBeInTheDocument()
     expect(screen.getByText(/chế độ chỉ đọc/)).toBeInTheDocument()
+  })
+})
+
+describe('SubjectsPage — danh mục và yêu cầu phòng', () => {
+  it('hiển thị danh mục và yêu cầu phòng của môn học', async () => {
+    vi.mocked(subjectsApi.list).mockResolvedValue([
+      { ...math, categoryName: 'Lập trình', roomRequirement: 'COMPUTER' },
+    ])
+
+    renderPage(<SubjectsPage />)
+    await screen.findByText('Toán 10')
+
+    expect(screen.getByText('Lập trình')).toBeInTheDocument()
+    expect(screen.getByText('Phòng máy')).toBeInTheDocument()
+  })
+
+  it('cảnh báo khi đổi danh mục/yêu cầu phòng của môn đang dùng rồi gửi lại confirm=true', async () => {
+    vi.mocked(subjectsApi.update)
+      .mockRejectedValueOnce(
+        new ApiError({
+          message: 'Môn học đang được sử dụng.',
+          status: 409,
+          code: 'SUBJECT_USAGE_CONFIRMATION_REQUIRED',
+          details: { classes: [{ id: 'class-1', name: 'Lớp 10A' }], curricula: [] },
+        }),
+      )
+      .mockResolvedValueOnce({ ...math, categoryId: 'cat-1', roomRequirement: 'COMPUTER' })
+
+    renderPage(<SubjectsPage />)
+    await screen.findByText('Toán 10')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sửa' }))
+    const dialog = await screen.findByRole('dialog')
+    const selects = within(dialog).getAllByRole('combobox')
+    await userEvent.click(selects[0]!)
+    await userEvent.click(await screen.findByRole('option', { name: 'Lập trình' }))
+    await userEvent.click(selects[1]!)
+    await userEvent.click(await screen.findByRole('option', { name: 'Phòng máy' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }))
+
+    expect(await within(dialog).findByText('Lớp đang dùng (1):')).toBeInTheDocument()
+    expect(within(dialog).getByText('Lớp 10A')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Lưu thay đổi' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vẫn lưu' }))
+
+    await waitFor(() =>
+      expect(subjectsApi.update).toHaveBeenLastCalledWith('sub-1', {
+        code: 'TOAN10',
+        name: 'Toán 10',
+        description: 'Đại số và hình học',
+        categoryId: 'cat-1',
+        roomRequirement: 'COMPUTER',
+        confirm: true,
+      }),
+    )
+  })
+
+  it('mở hộp thoại quản lý danh mục môn học', async () => {
+    renderPage(<SubjectsPage />)
+    await screen.findByText('Toán 10')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Danh mục' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('Danh mục môn học')).toBeInTheDocument()
+    expect(await within(dialog).findByText('Lập trình')).toBeInTheDocument()
+    expect(within(dialog).getByText('1 môn')).toBeInTheDocument()
   })
 })

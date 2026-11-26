@@ -122,6 +122,13 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: people-subject-categories-api
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/subject-categories/**,/api/subject-categories
+          filters:
+            - StripPrefix=1
+
         - id: people-subjects
           uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
           predicates:

@@ -77,6 +77,14 @@ const MESSAGES: Record<string, string> = {
   ROOM_NOT_AVAILABLE: 'Phòng học không khả dụng (đang bảo trì, có thiết bị hỏng hoặc không đủ chỗ).',
   ROOM_TYPE_MISMATCH: 'Môn này cần phòng máy — vui lòng chọn phòng máy tính.',
 
+  // Môn học & danh mục
+  SUBJECT_CATEGORY_NOT_FOUND: 'Không tìm thấy danh mục môn học.',
+  SUBJECT_CATEGORY_EXISTS: 'Tên danh mục môn học đã tồn tại trong tổ chức.',
+  SUBJECT_CATEGORY_INVALID: 'Danh mục môn học không hợp lệ hoặc đã ngừng hoạt động.',
+  ROOM_REQUIREMENT_INVALID: 'Yêu cầu phòng không hợp lệ. Chỉ chọn "Bất kỳ" hoặc "Phòng máy".',
+  SUBJECT_USAGE_CONFIRMATION_REQUIRED:
+    'Môn học đang được lớp hoặc chương trình sử dụng. Xác nhận để vẫn lưu thay đổi.',
+
   // Dịch vụ nội bộ
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không phản hồi. Vui lòng thử lại.',
   PEOPLE_UNAVAILABLE: 'Dịch vụ nhân sự tạm thời không phản hồi. Vui lòng thử lại.',

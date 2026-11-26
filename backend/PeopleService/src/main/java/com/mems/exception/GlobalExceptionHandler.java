@@ -32,6 +32,14 @@ public class GlobalExceptionHandler {
                 ErrorCode.SPECIALTY_MISMATCH.getMessage(), Map.of("classes", ex.getClasses())));
     }
 
+    @ExceptionHandler(SubjectUsageWarningException.class)
+    ResponseEntity<ApiResponse<Map<String, Object>>> subjectUsageWarning(SubjectUsageWarningException ex) {
+        return ResponseEntity.status(ErrorCode.SUBJECT_USAGE_CONFIRMATION_REQUIRED.getStatus())
+            .body(ApiResponse.failure(ErrorCode.SUBJECT_USAGE_CONFIRMATION_REQUIRED.name(),
+                ErrorCode.SUBJECT_USAGE_CONFIRMATION_REQUIRED.getMessage(),
+                Map.of("classes", ex.getClasses(), "curricula", ex.getCurricula())));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiResponse<Void>> denied() {
         return failure(ErrorCode.FORBIDDEN);

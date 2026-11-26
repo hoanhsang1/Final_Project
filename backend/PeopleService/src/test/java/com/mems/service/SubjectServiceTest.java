@@ -3,6 +3,7 @@ package com.mems.service;
 import com.mems.dto.*;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.exception.SubjectUsageWarningException;
 import com.mems.repository.SubjectRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,7 +63,8 @@ class SubjectServiceTest {
         SubjectResponse resp = sampleSubject("sub-1", "TOAN10", "Toán 10", true);
 
         when(repository.findByCode(orgId, "TOAN10")).thenReturn(Optional.empty());
-        when(repository.create(orgId, "TOAN10", "Toán 10", "Đại số", userId)).thenReturn(resp);
+        when(repository.create(orgId, "TOAN10", "Toán 10", "Đại số", null, "ANY", userId))
+            .thenReturn(resp);
 
         SubjectResponse result = service.create(req);
 
@@ -78,7 +81,8 @@ class SubjectServiceTest {
         SubjectRequest req = new SubjectRequest(null, "Ngữ văn 10", null);
         SubjectResponse resp = sampleSubject("sub-2", null, "Ngữ văn 10", true);
 
-        when(repository.create(orgId, null, "Ngữ văn 10", null, userId)).thenReturn(resp);
+        when(repository.create(orgId, null, "Ngữ văn 10", null, null, "ANY", userId))
+            .thenReturn(resp);
 
         SubjectResponse result = service.create(req);
 
@@ -147,7 +151,7 @@ class SubjectServiceTest {
 
         when(repository.require("sub-1", orgId)).thenReturn(before);
         when(repository.findByCode(orgId, "TOAN10")).thenReturn(Optional.of(before)); // same id -> ok
-        when(repository.update(eq("sub-1"), eq(orgId), eq("TOAN10"), eq("Toán 10 Chuyên"), eq("Mô tả mới"), eq(userId)))
+        when(repository.update(eq("sub-1"), eq(orgId), eq("TOAN10"), eq("Toán 10 Chuyên"), eq("Mô tả mới"), isNull(), eq("ANY"), eq(userId)))
             .thenReturn(after);
 
         SubjectResponse result = service.update("sub-1", req);
@@ -258,5 +262,105 @@ class SubjectServiceTest {
         assertThat(result).hasSize(2);
         // includeInactive is false because user is not owner and has no subject.manage
         verify(repository).list(orgId, null, false);
+    }
+
+    // ---------------------------------------------------------------- category
+
+    @Test
+    @DisplayName("TC-SUB-CAT-01: Tạo môn với category đang hoạt động truyền đúng categoryId")
+    void createWithActiveCategory() {
+        SubjectRequest req = new SubjectRequest("TIN10", "Tin 10", null, "cat-1", "computer", null);
+        SubjectResponse resp = new SubjectResponse("sub-3", "TIN10", "Tin 10", null, true,
+            Instant.now(), null, "cat-1", "Lập trình", "COMPUTER");
+
+        when(repository.findByCode(orgId, "TIN10")).thenReturn(Optional.empty());
+        when(repository.activeCategoryName(orgId, "cat-1")).thenReturn("Lập trình");
+        when(repository.create(orgId, "TIN10", "Tin 10", null, "cat-1", "COMPUTER", userId))
+            .thenReturn(resp);
+
+        SubjectResponse result = service.create(req);
+
+        assertThat(result.categoryId()).isEqualTo("cat-1");
+        assertThat(result.roomRequirement()).isEqualTo("COMPUTER");
+    }
+
+    @Test
+    @DisplayName("TC-SUB-CAT-02: Tạo môn với category không tồn tại/đã ngừng ném SUBJECT_CATEGORY_INVALID")
+    void createWithInactiveCategoryThrows() {
+        SubjectRequest req = new SubjectRequest(null, "Tin 10", null, "cat-x", null, null);
+        when(repository.activeCategoryName(orgId, "cat-x")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.create(req))
+            .isInstanceOf(AppException.class)
+            .satisfies(e -> assertThat(((AppException) e).getErrorCode())
+                .isEqualTo(ErrorCode.SUBJECT_CATEGORY_INVALID));
+        verify(repository, never()).create(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("TC-SUB-ROOM-01: roomRequirement lạ ném ROOM_REQUIREMENT_INVALID")
+    void createWithInvalidRoomRequirementThrows() {
+        SubjectRequest req = new SubjectRequest(null, "Tin 10", null, null, "LAB", null);
+
+        assertThatThrownBy(() -> service.create(req))
+            .isInstanceOf(AppException.class)
+            .satisfies(e -> assertThat(((AppException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ROOM_REQUIREMENT_INVALID));
+    }
+
+    @Test
+    @DisplayName("TC-SUB-CAT-03: Sửa môn giữ nguyên category đã ngừng thì không chặn")
+    void updateKeepingInactiveCategoryIsAllowed() {
+        SubjectResponse before = new SubjectResponse("sub-1", "TIN10", "Tin 10", null, true,
+            Instant.now(), null, "cat-1", "Lập trình", "ANY");
+        SubjectRequest req = new SubjectRequest("TIN10", "Tin 10 mới", null, "cat-1", "ANY", null);
+
+        when(repository.require("sub-1", orgId)).thenReturn(before);
+        when(repository.update("sub-1", orgId, "TIN10", "Tin 10 mới", null, "cat-1", "ANY", userId))
+            .thenReturn(before);
+
+        service.update("sub-1", req);
+
+        verify(repository, never()).activeCategoryName(any(), any());
+    }
+
+    @Test
+    @DisplayName("TC-SUB-WARN-01: Đổi yêu cầu phòng của môn đang dùng trả cảnh báo kèm danh sách lớp")
+    void updateClassificationOfUsedSubjectRequiresConfirmation() {
+        SubjectResponse before = sampleSubject("sub-1", "TIN10", "Tin 10", true);
+        SubjectRequest req = new SubjectRequest("TIN10", "Tin 10", null, null, "COMPUTER", null);
+        SubjectUsageResponse usage = new SubjectUsageResponse("sub-1", 0, List.of(), 1,
+            List.of(new SubjectUsageResponse.SubjectClassUsageItem("cls-1", "C10A", "Lớp 10A", "PLANNED")),
+            1, List.of(new SubjectUsageResponse.CurriculumUsageItem("cur-1", "CT01", "Chương trình 1")));
+
+        when(repository.require("sub-1", orgId)).thenReturn(before);
+        when(repository.getUsage("sub-1", orgId)).thenReturn(usage);
+
+        assertThatThrownBy(() -> service.update("sub-1", req))
+            .isInstanceOf(SubjectUsageWarningException.class)
+            .satisfies(e -> {
+                SubjectUsageWarningException warning = (SubjectUsageWarningException) e;
+                assertThat(warning.getClasses()).extracting(ClassMismatch::name).containsExactly("Lớp 10A");
+                assertThat(warning.getCurricula()).hasSize(1);
+            });
+        verify(repository, never()).update(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("TC-SUB-WARN-02: confirm=true bỏ qua cảnh báo và lưu thay đổi")
+    void updateClassificationWithConfirmApplies() {
+        SubjectResponse before = sampleSubject("sub-1", "TIN10", "Tin 10", true);
+        SubjectResponse after = new SubjectResponse("sub-1", "TIN10", "Tin 10", null, true,
+            Instant.now(), null, null, null, "COMPUTER");
+        SubjectRequest req = new SubjectRequest("TIN10", "Tin 10", null, null, "COMPUTER", true);
+
+        when(repository.require("sub-1", orgId)).thenReturn(before);
+        when(repository.update("sub-1", orgId, "TIN10", "Tin 10", null, null, "COMPUTER", userId))
+            .thenReturn(after);
+
+        SubjectResponse result = service.update("sub-1", req);
+
+        assertThat(result.roomRequirement()).isEqualTo("COMPUTER");
+        verify(repository, never()).getUsage(any(), any());
     }
 }

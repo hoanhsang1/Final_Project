@@ -6,6 +6,7 @@ import {
   curriculaApi,
   specialtySubjectsApi,
   studentsApi,
+  subjectCategoriesApi,
   subjectsApi,
   teacherSubjectsApi,
   teachersApi,
@@ -48,6 +49,7 @@ export const academicKeys = {
   classEvents: (id: string) => ['classes', id, 'close-events'] as const,
   subjects: (params: unknown) => ['subjects', params] as const,
   subjectUsage: (id: string) => ['subjects', id, 'usage'] as const,
+  subjectCategories: (params: unknown) => ['subject-categories', params] as const,
   curricula: (params: unknown) => ['curricula', params] as const,
   curriculum: (id: string) => ['curricula', id] as const,
   curriculumSubjects: (id: string) => ['curricula', id, 'subjects'] as const,
@@ -347,6 +349,7 @@ export function useSubjectMutations() {
     // Lớp đang hiển thị tên môn — làm mới để đồng bộ khi môn đổi tên/ngừng dùng.
     await queryClient.invalidateQueries({ queryKey: ['classes'] })
     await queryClient.invalidateQueries({ queryKey: ['curricula'] })
+    await queryClient.invalidateQueries({ queryKey: ['subject-categories'] })
   }
   return {
     create: useMutation({
@@ -372,6 +375,38 @@ export function useSubjectUsage(id: string | undefined, enabled = true) {
     queryFn: () => subjectsApi.usage(id!),
     enabled: Boolean(id) && enabled,
   })
+}
+
+export function useSubjectCategories(includeInactive = false) {
+  return useQuery({
+    queryKey: academicKeys.subjectCategories({ includeInactive }),
+    queryFn: () => subjectCategoriesApi.list({ includeInactive }),
+    staleTime: 60_000,
+  })
+}
+
+export function useSubjectCategoryMutations() {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['subject-categories'] })
+    await queryClient.invalidateQueries({ queryKey: ['subjects'] })
+  }
+  return {
+    create: useMutation({
+      mutationFn: (name: string) => subjectCategoriesApi.create(name),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, name }: { id: string; name: string }) =>
+        subjectCategoriesApi.update(id, name),
+      onSuccess: invalidate,
+    }),
+    setActive: useMutation({
+      mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+        subjectCategoriesApi.setActive(id, active),
+      onSuccess: invalidate,
+    }),
+  }
 }
 
 // ============================================================================

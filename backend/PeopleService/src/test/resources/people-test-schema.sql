@@ -80,13 +80,23 @@ CREATE TABLE IF NOT EXISTS specialty (
 -- has a NON-unique index from migration 42; migration 52 step 7 now replaces it
 -- with UNIQUE after a duplicate self-check (Revision 5, 2026-11-20). Do not
 -- weaken this fixture: tests prove the intended contract. Verify on MySQL staging.
+CREATE TABLE IF NOT EXISTS subject_category (
+ id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
+ name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
+ is_active BOOLEAN NOT NULL DEFAULT TRUE,
+ created_by VARCHAR(36), created_at TIMESTAMP NOT NULL, updated_by VARCHAR(36), updated_at TIMESTAMP,
+ UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented)
+);
 CREATE TABLE IF NOT EXISTS subject (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  code VARCHAR(50), description VARCHAR(500),
  name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
+ category_id VARCHAR(36), room_requirement VARCHAR(20) NOT NULL DEFAULT 'ANY',
  is_active BOOLEAN NOT NULL DEFAULT TRUE, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
  updated_by VARCHAR(36), updated_at TIMESTAMP,
- UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code)
+ UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented), CONSTRAINT uq_subject_org_code UNIQUE(org_id,code),
+ CONSTRAINT chk_subject_room_requirement CHECK(room_requirement IN ('ANY','COMPUTER')),
+ FOREIGN KEY(category_id,org_id) REFERENCES subject_category(id,org_id)
 );
 -- Phase 1 (Revision 5): curriculum/class-subject schema (migrations 51/52).
 -- H2 PARITY LIMITATION: secondary indexes of 51/52 (idx_curriculum_subject_subject,

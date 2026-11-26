@@ -40,4 +40,17 @@ describe('translateError', () => {
     expect(translateError({ code: 'ROOM_TYPE_MISMATCH', status: 409 })).toContain('phòng máy')
     expect(translateError({ code: 'ROOM_NOT_AVAILABLE', status: 409 })).toContain('không khả dụng')
   })
+
+  it('dịch lỗi danh mục môn học sang tiếng Việt', () => {
+    expect(translateError({ code: 'SUBJECT_CATEGORY_EXISTS', status: 409 })).toContain(
+      'đã tồn tại',
+    )
+    expect(translateError({ code: 'SUBJECT_CATEGORY_INVALID', status: 400 })).toContain(
+      'không hợp lệ',
+    )
+    expect(translateError({ code: 'ROOM_REQUIREMENT_INVALID', status: 400 })).toContain('Phòng máy')
+    expect(
+      translateError({ code: 'SUBJECT_USAGE_CONFIRMATION_REQUIRED', status: 409 }),
+    ).toContain('Xác nhận')
+  })
 })
