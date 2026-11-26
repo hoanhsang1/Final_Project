@@ -11,12 +11,11 @@ import com.mems.dto.AutoScheduleResult;
 import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
+import com.mems.time.SchoolClock;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,11 +34,14 @@ public class AutoScheduleService {
     private final ScheduleService scheduleService;
     private final PeopleClient people;
     private final FacilityClient facility;
+    private final SchoolClock clock;
 
-    public AutoScheduleService(ScheduleService scheduleService, PeopleClient people, FacilityClient facility) {
+    public AutoScheduleService(ScheduleService scheduleService, PeopleClient people,
+                               FacilityClient facility, SchoolClock clock) {
         this.scheduleService = scheduleService;
         this.people = people;
         this.facility = facility;
+        this.clock = clock;
     }
 
     /**
@@ -167,8 +169,8 @@ public class AutoScheduleService {
             outerSlot:
             for (LocalDate date : candidateDates) {
                 for (AutoScheduleRequest.TimeSlot slot : request.slots()) {
-                    Instant start = toInstant(date, slot.startTime());
-                    Instant end   = toInstant(date, slot.endTime());
+                    Instant start = clock.toInstant(date, slot.startTime());
+                    Instant end   = clock.toInstant(date, slot.endTime());
 
                     List<RoomInfo> suitableRooms = availableRooms.stream()
                         .filter(r -> r.capacity() >= info.studentCount())
@@ -230,10 +232,6 @@ public class AutoScheduleService {
             d = d.plusDays(1);
         }
         return dates;
-    }
-
-    private Instant toInstant(LocalDate date, LocalTime time) {
-        return date.atTime(time).toInstant(ZoneOffset.UTC);
     }
 
     private RoomInfo findRoom(List<RoomInfo> rooms, int requiredCapacity) {

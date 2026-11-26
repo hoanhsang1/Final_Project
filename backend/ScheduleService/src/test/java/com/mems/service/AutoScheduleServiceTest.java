@@ -11,6 +11,7 @@ import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.time.SchoolClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,8 @@ class AutoScheduleServiceTest {
     private PeopleClient people;
     @Mock
     private FacilityClient facility;
+    @Mock
+    private SchoolClock schoolClock;
 
     @InjectMocks
     private AutoScheduleService autoScheduleService;
