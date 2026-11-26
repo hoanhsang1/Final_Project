@@ -45,7 +45,7 @@ export const schedulesApi = {
 
   async roomSuggestions(
     departmentId: string,
-    params: { startTime?: string; endTime?: string },
+    params: { startTime?: string; endTime?: string; classId?: string },
   ): Promise<RoomSuggestion[]> {
     const { data } = await api.get<RoomSuggestion[]>(
       `/api/departments/${departmentId}/schedules/room-suggestions`,

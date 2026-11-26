@@ -27,6 +27,12 @@ export interface RoomSuggestion {
   name: string
   capacity: number
   status: string
+  roomType?: 'classroom' | 'computer_room' | null
+}
+
+export const ROOM_TYPE_LABELS: Record<string, string> = {
+  classroom: 'Phòng thường',
+  computer_room: 'Phòng máy',
 }
 
 export const SESSION_STATUS_LABELS: Record<string, string> = {

@@ -29,7 +29,12 @@ import {
   useScheduleMutations,
   useSchedules,
 } from '@/features/schedule/hooks'
-import { SESSION_STATUS_LABELS, type ScheduleInput, type ScheduleSession } from '@/features/schedule/types'
+import {
+  ROOM_TYPE_LABELS,
+  SESSION_STATUS_LABELS,
+  type ScheduleInput,
+  type ScheduleSession,
+} from '@/features/schedule/types'
 import { ApiError } from '@/lib/api-error'
 import { formatDateTime } from '@/lib/format'
 import { PERM } from '@/lib/permissions'
@@ -108,7 +113,7 @@ function SessionDialog({
   const endIso = toIso(form.endTime)
   const suggestions = useRoomSuggestions(
     departmentId,
-    { startTime: startIso, endTime: endIso },
+    { startTime: startIso, endTime: endIso, classId: form.classId || undefined },
     open,
   )
 
@@ -223,6 +228,7 @@ function SessionDialog({
                 {(suggestions.data ?? []).map((room) => (
                   <SelectItem key={room.id} value={room.id}>
                     {room.code} · {room.name} ({room.capacity} chỗ)
+                    {room.roomType ? ` · ${ROOM_TYPE_LABELS[room.roomType] ?? room.roomType}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -2,6 +2,7 @@ package com.mems.service;
 
 import com.mems.dto.EquipmentRequest;
 import com.mems.dto.EquipmentResponse;
+import com.mems.dto.InternalRoomResponse;
 import com.mems.dto.IssueReportRequest;
 import com.mems.dto.IssueResponse;
 import com.mems.dto.RoomRequest;
@@ -196,5 +197,33 @@ class FacilityServiceTest {
         assertThatThrownBy(() -> service.resolveIssue("org-1", "dept-1", "user-1", issue.id()))
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("ISSUE_ALREADY_RESOLVED"));
+    }
+
+    @Test
+    @DisplayName("API nội bộ trả roomType đúng cho phòng thường và phòng máy")
+    void internalRoomsReturnRoomType() {
+        RoomResponse normal = room("R1");
+        RoomResponse computer = service.createRoom("org-1", "dept-1",
+            new RoomRequest("R2", "Phòng máy 1", "A", "1", 30, "computer_room", "active"));
+
+        assertThat(service.internalRoom("org-1", normal.id()).roomType()).isEqualTo("classroom");
+        assertThat(service.internalRoom("org-1", computer.id()).roomType()).isEqualTo("computer_room");
+    }
+
+    @Test
+    @DisplayName("API nội bộ không departmentId trả mọi phòng của org, không lẫn org khác")
+    void internalRoomsWithoutDepartmentReturnsWholeOrg() {
+        room("R1");
+        service.createRoom("org-1", "dept-2",
+            new RoomRequest("R2", "Phòng khoa 2", "A", "2", 40, "classroom", "active"));
+        service.createRoom("org-2", "dept-1",
+            new RoomRequest("R9", "Phòng org khác", null, null, 30, "classroom", "active"));
+
+        assertThat(service.internalRooms("org-1", null))
+            .extracting(InternalRoomResponse::code)
+            .containsExactly("R1", "R2");
+        assertThat(service.internalRooms("org-1", "dept-1"))
+            .extracting(InternalRoomResponse::code)
+            .containsExactly("R1");
     }
 }

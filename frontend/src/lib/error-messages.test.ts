@@ -35,4 +35,9 @@ describe('translateError', () => {
   it('mã giáo viên không hợp lệ có thông điệp riêng', () => {
     expect(translateError({ code: 'TEACHER_NOT_AVAILABLE', status: 409 })).toContain('Đang dạy')
   })
+
+  it('dịch lỗi phòng học sang tiếng Việt', () => {
+    expect(translateError({ code: 'ROOM_TYPE_MISMATCH', status: 409 })).toContain('phòng máy')
+    expect(translateError({ code: 'ROOM_NOT_AVAILABLE', status: 409 })).toContain('không khả dụng')
+  })
 })

@@ -49,4 +49,16 @@ public class FacilityClient {
             throw new AppException(ErrorCode.FACILITY_UNAVAILABLE);
         }
     }
+
+    /** Phòng của toàn tổ chức (mọi phòng ban) — phòng là tài nguyên cấp org. */
+    public List<RoomInfo> roomsOfOrg(String orgId) {
+        try {
+            var response = http.exchange(
+                "/internal/rooms?orgId={orgId}", HttpMethod.GET, null,
+                new ParameterizedTypeReference<List<RoomInfo>>() {}, orgId);
+            return response.getBody() == null ? List.of() : response.getBody();
+        } catch (RestClientException ex) {
+            throw new AppException(ErrorCode.FACILITY_UNAVAILABLE);
+        }
+    }
 }

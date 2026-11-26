@@ -22,7 +22,8 @@ public enum ErrorCode {
     TEACHER_SCHEDULE_CONFLICT(3110, HttpStatus.CONFLICT, "Teacher already has a session in this time range"),
     ROOM_SCHEDULE_CONFLICT(3111, HttpStatus.CONFLICT, "Room is already booked in this time range"),
     CLASS_SCHEDULE_CONFLICT(3112, HttpStatus.CONFLICT, "Class already has a session in this time range"),
-    ROOM_NOT_AVAILABLE(3113, HttpStatus.CONFLICT, "Room is unavailable");
+    ROOM_NOT_AVAILABLE(3113, HttpStatus.CONFLICT, "Room is unavailable"),
+    ROOM_TYPE_MISMATCH(3114, HttpStatus.CONFLICT, "Room type does not match subject requirement");
 
     private final int code;
     private final HttpStatus status;

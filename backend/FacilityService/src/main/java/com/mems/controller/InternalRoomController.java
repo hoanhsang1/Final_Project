@@ -16,9 +16,10 @@ public class InternalRoomController {
         this.facilities = facilities;
     }
 
+    /** Không truyền departmentId: trả mọi phòng đang có của tổ chức (phòng là tài nguyên cấp org). */
     @GetMapping
     public List<InternalRoomResponse> rooms(@RequestParam String orgId,
-                                            @RequestParam String departmentId) {
+                                            @RequestParam(required = false) String departmentId) {
         return facilities.internalRooms(orgId, departmentId);
     }
 

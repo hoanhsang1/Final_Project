@@ -73,6 +73,10 @@ const MESSAGES: Record<string, string> = {
   GENERAL_MANAGER_ALREADY_APPOINTED: 'Nhân sự này đã là Tổng quản lý.',
   GENERAL_MANAGER_NOT_APPOINTED: 'Nhân sự này chưa được bổ nhiệm Tổng quản lý.',
 
+  // Lịch học & phòng học
+  ROOM_NOT_AVAILABLE: 'Phòng học không khả dụng (đang bảo trì, có thiết bị hỏng hoặc không đủ chỗ).',
+  ROOM_TYPE_MISMATCH: 'Môn này cần phòng máy — vui lòng chọn phòng máy tính.',
+
   // Dịch vụ nội bộ
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không phản hồi. Vui lòng thử lại.',
   PEOPLE_UNAVAILABLE: 'Dịch vụ nhân sự tạm thời không phản hồi. Vui lòng thử lại.',

@@ -83,13 +83,14 @@ public class DepartmentScheduleController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Gợi ý phòng còn trống; loại phòng bảo trì/đóng và phòng có thiết bị hỏng. */
+    /** Gợi ý phòng còn trống; classId để lọc theo sĩ số và ưu tiên phòng thường. */
     @GetMapping("/room-suggestions")
     public List<RoomSuggestionResponse> roomSuggestions(@PathVariable String departmentId,
+                                                         @RequestParam(required = false) String classId,
                                                          @RequestParam(required = false) Instant startTime,
                                                          @RequestParam(required = false) Instant endTime) {
         authorize(CREATE, departmentId);
-        return schedules.roomSuggestions(actor.orgId(), departmentId, startTime, endTime);
+        return schedules.roomSuggestions(actor.orgId(), departmentId, classId, startTime, endTime);
     }
 
     /** Buổi học bị ảnh hưởng do đổi giáo viên / lớp đóng-hủy / sự cố cơ sở vật chất. */

@@ -34,7 +34,7 @@ export function useMySchedule(params: { from?: string; to?: string }) {
 
 export function useRoomSuggestions(
   departmentId: string | null,
-  params: { startTime?: string; endTime?: string },
+  params: { startTime?: string; endTime?: string; classId?: string },
   enabled = true,
 ) {
   return useQuery({

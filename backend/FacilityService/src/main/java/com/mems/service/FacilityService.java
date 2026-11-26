@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -236,23 +237,31 @@ public class FacilityService {
 
     @Transactional(readOnly = true)
     public List<InternalRoomResponse> internalRooms(String orgId, String departmentId) {
-        return jdbc.query("""
-            SELECT c.id, c.code, c.name, c.capacity, c.status, c.department_id,
+        boolean byDepartment = departmentId != null && !departmentId.isBlank();
+        String sql = """
+            SELECT c.id, c.code, c.name, c.capacity, c.room_type, c.status, c.department_id,
                    (SELECT COUNT(*) FROM equipment e
                      WHERE e.room_id=c.id AND e.org_id=c.org_id AND e.deleted_at IS NULL
                        AND e.status='broken') AS broken_equipment
             FROM classroom c
-            WHERE c.org_id=? AND c.department_id=? AND c.deleted_at IS NULL
-            ORDER BY c.name
-            """, (rs, n) -> new InternalRoomResponse(rs.getString("id"), rs.getString("code"),
-            rs.getString("name"), rs.getInt("capacity"), rs.getString("status"),
-            rs.getString("department_id"), rs.getInt("broken_equipment")), orgId, departmentId);
+            WHERE c.org_id=? AND c.deleted_at IS NULL
+            """;
+        List<Object> args = new ArrayList<>(List.of(orgId));
+        if (byDepartment) {
+            sql += " AND c.department_id=?";
+            args.add(departmentId);
+        }
+        sql += " ORDER BY c.name";
+        return jdbc.query(sql, (rs, n) -> new InternalRoomResponse(rs.getString("id"),
+            rs.getString("code"), rs.getString("name"), rs.getInt("capacity"),
+            rs.getString("status"), rs.getString("department_id"), rs.getInt("broken_equipment"),
+            rs.getString("room_type")), args.toArray());
     }
 
     @Transactional(readOnly = true)
     public InternalRoomResponse internalRoom(String orgId, String roomId) {
         List<InternalRoomResponse> rows = jdbc.query("""
-            SELECT c.id, c.code, c.name, c.capacity, c.status, c.department_id,
+            SELECT c.id, c.code, c.name, c.capacity, c.room_type, c.status, c.department_id,
                    (SELECT COUNT(*) FROM equipment e
                      WHERE e.room_id=c.id AND e.org_id=c.org_id AND e.deleted_at IS NULL
                        AND e.status='broken') AS broken_equipment
@@ -260,7 +269,8 @@ public class FacilityService {
             WHERE c.id=? AND c.org_id=? AND c.deleted_at IS NULL
             """, (rs, n) -> new InternalRoomResponse(rs.getString("id"), rs.getString("code"),
             rs.getString("name"), rs.getInt("capacity"), rs.getString("status"),
-            rs.getString("department_id"), rs.getInt("broken_equipment")), roomId, orgId);
+            rs.getString("department_id"), rs.getInt("broken_equipment"),
+            rs.getString("room_type")), roomId, orgId);
         if (rows.isEmpty()) throw new AppException(ErrorCode.ROOM_NOT_FOUND);
         return rows.get(0);
     }

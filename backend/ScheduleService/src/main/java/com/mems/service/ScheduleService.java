@@ -19,6 +19,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -77,7 +78,7 @@ public class ScheduleService {
         validateWindow(request);
         ClassInfo info = requireClass(orgId, request.classId());
         String teacherId = resolveTeacher(info, request.teacherId());
-        validateRoom(orgId, info, request.roomId());
+        validateRoom(orgId, info, request.roomId(), null);
 
         ensureClassMirror(orgId, info, request);
         lockResources(orgId, teacherId, request.roomId());
@@ -111,7 +112,7 @@ public class ScheduleService {
         validateWindow(request);
         ClassInfo info = requireClass(orgId, request.classId());
         String teacherId = resolveTeacher(info, request.teacherId());
-        validateRoom(orgId, info, request.roomId());
+        validateRoom(orgId, info, request.roomId(), null);
 
         ensureClassMirror(orgId, info, request);
         lockResources(orgId, teacherId, request.roomId());
@@ -165,23 +166,47 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public List<RoomSuggestionResponse> roomSuggestions(String orgId, String departmentId,
                                                          Instant startTime, Instant endTime) {
+        return roomSuggestions(orgId, departmentId, null, startTime, endTime);
+    }
+
+    /**
+     * Gợi ý phòng dùng mọi phòng của tổ chức. Có classId thì lọc theo sĩ số và
+     * xếp phòng thường trước phòng máy; phòng đang bị chiếm tính trên toàn org.
+     */
+    @Transactional(readOnly = true)
+    public List<RoomSuggestionResponse> roomSuggestions(String orgId, String departmentId,
+                                                         String classId, Instant startTime,
+                                                         Instant endTime) {
+        Integer minCapacity = null;
+        if (classId != null && !classId.isBlank()) {
+            minCapacity = requireClass(orgId, classId).studentCount();
+        }
         Set<String> occupied = new HashSet<>();
         if (startTime != null && endTime != null) {
             occupied.addAll(jdbc.queryForList("""
                 SELECT DISTINCT s.room_id FROM session s JOIN `class` c ON c.id=s.class_id
-                WHERE c.org_id=? AND s.department_id=? AND s.room_id IS NOT NULL
+                WHERE c.org_id=? AND s.room_id IS NOT NULL
                   AND s.deleted_at IS NULL AND s.status<>'cancelled'
                   AND s.start_time<? AND s.end_time>?
-                """, String.class, orgId, departmentId,
+                """, String.class, orgId,
                 Timestamp.from(endTime), Timestamp.from(startTime)));
         }
-        List<RoomSuggestionResponse> result = new ArrayList<>();
-        for (RoomInfo room : facility.rooms(orgId, departmentId)) {
+        List<RoomInfo> usable = new ArrayList<>();
+        for (RoomInfo room : facility.roomsOfOrg(orgId)) {
             if (!"active".equals(room.status())) continue;
             if (room.brokenEquipmentCount() > 0) continue;
             if (occupied.contains(room.id())) continue;
+            if (minCapacity != null && room.capacity() < minCapacity) continue;
+            usable.add(room);
+        }
+        if (minCapacity != null) {
+            // Phòng thường trước; sort ổn định nên trong cùng loại giữ thứ tự theo tên.
+            usable.sort(Comparator.comparing(RoomInfo::isComputerRoom));
+        }
+        List<RoomSuggestionResponse> result = new ArrayList<>();
+        for (RoomInfo room : usable) {
             result.add(new RoomSuggestionResponse(room.id(), room.code(), room.name(),
-                room.capacity(), room.status()));
+                room.capacity(), room.status(), room.roomType()));
         }
         return result;
     }
@@ -282,7 +307,11 @@ public class ScheduleService {
         return info.teacherId();
     }
 
-    private void validateRoom(String orgId, ClassInfo info, String roomId) {
+    /**
+     * `requiredRoomType = "COMPUTER"` bắt buộc phòng máy; null/giá trị khác thì không ràng buộc loại.
+     * P6 sẽ truyền loại phòng theo môn của buổi, hiện create/update chưa có subjectId nên truyền null.
+     */
+    void validateRoom(String orgId, ClassInfo info, String roomId, String requiredRoomType) {
         if (roomId == null || roomId.isBlank()) return;
         RoomInfo room = facility.room(orgId, roomId);
         if (room == null) throw new AppException(ErrorCode.ROOM_NOT_AVAILABLE, "Room not found");
@@ -294,6 +323,15 @@ public class ScheduleService {
         if (info.studentCount() > room.capacity()) {
             throw new AppException(ErrorCode.ROOM_NOT_AVAILABLE, "Room capacity is too small");
         }
+        if (requiresComputerRoom(requiredRoomType) && !room.isComputerRoom()) {
+            throw new AppException(ErrorCode.ROOM_TYPE_MISMATCH,
+                "This subject requires a computer room");
+        }
+    }
+
+    private boolean requiresComputerRoom(String requiredRoomType) {
+        return "COMPUTER".equalsIgnoreCase(requiredRoomType)
+            || "computer_room".equalsIgnoreCase(requiredRoomType);
     }
 
     /** Schedule DB giữ bản sao lớp để hiển thị; People là nguồn chuẩn. */

@@ -161,7 +161,7 @@ class ScheduleServiceTest {
     @DisplayName("Gợi ý phòng loại phòng bảo trì, phòng có thiết bị hỏng và phòng đã kín lịch")
     void roomSuggestionsExcludeUnusableRooms() {
         service.create(ORG, DEPT, request("room-1", START, END));
-        when(facility.rooms(ORG, DEPT)).thenReturn(List.of(
+        when(facility.roomsOfOrg(ORG)).thenReturn(List.of(
             new RoomInfo("room-1", "R1", "Đã dùng", 40, "active", DEPT, 0),
             new RoomInfo("room-2", "R2", "Còn trống", 40, "active", DEPT, 0),
             new RoomInfo("room-3", "R3", "Bảo trì", 40, "maintenance", DEPT, 0),
