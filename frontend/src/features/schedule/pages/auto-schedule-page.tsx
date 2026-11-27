@@ -82,7 +82,17 @@ export function AutoSchedulePage() {
   const [discardOpen, setDiscardOpen] = useState(false)
   const [confirmFailures, setConfirmFailures] = useState<ScheduleDraftConfirmResult['failed']>([])
 
-  const classes = useClasses({ page: 1, size: 100, selectable: true })
+  // Lớp không thuộc phòng ban nào: lấy toàn bộ lớp org có môn học (server tự giới hạn
+  // theo phạm vi xem). Phòng ban đang chọn chỉ dùng cho lịch nháp + cấu hình tiết.
+  const classes = useClasses(
+    {
+      page: 1,
+      size: 100,
+      selectable: true,
+      hasSubjects: true,
+    },
+    true,
+  )
   const timeSlots = useScheduleTimeSlots()
   const drafts = useScheduleDrafts(effectiveDepartmentId ?? null)
   const detail = useScheduleDraftDetail(effectiveDepartmentId ?? null, activeDraftId, week)
@@ -90,6 +100,7 @@ export function AutoSchedulePage() {
 
   function changeDepartment(id: string) {
     setDepartmentId(id)
+    setSelectedClassIds([])
     setActiveDraftId(null)
     setWeek(1)
     setConfirmFailures([])
@@ -241,6 +252,10 @@ export function AutoSchedulePage() {
                 </SelectContent>
               </Select>
             </Field>
+            <p className="mt-1 text-xs text-ink-500">
+              Phòng ban dùng để lưu lịch nháp và cấu hình tiết; danh sách lớp bên dưới gồm toàn bộ
+              lớp của tổ chức.
+            </p>
           </div>
         )}
 
@@ -284,6 +299,10 @@ export function AutoSchedulePage() {
           </p>
           {classes.isLoading ? (
             <p className="text-sm text-ink-500">Đang tải danh sách lớp...</p>
+          ) : classes.isError ? (
+            <p className="py-4 text-center text-sm text-danger-600">
+              Không tải được danh sách lớp. Vui lòng tải lại trang.
+            </p>
           ) : (
             <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-lg border border-line p-2">
               {classItems.map((schoolClass) => (
@@ -297,17 +316,18 @@ export function AutoSchedulePage() {
                     checked={selectedClassIds.includes(schoolClass.id)}
                     onChange={() => toggleClass(schoolClass.id)}
                   />
-                  <span className="text-sm">
-                    <span className="font-medium">{schoolClass.name}</span>
-                    <span className="ml-1.5 text-xs text-ink-500">({schoolClass.classCode})</span>
-                    {schoolClass.subjectName && (
-                      <span className="ml-1.5 text-xs text-ink-400">· {schoolClass.subjectName}</span>
-                    )}
-                  </span>
+                  <span className="text-sm font-medium">{schoolClass.name}</span>
+                  <span className="text-xs text-ink-500">({schoolClass.classCode})</span>
                 </label>
               ))}
               {classItems.length === 0 && (
-                <p className="py-4 text-center text-sm text-ink-500">Không có lớp nào.</p>
+                <p className="py-4 text-center text-sm text-ink-500">
+                  Chưa có lớp nào được gán chương trình đào tạo kèm môn học.{' '}
+                  <Link to="/dao-tao/lop-hoc" className="font-medium text-jade-700 underline">
+                    Gán chương trình cho lớp
+                  </Link>{' '}
+                  rồi quay lại xếp lịch.
+                </p>
               )}
             </div>
           )}
@@ -330,7 +350,7 @@ export function AutoSchedulePage() {
         </Button>
         {!canCreate && <p className="text-sm text-danger-500">Bạn không có quyền xếp lịch.</p>}
         {!effectiveDepartmentId && (
-          <p className="text-sm text-ink-500">Chọn phòng ban để bắt đầu.</p>
+          <p className="text-sm text-ink-500">Chọn phòng ban để lưu lịch nháp.</p>
         )}
         {configMissing && (
           <p className="flex items-center gap-1.5 text-sm text-warning-600">

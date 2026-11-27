@@ -269,6 +269,20 @@ describe('SchedulePage — lịch học', () => {
     })
   })
 
+  it('lọc lịch theo lớp đang chọn', async () => {
+    renderPage(<SchedulePage />)
+    await screen.findByText('10A1 · Lớp 10A1')
+
+    const combos = screen.getAllByRole('combobox')
+    await userEvent.click(combos[combos.length - 1]!)
+    await userEvent.click(await screen.findByRole('option', { name: '10A1 · Lớp 10A1' }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(schedulesApi.list).mock.calls
+      expect(calls.some(([, params]) => params.classId === 'class-1')).toBe(true)
+    })
+  })
+
   it('bấm vào buổi học mở hộp thoại cập nhật', async () => {
     renderPage(<SchedulePage />)
     await userEvent.click(await screen.findByText('10A1 · Lớp 10A1'))

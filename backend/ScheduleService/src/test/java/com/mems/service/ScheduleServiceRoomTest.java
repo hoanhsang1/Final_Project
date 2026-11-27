@@ -6,6 +6,7 @@ import com.mems.client.PeopleClient;
 import com.mems.client.RoomInfo;
 import com.mems.dto.RoomSuggestionResponse;
 import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -184,6 +185,16 @@ class ScheduleServiceRoomTest {
             .isInstanceOf(AppException.class)
             .satisfies(ex -> assertThat(((AppException) ex).getCode())
                 .isEqualTo("ROOM_NOT_AVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("ROOM-09: Facility không phản hồi thì gợi ý phòng rỗng thay vì lỗi")
+    void suggestionsReturnEmptyWhenFacilityUnavailable() {
+        when(facility.roomsOfOrg(ORG)).thenThrow(new AppException(ErrorCode.FACILITY_UNAVAILABLE));
+
+        List<RoomSuggestionResponse> result = service.roomSuggestions(ORG, DEPT, null, START, END);
+
+        assertThat(result).isEmpty();
     }
 
     private ClassInfo classInfo(int studentCount) {

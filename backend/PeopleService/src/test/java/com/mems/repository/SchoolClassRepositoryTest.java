@@ -52,6 +52,31 @@ class SchoolClassRepositoryTest {
     }
 
     @Test
+    @DisplayName("hasSubjects: chỉ trả lớp đã có môn học kèm tên chương trình")
+    void listFiltersClassesWithSubjects() {
+        jdbc.update("""
+            INSERT INTO subject(id,org_id,name,name_unaccented,created_at)
+            VALUES ('sub-1','org-1','Toán','toan',?)
+            """, Timestamp.from(NOW));
+        jdbc.update("""
+            INSERT INTO curriculum(id,org_id,code,name,name_unaccented,created_at)
+            VALUES ('cur-1','org-1','CT1','Chương trình 1','chuong trinh 1',?)
+            """, Timestamp.from(NOW));
+        jdbc.update("UPDATE school_class SET curriculum_id='cur-1' WHERE id='class-1'");
+        jdbc.update("""
+            INSERT INTO class_subject(class_id,subject_id,org_id,curriculum_id,source,is_primary,
+                                      primary_class_id,created_at)
+            VALUES ('class-1','sub-1','org-1','cur-1','CURRICULUM',TRUE,'class-1',?)
+            """, Timestamp.from(NOW));
+
+        List<SchoolClassResponse> items = listWithSubjects();
+
+        assertThat(items).extracting(SchoolClassResponse::classCode).containsExactly("C001");
+        assertThat(items.get(0).curriculumId()).isEqualTo("cur-1");
+        assertThat(items.get(0).curriculumName()).isEqualTo("Chương trình 1");
+    }
+
+    @Test
     @DisplayName("Chi tiết lớp khoá dòng và trả đúng teacher/version")
     void requireWithLockReturnsTeacher() {
         SchoolClassResponse found = classes.require("class-1", "org-1", true);
@@ -87,6 +112,13 @@ class SchoolClassRepositoryTest {
     @SuppressWarnings("unchecked")
     private List<SchoolClassResponse> list(String status, String q) {
         Map<String, Object> result = classes.list("org-1", 1, 20, q, status, false);
+        return (List<SchoolClassResponse>) result.get("items");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<SchoolClassResponse> listWithSubjects() {
+        Map<String, Object> result = classes.list("org-1", 1, 20, null, null, false, null,
+            null, null, true);
         return (List<SchoolClassResponse>) result.get("items");
     }
 

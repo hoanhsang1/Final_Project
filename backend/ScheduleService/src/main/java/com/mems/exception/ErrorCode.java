@@ -40,7 +40,11 @@ public enum ErrorCode {
     SCHEDULE_DRAFT_ITEM_CONFLICT(3125, HttpStatus.CONFLICT,
         "Draft session conflicts with another session"),
     SCHEDULE_DRAFT_CONFIRM_FAILED(3126, HttpStatus.CONFLICT,
-        "Some draft sessions could not be confirmed");
+        "Some draft sessions could not be confirmed"),
+    SUBJECT_DAILY_LIMIT(3127, HttpStatus.CONFLICT,
+        "Mỗi môn chỉ được xếp tối đa 1 buổi trong một ngày"),
+    CLASS_DAILY_LIMIT(3128, HttpStatus.CONFLICT,
+        "Mỗi lớp chỉ được xếp tối đa 2 buổi hoặc 240 phút trong một ngày");
 
     private final int code;
     private final HttpStatus status;

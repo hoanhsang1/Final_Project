@@ -49,6 +49,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -116,11 +117,27 @@ public class ScheduleDraftService {
         SchedulingRequirements requirements = builder.build(orgId, request.classIds(),
             request.dateFrom(), request.dateTo());
         List<SessionRequirement> items = requirements.requirements();
+        if (items.isEmpty()) {
+            // Không lớp nào có môn trong chương trình: báo lỗi thay vì lưu lịch nháp rỗng.
+            String reason = requirements.unschedulable().stream()
+                .map(UnschedulableRequirement::reason)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse("Không lớp nào có môn học trong chương trình để xếp lịch");
+            throw new AppException(ErrorCode.VALIDATION_ERROR, reason);
+        }
 
-        List<SolverRoom> rooms = facility.roomsOfOrg(orgId).stream()
-            .filter(room -> "active".equals(room.status()) && room.brokenEquipmentCount() == 0)
-            .map(room -> new SolverRoom(room.id(), room.code(), room.capacity(), room.roomType()))
-            .toList();
+        List<SolverRoom> rooms;
+        try {
+            rooms = facility.roomsOfOrg(orgId).stream()
+                .filter(room -> "active".equals(room.status()) && room.brokenEquipmentCount() == 0)
+                .map(room -> new SolverRoom(room.id(), room.code(), room.capacity(), room.roomType()))
+                .toList();
+        } catch (AppException ex) {
+            if (ex.getErrorCode() != ErrorCode.FACILITY_UNAVAILABLE) throw ex;
+            // Facility chưa sẵn sàng: vẫn xếp giờ, buổi học để trống phòng (tính năng phòng tạm hoãn).
+            rooms = syntheticRooms(items);
+        }
 
         Set<String> teacherIds = new LinkedHashSet<>();
         Set<String> classIds = new LinkedHashSet<>();
@@ -159,10 +176,12 @@ public class ScheduleDraftService {
         String draftId = UUID.randomUUID().toString();
         List<ItemRow> itemRows = new ArrayList<>();
         for (SolverPlacement placement : result.placements()) {
+            boolean noRoom = placement.roomId() != null
+                && placement.roomId().startsWith(SolverRoom.NO_ROOM_PREFIX);
             itemRows.add(new ItemRow(UUID.randomUUID().toString(), draftId, placement.classId(),
                 placement.subjectId(), placement.teacherId(),
-                teacherNames.get(placement.teacherId()), placement.roomId(),
-                roomCodes.get(placement.roomId()),
+                teacherNames.get(placement.teacherId()), noRoom ? null : placement.roomId(),
+                noRoom ? null : roomCodes.get(placement.roomId()),
                 subjectNames.get(subjectKey(placement.classId(), placement.subjectId())),
                 placement.start(), placement.end(),
                 weekOf(placement.date(), firstMonday), placement.isException(),
@@ -381,6 +400,16 @@ public class ScheduleDraftService {
         if (startPeriod < 0) return List.of();
         int minutes = (int) Duration.between(start, end).toMinutes();
         return ScheduleRules.sessionPeriods(slots, startPeriod, minutes);
+    }
+
+    /** Một "phòng ảo" cho mỗi cặp lớp–môn để solver vẫn xếp được giờ khi chưa có dữ liệu phòng. */
+    private List<SolverRoom> syntheticRooms(List<SessionRequirement> items) {
+        Map<String, SolverRoom> unique = new LinkedHashMap<>();
+        for (SessionRequirement item : items) {
+            String id = SolverRoom.noRoomId(item.classId(), item.subjectId());
+            unique.putIfAbsent(id, new SolverRoom(id, null, Integer.MAX_VALUE, null));
+        }
+        return List.copyOf(unique.values());
     }
 
     private Map<String, String> teacherNames(List<SessionRequirement> requirements) {

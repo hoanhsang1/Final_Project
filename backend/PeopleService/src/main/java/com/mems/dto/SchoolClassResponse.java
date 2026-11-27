@@ -27,7 +27,9 @@ public record SchoolClassResponse(
     String subjectId,
     String subjectName,
     String cancelState,
-    String cancelRequestReason
+    String cancelRequestReason,
+    String curriculumId,
+    String curriculumName
 ) {
     /** Giữ constructor cũ cho ngữ cảnh không cần lý do/chi tiết mở rộng. */
     public SchoolClassResponse(
@@ -38,7 +40,7 @@ public record SchoolClassResponse(
     ) {
         this(id, orgId, classCode, name, academicYear, startDate, endDate, status, teacher,
             closeState, version, studentCount, createdBy, createdAt, updatedAt, null, null, null,
-            false, null, null, null, null, null);
+            false, null, null, null, null, null, null, null);
     }
 
     public SchoolClassResponse(
@@ -51,6 +53,6 @@ public record SchoolClassResponse(
         this(id, orgId, classCode, name, academicYear, startDate, endDate, status, teacher,
             closeState, version, studentCount, createdBy, createdAt, updatedAt, cancelReason,
             closeRequestNote, closeRejectReason, needsReassignment, reassignmentReason,
-            null, null, null, null);
+            null, null, null, null, null, null);
     }
 }

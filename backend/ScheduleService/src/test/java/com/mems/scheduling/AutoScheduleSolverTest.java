@@ -315,6 +315,37 @@ class AutoScheduleSolverTest {
         ScheduleConflictChecker.verify(input, result);
     }
 
+    // S15: buổi 150 phút → trần 240 phút/lớp/ngày chỉ cho 1 buổi mỗi ngày dù trần 2 buổi.
+    @Test
+    void s15_minuteCapKeepsLongSessionsToOnePerClassPerDay() {
+        List<TimeSlot> custom = List.of(
+            SolverFixtures.slot(1, "07:00", "07:50", true),
+            SolverFixtures.slot(2, "07:50", "08:40", true),
+            SolverFixtures.slot(3, "08:40", "09:30", false),
+            SolverFixtures.slot(4, "09:40", "10:30", true),
+            SolverFixtures.slot(5, "10:30", "11:20", true),
+            SolverFixtures.slot(6, "11:20", "12:10", false));
+        List<SessionRequirement> requirements = List.of(
+            new SessionRequirement("C1", "C1", "S1", "S1", "T1",
+                List.of(new EligibleTeacherInfo("T1", "T1", "DP")), 2, 2, 150, "ANY", 30,
+                SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1),
+            new SessionRequirement("C1", "C1", "S2", "S2", "T2",
+                List.of(new EligibleTeacherInfo("T2", "T2", "DP")), 2, 2, 150, "ANY", 30,
+                SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1));
+        SolverInput input = SolverFixtures.input(requirements,
+            List.of(SolverFixtures.normal("R1", 40), SolverFixtures.normal("R2", 40)), custom);
+
+        SolverResult result = solver.solve(input);
+
+        assertThat(result.stats().complete()).isTrue();
+        assertThat(result.placements()).hasSize(4);
+        var classDays = result.placements().stream()
+            .map(placement -> placement.date())
+            .collect(Collectors.toSet());
+        assertThat(classDays).hasSize(4);
+        ScheduleConflictChecker.verify(input, result);
+    }
+
     // S14: môn cần phòng máy được ưu tiên hơn môn ANY khi chỉ còn một phòng máy.
     @Test
     void s14_computerSubjectWinsSingleComputerRoom() {
@@ -387,5 +418,59 @@ class AutoScheduleSolverTest {
         assertThat(result.unscheduled()).isNotEmpty();
         assertThat(result.unscheduled()).allMatch(entry -> entry.reason() != null && !entry.reason().isBlank());
         ScheduleConflictChecker.verify(input, result);
+    }
+
+    // Facility không phản hồi: "phòng ảo" của môn này không được dùng cho môn khác.
+    @Test
+    void syntheticRoomOnlyServesItsOwnSubject() {
+        SessionRequirement requirement = SolverFixtures.requirement("C1", "S2", "T2", 2, 2, 30, "ANY",
+            SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1);
+        SolverInput input = SolverFixtures.input(List.of(requirement),
+            List.of(new SolverRoom(SolverRoom.noRoomId("C1", "S1"), null, Integer.MAX_VALUE, null)),
+            slots);
+
+        SolverResult result = solver.solve(input);
+
+        assertThat(result.placements()).isEmpty();
+        assertThat(result.unscheduled()).isNotEmpty()
+            .allMatch(entry -> entry.subjectId().equals("S2"));
+    }
+
+    // Facility không phản hồi: mỗi cặp lớp–môn có "phòng ảo" riêng, xếp đủ mà không trùng phòng.
+    @Test
+    void eachSubjectGetsItsOwnSyntheticRoom() {
+        List<SessionRequirement> requirements = List.of(
+            SolverFixtures.requirement("C1", "S1", "T1", 2, 2, 30, "ANY",
+                SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1),
+            SolverFixtures.requirement("C1", "S2", "T2", 2, 2, 30, "ANY",
+                SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1));
+        SolverInput input = SolverFixtures.input(requirements, List.of(
+            new SolverRoom(SolverRoom.noRoomId("C1", "S1"), null, Integer.MAX_VALUE, null),
+            new SolverRoom(SolverRoom.noRoomId("C1", "S2"), null, Integer.MAX_VALUE, null)), slots);
+
+        SolverResult result = solver.solve(input);
+
+        assertThat(result.stats().complete()).isTrue();
+        assertThat(result.placements()).hasSize(4);
+        assertThat(result.placements()).allSatisfy(placement ->
+            assertThat(placement.roomId()).isEqualTo(
+                SolverRoom.noRoomId(placement.classId(), placement.subjectId())));
+    }
+
+    // Facility không phản hồi: môn cần phòng máy vẫn xếp được giờ với "phòng ảo".
+    @Test
+    void syntheticRoomMakesComputerSubjectSchedulable() {
+        SessionRequirement requirement = SolverFixtures.requirement("C1", "S1", "T1", 2, 2, 30, "COMPUTER",
+            SolverFixtures.monday(0), SolverFixtures.endOfWeek(0), 1);
+        String noRoom = SolverRoom.noRoomId("C1", "S1");
+        SolverInput input = SolverFixtures.input(List.of(requirement),
+            List.of(new SolverRoom(noRoom, null, Integer.MAX_VALUE, null)), slots);
+
+        SolverResult result = solver.solve(input);
+
+        assertThat(result.stats().complete()).isTrue();
+        assertThat(result.unscheduled()).isEmpty();
+        assertThat(result.placements()).hasSize(2)
+            .allSatisfy(placement -> assertThat(placement.roomId()).isEqualTo(noRoom));
     }
 }

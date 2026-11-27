@@ -10,6 +10,7 @@ import com.mems.dto.UnschedulableRequirement;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -76,7 +77,7 @@ public class SchedulingRequirementBuilder {
         List<SubjectPlan> plans = new ArrayList<>();
         Set<String> needTeachers = new LinkedHashSet<>();
         for (ClassSubjectInfo subject : subjects) {
-            SubjectPlan plan = planSubject(orgId, info, subject, unschedulable);
+            SubjectPlan plan = planSubject(orgId, info, subject, dateFrom, dateTo, unschedulable);
             if (plan == null) continue;
             if (!plan.assigned()) needTeachers.add(subject.subjectId());
             plans.add(plan);
@@ -132,6 +133,7 @@ public class SchedulingRequirementBuilder {
 
     /** Trả `null` khi môn đã đủ buổi; trả plan khi còn phải xếp; ghi lý do khi môn lỗi. */
     private SubjectPlan planSubject(String orgId, ClassInfo info, ClassSubjectInfo subject,
+                                    LocalDate dateFrom, LocalDate dateTo,
                                     List<UnschedulableRequirement> unschedulable) {
         if (subject == null || subject.subjectId() == null || subject.subjectId().isBlank()) {
             unschedulable.add(entry(info, subject, "SUBJECT_INVALID", "Môn học thiếu subjectId"));
@@ -142,7 +144,9 @@ public class SchedulingRequirementBuilder {
                 "Môn " + subjectName(subject) + " chưa được gán danh mục môn học"));
             return null;
         }
-        int planned = subject.plannedSessions() != null ? subject.plannedSessions() : 0;
+        int perWeek = subject.sessionsPerWeek() != null && subject.sessionsPerWeek() > 0
+            ? subject.sessionsPerWeek() : DEFAULT_SESSIONS_PER_WEEK;
+        int planned = plannedSessions(subject, info, dateFrom, dateTo, perWeek);
         if (planned <= 0) {
             unschedulable.add(entry(info, subject, "MISSING_PLANNED_SESSIONS",
                 "Môn " + subjectName(subject) + " chưa có số buổi kế hoạch"));
@@ -159,10 +163,27 @@ public class SchedulingRequirementBuilder {
         }
         int needed = planned - existing;
         if (needed <= 0) return null;
-        int perWeek = subject.sessionsPerWeek() != null && subject.sessionsPerWeek() > 0
-            ? subject.sessionsPerWeek() : DEFAULT_SESSIONS_PER_WEEK;
         boolean assigned = subject.teacherId() != null && !subject.teacherId().isBlank();
         return new SubjectPlan(subject, needed, perWeek, assigned);
+    }
+
+    /**
+     * Số buổi kế hoạch của môn: ưu tiên planned, rồi required (không vượt tổng của môn),
+     * cuối cùng suy ra từ cửa sổ ngày của lượt xếp/lớp để xếp vừa đủ tuần × số buổi mỗi tuần.
+     */
+    private int plannedSessions(ClassSubjectInfo subject, ClassInfo info,
+                                LocalDate dateFrom, LocalDate dateTo, int perWeek) {
+        if (subject.plannedSessions() != null && subject.plannedSessions() > 0) {
+            return subject.plannedSessions();
+        }
+        if (subject.requiredSessions() != null && subject.requiredSessions() > 0) {
+            return subject.requiredSessions();
+        }
+        LocalDate from = dateFrom != null ? dateFrom : info.startDate();
+        LocalDate to = dateTo != null ? dateTo : info.endDate();
+        if (from == null || to == null || to.isBefore(from)) return 0;
+        long weeks = ChronoUnit.WEEKS.between(from, to) + 1;
+        return (int) Math.max(1L, weeks) * perWeek;
     }
 
     private SessionRequirement windowRequirement(ClassInfo info, Accepted accepted, int stage,

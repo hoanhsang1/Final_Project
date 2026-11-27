@@ -104,6 +104,8 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
     const inputs = within(dialog).getAllByRole('textbox')
     await userEvent.type(inputs[0]!, 'LH-10A2')
     await userEvent.type(inputs[1]!, 'Lớp 10A2')
+    await userEvent.click(within(dialog).getByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Chương trình 10 (CT10)' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
 
     await waitFor(() =>
@@ -121,6 +123,8 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
 
     expect(await screen.findByText('LH-10A1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Tạo lớp' })).toBeInTheDocument()
+    expect(screen.getByText('Chương trình đào tạo')).toBeInTheDocument()
+    expect(screen.getByText('Chưa gán')).toBeInTheDocument()
     await waitFor(() => expect(classesApi.list).toHaveBeenCalledTimes(1))
   })
 
@@ -134,10 +138,27 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
     const inputs = within(dialog).getAllByRole('textbox')
     await userEvent.type(inputs[0]!, 'LH-10A3')
     await userEvent.type(inputs[1]!, 'Lớp 10A3')
+    await userEvent.click(within(dialog).getByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Chương trình 10 (CT10)' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
 
     await waitFor(() => expect(classesApi.create).toHaveBeenCalled())
     expect(vi.mocked(classesApi.create).mock.calls[0]?.[0]).not.toHaveProperty('status')
+  })
+
+  it('chưa chọn chương trình đào tạo: chặn tạo lớp kèm thông báo', async () => {
+    renderPage(<ClassesPage />)
+    await screen.findByText('LH-10A1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo lớp' }))
+    const dialog = await screen.findByRole('dialog')
+    const inputs = within(dialog).getAllByRole('textbox')
+    await userEvent.type(inputs[0]!, 'LH-10D1')
+    await userEvent.type(inputs[1]!, 'Lớp 10D1')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
+
+    expect(await within(dialog).findByText('Vui lòng chọn chương trình đào tạo cho lớp.')).toBeInTheDocument()
+    expect(classesApi.create).not.toHaveBeenCalled()
   })
 
   it('tạo lớp kèm chương trình: gửi curriculumId để backend áp môn ngay', async () => {
@@ -150,7 +171,7 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
     const inputs = within(dialog).getAllByRole('textbox')
     await userEvent.type(inputs[0]!, 'LH-10C1')
     await userEvent.type(inputs[1]!, 'Lớp 10C1')
-    await userEvent.click(within(dialog).getAllByRole('combobox')[1]!)
+    await userEvent.click(within(dialog).getByRole('combobox'))
     await userEvent.click(await screen.findByRole('option', { name: 'Chương trình 10 (CT10)' }))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
 

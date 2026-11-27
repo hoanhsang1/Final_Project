@@ -42,9 +42,12 @@ public class SchoolClassController {
         @RequestParam(required = false) String q,
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "false") boolean selectable,
-        @RequestParam(required = false) Boolean needsReassignment
+        @RequestParam(required = false) Boolean needsReassignment,
+        @RequestParam(required = false) String departmentId,
+        @RequestParam(defaultValue = "false") boolean hasSubjects
     ) {
-        return service.list(page, size, q, status, selectable, needsReassignment);
+        return service.list(page, size, q, status, selectable, needsReassignment, departmentId,
+            hasSubjects);
     }
 
     @GetMapping("/{id}")

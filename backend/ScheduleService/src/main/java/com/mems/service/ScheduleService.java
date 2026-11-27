@@ -11,13 +11,16 @@ import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.schedule.ScheduleRules;
 import com.mems.scheduling.ExistingSession;
+import com.mems.scheduling.SolverOptions;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -36,6 +39,10 @@ import java.util.UUID;
 public class ScheduleService {
     private static final String CLASS_CANCELLED = "DA_HUY";
     private static final String CLASS_FINISHED = "DA_KET_THUC";
+    private static final int MAX_SESSIONS_PER_CLASS_PER_DAY =
+        SolverOptions.DEFAULT_MAX_SESSIONS_PER_DAY_PER_CLASS;
+    private static final int MAX_MINUTES_PER_CLASS_PER_DAY =
+        SolverOptions.DEFAULT_MAX_MINUTES_PER_DAY_PER_CLASS;
 
     private final JdbcTemplate jdbc;
     private final PeopleClient people;
@@ -93,6 +100,8 @@ public class ScheduleService {
         Timestamp now = Timestamp.from(Instant.now());
         String teacherName = request.teacherName() != null ? request.teacherName() : info.teacherName();
         String subjectName = request.subjectName() != null ? request.subjectName() : info.subjectName();
+        assertDailyLimits(orgId, request.classId(), request.subjectId(), subjectName,
+            request.startTime(), request.endTime(), null);
         jdbc.update("""
             INSERT INTO session(id, class_id, teacher_id, teacher_name, room_id, room_code,
                                 subject_name, subject_id, start_time, end_time, status, department_id,
@@ -122,6 +131,8 @@ public class ScheduleService {
         ensureClassMirror(orgId, info, request);
         lockResources(orgId, teacherId, request.roomId());
         assertNoConflicts(orgId, teacherId, request.roomId(), request.classId(),
+            request.startTime(), request.endTime(), sessionId);
+        assertDailyLimits(orgId, request.classId(), request.subjectId(), info.subjectName(),
             request.startTime(), request.endTime(), sessionId);
 
         jdbc.update("""
@@ -197,12 +208,17 @@ public class ScheduleService {
                 Timestamp.from(endTime), Timestamp.from(startTime)));
         }
         List<RoomInfo> usable = new ArrayList<>();
-        for (RoomInfo room : facility.roomsOfOrg(orgId)) {
-            if (!"active".equals(room.status())) continue;
-            if (room.brokenEquipmentCount() > 0) continue;
-            if (occupied.contains(room.id())) continue;
-            if (minCapacity != null && room.capacity() < minCapacity) continue;
-            usable.add(room);
+        try {
+            for (RoomInfo room : facility.roomsOfOrg(orgId)) {
+                if (!"active".equals(room.status())) continue;
+                if (room.brokenEquipmentCount() > 0) continue;
+                if (occupied.contains(room.id())) continue;
+                if (minCapacity != null && room.capacity() < minCapacity) continue;
+                usable.add(room);
+            }
+        } catch (AppException ex) {
+            // Facility chưa sẵn sàng: gợi ý phòng rỗng thay vì chặn cả màn xếp lịch.
+            if (ex.getErrorCode() != ErrorCode.FACILITY_UNAVAILABLE) throw ex;
         }
         if (minCapacity != null) {
             // Phòng thường trước; sort ổn định nên trong cùng loại giữ thứ tự theo tên.
@@ -413,6 +429,58 @@ public class ScheduleService {
             throw new AppException(ErrorCode.CLASS_SCHEDULE_CONFLICT);
         }
     }
+
+    /**
+     * Chặn vượt trần trong một ngày (giờ Việt Nam): mỗi môn tối đa 1 buổi,
+     * mỗi lớp tối đa 2 buổi và 240 phút. Buổi đã huỷ/đã xoá không tính.
+     */
+    void assertDailyLimits(String orgId, String classId, String subjectId, String subjectName,
+                           Instant start, Instant end, String excludeId) {
+        LocalDate day = start.atZone(ScheduleRules.BUSINESS_ZONE).toLocalDate();
+        Instant dayStart = day.atStartOfDay(ScheduleRules.BUSINESS_ZONE).toInstant();
+        Instant dayEnd = day.plusDays(1).atStartOfDay(ScheduleRules.BUSINESS_ZONE).toInstant();
+        String sql = """
+            SELECT s.subject_id, s.subject_name, s.start_time, s.end_time
+            FROM session s JOIN `class` c ON c.id=s.class_id
+            WHERE c.org_id=? AND s.class_id=? AND s.deleted_at IS NULL AND c.deleted_at IS NULL
+              AND s.status<>'cancelled' AND s.end_time>? AND s.start_time<?
+            """ + (excludeId == null ? "" : " AND s.id<>?");
+        List<Object> args = new ArrayList<>(List.of(orgId, classId,
+            Timestamp.from(dayStart), Timestamp.from(dayEnd)));
+        if (excludeId != null) args.add(excludeId);
+        List<DailySession> sameDay = jdbc.query(sql, (rs, row) -> new DailySession(
+            rs.getString("subject_id"), rs.getString("subject_name"),
+            rs.getTimestamp("start_time").toInstant(), rs.getTimestamp("end_time").toInstant()),
+            args.toArray());
+
+        long minutes = Duration.between(start, end).toMinutes();
+        for (DailySession existing : sameDay) {
+            if (sameSubject(existing.subjectId(), existing.subjectName(), subjectId, subjectName)) {
+                throw new AppException(ErrorCode.SUBJECT_DAILY_LIMIT);
+            }
+            minutes += Duration.between(existing.start(), existing.end()).toMinutes();
+        }
+        if (sameDay.size() >= MAX_SESSIONS_PER_CLASS_PER_DAY) {
+            throw new AppException(ErrorCode.CLASS_DAILY_LIMIT);
+        }
+        if (minutes > MAX_MINUTES_PER_CLASS_PER_DAY) {
+            throw new AppException(ErrorCode.CLASS_DAILY_LIMIT,
+                "Lớp đã vượt " + MAX_MINUTES_PER_CLASS_PER_DAY + " phút trong ngày " + day);
+        }
+    }
+
+    /** subject_id là chuẩn; buổi cũ (subject_id NULL) so theo tên như countScheduledSessions. */
+    private boolean sameSubject(String rowSubjectId, String rowSubjectName,
+                                String subjectId, String subjectName) {
+        if (subjectId != null && !subjectId.isBlank()) {
+            return subjectId.equals(rowSubjectId);
+        }
+        return (rowSubjectId == null || rowSubjectId.isBlank())
+            && subjectName != null && !subjectName.isBlank()
+            && subjectName.equals(rowSubjectName);
+    }
+
+    private record DailySession(String subjectId, String subjectName, Instant start, Instant end) {}
 
     private int countConflicts(String orgId, String column, String value, Instant start, Instant end,
                                String excludeId) {

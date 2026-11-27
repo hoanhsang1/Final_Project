@@ -84,6 +84,21 @@ final class ScheduleConflictChecker {
                 placement.subjectId(), placement.classId(), placement.date()).isEqualTo(1);
         }
 
+        Map<String, Integer> classDaySessions = new HashMap<>();
+        Map<String, Integer> classDayMinutes = new HashMap<>();
+        for (SolverPlacement placement : placements) {
+            String classDay = placement.classId() + "|" + placement.date();
+            int sessions = classDaySessions.merge(classDay, 1, Integer::sum);
+            int minutes = classDayMinutes.merge(classDay,
+                (int) Duration.between(placement.start(), placement.end()).toMinutes(), Integer::sum);
+            assertThat(sessions).as("lớp %s không được quá %d buổi ngày %s",
+                placement.classId(), input.options().maxSessionsPerDayPerClass(), placement.date())
+                .isLessThanOrEqualTo(input.options().maxSessionsPerDayPerClass());
+            assertThat(minutes).as("lớp %s không được quá %d phút ngày %s",
+                placement.classId(), input.options().maxMinutesPerDayPerClass(), placement.date())
+                .isLessThanOrEqualTo(input.options().maxMinutesPerDayPerClass());
+        }
+
         for (SolverUnscheduled entry : result.unscheduled()) {
             assertThat(entry.reason()).as("lý do bỏ buổi phải có nội dung").isNotBlank();
         }

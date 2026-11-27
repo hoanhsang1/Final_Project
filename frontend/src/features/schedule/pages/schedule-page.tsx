@@ -107,7 +107,10 @@ function SessionDialog({
   departmentId: string | null
   session: ScheduleSession | null
 }) {
-  const classes = useClasses({ page: 1, size: 100, selectable: true })
+  const classes = useClasses(
+    { page: 1, size: 100, selectable: true, departmentId: departmentId || undefined },
+    open && Boolean(departmentId),
+  )
   const teachers = useAssignableTeachers('', open)
   const mutations = useScheduleMutations(departmentId)
   const [form, setForm] = useState<SessionForm>(EMPTY_FORM)
@@ -281,6 +284,7 @@ export function SchedulePage() {
   const classes = useClasses({ page: 1, size: 100 })
   const [tab, setTab] = useState<ScheduleTab>('week')
   const [departmentId, setDepartmentId] = useState('')
+  const [filterClassId, setFilterClassId] = useState('')
   const [anchorKey, setAnchorKey] = useState(() => dateKey(startOfWeekLocal(new Date())))
   const [hiddenDepartmentIds, setHiddenDepartmentIds] = useState<string[]>([])
   const [from, setFrom] = useState('')
@@ -306,8 +310,9 @@ export function SchedulePage() {
     return {
       from: new Date(start.getFullYear(), start.getMonth(), start.getDate()).toISOString(),
       to: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).toISOString(),
+      classId: filterClassId || undefined,
     }
-  }, [anchorKey])
+  }, [anchorKey, filterClassId])
 
   const weekDepartments = useMemo(() => {
     if (!scope.isScoped) return (departments.data ?? []).map(({ id, name }) => ({ id, name }))
@@ -335,7 +340,10 @@ export function SchedulePage() {
     .map((query, index) => ({ query, name: weekDepartments[index]?.name ?? '' }))
     .filter((entry) => entry.query.isError)
 
-  const listBounds = useMemo(() => dayBounds(from, to), [from, to])
+  const listBounds = useMemo(
+    () => ({ ...dayBounds(from, to), classId: filterClassId || undefined }),
+    [from, to, filterClassId],
+  )
   const listSessions = useSchedules(createDepartmentId, listBounds)
   const listMutations = useScheduleMutations(createDepartmentId)
   const listRows = listSessions.data ?? []
@@ -505,6 +513,25 @@ export function SchedulePage() {
                 </Select>
               </Field>
             ) : null}
+
+            <Field label="Lớp" labelSize="sm">
+              <Select
+                value={filterClassId || 'all'}
+                onValueChange={(value) => setFilterClassId(value === 'all' ? '' : value)}
+              >
+                <SelectTrigger className="sm:w-60">
+                  <SelectValue placeholder="Tất cả lớp" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả lớp</SelectItem>
+                  {(classes.data?.items ?? []).map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.classCode} · {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
             {tab === 'week' ? (
               <>

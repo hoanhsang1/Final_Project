@@ -144,6 +144,9 @@ export interface SchoolClass {
   subjectName: string | null
   cancelState: string | null
   cancelRequestReason: string | null
+  /** Chương trình đào tạo đã áp cho lớp; null khi lớp chưa được gán. */
+  curriculumId?: string | null
+  curriculumName?: string | null
 }
 
 export interface ClassInput {

@@ -117,6 +117,48 @@ class ScheduleDraftServiceTest {
     }
 
     @Test
+    @DisplayName("Facility không phản hồi: vẫn tạo lịch nháp, buổi để trống phòng")
+    void createDraftWhenFacilityUnavailableLeavesRoomsEmpty() {
+        when(facility.roomsOfOrg(ORG)).thenThrow(new AppException(ErrorCode.FACILITY_UNAVAILABLE));
+
+        ScheduleDraftDetailResponse detail = service.create(ORG, DEPT, "user-1", request());
+
+        assertThat(detail.status()).isEqualTo("DRAFT");
+        assertThat(detail.items()).hasSize(2);
+        assertThat(detail.items()).allSatisfy(item -> {
+            assertThat(item.roomId()).isNull();
+            assertThat(item.roomCode()).isNull();
+            assertThat(item.periods()).isNotEmpty();
+        });
+        assertThat(detail.unscheduled()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Facility không phản hồi: xác nhận lịch nháp vẫn tạo buổi (không phòng)")
+    void confirmCreatesSessionsWithoutRoomWhenFacilityUnavailable() {
+        when(facility.roomsOfOrg(ORG)).thenThrow(new AppException(ErrorCode.FACILITY_UNAVAILABLE));
+        ScheduleDraftDetailResponse detail = service.create(ORG, DEPT, "user-1", request());
+
+        ScheduleDraftConfirmResponse result = service.confirm(ORG, DEPT, detail.id());
+
+        assertThat(result.created()).isEqualTo(2);
+        assertThat(result.failed()).isEmpty();
+        assertThat(jdbc.queryForList("SELECT room_id FROM session", String.class))
+            .containsOnlyNulls();
+    }
+
+    @Test
+    @DisplayName("Lớp chưa có môn học trong chương trình: báo lỗi thay vì lưu lịch nháp rỗng")
+    void rejectsClassesWithoutSubjects() {
+        when(people.classSubjects(ORG, CLASS_ID)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.create(ORG, DEPT, "user-1", request()))
+            .isInstanceOfSatisfying(AppException.class, ex ->
+                assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_ERROR));
+        assertThat(count("schedule_draft")).isZero();
+    }
+
+    @Test
     @DisplayName("Sửa tay phòng hợp lệ: lưu và đánh dấu is_manual_edit")
     void patchValidRoomMarksManualEdit() {
         ScheduleDraftDetailResponse detail = service.create(ORG, DEPT, "user-1", request());

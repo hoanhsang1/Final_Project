@@ -9,11 +9,14 @@ import com.mems.schedule.TimeSlot;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -124,6 +127,9 @@ public final class AutoScheduleSolver {
         private final OccupancyBoard board = new OccupancyBoard();
         private final List<SolverPlacement> placements = new ArrayList<>();
         private final List<SolverUnscheduled> unscheduled = new ArrayList<>();
+        // Trần buổi/phút mỗi lớp trong một ngày, chỉ chốt được khi đã có ngày cụ thể (giai đoạn 2).
+        private final Map<String, Map<LocalDate, Integer>> classDaySessions = new HashMap<>();
+        private final Map<String, Map<LocalDate, Integer>> classDayMinutes = new HashMap<>();
 
         private long steps;
         private int exceptionCount;
@@ -146,6 +152,7 @@ public final class AutoScheduleSolver {
                 if (session == null) continue;
                 board.add(session.teacherId(), session.roomId(), session.classId(), null,
                     session.start(), session.end());
+                accumulateDay(session.classId(), session.start(), session.end());
             }
             try {
                 solveStages();
@@ -338,8 +345,14 @@ public final class AutoScheduleSolver {
 
         private List<SolverRoom> roomsFor(SessionRequirement requirement) {
             List<SolverRoom> result = new ArrayList<>();
+            String noRoomId = SolverRoom.noRoomId(requirement.classId(), requirement.subjectId());
             for (SolverRoom room : input.rooms()) {
                 if (room == null) continue;
+                // "Phòng ảo" khi Facility không phản hồi: chỉ dùng cho đúng môn của đúng lớp.
+                if (room.synthetic()) {
+                    if (room.id().equals(noRoomId)) result.add(room);
+                    continue;
+                }
                 if (isComputerRequirement(requirement) && !room.isComputerRoom()) continue;
                 result.add(room);
             }
@@ -398,6 +411,7 @@ public final class AutoScheduleSolver {
             private final WeeklyTemplateBoard classBoard = new WeeklyTemplateBoard();
             private final WeeklyTemplateBoard teacherBoard = new WeeklyTemplateBoard();
             private final WeeklyTemplateBoard roomBoard = new WeeklyTemplateBoard();
+            private final Map<Integer, List<LocalDate>> datesByCell = new HashMap<>();
             private final int totalCells;
             private int assigned;
             private int bestAssigned;
@@ -490,11 +504,59 @@ public final class AutoScheduleSolver {
                 if (classBoard.classConflict(resultPlan.requirement.classId(), candidate.weekday(), candidate.periods())) {
                     return false;
                 }
+                if (!withinClassDayCap(planIndex, candidate)) return false;
                 if (candidate.teacherId() != null
                     && teacherBoard.teacherConflict(candidate.teacherId(), candidate.weekday(), candidate.periods())) {
                     return false;
                 }
                 return !roomBoard.roomConflict(candidate.roomId(), candidate.weekday(), candidate.periods());
+            }
+
+            /** Trần buổi/phút của một lớp trên từng ngày thật, tính cả các ô đã đặt trong giai đoạn. */
+            private boolean withinClassDayCap(int planIndex, WeeklyCandidate candidate) {
+                String classId = plans.get(planIndex).requirement.classId();
+                if (classId == null) return true;
+                List<LocalDate> dates = datesOf(planIndex, candidate);
+                if (dates.isEmpty()) return true;
+                Set<LocalDate> candidateDates = new HashSet<>(dates);
+                int candidateMinutes = sessionMinutes(candidate.periods());
+                Map<LocalDate, Integer> sessions = new HashMap<>();
+                Map<LocalDate, Integer> minutes = new HashMap<>();
+                for (int index = 0; index < plans.size(); index++) {
+                    if (!classId.equals(plans.get(index).requirement.classId())) continue;
+                    for (WeeklyCandidate placed : assignment[index]) {
+                        if (placed == null) continue;
+                        int placedMinutes = sessionMinutes(placed.periods());
+                        for (LocalDate date : datesOf(index, placed)) {
+                            if (!candidateDates.contains(date)) continue;
+                            sessions.merge(date, 1, Integer::sum);
+                            minutes.merge(date, placedMinutes, Integer::sum);
+                        }
+                    }
+                }
+                for (LocalDate date : dates) {
+                    if (sessions.getOrDefault(date, 0) + 1 > options.maxSessionsPerDayPerClass()) return false;
+                    if (minutes.getOrDefault(date, 0) + candidateMinutes > options.maxMinutesPerDayPerClass()) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            private List<LocalDate> datesOf(int planIndex, WeeklyCandidate candidate) {
+                return datesByCell.computeIfAbsent(planIndex * 10 + candidate.weekday(), key -> {
+                    SessionRequirement requirement = plans.get(planIndex).requirement;
+                    return datesForWeekday(requirement.windowFrom(), requirement.windowTo(), candidate.weekday());
+                });
+            }
+
+            private int sessionMinutes(List<Integer> periods) {
+                long total = 0;
+                for (Integer period : periods) {
+                    TimeSlot slot = slots.get(period);
+                    if (slot != null) total += Duration.between(slot.start(), slot.end()).toMinutes();
+                }
+                return (int) total;
             }
 
             private void assign(int planIndex, int cellIndex, WeeklyCandidate candidate) {
@@ -697,6 +759,7 @@ public final class AutoScheduleSolver {
                 return null;
             }
             if (board.roomConflict(roomId, range.start(), range.end()) != null) return null;
+            if (!withinDailyCap(requirement.classId(), date, minutes(range))) return null;
             Attempt attempt = new Attempt();
             attempt.date = date;
             attempt.periods = List.copyOf(periods);
@@ -717,6 +780,10 @@ public final class AutoScheduleSolver {
             SolverRoom room = roomById(roomId);
             if (room == null || !roomFits(requirement, room)) return "không có phòng phù hợp sức chứa/loại phòng";
             TimeRange range = range(date, periods);
+            if (!withinDailyCap(requirement.classId(), date, minutes(range))) {
+                return "lớp đã đạt trần " + options.maxSessionsPerDayPerClass() + " buổi hoặc "
+                    + options.maxMinutesPerDayPerClass() + " phút trong ngày " + date;
+            }
             OccupancyBoard.Entry classEntry = board.classConflict(requirement.classId(), range.start(), range.end());
             if (classEntry != null) return "lớp đã có buổi môn " + safe(classEntry.subjectId());
             if (teacherId != null) {
@@ -736,6 +803,26 @@ public final class AutoScheduleSolver {
                 attempt.isException(), attempt.exceptionType, attempt.exceptionReason));
             board.add(attempt.teacherId, attempt.roomId, requirement.classId(), requirement.subjectId(),
                 attempt.range.start(), attempt.range.end());
+            accumulateDay(requirement.classId(), attempt.range.start(), attempt.range.end());
+        }
+
+        private void accumulateDay(String classId, Instant start, Instant end) {
+            if (classId == null) return;
+            LocalDate date = start.atZone(ScheduleRules.BUSINESS_ZONE).toLocalDate();
+            classDaySessions.computeIfAbsent(classId, key -> new HashMap<>()).merge(date, 1, Integer::sum);
+            classDayMinutes.computeIfAbsent(classId, key -> new HashMap<>())
+                .merge(date, (int) Math.max(0L, Duration.between(start, end).toMinutes()), Integer::sum);
+        }
+
+        private boolean withinDailyCap(String classId, LocalDate date, int sessionMinutes) {
+            int sessions = classDaySessions.getOrDefault(classId, Map.of()).getOrDefault(date, 0);
+            int minutes = classDayMinutes.getOrDefault(classId, Map.of()).getOrDefault(date, 0);
+            return sessions + 1 <= options.maxSessionsPerDayPerClass()
+                && minutes + sessionMinutes <= options.maxMinutesPerDayPerClass();
+        }
+
+        private static int minutes(TimeRange range) {
+            return (int) Math.max(0L, Duration.between(range.start(), range.end()).toMinutes());
         }
 
         private List<SolverRoom> fitRoomsFor(SessionRequirement requirement) {
@@ -775,6 +862,7 @@ public final class AutoScheduleSolver {
 
         private boolean roomFits(SessionRequirement requirement, SolverRoom room) {
             if (room.capacity() < requirement.studentCount()) return false;
+            if (room.synthetic()) return true;
             return !isComputerRequirement(requirement) || room.isComputerRoom();
         }
 

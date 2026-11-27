@@ -11,6 +11,7 @@ import com.mems.dto.AutoScheduleResult;
 import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.time.SchoolClock;
 import org.springframework.stereotype.Service;
 
@@ -132,9 +133,16 @@ public class AutoScheduleService {
         candidates.sort(Comparator.comparingInt(c -> c.eligibleTeachers().size()));
 
         // ---- 3. Lấy phòng khả dụng theo department ----
-        List<RoomInfo> availableRooms = facility.rooms(orgId, departmentId).stream()
-            .filter(r -> "active".equals(r.status()) && r.brokenEquipmentCount() == 0)
-            .toList();
+        List<RoomInfo> availableRooms;
+        try {
+            availableRooms = facility.rooms(orgId, departmentId).stream()
+                .filter(r -> "active".equals(r.status()) && r.brokenEquipmentCount() == 0)
+                .toList();
+        } catch (AppException ex) {
+            // Facility chưa sẵn sàng: coi như chưa có phòng để báo lý do thay vì lỗi 500.
+            if (ex.getErrorCode() != ErrorCode.FACILITY_UNAVAILABLE) throw ex;
+            availableRooms = List.of();
+        }
 
         if (availableRooms.isEmpty()) {
             for (ClassSubjectCandidate c : candidates) {

@@ -58,27 +58,31 @@ public class SchoolClassRepository {
             rs.getString("subject_id"),
             rs.getString("subject_name"),
             rs.getString("cancel_state"),
-            rs.getString("cancel_request_reason")
+            rs.getString("cancel_request_reason"),
+            rs.getString("curriculum_id"),
+            rs.getString("curriculum_name")
         );
     }
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable) {
-        return list(orgId, page, size, q, status, selectable, null, null, null);
+        return list(orgId, page, size, q, status, selectable, null, null, null, false);
     }
 
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable, Boolean needsReassignment) {
-        return list(orgId, page, size, q, status, selectable, needsReassignment, null, null);
+        return list(orgId, page, size, q, status, selectable, needsReassignment, null, null, false);
     }
 
     /**
      * @param teacherId     chỉ lớp của giáo viên này (giáo viên xem lớp của mình)
      * @param departmentIds chỉ lớp do giáo viên/người tạo thuộc các phòng này phụ trách
+     * @param hasSubjects   chỉ lớp đã có môn học trong lớp (xếp lịch được)
      */
     public Map<String, Object> list(String orgId, int page, int size, String q, String status,
                                     boolean selectable, Boolean needsReassignment,
-                                    String teacherId, Set<String> departmentIds) {
+                                    String teacherId, Set<String> departmentIds,
+                                    boolean hasSubjects) {
         if (page < 1) page = 1;
         if (size < 1) size = 20;
         if (size > 100) size = 100;
@@ -107,6 +111,12 @@ public class SchoolClassRepository {
 
         appendDepartmentFilter(where, params, departmentIds);
 
+        if (hasSubjects) {
+            // class_subject không có org_id trên schema thật; class_id đã thuộc lớp trong org.
+            where.append(" AND EXISTS (SELECT 1 FROM class_subject csx "
+                + "WHERE csx.class_id = c.id) ");
+        }
+
         if (q != null && !q.isBlank()) {
             where.append(" AND (LOWER(c.name) LIKE ? OR LOWER(c.class_code) LIKE ?) ");
             String term = "%" + q.trim().toLowerCase() + "%";
@@ -126,6 +136,7 @@ public class SchoolClassRepository {
                    c.needs_reassignment, c.reassignment_reason,
                    c.subject_id, sub.name AS subject_name,
                    c.cancel_state, c.cancel_request_reason,
+                   c.curriculum_id, cur.name AS curriculum_name,
                    t.staff_code AS teacher_code, t.full_name AS teacher_name,
                    COUNT(cs.student_id) AS student_count,
                    c.created_by, c.created_at, c.updated_at
@@ -133,12 +144,14 @@ public class SchoolClassRepository {
             LEFT JOIN class_student cs ON cs.class_id = c.id AND cs.org_id = c.org_id
             LEFT JOIN staff_profile t ON t.user_id = c.teacher_id AND t.org_id = c.org_id
             LEFT JOIN subject sub ON sub.id = c.subject_id AND sub.org_id = c.org_id
+            LEFT JOIN curriculum cur ON cur.id = c.curriculum_id AND cur.org_id = c.org_id
             """ + where + """
             GROUP BY c.id, c.org_id, c.class_code, c.name, c.academic_year,
                      c.start_date, c.end_date, c.status,
                      c.teacher_id, c.close_state, c.version,
                      c.needs_reassignment, c.reassignment_reason,
                      c.subject_id, sub.name, c.cancel_state, c.cancel_request_reason,
+                     c.curriculum_id, cur.name,
                      t.staff_code, t.full_name,
                      c.created_by, c.created_at, c.updated_at
             ORDER BY c.class_code ASC LIMIT ? OFFSET ?
@@ -175,6 +188,7 @@ public class SchoolClassRepository {
                    c.needs_reassignment, c.reassignment_reason,
                    c.subject_id, sub.name AS subject_name,
                    c.cancel_state, c.cancel_request_reason,
+                   c.curriculum_id, cur.name AS curriculum_name,
                    t.staff_code AS teacher_code, t.full_name AS teacher_name,
                    COUNT(cs.student_id) AS student_count,
                    c.created_by, c.created_at, c.updated_at,
@@ -191,12 +205,14 @@ public class SchoolClassRepository {
             LEFT JOIN class_student cs ON cs.class_id = c.id AND cs.org_id = c.org_id
             LEFT JOIN staff_profile t ON t.user_id = c.teacher_id AND t.org_id = c.org_id
             LEFT JOIN subject sub ON sub.id = c.subject_id AND sub.org_id = c.org_id
+            LEFT JOIN curriculum cur ON cur.id = c.curriculum_id AND cur.org_id = c.org_id
             WHERE c.id = ? AND c.org_id = ? AND c.deleted_at IS NULL
             GROUP BY c.id, c.org_id, c.class_code, c.name, c.academic_year,
                      c.start_date, c.end_date, c.status,
                      c.teacher_id, c.close_state, c.version,
                      c.needs_reassignment, c.reassignment_reason,
                      c.subject_id, sub.name, c.cancel_state, c.cancel_request_reason,
+                     c.curriculum_id, cur.name,
                      t.staff_code, t.full_name,
                      c.created_by, c.created_at, c.updated_at
             """;

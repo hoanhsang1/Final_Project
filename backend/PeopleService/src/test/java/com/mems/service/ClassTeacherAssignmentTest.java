@@ -223,7 +223,7 @@ class ClassTeacherAssignmentTest {
         return new SchoolClassResponse(id, "org-1", "C001", "Class 1", "2026", null, null,
             "CHUA_BAT_DAU", null, "NONE", 0L, 0, "owner", Instant.now(), null,
             null, null, null, true, "Giáo viên đã nghỉ việc", subjectId, "Toán",
-            "NONE", null);
+            "NONE", null, null, null);
     }
 
     private TeacherRepository.TeacherRow teacher(String id, String teachingStatus) {

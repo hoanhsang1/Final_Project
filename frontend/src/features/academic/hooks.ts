@@ -193,6 +193,8 @@ export function useClasses(
     status?: string
     selectable?: boolean
     needsReassignment?: boolean
+    departmentId?: string
+    hasSubjects?: boolean
   },
   enabled = true,
 ) {

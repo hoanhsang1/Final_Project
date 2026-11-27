@@ -152,6 +152,6 @@ class ClassCancelWorkflowTest {
         return new SchoolClassResponse(CLASS, ORG, "C001", "Lớp 10A", "2026",
             null, null, "DANG_DIEN_RA", null, "NONE", 0L, studentCount, "owner",
             Instant.now(), null, null, null, null, false, null, null, null,
-            cancelState, "PENDING".equals(cancelState) ? "Trùng lịch" : null);
+            cancelState, "PENDING".equals(cancelState) ? "Trùng lịch" : null, null, null);
     }
 }

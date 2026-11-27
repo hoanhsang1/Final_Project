@@ -173,6 +173,69 @@ class ScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("Cùng môn không được xếp buổi thứ hai trong ngày")
+    void rejectsSecondSessionOfSameSubjectSameDay() {
+        service.create(ORG, DEPT, request("room-1", START, END));
+
+        assertThatThrownBy(() -> service.create(ORG, DEPT, request("room-1",
+            START.plusSeconds(3 * 3600), END.plusSeconds(3 * 3600))))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("SUBJECT_DAILY_LIMIT"));
+    }
+
+    @Test
+    @DisplayName("Lớp không được xếp buổi thứ ba trong ngày")
+    void rejectsThirdSessionOfClassSameDay() {
+        service.create(ORG, DEPT, subjectRequest("sub-1", "Toán", "teacher-1", "room-1", START, END));
+        service.create(ORG, DEPT, subjectRequest("sub-2", "Lý", "teacher-2", "room-2",
+            START.plusSeconds(2 * 3600), END.plusSeconds(2 * 3600)));
+
+        assertThatThrownBy(() -> service.create(ORG, DEPT,
+            subjectRequest("sub-3", "Hóa", "teacher-3", "room-3",
+                START.plusSeconds(5 * 3600), END.plusSeconds(5 * 3600))))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("CLASS_DAILY_LIMIT"));
+    }
+
+    @Test
+    @DisplayName("Lớp không được quá 240 phút trong ngày")
+    void rejectsTotalMinutesOverDailyCap() {
+        service.create(ORG, DEPT, subjectRequest("sub-1", "Toán", "teacher-1", "room-1", START,
+            START.plusSeconds(150 * 60)));
+
+        assertThatThrownBy(() -> service.create(ORG, DEPT,
+            subjectRequest("sub-2", "Lý", "teacher-2", "room-2",
+                START.plusSeconds(3 * 3600), START.plusSeconds(3 * 3600 + 150 * 60))))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("CLASS_DAILY_LIMIT"));
+    }
+
+    @Test
+    @DisplayName("Cập nhật buổi sang trùng môn cùng ngày bị chặn")
+    void updateRejectsSameSubjectSameDay() {
+        service.create(ORG, DEPT, subjectRequest("sub-1", "Toán", "teacher-1", "room-1", START, END));
+        ScheduleResponse second = service.create(ORG, DEPT,
+            subjectRequest("sub-2", "Lý", "teacher-2", "room-2",
+                START.plusSeconds(3 * 3600), END.plusSeconds(3 * 3600)));
+
+        ScheduleRequest change = subjectRequest("sub-1", "Toán", "teacher-2", "room-2",
+            START.plusSeconds(3 * 3600), END.plusSeconds(3 * 3600));
+
+        assertThatThrownBy(() -> service.update(ORG, DEPT, second.id(), change))
+            .isInstanceOf(AppException.class)
+            .satisfies(ex -> assertThat(((AppException) ex).getCode())
+                .isEqualTo("SUBJECT_DAILY_LIMIT"));
+    }
+
+    private ScheduleRequest subjectRequest(String subjectId, String subjectName, String teacherId,
+                                           String roomId, Instant start, Instant end) {
+        return new ScheduleRequest("class-1", teacherId, null, subjectName, roomId, start, end, subjectId);
+    }
+
+    @Test
     @DisplayName("Khung giờ không hợp lệ bị từ chối")
     void rejectsInvalidWindow() {
         assertThatThrownBy(() -> service.create(ORG, DEPT, request("room-1", END, START)))

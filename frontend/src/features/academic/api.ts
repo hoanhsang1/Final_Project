@@ -144,6 +144,10 @@ export const classesApi = {
     status?: string
     selectable?: boolean
     needsReassignment?: boolean
+    /** Chỉ lớp thuộc phòng ban đã chọn (giáo viên/chủ lớp là thành viên phòng ban). */
+    departmentId?: string
+    /** Chỉ lớp đã có môn học trong lớp (điều kiện xếp lịch được). */
+    hasSubjects?: boolean
   }): Promise<PageResponse<SchoolClass>> {
     const { data } = await api.get<PageResponse<SchoolClass>>('/classes', { params })
     return data

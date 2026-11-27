@@ -193,6 +193,22 @@ async function openDraft() {
 }
 
 describe('AutoSchedulePage — xếp lịch nháp', () => {
+  it('chỉ lấy lớp đã có môn học và hướng dẫn khi chưa có lớp nào', async () => {
+    vi.mocked(classesApi.list).mockResolvedValue({ items: [], total: 0, page: 1, size: 100 })
+
+    renderPage(<AutoSchedulePage />)
+
+    expect(
+      await screen.findByText(/Chưa có lớp nào được gán chương trình đào tạo/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Gán chương trình cho lớp' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(classesApi.list).toHaveBeenCalledWith(
+        expect.objectContaining({ hasSubjects: true, selectable: true }),
+      ),
+    )
+  })
+
   it('tạo lịch nháp với lớp đã chọn rồi hiển thị lưới tuần', async () => {
     renderPage(<AutoSchedulePage />)
 

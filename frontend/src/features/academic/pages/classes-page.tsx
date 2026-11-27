@@ -1,5 +1,6 @@
 import { BookOpen, Pencil, Plus, Trash2, UserPlus, Users } from 'lucide-react'
 import { useDeferredValue, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -484,7 +485,6 @@ type ClassForm = {
   classCode: string
   name: string
   academicYear: string
-  subjectId: string
   curriculumId: string
   startDate: string
   endDate: string
@@ -494,7 +494,6 @@ const EMPTY_FORM: ClassForm = {
   classCode: '',
   name: '',
   academicYear: '',
-  subjectId: '',
   curriculumId: '',
   startDate: '',
   endDate: '',
@@ -511,7 +510,6 @@ function ClassFormDialog({
   schoolClass: SchoolClass | null
   onCreated?: (created: SchoolClass) => void
 }) {
-  const subjects = useSubjects()
   const curricula = useCurricula({ isActive: true, page: 1, size: 100 })
   const mutations = useClassMutations()
   const [form, setForm] = useState<ClassForm>(EMPTY_FORM)
@@ -525,7 +523,6 @@ function ClassFormDialog({
             classCode: schoolClass.classCode,
             name: schoolClass.name,
             academicYear: schoolClass.academicYear ?? '',
-            subjectId: schoolClass.subjectId ?? 'none',
             curriculumId: '',
             startDate: schoolClass.startDate ?? '',
             endDate: schoolClass.endDate ?? '',
@@ -543,6 +540,10 @@ function ClassFormDialog({
     }
     if (!form.name.trim()) {
       setError('Vui lòng nhập tên lớp.')
+      return
+    }
+    if (!schoolClass && !form.curriculumId) {
+      setError('Vui lòng chọn chương trình đào tạo cho lớp.')
       return
     }
     if (form.startDate && form.endDate && form.endDate < form.startDate) {
@@ -565,7 +566,6 @@ function ClassFormDialog({
           input: {
             name: form.name.trim(),
             academicYear: form.academicYear.trim() || undefined,
-            subjectId: form.subjectId === 'none' ? undefined : form.subjectId || undefined,
             startDate: form.startDate || undefined,
             endDate: form.endDate || undefined,
             version: schoolClass.version,
@@ -578,7 +578,6 @@ function ClassFormDialog({
         classCode: form.classCode.trim(),
         name: form.name.trim(),
         academicYear: form.academicYear.trim() || undefined,
-        subjectId: form.subjectId === 'none' ? undefined : form.subjectId || undefined,
         curriculumId: form.curriculumId || undefined,
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
@@ -618,24 +617,6 @@ function ClassFormDialog({
                 onChange={(event) => setForm({ ...form, academicYear: event.target.value })}
               />
             </Field>
-            <Field label="Môn học">
-              <Select
-                value={form.subjectId || 'none'}
-                onValueChange={(value) => setForm({ ...form, subjectId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn môn học" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Chưa gán môn</SelectItem>
-                  {(subjects.data ?? []).map((subject) => (
-                    <SelectItem key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
             <Field label="Ngày bắt đầu">
               <Input
                 type="date"
@@ -651,21 +632,23 @@ function ClassFormDialog({
               />
             </Field>
             {!schoolClass ? (
-              <Field label="Chương trình đào tạo">
+              <Field label="Chương trình đào tạo" required>
                 <Select
-                  value={form.curriculumId || 'none'}
-                  onValueChange={(value) =>
-                    setForm({ ...form, curriculumId: value === 'none' ? '' : value })
-                  }
+                  value={form.curriculumId}
+                  onValueChange={(value) => setForm({ ...form, curriculumId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Không áp chương trình" />
+                    <SelectValue placeholder="Chọn chương trình đào tạo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Không áp chương trình</SelectItem>
                     {(curricula.data?.items ?? []).map((curriculum) => (
-                      <SelectItem key={curriculum.id} value={curriculum.id}>
+                      <SelectItem
+                        key={curriculum.id}
+                        value={curriculum.id}
+                        disabled={curriculum.subjectCount === 0}
+                      >
                         {curriculum.name} ({curriculum.code})
+                        {curriculum.subjectCount === 0 ? ' — chưa có môn' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -673,11 +656,23 @@ function ClassFormDialog({
               </Field>
             ) : null}
           </div>
+          {!schoolClass && curricula.data && (curricula.data.items ?? []).length === 0 ? (
+            <Alert tone="info" title="Chưa có chương trình đào tạo">
+              Hãy tạo chương trình đào tạo (có ít nhất một môn) trước khi tạo lớp.{' '}
+              <Link to="/dao-tao/chuong-trinh-dao-tao" className="font-medium underline">
+                Mở chương trình đào tạo
+              </Link>
+            </Alert>
+          ) : null}
+          {!schoolClass && curricula.isError ? (
+            <Alert tone="danger" title="Không tải được chương trình đào tạo">
+              Cần quyền xem chương trình đào tạo để chọn chương trình cho lớp.
+            </Alert>
+          ) : null}
           {!schoolClass ? (
             <p className="text-xs text-ink-500">
               Lớp mới bắt đầu ở trạng thái “Chưa bắt đầu”; trạng thái tự chuyển khi tới ngày bắt
-              đầu/kết thúc. Chọn chương trình đào tạo thì danh sách môn được áp ngay sau khi tạo
-              lớp.
+              đầu/kết thúc. Lớp phải có chương trình đào tạo (kèm môn học) mới xếp được lịch.
             </p>
           ) : null}
           {error ? <p className="text-sm text-danger-600">{error}</p> : null}
@@ -798,10 +793,6 @@ function ClassDetailDialog({
                 <div>
                   <dt className="text-ink-500">Niên khoá</dt>
                   <dd className="text-ink-900">{schoolClass.academicYear ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-ink-500">Môn học</dt>
-                  <dd className="text-ink-900">{schoolClass.subjectName ?? '—'}</dd>
                 </div>
                 <div>
                   <dt className="text-ink-500">Số sinh viên</dt>
@@ -1331,10 +1322,11 @@ export function ClassesPage() {
       sortValue: (row) => row.classCode,
     },
     {
-      id: 'subject',
-      header: 'Môn học',
-      hideBelow: 'md',
-      cell: (row) => row.subjectName ?? '—',
+      id: 'curriculum',
+      header: 'Chương trình đào tạo',
+      hideBelow: 'lg',
+      cell: (row) =>
+        row.curriculumName ?? <Badge tone="warning">Chưa gán</Badge>,
     },
     {
       id: 'teacher',

@@ -160,6 +160,44 @@ class SchedulingRequirementBuilderTest {
             .containsExactly("STAGE_EXCEEDS_CLASS_END");
     }
 
+    @Test
+    @DisplayName("TC-BUILD-007: môn thiếu số buổi kế hoạch thì suy ra từ cửa sổ ngày (tuần × buổi/tuần)")
+    void derivesPlannedFromRequestWindowWhenMissing() {
+        when(people.classInfo(ORG, CLASS_ID)).thenReturn(classInfo("DANG_DIEN_RA", "NONE",
+            LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 31)));
+        ClassSubjectInfo noPlan = new ClassSubjectInfo(CLASS_ID, "sub-1", "CODE-1", "Toán",
+            "CURRICULUM", "cur-1", null, null, 90, 2, 1, "cat-1", "ANY",
+            "t-1", "GV t-1", false, "PLANNED");
+        when(people.classSubjects(ORG, CLASS_ID)).thenReturn(List.of(noPlan));
+        when(scheduleService.countScheduledSessions(ORG, CLASS_ID, "sub-1", "Toán")).thenReturn(0);
+
+        SchedulingRequirements result = builder.build(ORG, List.of(CLASS_ID),
+            LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 18));
+
+        assertThat(result.unschedulable()).isEmpty();
+        assertThat(result.requirements()).hasSize(1);
+        // 2 tuần × 2 buổi/tuần = 4 buổi.
+        assertThat(result.requirements().get(0).sessionsNeeded()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("TC-BUILD-008: môn có số buổi required nhưng thiếu planned thì lấy required")
+    void fallsBackToRequiredSessions() {
+        when(people.classInfo(ORG, CLASS_ID)).thenReturn(classInfo("DANG_DIEN_RA", "NONE",
+            LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 31)));
+        ClassSubjectInfo requiredOnly = new ClassSubjectInfo(CLASS_ID, "sub-1", "CODE-1", "Toán",
+            "CURRICULUM", "cur-1", 6, null, 90, 2, 1, "cat-1", "ANY",
+            "t-1", "GV t-1", false, "PLANNED");
+        when(people.classSubjects(ORG, CLASS_ID)).thenReturn(List.of(requiredOnly));
+        when(scheduleService.countScheduledSessions(ORG, CLASS_ID, "sub-1", "Toán")).thenReturn(0);
+
+        SchedulingRequirements result = builder.build(ORG, List.of(CLASS_ID), null, null);
+
+        assertThat(result.unschedulable()).isEmpty();
+        assertThat(result.requirements()).hasSize(1);
+        assertThat(result.requirements().get(0).sessionsNeeded()).isEqualTo(6);
+    }
+
     private ClassInfo classInfo(String status, String closeState, LocalDate start, LocalDate end) {
         return new ClassInfo(CLASS_ID, ORG, "C1", "Lớp 1", status, closeState,
             "homeroom-1", "GV chủ nhiệm", start, end, "sub-1", "Toán", 20);

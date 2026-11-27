@@ -71,11 +71,36 @@ public class SchoolClassService {
     @Transactional
     public Map<String, Object> list(int page, int size, String q, String status, boolean selectable,
                                     Boolean needsReassignment) {
+        return list(page, size, q, status, selectable, needsReassignment, null);
+    }
+
+    @Transactional
+    public Map<String, Object> list(int page, int size, String q, String status, boolean selectable,
+                                    Boolean needsReassignment, String departmentId) {
+        return list(page, size, q, status, selectable, needsReassignment, departmentId, false);
+    }
+
+    /** @param hasSubjects chỉ lớp đã có môn học trong lớp (điều kiện xếp lịch được) */
+    @Transactional
+    public Map<String, Object> list(int page, int size, String q, String status, boolean selectable,
+                                    Boolean needsReassignment, String departmentId,
+                                    boolean hasSubjects) {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, "STUDENT_MANAGEMENT");
         classStatusService.refreshOrganization(orgId);
         return repository.list(orgId, page, size, q, status, selectable, needsReassignment,
-            null, classViewDepartments());
+            null, departmentViewScope(departmentId), hasSubjects);
+    }
+
+    /** Lọc theo một phòng ban cụ thể nhưng không vượt quá phạm vi xem lớp của người dùng. */
+    private Set<String> departmentViewScope(String departmentId) {
+        Set<String> allowed = classViewDepartments();
+        if (departmentId == null || departmentId.isBlank()) return allowed;
+        if (allowed == null) return Set.of(departmentId);
+        if (!allowed.contains(departmentId)) {
+            throw actor.forbidden("Missing permission in scope: class.view");
+        }
+        return Set.of(departmentId);
     }
 
     /** Lớp được phân công cho chính giáo viên đang đăng nhập. */
@@ -86,7 +111,7 @@ public class SchoolClassService {
         teacherRepository.requireTeacher(actor.userId(), orgId, false);
         classStatusService.refreshOrganization(orgId);
         return repository.list(orgId, page, size, q, status, selectable, null,
-            actor.userId(), null);
+            actor.userId(), null, false);
     }
 
     @Transactional

@@ -86,6 +86,24 @@ class AutoScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("TC-AUTO-010: Facility không phản hồi -> báo chưa có phòng thay vì lỗi 500")
+    void testFacilityUnavailableReportsNoRoom() {
+        ClassInfo classInfo = new ClassInfo("class-1", ORG, "C1", "Lớp 1", "DANG_DIEN_RA", "NONE",
+            "teacher-1", "Giáo viên 1", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+            "subj-1", "Toán", 20);
+        when(people.classInfo(ORG, "class-1")).thenReturn(classInfo);
+        when(people.classSubjects(ORG, "class-1")).thenReturn(List.of());
+        when(scheduleService.countScheduledSessions(eq(ORG), eq("class-1"), any())).thenReturn(0);
+        when(facility.rooms(ORG, DEPT)).thenThrow(new AppException(ErrorCode.FACILITY_UNAVAILABLE));
+
+        AutoScheduleResult result = autoScheduleService.generate(ORG, DEPT, sampleRequest);
+
+        assertThat(result.summary().scheduled()).isEqualTo(0);
+        assertThat(result.summary().unscheduled()).isEqualTo(1);
+        assertThat(result.unscheduled().get(0).reason()).contains("Không có phòng học khả dụng");
+    }
+
+    @Test
     @DisplayName("TC-AUTO-002: Lớp không tồn tại -> unscheduled với lý do")
     void testClassNotFound() {
         when(people.classInfo(ORG, "class-1")).thenReturn(null);

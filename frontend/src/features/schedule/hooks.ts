@@ -43,7 +43,7 @@ export function useSchedules(
 /** Lịch tuần của nhiều phòng ban: mỗi phòng một query để lỗi 403 không kéo cả trang. */
 export function useSchedulesByDepartments(
   departmentIds: string[],
-  params: { from: string; to: string },
+  params: { from: string; to: string; classId?: string },
 ) {
   return useQueries({
     queries: departmentIds.map((departmentId) => ({
