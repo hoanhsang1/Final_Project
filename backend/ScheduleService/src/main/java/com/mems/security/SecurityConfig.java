@@ -25,6 +25,11 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/schedules/me")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.anyOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole("OWNER"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAnyAuthority(
+                            "SCHEDULE_SELF_VIEW", "schedule.self_view", "SCHEDULE_VIEW", "schedule.view")))
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/departments/*/schedules", "/departments/*/schedules/**")
                     .access(org.springframework.security.authorization.AuthorizationManagers.anyOf(
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole("OWNER"),
@@ -32,7 +37,7 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/departments/*/schedules", "/departments/*/schedules/**")
                     .access(org.springframework.security.authorization.AuthorizationManagers.anyOf(
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasRole("OWNER"),
-                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCHEDULE_CREATE")))
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAnyAuthority("SCHEDULE_CREATE", "schedule.create")))
                 .anyRequest().denyAll())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();

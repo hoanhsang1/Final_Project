@@ -4,7 +4,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Component
 public class Actor {
@@ -27,6 +29,14 @@ public class Actor {
         orgId();
         if (!owner() && !Objects.equals(id, jwt().getClaimAsString("departmentId")))
             throw forbidden("Department access denied");
+    }
+    /** Yêu cầu một trong các alias quyền (schedule.create / SCHEDULE_CREATE) trong phòng ban. */
+    public void requireAnyPermissionIn(Set<String> aliases, String departmentId) {
+        requireDepartment(departmentId);
+        if (owner()) return;
+        List<String> permissions = jwt().getClaimAsStringList("permissions");
+        if (permissions == null || permissions.stream().noneMatch(aliases::contains))
+            throw forbidden("Required permission is missing in this department");
     }
     public ApiException forbidden(String message) {
         return new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", message);

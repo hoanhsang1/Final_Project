@@ -62,3 +62,24 @@ spring:
             - Path=/api/classes/**,/api/classes
           filters:
             - StripPrefix=1
+
+        - id: people-students
+          uri: ${PEOPLE_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/students/**,/api/students
+          filters:
+            - StripPrefix=1
+
+        - id: schedule-self
+          uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/schedules/**,/api/schedules
+          filters:
+            - StripPrefix=1
+
+        - id: schedule-departments
+          uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/departments/*/schedules/**,/api/departments/*/schedules
+          filters:
+            - StripPrefix=1

@@ -10,6 +10,8 @@ public record ClassSubjectResponse(
     Integer requiredSessions,
     Integer plannedSessions,
     Integer sessionMinutes,
+    Integer stageNo,          // D9: curriculum_subject.sequence_no, mặc định 1
+    Integer sessionsPerWeek,  // D8: suy từ planned_sessions/4, curriculum, mặc định 2
     String teacherId,
     String teacherName,
     boolean isPrimary,

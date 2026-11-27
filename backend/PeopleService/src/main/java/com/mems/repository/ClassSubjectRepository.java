@@ -22,21 +22,32 @@ public class ClassSubjectRepository {
         this.jdbc = jdbc;
     }
 
+    // D9: stageNo lấy sequence_no của môn trong chương trình (default 1).
+    // D8: chưa có cột sessions_per_week và không tạo migration mới; suy số buổi/tuần
+    // từ planned_sessions cho 4 tuần mẫu, rồi fallback required_sessions của chương trình và 2.
+    private static final String SUBJECT_SELECT = """
+        SELECT cs.*, s.code AS subject_code, s.name AS subject_name,
+               sp.full_name AS teacher_name,
+               COALESCE(cs2.sequence_no, 1) AS stage_no,
+               COALESCE(CAST(cs.planned_sessions / 4 AS SIGNED), cs2.required_sessions, 2) AS sessions_per_week
+        FROM class_subject cs
+        JOIN subject s ON s.id = cs.subject_id
+        LEFT JOIN school_class sc ON sc.id = cs.class_id
+        LEFT JOIN staff_profile sp ON sp.user_id = cs.teacher_id
+        LEFT JOIN curriculum_subject cs2
+               ON cs2.curriculum_id = COALESCE(cs.curriculum_id, sc.curriculum_id)
+              AND cs2.subject_id = cs.subject_id
+        """;
+
     public ClassSubjectListResponse list(String classId) {
         // Get curriculum_id from class
         List<String> curriculumIds = jdbc.queryForList(
             "SELECT curriculum_id FROM school_class WHERE id=?", String.class, classId);
         String curriculumId = curriculumIds.isEmpty() ? null : curriculumIds.get(0);
 
-        List<ClassSubjectResponse> subjects = jdbc.query("""
-            SELECT cs.*, s.code AS subject_code, s.name AS subject_name,
-                   CONCAT(sp.full_name, '') AS teacher_name
-            FROM class_subject cs
-            JOIN subject s ON s.id = cs.subject_id
-            LEFT JOIN staff_profile sp ON sp.user_id = cs.teacher_id
-            WHERE cs.class_id=?
-            ORDER BY cs.is_primary DESC, cs.created_at
-            """, (rs, n) -> mapSubject(rs), classId);
+        List<ClassSubjectResponse> subjects = jdbc.query(
+            SUBJECT_SELECT + " WHERE cs.class_id=? ORDER BY cs.is_primary DESC, cs.created_at",
+            (rs, n) -> mapSubject(rs), classId);
 
         return new ClassSubjectListResponse(classId, curriculumId, subjects);
     }
@@ -96,14 +107,9 @@ public class ClassSubjectRepository {
     }
 
     public ClassSubjectResponse getSubject(String classId, String subjectId) {
-        List<ClassSubjectResponse> rows = jdbc.query("""
-            SELECT cs.*, s.code AS subject_code, s.name AS subject_name,
-                   sp.full_name AS teacher_name
-            FROM class_subject cs
-            JOIN subject s ON s.id = cs.subject_id
-            LEFT JOIN staff_profile sp ON sp.user_id = cs.teacher_id
-            WHERE cs.class_id=? AND cs.subject_id=?
-            """, (rs, n) -> mapSubject(rs), classId, subjectId);
+        List<ClassSubjectResponse> rows = jdbc.query(
+            SUBJECT_SELECT + " WHERE cs.class_id=? AND cs.subject_id=?",
+            (rs, n) -> mapSubject(rs), classId, subjectId);
         if (rows.isEmpty()) throw new AppException(ErrorCode.CLASS_SUBJECT_NOT_FOUND);
         return rows.get(0);
     }
@@ -114,7 +120,8 @@ public class ClassSubjectRepository {
             rs.getString("subject_code"), rs.getString("subject_name"),
             rs.getString("source"), rs.getString("curriculum_id"),
             getIntOrNull(rs, "required_sessions"), getIntOrNull(rs, "planned_sessions"),
-            getIntOrNull(rs, "session_minutes"), rs.getString("teacher_id"),
+            getIntOrNull(rs, "session_minutes"), getIntOrNull(rs, "stage_no"),
+            getIntOrNull(rs, "sessions_per_week"), rs.getString("teacher_id"),
             rs.getString("teacher_name"), rs.getBoolean("is_primary"), rs.getString("status"));
     }
 
