@@ -1,8 +1,25 @@
+> ⚠️ **Snapshot lịch sử — đối chiếu 2026-11-26.** Mọi trạng thái/số liệu/lệnh bên dưới là tại thời điểm soạn, không phải hiện tại. Nguồn chuẩn hiện tại: `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md`; quyết định P4: `D:\Final_Project\docs\scope-can-chot-xep-lich.md`. Giữ lại để tra cứu, không xoá.
+
 # MEMS — Ngữ cảnh toàn bộ đồ án (từ đầu đến hiện tại)
 
 > **Mục đích file:** Tổng hợp ngữ cảnh dự án MEMS để onboard nhanh (cho bạn, teammate, hoặc AI như Cursor/OpenCode).  
 > **Nguồn tham chiếu:** `README.md`, `docs/api.md`, `frontend/package.json`, git history/branches tại `D:\Final_Project`, `AGENTS.md` (workspace MEMS FE), và ngữ cảnh trao đổi gần đây.  
 > **Cập nhật:** 2026-11-05 (draft). Hãy chỉnh sửa phần “Cần xác nhận” bên dưới cho đúng thực tế.
+
+> ✅ **Đính chính 26/11/2026** (toàn bộ nội dung dưới đây là snapshot 05/11):
+>
+> - **Stack hiện tại:** Astryx `@astryxdesign/core` 0.7.16, **không còn Ant Design 5**;
+>   form dùng `frontend/src/hooks/useFormState.ts`, **không** React Hook Form/Zod; theme ở
+>   `frontend/src/theme.ts` + CSS vars, không `ConfigProvider` (`docs/ui-conventions.md`).
+> - **`AGENTS.md` không nằm trong repo** (`D:\Final_Project\AGENTS.md` không tồn tại). Rule
+>   ngoài repo tại `D:\Đồ án tốt nghiệp\AGENTS-MEMS.md` đã gắn nhãn snapshot; `D:\mems-frontend`
+>   cũng không tồn tại. Đừng copy hướng dẫn antd/Tailwind cũ vào repo.
+> - **Kiểm chứng:** FE shell worktree 27 file / 182 test pass, `tsc`/`eslint` sạch; E2E
+>   **125/125 pass** (test-only locator fixes); BE smoke 6 endpoint HTTP 200 nhưng **chưa
+>   build/test bằng JDK**. Xem `docs/trang-thai-hien-tai-2026-11-26.md`.
+> - **Contract:** các dòng `D-16`, `D-20…D-31` ghi "chưa có" ở phần dưới đã có code; phần
+>   còn mở (D-27 `reason`, D-28 `is_core`, D-29/D-31 email, D-30 tự đổi role) xem `docs/api.md`.
+> - **P4** vẫn BLOCKED, kể cả khi FE shell đã có trong worktree.
 
 ---
 

@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # Sprint 4 — Bàn giao Frontend (giao diện quản lý giáo viên & lớp)
 
 > **Bản làm việc trong repo.** Copy từ `D:\Đồ án tốt nghiệp\Tài liệu liên quan dự án\Sprint-van-hanh\Dac-ta\sprint4-fe-handoff.md`; bản ngoài repo chỉ để nộp. Contract đang chạy nằm ở `frontend/src/features/sprint4/sprint4Api.ts`.

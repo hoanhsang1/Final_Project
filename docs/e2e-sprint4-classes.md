@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # E2E mock slice Lớp/Giáo viên (Sprint 4)
 
 > Nhánh `chore/sync-main-class-flow`. Mục tiêu: kiểm hành vi FE Astryx theo
@@ -38,11 +40,14 @@ Không đổi file helper cũ, không đổi source `frontend/src`, không thêm
 
 ## 3. Phát hiện trong lúc chạy (không sửa source FE)
 
-1. **Astryx nhân đôi thông báo**: cùng một chuỗi xuất hiện trong component thật
+1. **Astryx "nhân đôi" thông báo** *(đã làm rõ 26/11 — không phải lỗi app)*: cùng một chuỗi xuất hiện trong component thật
    và trong `role="status" aria-live="polite"` / modal live-region. Các assert đã
    scope bằng `getByRole('heading'|'definition')`, `getByRole('dialog')` hoặc `.first()`.
    Đây cũng là nguyên nhân chính của 38 ca cũ fail trong
-   `docs/e2e-run-2026-11-25.md`; cần triage riêng, không thuộc slice này.
+   `docs/e2e-run-2026-11-25.md`. **Đã verify 26/11:** đây là thiết kế a11y đúng
+   (BR-08/WCAG 2.1 AA), live-region được giữ nguyên; test đã scope lại (region
+   `Notifications` / `.astryx-field-status`), **không dùng `.first()` ẩu**. Đợt dọn
+   locator-only xong, full suite **125/125 pass**.
 2. **Menu bị banner chắn pointer**: ở lớp `closeState = CLOSED`, banner "Lớp đã đóng"
    nằm chồng lên `menuitem "Mở lại lớp"`; `locator.click()` bị chặn bởi banner.
    Test dùng `press('Enter')` trên menuitem để vẫn kiểm được hành động bàn phím.

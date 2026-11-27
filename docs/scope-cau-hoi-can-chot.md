@@ -1,3 +1,11 @@
+> ⚠️ **Snapshot thảo luận 16–18/11 — đối chiếu 2026-11-26.** Đây là câu hỏi/checklist,
+> không phải quyết định cuối cùng. Phần đã chốt một phần 25/11 nằm ở
+> `docs/scope-can-chot-xep-lich.md`; trạng thái hiện tại: `docs/trang-thai-hien-tai-2026-11-26.md`.
+>
+> **Đã chốt một phần 26/11 về phân gói khách hàng:** xem `docs/dinh-nghia-goi-khach-hang.md`
+> (Gói chuẩn / Gói doanh nghiệp theo nhóm phòng ban). Các ô `[ ]` dưới đây vẫn giữ nguyên
+> để phản ánh snapshot thảo luận; chỉ đối chiếu khi cần quyết định.
+
 # Câu hỏi cần scope / làm rõ (thảo luận)
 
 > Tài liệu tổng hợp từ buổi thảo luận (16–18/11/2026). Mục tiêu: chốt phạm vi giai đoạn hiện tại và các định nghĩa nền để không vướng khi mở rộng/thu phí sau. **Chưa phải quyết định cuối cùng** — dùng làm checklist để thảo luận và chốt dần.

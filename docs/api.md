@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # MEMS Backend API Documentation
 
 > **Base URL (qua API Gateway):** `http://localhost:8080`  
@@ -522,21 +524,25 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 
 | Mã | Method & Path | Query / Body | Thành công | Trạng thái |
 |---|---|---|---|---|
-| `D-20` | `GET /api/v1/organizations` | `page`, `size`, `status` (csv), `orgType`, `keyword`, `sort` | 200 envelope. Item: `id, name, org_type, status, owner_username, owner_email, created_at`. `sort` mặc định `name,asc` | ❌ chưa có |
-| `D-20b` | `GET /api/v1/organizations/options` | — | 200 **mảng phẳng** `[{ id, name }]` (dropdown, không phân trang) | ❌ chưa có |
-| `D-21` | `PATCH /api/v1/organizations/{id}/suspend` | Body `{ reason }` — **bắt buộc**, 1–500 ký tự | `204` | ❌ chưa có |
-| `D-21b` | `PATCH /api/v1/organizations/{id}/reactivate` | Body `{ reason? }` — tuỳ chọn | `204` | ❌ chưa có |
-| `D-22` | `GET /api/v1/audit-logs` | `page`, `size`, `action` (csv), `organizationId`, `accountId`, `from`, `to`, `keyword`, `sort` | 200 envelope. Item: `id, created_at, action, actor_username, target_type, target_id, target_name, description`. `sort` mặc định `created_at,desc` | ❌ chưa có |
-| `D-24` | `GET /api/v1/accounts` | `page`, `size`, `organizationId`, `role`, `status` (csv), `keyword`, `sort` | 200 envelope. Item: `id, username, email, full_name, organization_id, organization_name, role, status, created_at, last_login_at`. `sort` mặc định `username,asc` | ❌ chưa có |
-| `D-24b` | `GET /api/v1/accounts/{id}` | — | 200 — 1 item như trên | ❌ chưa có |
-| `D-24c` | `PATCH /api/v1/accounts/{id}/status` | Body `{ status: active \| locked \| disabled, reason? }` | `204` | ❌ chưa có |
-| `D-26` | `PUT /api/v1/organizations/{id}/modules` *(mở rộng)* | Body `{ modules: string[] }` | `204` — **bỏ điều kiện "chỉ khi org còn `pending`"**: cho phép `active`/`rejected`, trả `409` khi `suspended` | ❌ chưa có |
-| `D-27` | `PATCH .../approve` \| `.../reject` *(mở rộng)* | approve `{ notifyEmail? }` · reject `{ reason, notifyEmail? }` | `204` | ⚠️ có nhưng **chưa** đọc `reason`/`notifyEmail` |
-| `D-28` | `GET /api/v1/modules` *(mở rộng)* | — | 200 — thêm `description?`. **Khuyến nghị thêm `is_core: boolean`** (`Q-32`) | ⚠️ thiếu `is_core` |
-| `D-29` | `POST /api/v1/accounts` | Body `{ email, full_name, role, organization_id }` — BE sinh `username` + mật khẩu tạm, gửi email | `201` item vừa tạo · `409` trùng email/username · `400` · `403` | ❌ chưa có |
-| `D-30` | `PATCH /api/v1/accounts/{id}/role` | Body `{ role }` — không nhận `SUPER_ADMIN` | `204` · `409` khi tự đổi vai trò chính mình | ❌ chưa có |
-| `D-31` | `POST /api/v1/accounts/{id}/reset-password` | Body `{}` → sinh mật khẩu tạm + gửi email · `{ new_password }` → đặt thẳng (≥ 8 ký tự) | `204` · `400` khi mật khẩu ngắn hơn 8 | ❌ chưa có |
-| `D-16` | `PUT /api/v1/organizations/{id}/modules` | — | `204` | ❌ chưa có |
+> **Cập nhật 26/11/2026:** cột "Trạng thái" bên dưới đã được đối chiếu với code hiện tại và smoke test thật (xem `docs/trang-thai-hien-tai-2026-11-26.md`). Các dòng ❌ cũ đã có code; phần còn mở được ghi rõ.
+
+| Mã | Method & Path | Query / Body | Thành công | Trạng thái (26/11) |
+|---|---|---|---|---|
+| `D-20` | `GET /api/v1/organizations` | `page`, `size`, `status` (csv), `orgType`, `keyword`, `sort` | 200 envelope. Item: `id, name, org_type, status, owner_username, owner_email, created_at`. `sort` mặc định `name,asc` | ✅ có code, **verify HTTP 200** |
+| `D-20b` | `GET /api/v1/organizations/options` | — | 200 **mảng phẳng** `[{ id, name }]` (dropdown, không phân trang) | ✅ có code, **verify HTTP 200** |
+| `D-21` | `PATCH /api/v1/organizations/{id}/suspend` | Body `{ reason }` — **bắt buộc**, 1–500 ký tự | `204` | ✅ có code (chưa smoke riêng) |
+| `D-21b` | `PATCH /api/v1/organizations/{id}/reactivate` | Body `{ reason? }` — tuỳ chọn | `204` | ✅ có code (chưa smoke riêng) |
+| `D-22` | `GET /api/v1/audit-logs` | `page`, `size`, `action` (csv), `organizationId`, `accountId`, `from`, `to`, `keyword`, `sort` | 200 envelope. Item: `id, created_at, action, actor_username, target_type, target_id, target_name, description`. `sort` mặc định `created_at,desc` | ✅ có code, **verify HTTP 200** |
+| `D-24` | `GET /api/v1/accounts` | `page`, `size`, `organizationId`, `role`, `status` (csv), `keyword`, `sort` | 200 envelope. Item: `id, username, email, full_name, organization_id, organization_name, role, status, created_at, last_login_at`. `sort` mặc định `username,asc` | ✅ có code, **verify HTTP 200** |
+| `D-24b` | `GET /api/v1/accounts/{id}` | — | 200 — 1 item như trên | ✅ có code |
+| `D-24c` | `PATCH /api/v1/accounts/{id}/status` | Body `{ status: active \| locked \| disabled, reason? }` | `204` | ✅ có code |
+| `D-26` | `PUT /api/v1/organizations/{id}/modules` *(mở rộng)* | Body `{ modules: string[] }` | `204` — **bỏ điều kiện "chỉ khi org còn `pending`"**: cho phép `active`/`rejected`, trả `409` khi `suspended` | ✅ có code (đối chiếu rule `409` khi smoke) |
+| `D-27` | `PATCH .../approve` \| `.../reject` *(mở rộng)* | approve `{ notifyEmail? }` · reject `{ reason, notifyEmail? }` | `204` | ⚠️ có endpoint nhưng controller **chưa đọc** `reason`/`notifyEmail`; BE chưa lưu/hiện lại `reason` |
+| `D-28` | `GET /api/v1/modules` *(mở rộng)* | — | 200 — thêm `description?`. **Khuyến nghị thêm `is_core: boolean`** (`Q-32`) | ⚠️ verify HTTP 200 nhưng public vẫn chỉ trả `code, name`, **thiếu `is_core`/`description`** |
+| `D-29` | `POST /api/v1/accounts` | Body `{ email, full_name, role, organization_id }` — BE sinh `username` + mật khẩu tạm, gửi email | `201` item vừa tạo · `409` trùng email/username · `400` · `403` | ⚠️ có endpoint, nhưng **chưa gửi email mật khẩu tạm** |
+| `D-30` | `PATCH /api/v1/accounts/{id}/role` | Body `{ role }` — không nhận `SUPER_ADMIN` | `204` · `409` khi tự đổi vai trò chính mình | ⚠️ có endpoint, **chưa chặn tự đổi role chính mình** |
+| `D-31` | `POST /api/v1/accounts/{id}/reset-password` | Body `{}` → sinh mật khẩu tạm + gửi email · `{ new_password }` → đặt thẳng (≥ 8 ký tự) | `204` · `400` khi mật khẩu ngắn hơn 8 | ⚠️ có endpoint, **chưa gửi email mật khẩu tạm** |
+| `D-16` | `PUT /api/v1/organizations/{id}/modules` | — | `204` | ✅ có code (trùng `D-26`) |
 
 **Quy ước chung cho các endpoint mới**
 
@@ -553,7 +559,7 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 
 | Dạng path | Nghĩa | FE hiện |
 |---|---|---|
-| Collection — `/organizations`, `/organizations/options`, `/audit-logs`, `/accounts` | BE **chưa làm** endpoint | `Alert` "Tính năng đang chờ backend (`D-nn`)" + nút Thử lại |
+| Collection — `/organizations`, `/organizations/options`, `/audit-logs`, `/accounts` | Endpoint **đã có + verify HTTP 200** (26/11); bảng này là snapshot cũ, giữ lại để tra cứu hành vi FE lúc 404 | `Alert` "Tính năng đang chờ backend (`D-nn`)" + nút Thử lại (chỉ còn đúng nếu endpoint mất/404) |
 | Item — `/organizations/{id}`, `/accounts/{id}` | Đối tượng **không tồn tại** | `Result 404` + "Không tìm thấy …" |
 
 ### Quên / đặt lại mật khẩu (màn công khai)
@@ -574,15 +580,21 @@ Cấu hình module của một tổ chức (màn "Cấu hình module" trong màn
 
 ## Các service khác
 
-Các service sau đang **chạy** (có container) nhưng controller chưa có endpoint nào:
+> **Cập nhật 26/11:** nhận xét "controller rỗng" bên dưới là snapshot cũ — các service này
+> đã có controller (People: `/departments/**`, `/positions/**`, `/permissions/**`,
+> `/api/classes/**`, `/api/teachers/**`; Facility: `/departments/{id}/facilities`;
+> Schedule: `/departments/{id}/schedules`) và gateway đã có route tương ứng
+> (`backend/APIGateway/src/main/resources/application.yml`). Chưa smoke test hết từng
+> endpoint; lưu ý `docker-compose.yml` chưa truyền `PEOPLE_SERVICE_URL` cho gateway.
 
-| Service | Port | Trạng thái |
+| Service | Port | Trạng thái (snapshot cũ → hiện tại) |
 |---------|------|------------|
-| **PeopleService** | `:8082` | Container up, controller rỗng |
-| **ScheduleService** | `:8083` | Container up, controller rỗng |
-| **FacilityService** | `:8084` | Container up, controller rỗng |
+| **PeopleService** | `:8082` | `controller rỗng` → **đã có controller** (departments, positions, permissions, classes, teachers…) |
+| **ScheduleService** | `:8083` | `controller rỗng` → **đã có** `DepartmentScheduleController` |
+| **FacilityService** | `:8084` | `controller rỗng` → **đã có** `DepartmentFacilityController` |
 
-> API doc cho các service trên sẽ được bổ sung khi có endpoint.
+> API doc chi tiết cho các service trên chưa được viết trong file này; đọc trực tiếp
+> `backend/<Service>/src/main/java/com/mems/controller/` và cấu hình gateway.
 
 ---
 
@@ -592,8 +604,11 @@ Các service sau đang **chạy** (có container) nhưng controller chưa có en
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "Admin@2026Secure!"}'
+  -d '{"username": "platform_admin", "password": "123456"}'
 ```
+> `123456` là mật khẩu đã dùng khi smoke test 26/11 (trả JWT `SUPER_ADMIN`); với bản
+> cài đặt khác lấy giá trị `ADMIN_BOOTSTRAP_PASSWORD` trong `.env` / `05_seed_admin.sql`.
+> Cặp `admin` / `Admin@2026Secure!` trong bản cũ là sai.
 
 ### Đăng ký tổ chức
 ```bash

@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # MEMS — Hệ thống Quản lý Giáo dục theo Module
 
 Hệ thống quản lý giáo dục **đa tổ chức** (multi-tenant): một nền tảng phục vụ nhiều
@@ -8,9 +10,12 @@ Bốn nhóm người dùng: **Admin hệ thống** (duyệt tổ chức, quản 
 **Cán bộ quản lý** (giáo vụ của tổ chức), **Giáo viên** (lịch dạy, báo sự cố thiết bị),
 **Sinh viên** (thời khoá biểu).
 
-> Trạng thái: đang ở **Sprint 1** — đăng nhập đã nối backend thật.
-> Trang **Đăng ký** mới chỉ là giao diện (backend chưa có endpoint đăng ký).
-> Chưa có trang chủ theo vai trò — sau khi đăng nhập sẽ vào trang tạm `/xem-thu/<vai-tro>`.
+> **Cập nhật 26/11/2026 (xem `docs/trang-thai-hien-tai-2026-11-26.md`):** bản dưới đây là
+> snapshot Sprint 1/2. Hiện tại FE đã chuyển sang **Astryx**, E2E **125/125 pass**, và
+> nhiều endpoint từng ghi "chưa có" đã có code (`D-16/D-20…D-31` — xem `docs/api.md` bảng
+> đã cập nhật). Sau đăng nhập: `SUPER_ADMIN` → `/quan-tri/to-chuc`, Owner → `/to-chuc`,
+> Academic → `/dao-tao`, các vai trò khác → `/xem-thu/<vai-tro>`. FE shell
+> `/dao-tao/tu-dong-xep-lich` chỉ có ở worktree, chưa commit; P4 vẫn BLOCKED.
 
 ---
 
@@ -26,6 +31,10 @@ mysql -u root -p < 02_people_db.sql
 mysql -u root -p < 03_schedule_db.sql
 mysql -u root -p < 04_facility_db.sql
 mysql -u root -p < 05_seed_admin.sql      # tạo role/quyền + tài khoản platform_admin
+
+# 1b) CHƯA chạy 06–09 như thể đã xong: 07_people_department_access.sql đang lỗi DDL
+#     (ERROR 1064 near 'position(id) ON DELETE CASCADE') và đã bị revert.
+#     Xem docs/docker-postman-guide.md + docs/trang-thai-hien-tai-2026-11-26.md mục 3.
 
 # 2) Cấu hình biến môi trường
 copy .env.example .env        # Windows;  macOS/Linux: cp .env.example .env
@@ -265,8 +274,10 @@ server: { proxy: { '/api': 'http://127.0.0.1:8080' } }
 ```
 
 Nghĩa là FE gọi `/api/...` trên **cùng cổng 5173**, Vite chuyển tiếp sang gateway 8080.
-Nhờ vậy **không vướng CORS** — backend hiện **chưa** cấu hình CORS, nên gọi thẳng
-`http://localhost:8080` từ trình duyệt sẽ bị chặn.
+**Cập nhật 26/11:** các service đã có `CorsConfig.java` (đọc `CORS_ALLOWED_ORIGINS`, mặc
+định `http://localhost:5173`), nên nhận xét "backend chưa cấu hình CORS" trong bản cũ là
+lỗi thời. Giữ proxy trong dev để không phụ thuộc cấu hình origin; khi tách domain phải
+cấu hình `CORS_ALLOWED_ORIGINS` cho từng service (xem §11).
 
 ---
 
@@ -344,8 +355,9 @@ service; không dùng POM chung trong thư mục backend.
 - `05_seed_admin.sql` có sẵn hash BCrypt của `platform_admin` ứng với mật khẩu mẫu. Mật khẩu
   này **công khai trong repo** ⇒ trước khi triển khai thật phải đổi mật khẩu (hoặc xoá tài
   khoản mẫu) và dùng mật khẩu mạnh riêng.
-- Backend **chưa** cấu hình CORS. Khi tách frontend và backend ra hai tên miền khác nhau thì
-  phải cấu hình CORS (hoặc đặt reverse proxy) — proxy của Vite chỉ dùng được khi phát triển.
+- **Cập nhật 26/11:** backend **đã có** `CorsConfig` ở cả 4 service (`CORS_ALLOWED_ORIGINS`,
+  mặc định `http://localhost:5173`). Khi tách domain vẫn phải khai báo đúng origin cho từng
+  service hoặc dùng reverse proxy — proxy của Vite chỉ dùng được khi phát triển.
 - Khoá `JWT_SECRET_BASE64` là chìa khoá ký token. Lộ khoá = ai cũng giả được phiên đăng nhập.
 - Chưa có giới hạn số lần đăng nhập sai. Schema **đã có** cột `failed_login_attempts` và
   `locked_until`, nhưng mã Java **chưa dùng** tới.
@@ -364,9 +376,9 @@ service; không dùng POM chung trong thư mục backend.
 - **BE chưa lưu lý do từ chối** (`D-05`). `PATCH /organizations/{id}/reject` chưa đọc body
   `reason` và chưa ghi `rejection_reason` / `approved_by` / `approved_at` / `audit_log`.
   FE đã bắt buộc nhập lý do và đã gửi body, nhưng **BE chưa lưu ⇒ lý do mất sạch**.
-- **BE chưa có endpoint cấu hình module** (`D-16`). `PUT /organizations/{id}/modules` chưa tồn tại
-  ⇒ khối "Cấu hình module" trên màn chi tiết chưa lưu được. Contract mong đợi đã mô tả trong
-  `docs/api.md`.
+- ~~**BE chưa có endpoint cấu hình module** (`D-16`).~~ **Đã có code (26/11)** —
+  `PUT /organizations/{id}/modules` tồn tại trong `OrganizationController` (`D-16` = `D-26`).
+  Cần đối chiếu lại rule `409` khi org `suspended` và smoke test riêng; xem `docs/api.md`.
 - **Danh mục module thiếu so với SRS** (`D-15`). Seed hiện chỉ có 6 module, thiếu 4 module của
   SRS §4.2, và bảng `module` **không có cột `is_core`** ⇒ luật "4 module lõi không thể tắt"
   (`BR-06`) mới chỉ được chặn ở FE, chưa có ở tầng BE.
@@ -374,5 +386,6 @@ service; không dùng POM chung trong thư mục backend.
   lệch với backend khi backend đổi.
 - **Bundle frontend còn lớn:** bản build ra ~1 MB (gzip ~319 kB), Vite có cảnh báo. Nên tách nhỏ
   khi thêm nhiều trang.
-- **Backend chưa cấu hình CORS**, nên khi triển khai tách tên miền sẽ phải xử lý (xem §11).
+- **CORS đã có cấu hình ở 4 service** (26/11); khi tách tên miền chỉ cần set đúng
+  `CORS_ALLOWED_ORIGINS` (xem §11).
 - **`mems.sql` ở gốc repo đang rỗng (0 KB).**

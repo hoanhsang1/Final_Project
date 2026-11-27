@@ -1,3 +1,5 @@
+> ⚠️ **Snapshot lịch sử — đối chiếu 2026-11-26.** Mọi trạng thái/số liệu/lệnh bên dưới là tại thời điểm soạn, không phải hiện tại. Nguồn chuẩn hiện tại: `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md`; quyết định P4: `D:\Final_Project\docs\scope-can-chot-xep-lich.md`. Giữ lại để tra cứu, không xoá.
+
 # API phòng ban, chức vụ và phân quyền MEMS
 
 Hướng dẫn thao tác theo từng bước bằng **Docker + MySQL + Postman**, kèm tóm tắt chức năng: [docker-postman-guide.md](docker-postman-guide.md). Hướng dẫn này dùng OWNER đăng ký theo từng tổ chức và được SUPER_ADMIN duyệt, với OWNER_BOOTSTRAP_ENABLED=false. Bootstrap bên dưới chỉ là tùy chọn khởi tạo/test, không phải nơi cấu hình OWNER của các tổ chức.
@@ -20,6 +22,8 @@ Với database hiện có, sao lưu và chạy các migration bổ sung bằng M
 4. `09_schedule_department_access.sql` — Schedule: thêm `session.department_id`.
 
 Các migration có thể chạy lại. **Không chạy lại** bộ `01`–`05` trên database đã có bảng/dữ liệu. Cài mới dùng bộ `01`–`05` trước, sau đó `06`–`09`. Các dòng Facility/Schedule cũ có department_id NULL, chưa xuất hiện trong API theo phòng ban; việc chuyển dữ liệu phải gán đúng phòng và tổ chức. Các ID phòng ở những database này là tham chiếu mềm.
+
+> ⛔ **Cảnh báo 26/11/2026:** danh sách `06`–`09` ở trên là kế hoạch, **không phải trạng thái đã apply**. `07_people_department_access.sql` đang **lỗi DDL** `ERROR 1064 ... near 'position(id) ON DELETE CASCADE'` (từ khoá `position`); thay đổi đã revert, chỉ báo cáo, **không tự sửa**. Chưa chạy lại bộ migration này khi chưa chốt cách sửa. Xem `docs/trang-thai-hien-tai-2026-11-26.md` mục 3.
 
 Dùng JDK 21, MySQL 8.0.16+ và Maven. Điền `.env.example` vào biến môi trường của tiến trình (java -jar không tự đọc file .env). Docker Compose đọc .env để nội suy. Mỗi service nhận DB_URL riêng. Identity, People, Facility và Schedule dùng cùng JWT_SECRET_BASE64; Identity và People dùng cùng INTERNAL_API_KEY tối thiểu 32 ký tự. Không cung cấp secret nội bộ cho frontend.
 

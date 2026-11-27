@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # Quy ước giao diện MEMS — v2 (14/11/2026)
 
 > **Đọc gì trước:** sửa code → mục 3, 4, 6. Review → mục 12. Chưa rõ vì sao đổi so với v1 → mục 0.
@@ -490,9 +492,15 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
 - [ ] `prefers-reduced-motion` không còn animation.
 - [ ] Che logo: vẫn nhận ra là phần mềm quản lý giáo dục?
 
-## 13. Trạng thái chuyển tiếp (antd + Astryx cùng chạy)
+## 13. Trạng thái chuyển tiếp (snapshot — antd + Astryx cùng chạy)
 
-Đang trong lúc port, **cả hai** thư viện cùng tồn tại. Quy tắc để không sinh lỗi khó tìm:
+> ✅ **Cập nhật 26/11/2026:** mục này mô tả giai đoạn port, **không còn đúng hiện tại**.
+> `frontend/src` hiện có **0 import `from 'antd'`**, form dùng `useFormState.ts` (không
+> React Hook Form/Zod), theme là `theme.ts` + CSS vars. Các dòng `ConfigProvider`, patch
+> React 19, class `.ant-*` và "xoá antd ở P5" bên dưới là **đã hoàn tất**; giữ lại chỉ để
+> tra cứu lịch sử port. Quy ước hiện tại là các mục 3/4/6 ở đầu file.
+
+Đang trong lúc port (snapshot), **cả hai** thư viện cùng tồn tại. Quy tắc để không sinh lỗi khó tìm:
 
 - CSS layer: `reset → astryx-base → astryx-theme`. CSS antd **không** nằm trong layer
   nên **antd thắng** ở selector trùng. Vì vậy **mỗi trang là một trong hai**, không
@@ -517,7 +525,8 @@ Breakpoint của Astryx: **sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536**.
   `<a>` trần. Không bọc `LinkProvider` toàn cục vì chỉ có vài chỗ cần, và provider toàn
   cục sẽ khiến link ngoài `Router` (test riêng lẻ) chết theo.
 - Xoá antd (P5) khi `grep -r "from 'antd'" src` = 0; lúc đó xoá `themeToken`,
-  `themeComponents`, patch React 19 và `ConfigProvider`.
+  `themeComponents`, patch React 19 và `ConfigProvider`. **Đã đạt 0 import (26/11)** —
+  đây không còn là việc cần làm.
 
 ## 14. Ngoại lệ đã biết
 

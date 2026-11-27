@@ -1,3 +1,5 @@
+> ⚠️ **Snapshot lịch sử — đối chiếu 2026-11-26.** Mọi trạng thái/số liệu/lệnh bên dưới là tại thời điểm soạn, không phải hiện tại. Nguồn chuẩn hiện tại: `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md`; quyết định P4: `D:\Final_Project\docs\scope-can-chot-xep-lich.md`. Giữ lại để tra cứu, không xoá.
+
 # MEMS — Hướng dẫn chạy Docker và kiểm thử bằng Postman
 
 Tài liệu dùng cho môi trường phát triển/test, theo code ngày 23/10/2026. Thực hiện theo thứ tự: **cấu hình .env → cập nhật MySQL → chạy Docker → đăng ký tổ chức → SUPER_ADMIN duyệt → OWNER quản lý phòng ban → MANAGER thêm STAFF → kiểm tra quyền**.
@@ -104,6 +106,12 @@ Mở và Execute **toàn bộ file**, theo thứ tự:
 | 4 | [09_schedule_department_access.sql](../09_schedule_department_access.sql) | mems_schedule_db: session.department_id |
 
 Các file có USE database và delimiter cần thiết. Không chọn riêng từng dòng trong procedure để chạy. Không chạy lại bộ tạo bảng 01–05 trên database đã có bảng/dữ liệu.
+
+> ⛔ **Cảnh báo 26/11/2026 — đừng chạy mục này như cũ:** `07_people_department_access.sql`
+> hiện **lỗi DDL** `ERROR 1064 ... near 'position(id) ON DELETE CASCADE'` (`position` là từ
+> khoá reserved trong MySQL). Thay đổi đã bị **revert**, chỉ báo cáo — **không tự sửa** và
+> không coi 06–09 là đã apply thành công. Khi cần migrate phải sửa DDL và được chốt riêng
+> trước. Xem `docs/trang-thai-hien-tai-2026-11-26.md` mục 3.
 
 ### 4.2. Cài mới database hoàn toàn
 

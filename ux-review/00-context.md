@@ -1,3 +1,5 @@
+> ⚠️ **Snapshot lịch sử — đối chiếu 2026-11-26.** Mọi trạng thái/số liệu/lệnh bên dưới là tại thời điểm soạn, không phải hiện tại. Nguồn chuẩn hiện tại: `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md`; quyết định P4: `D:\Final_Project\docs\scope-can-chot-xep-lich.md`. Giữ lại để tra cứu, không xoá.
+
 # 00 — Bối cảnh & dấu hiệu "tạm / chưa làm"
 
 > **Mục đích:** Trước khi review UX, ghi lại những thứ *có thể trông thừa/thiếu/lỗi* nhưng thực ra là **tạm, thử nghiệm, hoặc chưa tới sprint** — kèm bằng chứng `file:dòng`.
