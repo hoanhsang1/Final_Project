@@ -10,6 +10,7 @@ import type * as OrganizationApi from '@/features/organization/api'
 import type { Department } from '@/features/organization/types'
 import { schedulesApi } from '@/features/schedule/api'
 import type * as ScheduleApi from '@/features/schedule/api'
+import { addDaysLocal, startOfWeekLocal } from '@/features/schedule/components/week-calendar-utils'
 import { SchedulePage } from '@/features/schedule/pages/schedule-page'
 import type { ScheduleSession } from '@/features/schedule/types'
 import { ApiError } from '@/lib/api-error'
@@ -58,6 +59,12 @@ const department: Department = {
   modules: ['SCHEDULE_MANAGEMENT'],
 }
 
+const secondDepartment: Department = {
+  ...department,
+  id: 'dept-2',
+  name: 'Tổ Văn – Sử',
+}
+
 const classSummary: SchoolClass = {
   id: 'class-1',
   orgId: 'org-1',
@@ -85,16 +92,30 @@ const classSummary: SchoolClass = {
   cancelRequestReason: null,
 }
 
+/** ISO của một buổi trong tuần hiện tại (0 = thứ 2), tính theo giờ địa phương. */
+function isoInCurrentWeek(dayOffset: number, hour: number, minute = 0): string {
+  const day = addDaysLocal(startOfWeekLocal(new Date()), dayOffset)
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute).toISOString()
+}
+
 const session: ScheduleSession = {
   id: 'ses-1',
   classId: 'class-1',
   className: 'Lớp 10A1',
   teacherId: null,
   roomId: null,
-  startTime: '2026-03-02T01:00:00Z',
-  endTime: '2026-03-02T03:00:00Z',
+  startTime: isoInCurrentWeek(0, 8),
+  endTime: isoInCurrentWeek(0, 10),
   status: 'scheduled',
   departmentId: 'dept-1',
+}
+
+const secondSession: ScheduleSession = {
+  ...session,
+  id: 'ses-2',
+  classId: 'class-2',
+  className: 'Lớp 11B1',
+  departmentId: 'dept-2',
 }
 
 beforeEach(() => {
@@ -120,6 +141,7 @@ beforeEach(() => {
     permissions: [
       PERM.scheduleView,
       PERM.scheduleCreate,
+      PERM.scheduleEdit,
       PERM.scheduleCancelSession,
       PERM.scheduleDelete,
     ],
@@ -127,7 +149,7 @@ beforeEach(() => {
 })
 
 describe('SchedulePage — lịch học', () => {
-  it('hiển thị buổi học của phòng ban đang chọn', async () => {
+  it('hiển thị buổi học của phòng ban đang chọn trên lịch tuần', async () => {
     renderPage(<SchedulePage />)
 
     expect(await screen.findByText('10A1 · Lớp 10A1')).toBeInTheDocument()
@@ -153,12 +175,18 @@ describe('SchedulePage — lịch học', () => {
     renderPage(<SchedulePage />)
     await screen.findByText('10A1 · Lớp 10A1')
 
+    await userEvent.click(screen.getByRole('tab', { name: 'Danh sách' }))
+    await screen.findByText('10A1 · Lớp 10A1')
+    const callsBefore = vi.mocked(schedulesApi.list).mock.calls.length
+
     await userEvent.click(screen.getByRole('button', { name: 'Huỷ' }))
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Huỷ buổi' }))
 
     await waitFor(() => expect(schedulesApi.cancel).toHaveBeenCalledWith('dept-1', 'ses-1'))
-    await waitFor(() => expect(schedulesApi.list).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(vi.mocked(schedulesApi.list).mock.calls.length).toBeGreaterThan(callsBefore),
+    )
   })
 
   it('báo lỗi khi tải lịch thất bại', async () => {
@@ -169,7 +197,11 @@ describe('SchedulePage — lịch học', () => {
     renderPage(<SchedulePage />)
 
     expect(
-      await screen.findByText('Bạn không có quyền xem lịch của phòng ban này.', {}, { timeout: 3000 }),
+      await screen.findByText(
+        'Bạn không có quyền xem lịch của phòng ban này.',
+        {},
+        { timeout: 3000 },
+      ),
     ).toBeInTheDocument()
   })
 
@@ -179,7 +211,97 @@ describe('SchedulePage — lịch học', () => {
     renderPage(<SchedulePage />)
     await screen.findByText('10A1 · Lớp 10A1')
     expect(screen.queryByRole('button', { name: 'Xếp buổi học' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Danh sách' }))
+    await screen.findByText('10A1 · Lớp 10A1')
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Huỷ' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Xoá' })).not.toBeInTheDocument()
+  })
+
+  it('hiển thị lịch nhiều phòng ban, mỗi phòng ban một màu', async () => {
+    vi.mocked(departmentsApi.list).mockResolvedValue([department, secondDepartment])
+    vi.mocked(schedulesApi.list).mockImplementation(async (departmentId) =>
+      departmentId === 'dept-1' ? [session] : [secondSession],
+    )
+
+    renderPage(<SchedulePage />)
+
+    const first = (await screen.findByText('10A1 · Lớp 10A1')).closest('button')
+    const second = (await screen.findByText('Lớp 11B1')).closest('button')
+    expect(first?.className).toContain('bg-lane-1-50')
+    expect(second?.className).toContain('bg-lane-2-50')
+    expect(screen.getByRole('checkbox', { name: 'Tổ Toán – Tin' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Tổ Văn – Sử' })).toBeInTheDocument()
+  })
+
+  it('bỏ chọn phòng ban trong chú thích thì ẩn buổi học của phòng đó', async () => {
+    vi.mocked(departmentsApi.list).mockResolvedValue([department, secondDepartment])
+    vi.mocked(schedulesApi.list).mockImplementation(async (departmentId) =>
+      departmentId === 'dept-1' ? [session] : [secondSession],
+    )
+
+    renderPage(<SchedulePage />)
+    await screen.findByText('Lớp 11B1')
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Tổ Văn – Sử' }))
+
+    await waitFor(() => expect(screen.queryByText('Lớp 11B1')).not.toBeInTheDocument())
+    expect(screen.getByText('10A1 · Lớp 10A1')).toBeInTheDocument()
+  })
+
+  it('chuyển tuần trước tải lịch đúng khoảng thời gian', async () => {
+    renderPage(<SchedulePage />)
+    await screen.findByText('10A1 · Lớp 10A1')
+
+    const previousMonday = addDaysLocal(startOfWeekLocal(new Date()), -7)
+    const expectedFrom = new Date(
+      previousMonday.getFullYear(),
+      previousMonday.getMonth(),
+      previousMonday.getDate(),
+    ).toISOString()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tuần trước' }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(schedulesApi.list).mock.calls
+      expect(calls.some(([, params]) => params.from === expectedFrom)).toBe(true)
+    })
+  })
+
+  it('bấm vào buổi học mở hộp thoại cập nhật', async () => {
+    renderPage(<SchedulePage />)
+    await userEvent.click(await screen.findByText('10A1 · Lớp 10A1'))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Cập nhật buổi học')).toBeInTheDocument()
+  })
+
+  it('buổi đã huỷ hiển thị mờ và gạch ngang', async () => {
+    vi.mocked(schedulesApi.list).mockResolvedValue([{ ...session, status: 'cancelled' }])
+
+    renderPage(<SchedulePage />)
+
+    const block = (await screen.findByText('10A1 · Lớp 10A1')).closest('button')
+    expect(block?.className).toContain('line-through')
+  })
+
+  it('chỉ báo lỗi phòng ban bị từ chối, vẫn hiện phòng ban còn lại', async () => {
+    vi.mocked(departmentsApi.list).mockResolvedValue([department, secondDepartment])
+    vi.mocked(schedulesApi.list).mockImplementation(async (departmentId) => {
+      if (departmentId === 'dept-2') {
+        throw new ApiError({ status: 403, message: 'Bạn không có quyền xem lịch của phòng ban này.' })
+      }
+      return [session]
+    })
+
+    renderPage(<SchedulePage />)
+
+    expect(
+      await screen.findByText('10A1 · Lớp 10A1', {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Tổ Văn – Sử: Bạn không có quyền xem lịch/, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
   })
 })

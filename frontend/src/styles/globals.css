@@ -84,6 +84,20 @@
   --color-info-500: #1f56c4;
   --color-info-600: #1a47a3;
 
+  /* --- Lịch nhiều phòng ban (lane màu) ---------------------------------- */
+  --color-lane-1-50: #eaf1fd;
+  --color-lane-1-500: #2563c9;
+  --color-lane-2-50: #e7f6ee;
+  --color-lane-2-500: #1f7a4d;
+  --color-lane-3-50: #f1ecfd;
+  --color-lane-3-500: #6b46c1;
+  --color-lane-4-50: #fdf2e3;
+  --color-lane-4-500: #b2620a;
+  --color-lane-5-50: #e4f5f3;
+  --color-lane-5-500: #0f766e;
+  --color-lane-6-50: #fdebf0;
+  --color-lane-6-500: #b02a4e;
+
   /* --- Surfaces & lines ------------------------------------------------- */
   --color-canvas: #f4f6f3;
   --color-surface: #ffffff;

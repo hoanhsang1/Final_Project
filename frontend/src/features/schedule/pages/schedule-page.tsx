@@ -1,9 +1,20 @@
-import { CalendarDays, DoorOpen, Pencil, Plus, Trash2, XCircle } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  DoorOpen,
+  List,
+  Pencil,
+  Plus,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DataTable, type DataColumn } from '@/components/ui/data-table'
 import {
@@ -19,15 +30,24 @@ import { Field, Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ErrorState } from '@/components/ui/states'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageContainer } from '@/components/layout/page-container'
 import { useAssignableTeachers, useClasses } from '@/features/academic/hooks'
 import { usePermission } from '@/features/auth/hooks'
 import { useDepartments } from '@/features/organization/hooks'
 import { useDepartmentScope } from '@/features/organization/use-scope'
+import { WeekCalendar, laneStyle, type WeekCalendarEntry } from '@/features/schedule/components/week-calendar'
+import {
+  addDaysLocal,
+  dateKey,
+  parseDateKey,
+  startOfWeekLocal,
+} from '@/features/schedule/components/week-calendar-utils'
 import {
   useRoomSuggestions,
   useScheduleMutations,
   useSchedules,
+  useSchedulesByDepartments,
 } from '@/features/schedule/hooks'
 import {
   ROOM_TYPE_LABELS,
@@ -36,7 +56,7 @@ import {
   type ScheduleSession,
 } from '@/features/schedule/types'
 import { ApiError } from '@/lib/api-error'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatDayMonth } from '@/lib/format'
 import { PERM } from '@/lib/permissions'
 
 function toLocalInput(iso: string | null | undefined): string {
@@ -252,11 +272,17 @@ function SessionDialog({
   )
 }
 
+type ScheduleTab = 'week' | 'list'
+
 export function SchedulePage() {
   const { can } = usePermission()
   const scope = useDepartmentScope()
   const departments = useDepartments()
-  const [departmentId, setDepartmentId] = useState<string>('')
+  const classes = useClasses({ page: 1, size: 100 })
+  const [tab, setTab] = useState<ScheduleTab>('week')
+  const [departmentId, setDepartmentId] = useState('')
+  const [anchorKey, setAnchorKey] = useState(() => dateKey(startOfWeekLocal(new Date())))
+  const [hiddenDepartmentIds, setHiddenDepartmentIds] = useState<string[]>([])
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -264,26 +290,75 @@ export function SchedulePage() {
   const [cancelling, setCancelling] = useState<ScheduleSession | null>(null)
   const [deleting, setDeleting] = useState<ScheduleSession | null>(null)
 
-  const effectiveDepartmentId = scope.isScoped ? scope.departmentId : departmentId || null
-
   useEffect(() => {
     if (!scope.isScoped && !departmentId && departments.data?.length) {
       setDepartmentId(departments.data[0]!.id)
     }
   }, [scope.isScoped, departmentId, departments.data])
 
-  const bounds = useMemo(() => dayBounds(from, to), [from, to])
-  const sessions = useSchedules(effectiveDepartmentId, bounds)
-  const mutations = useScheduleMutations(effectiveDepartmentId)
-  const classes = useClasses({ page: 1, size: 100 })
+  const createDepartmentId = scope.isScoped ? scope.departmentId : departmentId || null
+  const anchor = parseDateKey(anchorKey)
+  const weekEnd = addDaysLocal(anchor, 6)
+
+  const weekParams = useMemo(() => {
+    const start = parseDateKey(anchorKey)
+    const end = addDaysLocal(start, 6)
+    return {
+      from: new Date(start.getFullYear(), start.getMonth(), start.getDate()).toISOString(),
+      to: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).toISOString(),
+    }
+  }, [anchorKey])
+
+  const weekDepartments = useMemo(() => {
+    if (!scope.isScoped) return (departments.data ?? []).map(({ id, name }) => ({ id, name }))
+    if (!scope.departmentId) return []
+    const found = (departments.data ?? []).find((department) => department.id === scope.departmentId)
+    return [{ id: scope.departmentId, name: found?.name ?? 'Phòng ban của tôi' }]
+  }, [scope.isScoped, scope.departmentId, departments.data])
+
+  const weekQueries = useSchedulesByDepartments(
+    weekDepartments.map((department) => department.id),
+    weekParams,
+  )
+
+  const weekEntries: WeekCalendarEntry[] = weekQueries.flatMap((query, index) => {
+    const department = weekDepartments[index]
+    if (!department || hiddenDepartmentIds.includes(department.id)) return []
+    return (query.data ?? []).map((session) => ({ session, lane: index }))
+  })
+  const weekLoading =
+    departments.isLoading ||
+    (weekDepartments.length > 0 && weekQueries.some((query) => query.isPending))
+  const weekFailed =
+    weekDepartments.length > 0 && weekQueries.every((query) => query.isError)
+  const weekErrors = weekQueries
+    .map((query, index) => ({ query, name: weekDepartments[index]?.name ?? '' }))
+    .filter((entry) => entry.query.isError)
+
+  const listBounds = useMemo(() => dayBounds(from, to), [from, to])
+  const listSessions = useSchedules(createDepartmentId, listBounds)
+  const listMutations = useScheduleMutations(createDepartmentId)
+  const listRows = listSessions.data ?? []
+
+  const labelOf = (session: ScheduleSession) => {
+    const found = classes.data?.items.find((item) => item.id === session.classId)
+    if (found) return `${found.classCode} · ${found.name}`
+    return session.className ?? session.classId.slice(0, 8)
+  }
 
   const className = (id: string) => {
     const found = classes.data?.items.find((item) => item.id === id)
     return found ? `${found.classCode} · ${found.name}` : id.slice(0, 8)
   }
 
-  const rows = sessions.data ?? []
-  const cancelled = rows.filter((row) => row.status === 'cancelled').length
+  const toggleDepartment = (id: string, checked: boolean) => {
+    setHiddenDepartmentIds((current) =>
+      checked ? current.filter((item) => item !== id) : [...current, id],
+    )
+  }
+
+  const shownRows = tab === 'week' ? weekEntries.map((entry) => entry.session) : listRows
+  const cancelled = shownRows.filter((row) => row.status === 'cancelled').length
 
   const columns: DataColumn<ScheduleSession>[] = [
     {
@@ -381,12 +456,12 @@ export function SchedulePage() {
       <PageHeader
         eyebrow="Đào tạo · Lịch học"
         title="Lịch học"
-        description="Xếp buổi học theo phòng ban, chọn phòng còn trống và theo dõi trạng thái buổi học."
+        description="Lịch tuần hiển thị mọi phòng ban được phân quyền; buổi học mới xếp theo phòng ban đang chọn."
         actions={
           can(PERM.scheduleCreate) ? (
             <Button
               size="sm"
-              disabled={!effectiveDepartmentId}
+              disabled={!createDepartmentId}
               onClick={() => {
                 setEditing(null)
                 setDialogOpen(true)
@@ -401,7 +476,7 @@ export function SchedulePage() {
           <>
             <span className="inline-flex items-center gap-1.5 text-xs text-ink-500">
               <CalendarDays className="size-3.5" aria-hidden="true" />
-              {rows.length} buổi
+              {shownRows.length} buổi
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-ink-500">
               <DoorOpen className="size-3.5" aria-hidden="true" />
@@ -411,61 +486,180 @@ export function SchedulePage() {
         }
       />
 
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
-        {!scope.isScoped ? (
-          <Field label="Phòng ban" labelSize="sm">
-            <Select value={departmentId} onValueChange={setDepartmentId}>
-              <SelectTrigger className="sm:w-60">
-                <SelectValue placeholder="Chọn phòng ban" />
-              </SelectTrigger>
-              <SelectContent>
-                {(departments.data ?? []).map((department) => (
-                  <SelectItem key={department.id} value={department.id}>
-                    {department.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        ) : null}
-        <Field label="Từ ngày" labelSize="sm">
-          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-        </Field>
-        <Field label="Đến ngày" labelSize="sm">
-          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-        </Field>
-      </div>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as ScheduleTab)} className="mt-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            {!scope.isScoped ? (
+              <Field label="Phòng ban" labelSize="sm">
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger className="sm:w-60">
+                    <SelectValue placeholder="Chọn phòng ban" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(departments.data ?? []).map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
 
-      <div className="mt-4">
-        <DataTable
-          columns={columns}
-          data={rows}
-          rowKey={(row) => row.id}
-          isLoading={sessions.isLoading}
-          error={
-            sessions.isError ? (
-              <ErrorState
-                title="Không tải được lịch học"
-                description={ApiError.from(sessions.error).message}
-                onRetry={() => void sessions.refetch()}
+            {tab === 'week' ? (
+              <>
+                <Field label="Tuần" labelSize="sm">
+                  <Input
+                    type="date"
+                    value={anchorKey}
+                    onChange={(event) => {
+                      if (!event.target.value) return
+                      setAnchorKey(dateKey(startOfWeekLocal(parseDateKey(event.target.value))))
+                    }}
+                  />
+                </Field>
+                <div className="flex items-center gap-1 pb-0.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label="Tuần trước"
+                    onClick={() => setAnchorKey(dateKey(addDaysLocal(anchor, -7)))}
+                  >
+                    <ChevronLeft aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAnchorKey(dateKey(startOfWeekLocal(new Date())))}
+                  >
+                    Hôm nay
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label="Tuần sau"
+                    onClick={() => setAnchorKey(dateKey(addDaysLocal(anchor, 7)))}
+                  >
+                    <ChevronRight aria-hidden="true" />
+                  </Button>
+                </div>
+                <span className="pb-2 text-sm font-medium text-ink-800">
+                  {formatDayMonth(anchor)} – {formatDayMonth(weekEnd)}/{weekEnd.getFullYear()}
+                </span>
+              </>
+            ) : (
+              <>
+                <Field label="Từ ngày" labelSize="sm">
+                  <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+                </Field>
+                <Field label="Đến ngày" labelSize="sm">
+                  <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+                </Field>
+              </>
+            )}
+          </div>
+
+          <TabsList>
+            <TabsTrigger value="week">
+              <CalendarDays aria-hidden="true" />
+              Tuần
+            </TabsTrigger>
+            <TabsTrigger value="list">
+              <List aria-hidden="true" />
+              Danh sách
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="week" className="mt-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {weekDepartments.map((department, index) => (
+              <div
+                key={department.id}
+                className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-2.5 py-1"
+              >
+                <Checkbox
+                  id={`week-dept-${department.id}`}
+                  checked={!hiddenDepartmentIds.includes(department.id)}
+                  onCheckedChange={(checked) => toggleDepartment(department.id, checked === true)}
+                />
+                <label
+                  htmlFor={`week-dept-${department.id}`}
+                  className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-ink-700"
+                >
+                  <span
+                    className={`size-2.5 rounded-full ${laneStyle(index).dot}`}
+                    aria-hidden="true"
+                  />
+                  {department.name}
+                </label>
+              </div>
+            ))}
+            {weekErrors.map((entry) => (
+              <Badge key={entry.name} tone="danger">
+                {entry.name}: {ApiError.from(entry.query.error).message}
+              </Badge>
+            ))}
+          </div>
+
+          {weekFailed ? (
+            <ErrorState
+              title="Không tải được lịch học"
+              description={ApiError.from(weekErrors[0]?.query.error).message}
+              onRetry={() => weekQueries.forEach((query) => void query.refetch())}
+            />
+          ) : weekLoading ? (
+            <p className="py-8 text-center text-sm text-ink-500">Đang tải lịch…</p>
+          ) : (
+            <>
+              {weekEntries.length === 0 ? (
+                <p className="text-sm text-ink-500">Không có buổi học trong tuần này.</p>
+              ) : null}
+              <WeekCalendar
+                weekStart={anchor}
+                entries={weekEntries}
+                labelOf={labelOf}
+                canEdit={can(PERM.scheduleEdit)}
+                onSelect={(session) => {
+                  setEditing(session)
+                  setDialogOpen(true)
+                }}
               />
-            ) : undefined
-          }
-          empty={
-            <p className="py-8 text-center text-sm text-ink-500">
-              {effectiveDepartmentId
-                ? 'Không có buổi học trong khoảng thời gian đã chọn.'
-                : 'Chọn phòng ban để xem lịch học.'}
-            </p>
-          }
-          initialPageSize={20}
-        />
-      </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-4">
+          <DataTable
+            columns={columns}
+            data={listRows}
+            rowKey={(row) => row.id}
+            isLoading={listSessions.isLoading}
+            error={
+              listSessions.isError ? (
+                <ErrorState
+                  title="Không tải được lịch học"
+                  description={ApiError.from(listSessions.error).message}
+                  onRetry={() => void listSessions.refetch()}
+                />
+              ) : undefined
+            }
+            empty={
+              <p className="py-8 text-center text-sm text-ink-500">
+                {createDepartmentId
+                  ? 'Không có buổi học trong khoảng thời gian đã chọn.'
+                  : 'Chọn phòng ban để xem lịch học.'}
+              </p>
+            }
+            initialPageSize={20}
+          />
+        </TabsContent>
+      </Tabs>
 
       <SessionDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        departmentId={effectiveDepartmentId}
+        departmentId={editing?.departmentId ?? createDepartmentId}
         session={editing}
       />
 
@@ -478,7 +672,7 @@ export function SchedulePage() {
         tone="danger"
         onConfirm={() => {
           if (!cancelling) return
-          mutations.cancel.mutate(cancelling.id, {
+          listMutations.cancel.mutate(cancelling.id, {
             onSuccess: () => {
               toast.success('Đã huỷ buổi học.')
               setCancelling(null)
@@ -498,7 +692,7 @@ export function SchedulePage() {
         tone="danger"
         onConfirm={() => {
           if (!deleting) return
-          mutations.remove.mutate(deleting.id, {
+          listMutations.remove.mutate(deleting.id, {
             onSuccess: () => {
               toast.success('Đã xoá buổi học.')
               setDeleting(null)

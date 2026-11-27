@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { scheduleConfigApi, scheduleDraftsApi, schedulesApi } from '@/features/schedule/api'
 import type {
@@ -37,6 +37,20 @@ export function useSchedules(
     queryFn: () => schedulesApi.list(departmentId!, params),
     enabled: Boolean(departmentId),
     placeholderData: (previous) => previous,
+  })
+}
+
+/** Lịch tuần của nhiều phòng ban: mỗi phòng một query để lỗi 403 không kéo cả trang. */
+export function useSchedulesByDepartments(
+  departmentIds: string[],
+  params: { from: string; to: string },
+) {
+  return useQueries({
+    queries: departmentIds.map((departmentId) => ({
+      queryKey: scheduleKeys.list(departmentId, params),
+      queryFn: () => schedulesApi.list(departmentId, params),
+      enabled: Boolean(departmentId) && Boolean(params.from) && Boolean(params.to),
+    })),
   })
 }
 
