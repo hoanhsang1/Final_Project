@@ -208,6 +208,33 @@ describe('AutoSchedulePage — nháp → xem trước → xác nhận', () => {
     expect(screen.queryByText(MSG_AUTO.CONFIRM_SUCCESS)).toBeNull();
   });
 
+  it('preview không trùng React key khi cùng một lớp có nhiều môn chưa xếp được', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGenerate.mockResolvedValueOnce({
+      ...DRAFT_RESULT,
+      scheduled: [],
+      unscheduled: [
+        { classId: 'c1', className: '12A1', subjectName: 'Java', reason: 'Hết phòng' },
+        { classId: 'c1', className: '12A1', subjectName: 'Python', reason: 'Hết giáo viên' },
+      ],
+    });
+
+    try {
+      renderPage();
+      await fillRequiredFields();
+      await userEvent.click(screen.getByRole('button', { name: MSG_AUTO.SUBMIT_DRAFT }));
+
+      expect(await screen.findByText('Java')).toBeInTheDocument();
+      expect(screen.getByText('Python')).toBeInTheDocument();
+      const duplicateKeyWarnings = consoleError.mock.calls.filter((call) =>
+        String(call[0]).includes('same key'),
+      );
+      expect(duplicateKeyWarnings).toHaveLength(0);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('nguồn nhập tay gửi số buổi/phút làm override cho BE', async () => {
     renderPage();
     await screen.findByRole('combobox', { name: MSG_AUTO.CLASS_LABEL });
@@ -259,9 +286,11 @@ describe('AutoSchedulePage — nháp → xem trước → xác nhận', () => {
 
     await userEvent.click(screen.getByRole('button', { name: MSG_AUTO.SUBMIT_DRAFT }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Phòng học đã được đặt trong khung giờ này.',
-    );
+    // Astryx dựng thêm live-region role="alert" ẩn, nên query theo nội dung
+    // thay vì role để tránh trùng với node đó.
+    expect(
+      await screen.findByText('Phòng học đã được đặt trong khung giờ này.'),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText(MSG_AUTO.CONFIRM_SUCCESS)).toBeNull();
   });

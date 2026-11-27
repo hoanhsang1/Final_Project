@@ -276,6 +276,13 @@ export default function AutoSchedulePage(): React.JSX.Element {
     },
   ];
 
+  // BE có thể trả nhiều môn chưa xếp được cho CÙNG một lớp; `classId` vì thế
+  // không phải khoá duy nhất. Thêm suffix để React/Astryx Table không trùng key.
+  const unscheduledRows: UnscheduledRow[] = (preview?.unscheduled ?? []).map((row, index) => ({
+    ...row,
+    id: `${row.classId}:${row.subjectName}:${index}`,
+  }));
+
   const unscheduledColumns: TableColumn<UnscheduledRow>[] = [
     {
       key: 'className',
@@ -512,9 +519,9 @@ export default function AutoSchedulePage(): React.JSX.Element {
               />
               <Text type="label">{MSG_AUTO.UNSCHEDULED_TITLE}</Text>
               <Table<UnscheduledRow>
-                data={preview.unscheduled as UnscheduledRow[]}
+                data={unscheduledRows}
                 columns={unscheduledColumns}
-                idKey="classId"
+                idKey="id"
                 hasHover
                 textOverflow="truncate"
                 emptyState={<EmptyState description={MSG_AUTO.UNSCHEDULED_EMPTY} compact />}
