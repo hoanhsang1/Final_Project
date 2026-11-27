@@ -9,6 +9,7 @@ import com.mems.dto.TeacherAssignableItem;
 import com.mems.dto.TeacherClassResponse;
 import com.mems.dto.TeacherHistoryResponse;
 import com.mems.dto.TeacherListItem;
+import com.mems.dto.TeacherSubjectResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import com.mems.service.TextNormalizer;
@@ -22,6 +23,31 @@ import java.util.*;
 
 @Repository
 public class TeacherRepository {
+    /**
+     * Quy tắc D1 duy nhất: với alias `sp` (staff_profile) và `sub` (subject đang hoạt động),
+     * giáo viên đủ điều kiện dạy môn khi có chuyên môn cùng danh mục môn học hoặc có ngoại lệ
+     * APPROVED trong teacher_subject. Điều kiện DANG_DAY do từng truy vấn thêm vào.
+     * Không chứa tham số — dùng lại được ở teachesSubject / eligibleForSubject / teachableSubjects.
+     */
+    private static final String D1_ELIGIBLE = """
+        (
+          EXISTS (
+            SELECT 1
+            FROM teacher_specialty tspe
+            JOIN specialty spc ON spc.id=tspe.specialty_id AND spc.org_id=tspe.org_id
+            WHERE tspe.user_id=sp.user_id AND tspe.org_id=sp.org_id
+              AND spc.is_active=TRUE
+              AND sub.category_id IS NOT NULL
+              AND spc.category_id=sub.category_id
+          )
+          OR EXISTS (
+            SELECT 1 FROM teacher_subject tsub
+            WHERE tsub.user_id=sp.user_id AND tsub.org_id=sp.org_id
+              AND tsub.subject_id=sub.id AND tsub.status='APPROVED'
+          )
+        )
+        """;
+
     private final JdbcTemplate jdbc;
     private final SpecialtyRepository specialties;
     private final ObjectMapper mapper;
@@ -71,61 +97,117 @@ public class TeacherRepository {
         return count != null && count > 0;
     }
 
-    /** Giáo viên có chuyên môn trùng tên môn học của lớp (quy tắc 13). */
+    /** Giáo viên đang dạy và đủ điều kiện dạy môn theo quy tắc D1 (quy tắc 13). */
     public boolean teachesSubject(String userId, String orgId, String subjectId) {
         Integer count = jdbc.queryForObject("""
             SELECT COUNT(*)
-            FROM teacher_subject ts
-            JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
-            WHERE ts.user_id=? AND ts.org_id=? AND ts.subject_id=? AND ts.status='APPROVED'
-            """, Integer.class, userId, orgId, subjectId);
+            FROM subject sub
+            JOIN teacher_profile tp ON tp.user_id=? AND tp.org_id=sub.org_id
+            JOIN staff_profile sp ON sp.user_id=tp.user_id AND sp.org_id=tp.org_id
+            WHERE sub.id=? AND sub.org_id=? AND sub.is_active=TRUE
+              AND tp.teaching_status='DANG_DAY'
+              AND """ + D1_ELIGIBLE,
+            Integer.class, userId, subjectId, orgId);
         return count != null && count > 0;
     }
 
     /**
-     * Danh sách giáo viên đang dạy (DANG_DAY) trong org, đủ điều kiện dạy subjectId.
-     * Nguồn dữ liệu chuẩn theo D-06: bảng `teacher_subject` với status = 'APPROVED'.
-     * Loại bỏ hoàn toàn fallback tên chuyên môn để tránh sai phân quyền nghiệp vụ.
-     * Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
+     * Danh sách giáo viên đang dạy (DANG_DAY) trong org đủ điều kiện dạy subjectId theo D1.
+     * Không còn fallback "mọi giáo viên đang dạy": môn chưa gán chuyên môn/ngoại lệ thì
+     * trả danh sách rỗng. Dùng bởi ScheduleService qua internal API để xếp lịch tự động.
      */
     public List<EligibleTeacherInfo> eligibleForSubject(String orgId, String subjectId) {
-        List<EligibleTeacherInfo> specific = jdbc.query("""
-            SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
-            FROM staff_profile sp
-            JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
-            JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
-            WHERE sp.org_id=?
-              AND tp.teaching_status='DANG_DAY'
-              AND EXISTS (
-                SELECT 1 FROM teacher_subject ts
-                JOIN subject sub ON sub.id=ts.subject_id AND sub.org_id=ts.org_id AND sub.is_active=TRUE
-                WHERE ts.user_id=sp.user_id AND ts.org_id=sp.org_id
-                  AND ts.subject_id=? AND ts.status='APPROVED'
-              )
-            ORDER BY sp.full_name
-            """,
-            (rs, n) -> new EligibleTeacherInfo(
-                rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
-            orgId, subjectId);
-
-        if (!specific.isEmpty()) {
-            return specific;
-        }
-
-        // Fallback: nếu môn học chưa được phân công giáo viên cụ thể trong teacher_subject,
-        // lấy tất cả giáo viên đang dạy (DANG_DAY) trong tổ chức để tự động tìm người rảnh lịch.
         return jdbc.query("""
             SELECT DISTINCT sp.user_id, sp.full_name, dm.department_id
-            FROM staff_profile sp
+            FROM subject sub
+            JOIN staff_profile sp ON sp.org_id=sub.org_id
             JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
             JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
-            WHERE sp.org_id=?
+            WHERE sub.id=? AND sub.org_id=? AND sub.is_active=TRUE
               AND tp.teaching_status='DANG_DAY'
+              AND """ + D1_ELIGIBLE + """
             ORDER BY sp.full_name
             """,
             (rs, n) -> new EligibleTeacherInfo(
                 rs.getString("user_id"), rs.getString("full_name"), rs.getString("department_id")),
-            orgId);
+            subjectId, orgId);
+    }
+
+    /**
+     * Như eligibleForSubject nhưng cho nhiều môn trong một truy vấn. Luôn trả về đủ key
+     * của mọi subjectId được hỏi (danh sách rỗng nếu không có giáo viên đủ điều kiện).
+     */
+    public Map<String, List<EligibleTeacherInfo>> eligibleForSubjectBatch(String orgId,
+                                                                        Collection<String> subjectIds) {
+        Map<String, List<EligibleTeacherInfo>> result = new LinkedHashMap<>();
+        if (subjectIds == null || subjectIds.isEmpty()) return result;
+        List<String> ids = subjectIds.stream()
+            .filter(Objects::nonNull).map(String::trim).filter(id -> !id.isEmpty())
+            .distinct().toList();
+        ids.forEach(id -> result.put(id, new ArrayList<>()));
+        if (ids.isEmpty()) return result;
+
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        List<Object> params = new ArrayList<>();
+        params.add(orgId);
+        params.addAll(ids);
+        jdbc.query("""
+            SELECT sub.id AS subject_id, sp.user_id, sp.full_name, dm.department_id
+            FROM subject sub
+            JOIN staff_profile sp ON sp.org_id=sub.org_id
+            JOIN teacher_profile tp ON tp.user_id=sp.user_id AND tp.org_id=sp.org_id
+            JOIN department_member dm ON dm.user_id=sp.user_id AND dm.org_id=sp.org_id
+            WHERE sub.org_id=? AND sub.is_active=TRUE AND sub.id IN (""" + placeholders + """
+            )
+              AND tp.teaching_status='DANG_DAY'
+              AND """ + D1_ELIGIBLE + """
+            ORDER BY sub.id, sp.full_name
+            """, rs -> {
+                result.computeIfAbsent(rs.getString("subject_id"), key -> new ArrayList<>())
+                    .add(new EligibleTeacherInfo(rs.getString("user_id"), rs.getString("full_name"),
+                        rs.getString("department_id")));
+            },
+            params.toArray());
+        return result;
+    }
+
+    /**
+     * Các môn đang hoạt động mà giáo viên đủ điều kiện dạy theo D1, kèm lý do:
+     * EXCEPTION nếu có dòng teacher_subject APPROVED cho đúng môn, ngược lại CATEGORY.
+     */
+    public List<TeacherSubjectResponse> teachableSubjects(String userId, String orgId) {
+        return jdbc.query("""
+            SELECT sub.id, sub.code, sub.name,
+                   CASE WHEN EXISTS (
+                     SELECT 1 FROM teacher_subject tsub
+                     WHERE tsub.user_id=sp.user_id AND tsub.org_id=sp.org_id
+                       AND tsub.subject_id=sub.id AND tsub.status='APPROVED'
+                   ) THEN 'EXCEPTION' ELSE 'CATEGORY' END AS reason
+            FROM subject sub
+            JOIN teacher_profile tp ON tp.user_id=? AND tp.org_id=sub.org_id
+            JOIN staff_profile sp ON sp.user_id=tp.user_id AND sp.org_id=tp.org_id
+            WHERE sub.org_id=? AND sub.is_active=TRUE
+              AND tp.teaching_status='DANG_DAY'
+              AND """ + D1_ELIGIBLE + """
+            ORDER BY sub.name
+            """, (rs, n) -> new TeacherSubjectResponse(rs.getString("id"), rs.getString("code"),
+                rs.getString("name"), rs.getString("reason")), userId, orgId);
+    }
+
+    /**
+     * Ghi đè tập ngoại lệ môn học (chỉ các dòng source='MANUAL'); giữ nguyên dòng SPECIALTY.
+     * Ghi cả teacher_id và user_id để khớp khóa chính thật của MySQL.
+     */
+    public void replaceSubjectExceptions(String userId, String orgId, Collection<String> subjectIds,
+                                         String actorId) {
+        jdbc.update("DELETE FROM teacher_subject WHERE user_id=? AND org_id=? AND source='MANUAL'",
+            userId, orgId);
+        Timestamp now = Timestamp.from(Instant.now());
+        new TreeSet<>(subjectIds).forEach(subjectId -> jdbc.update("""
+            INSERT INTO teacher_subject(teacher_id, user_id, subject_id, org_id, status, source,
+                                        approved_by, approved_at, created_by, created_at)
+            VALUES (?, ?, ?, ?, 'APPROVED', 'MANUAL', ?, ?, ?, ?)
+            """, userId, userId, subjectId, orgId, actorId, now, actorId, now));
     }
 
     public boolean hasProfile(String userId, String orgId) {
@@ -321,26 +403,63 @@ public class TeacherRepository {
             orgId, userId);
     }
 
+    /**
+     * Lớp đang chờ/đang diễn ra mà giáo viên sẽ không còn đủ điều kiện dạy nếu chuyên môn
+     * đổi thành {@code specialtyIds}. Áp dụng đúng D1 cho tập chuyên môn tương lai: phủ danh
+     * mục qua specialty.category_id, hoặc ngoại lệ teacher_subject APPROVED hiện có. Xét cả
+     * lớp giáo viên chủ nhiệm (school_class.subject_id) và lớp giáo viên dạy môn
+     * (class_subject.teacher_id).
+     */
     public List<ClassMismatch> subjectMismatch(String userId, String orgId, Collection<String> specialtyIds) {
-        if (specialtyIds == null || specialtyIds.isEmpty()) return List.of();
-        String placeholders = String.join(",", Collections.nCopies(specialtyIds.size(), "?"));
+        List<String> requested = specialtyIds == null ? List.of()
+            : specialtyIds.stream().filter(Objects::nonNull).map(String::trim)
+                .filter(id -> !id.isEmpty()).distinct().toList();
+        String placeholders = requested.isEmpty() ? "NULL"
+            : String.join(",", Collections.nCopies(requested.size(), "?"));
+
         List<Object> params = new ArrayList<>();
+        params.add(orgId);
         params.add(userId);
         params.add(orgId);
-        params.addAll(specialtyIds);
+        params.add(userId);
+        params.add(orgId);
+        params.add(orgId);
+        params.addAll(requested);
+        params.add(userId);
+        params.add(orgId);
+
         return jdbc.query("""
-            SELECT sc.id, sc.name
-            FROM school_class sc
-            JOIN subject sub ON sub.id=sc.subject_id AND sub.org_id=sc.org_id
-            WHERE sc.teacher_id=? AND sc.org_id=? AND sc.deleted_at IS NULL
-              AND sc.status IN ('CHUA_BAT_DAU','DANG_DIEN_RA')
-              AND NOT EXISTS (
-                SELECT 1 FROM specialty s
-                WHERE s.org_id=sc.org_id AND s.name_unaccented=sub.name_unaccented
-                  AND s.id IN (""" + placeholders + """
+            SELECT DISTINCT a.id, a.name
+            FROM (
+              SELECT sc.id, sc.class_code, sc.name, sc.subject_id
+              FROM school_class sc
+              WHERE sc.org_id=? AND sc.teacher_id=? AND sc.deleted_at IS NULL
+                AND sc.status IN ('CHUA_BAT_DAU','DANG_DIEN_RA') AND sc.subject_id IS NOT NULL
+              UNION
+              SELECT sc.id, sc.class_code, sc.name, cs.subject_id
+              FROM class_subject cs
+              JOIN school_class sc ON sc.id=cs.class_id AND sc.org_id=cs.org_id
+              WHERE cs.org_id=? AND cs.teacher_id=? AND sc.deleted_at IS NULL
+                AND sc.status IN ('CHUA_BAT_DAU','DANG_DIEN_RA')
+            ) a
+            JOIN subject sub ON sub.id=a.subject_id AND sub.org_id=? AND sub.is_active=TRUE
+            WHERE NOT (
+              (
+                sub.category_id IS NOT NULL
+                AND EXISTS (
+                  SELECT 1 FROM specialty s
+                  WHERE s.org_id=? AND s.is_active=TRUE AND s.category_id=sub.category_id
+                    AND s.id IN (""" + placeholders + """
+                  )
                 )
               )
-            ORDER BY sc.class_code
+              OR EXISTS (
+                SELECT 1 FROM teacher_subject tsub
+                WHERE tsub.user_id=? AND tsub.org_id=? AND tsub.subject_id=sub.id
+                  AND tsub.status='APPROVED'
+              )
+            )
+            ORDER BY a.name
             """, (rs, n) -> new ClassMismatch(rs.getString("id"), rs.getString("name")),
             params.toArray());
     }

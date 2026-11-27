@@ -17,6 +17,7 @@ import type {
   CurriculumSubjectUpdateRequest,
   CurriculumSummary,
   CurriculumUpdateRequest,
+  EligibleTeacher,
   PageResponse,
   PrimarySubjectChangeRequest,
   PrimarySubjectChangeResponse,
@@ -34,6 +35,7 @@ import type {
   SubjectInput,
   SubjectUpdateRequest,
   SubjectUsageResponse,
+  TeachableSubject,
   TeacherDetail,
   TeacherItem,
   TeacherSubject,
@@ -301,6 +303,12 @@ export const subjectsApi = {
     const { data } = await api.get<SubjectUsageResponse>(`/api/subjects/${id}/usage`)
     return data
   },
+
+  /** Giáo viên đang dạy (DANG_DAY) đủ điều kiện dạy môn theo quy tắc D1. */
+  async eligibleTeachers(id: string): Promise<EligibleTeacher[]> {
+    const { data } = await api.get<EligibleTeacher[]>(`/api/subjects/${id}/eligible-teachers`)
+    return data
+  },
 }
 
 export const subjectCategoriesApi = {
@@ -487,6 +495,23 @@ export const classSubjectsApi = {
 export const teacherSubjectsApi = {
   async list(staffId: string): Promise<TeacherSubjectListResponse> {
     const { data } = await api.get<TeacherSubjectListResponse>(`/api/teachers/${staffId}/subjects`)
+    return data
+  },
+
+  /**
+   * Môn giáo viên dạy được theo quy tắc D1 (cùng danh mục chuyên môn hoặc ngoại lệ).
+   * Backend trả kèm lý do để phân biệt ngoại lệ cần duyệt.
+   */
+  async teachable(staffId: string): Promise<TeachableSubject[]> {
+    const { data } = await api.get<TeachableSubject[]>(`/api/teachers/${staffId}/subjects`)
+    return data
+  },
+
+  /** Thay toàn bộ danh sách ngoại lệ môn học (nguồn MANUAL) của giáo viên. */
+  async replaceExceptions(staffId: string, subjectIds: string[]): Promise<TeachableSubject[]> {
+    const { data } = await api.put<TeachableSubject[]>(`/api/teachers/${staffId}/subjects`, {
+      subjectIds,
+    })
     return data
   },
 

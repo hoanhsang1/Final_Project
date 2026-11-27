@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Tra cứu lớp cho ScheduleService: trạng thái lớp, giáo viên phụ trách và lớp của
@@ -66,5 +67,24 @@ public class InternalScheduleLookupController {
     public List<EligibleTeacherInfo> eligibleTeachers(@RequestParam String orgId,
                                                       @RequestParam String subjectId) {
         return teachers.eligibleForSubject(orgId, subjectId);
+    }
+
+    /**
+     * Batch: với mỗi subjectId trả danh sách giáo viên đủ điều kiện (có thể rỗng).
+     * Dùng bởi ScheduleService khi dựng yêu cầu xếp lịch cho cả lớp.
+     */
+    @GetMapping("/subjects/eligible-teachers")
+    @Transactional(readOnly = true)
+    public Map<String, List<EligibleTeacherInfo>> eligibleTeachersBatch(
+            @RequestParam String orgId, @RequestParam List<String> subjectIds) {
+        return teachers.eligibleForSubjectBatch(orgId, subjectIds);
+    }
+
+    /** Xác nhận giáo viên thuộc org; 404 khi không tồn tại hoặc khác tổ chức. */
+    @GetMapping("/teachers/{teacherId}")
+    @Transactional(readOnly = true)
+    public EligibleTeacherInfo teacher(@PathVariable String teacherId, @RequestParam String orgId) {
+        var row = teachers.requireTeacher(teacherId, orgId, false);
+        return new EligibleTeacherInfo(row.userId(), row.fullName(), row.departmentId());
     }
 }

@@ -2,6 +2,7 @@ package com.mems.controller;
 
 import com.mems.dto.SpecialtyCreateRequest;
 import com.mems.dto.SpecialtyResponse;
+import com.mems.dto.SpecialtyUpdateRequest;
 import com.mems.service.SpecialtyService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -30,5 +31,12 @@ public class SpecialtyController {
     @ResponseStatus(HttpStatus.CREATED)
     public SpecialtyResponse create(@Valid @RequestBody SpecialtyCreateRequest request) {
         return service.create(request);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER') or hasAuthority('employee.edit')")
+    public SpecialtyResponse update(@PathVariable String id,
+                                    @Valid @RequestBody SpecialtyUpdateRequest request) {
+        return service.update(id, request);
     }
 }

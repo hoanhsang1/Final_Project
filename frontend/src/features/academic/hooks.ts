@@ -57,6 +57,8 @@ export const academicKeys = {
   classSubjectHistory: (classId: string, params: unknown) =>
     ['classes', classId, 'subject-history', params] as const,
   teacherSubjects: (staffId: string) => ['teachers', staffId, 'subjects'] as const,
+  teachableSubjects: (staffId: string) => ['teachers', staffId, 'teachable-subjects'] as const,
+  eligibleTeachers: (subjectId: string) => ['subjects', subjectId, 'eligible-teachers'] as const,
   specialtySubjects: (specialtyId: string) => ['specialties', specialtyId, 'subjects'] as const,
 }
 
@@ -609,5 +611,40 @@ export function useSpecialtySubjectMutations(specialtyId: string) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: academicKeys.specialtySubjects(specialtyId) })
     },
+  })
+}
+
+// ============================================================================
+// Teacher eligibility (D1) — môn dạy được & ngoại lệ
+// ============================================================================
+
+/** Môn giáo viên dạy được, kèm lý do CATEGORY (cùng danh mục) hoặc EXCEPTION (ngoại lệ). */
+export function useTeachableSubjects(staffId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: academicKeys.teachableSubjects(staffId ?? ''),
+    queryFn: () => teacherSubjectsApi.teachable(staffId!),
+    enabled: Boolean(staffId) && enabled,
+  })
+}
+
+export function useTeachableSubjectMutations(staffId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (subjectIds: string[]) => teacherSubjectsApi.replaceExceptions(staffId, subjectIds),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: academicKeys.teachableSubjects(staffId) })
+      await queryClient.invalidateQueries({ queryKey: academicKeys.teacher(staffId) })
+      await queryClient.invalidateQueries({ queryKey: ['subjects'] })
+    },
+  })
+}
+
+/** Giáo viên đang dạy và đủ điều kiện dạy môn; dùng cho picker giáo viên của lớp. */
+export function useEligibleTeachers(subjectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: academicKeys.eligibleTeachers(subjectId ?? ''),
+    queryFn: () => subjectsApi.eligibleTeachers(subjectId!),
+    enabled: Boolean(subjectId) && enabled,
+    staleTime: 60_000,
   })
 }

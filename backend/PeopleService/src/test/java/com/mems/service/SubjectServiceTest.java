@@ -32,6 +32,9 @@ class SubjectServiceTest {
     private SubjectRepository repository;
 
     @Mock
+    private com.mems.repository.TeacherRepository teachers;
+
+    @Mock
     private Actor actor;
 
     @Mock
@@ -47,7 +50,7 @@ class SubjectServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SubjectService(repository, actor, moduleGuard, audit);
+        service = new SubjectService(repository, teachers, actor, moduleGuard, audit);
         lenient().when(actor.orgId()).thenReturn(orgId);
         lenient().when(actor.userId()).thenReturn(userId);
     }

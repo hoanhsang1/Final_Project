@@ -109,6 +109,29 @@ class ScheduleEventConsumerTest {
     }
 
     @Test
+    @DisplayName("CLS-03: hủy lớp nhiều môn đánh dấu mọi buổi tương lai, kể cả buổi môn khác")
+    void cancelMultiSubjectClassMarksAllFutureSessions() {
+        insertClass(CLASS, ORG);
+        String math = insertSessionWithSubject("s-math", CLASS, "dept-1", "t1", ROOM, "sub-math",
+            "Toán", Instant.now().plusSeconds(86_400), "scheduled");
+        String physics = insertSessionWithSubject("s-physics", CLASS, "dept-1", "t2", ROOM,
+            "sub-physics", "Lý", Instant.now().plusSeconds(172_800), "scheduled");
+        String pastMath = insertSessionWithSubject("s-past-math", CLASS, "dept-1", "t1", ROOM,
+            "sub-math", "Toán", Instant.now().minusSeconds(86_400), "scheduled");
+
+        consumer.handle(statusChangedEvent("evt-cancel-multi", 2L, "DA_HUY", "NONE", "DA_HUY"));
+
+        assertThat(impactsOf(math)).hasSize(1);
+        assertThat(impactsOf(physics)).hasSize(1);
+        assertThat(impactsOf(pastMath)).isEmpty();
+        assertThat(statusOf(math)).isEqualTo("OPEN");
+        assertThat(statusOf(physics)).isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject(
+            "SELECT COUNT(*) FROM session_impact WHERE source_type='CLASS_STATUS_CHANGED'",
+            Integer.class)).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("SCH-04: sự cố phòng đánh dấu buổi tương lai dùng phòng đó")
     void incidentOpenedMarksFutureSessionsOfRoom() {
         insertClass(CLASS, ORG);
@@ -227,6 +250,19 @@ class ScheduleEventConsumerTest {
                                 end_time, status, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?)
             """, id, classId, departmentId, teacherId, roomId, at,
+            Timestamp.from(start.plusSeconds(3_600)), status, at, at);
+        return id;
+    }
+
+    private String insertSessionWithSubject(String id, String classId, String departmentId,
+                                            String teacherId, String roomId, String subjectId,
+                                            String subjectName, Instant start, String status) {
+        Timestamp at = Timestamp.from(start);
+        jdbc.update("""
+            INSERT INTO session(id, class_id, department_id, teacher_id, room_id, subject_id,
+                                subject_name, start_time, end_time, status, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            """, id, classId, departmentId, teacherId, roomId, subjectId, subjectName, at,
             Timestamp.from(start.plusSeconds(3_600)), status, at, at);
         return id;
     }

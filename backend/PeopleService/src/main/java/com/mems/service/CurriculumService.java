@@ -1,6 +1,8 @@
 package com.mems.service;
 
 import com.mems.dto.*;
+import com.mems.exception.AppException;
+import com.mems.exception.ErrorCode;
 import com.mems.repository.CurriculumRepository;
 import com.mems.repository.SubjectRepository;
 import com.mems.security.Actor;
@@ -8,8 +10,14 @@ import com.mems.security.OrganizationModuleGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class CurriculumService {
@@ -90,10 +98,11 @@ public class CurriculumService {
         repo.require(curriculumId, orgId);
         // validate subject exists and is active
         subjectRepo.requireActive(request.subjectId(), orgId);
+        ensureNoCycle(curriculumId, request.subjectId(), request.prerequisiteSubjectIds());
         boolean required = request.isRequired() == null ? true : request.isRequired();
         CurriculumSubjectResponse result = repo.addSubject(curriculumId, request.subjectId(),
             request.sequenceNo(), request.requiredSessions(), request.sessionMinutes(),
-            request.theoryHours(), request.practiceHours(), required,
+            request.sessionsPerWeek(), request.theoryHours(), request.practiceHours(), required,
             request.notes(), request.prerequisiteSubjectIds());
         audit.record(orgId, actor.userId(), "CURRICULUM_SUBJECT_ADDED", curriculumId, result);
         return result;
@@ -105,13 +114,47 @@ public class CurriculumService {
         String orgId = actor.orgId();
         moduleGuard.requireModule(orgId, MODULE);
         repo.require(curriculumId, orgId);
+        ensureNoCycle(curriculumId, subjectId, request.prerequisiteSubjectIds());
         boolean required = request.isRequired() == null ? true : request.isRequired();
         CurriculumSubjectResponse result = repo.updateSubject(curriculumId, subjectId,
             request.sequenceNo(), request.requiredSessions(), request.sessionMinutes(),
-            request.theoryHours(), request.practiceHours(), required,
+            request.sessionsPerWeek(), request.theoryHours(), request.practiceHours(), required,
             request.notes(), request.prerequisiteSubjectIds());
         audit.record(orgId, actor.userId(), "CURRICULUM_SUBJECT_UPDATED", curriculumId, result);
         return result;
+    }
+
+    /**
+     * Chặn vòng tiên quyết khi thêm/sửa môn: tự trỏ chính mình, A<->B, hoặc vòng dài hơn.
+     * Cạnh cũ của chính môn được thay thế nên không tính vào phép kiểm tra.
+     */
+    private void ensureNoCycle(String curriculumId, String subjectId, List<String> prerequisiteIds) {
+        if (prerequisiteIds == null || prerequisiteIds.isEmpty()) return;
+        Set<String> requested = new LinkedHashSet<>(prerequisiteIds);
+        if (requested.contains(subjectId)) {
+            throw new AppException(ErrorCode.PREREQUISITE_CYCLE,
+                "Môn không thể là tiên quyết của chính nó");
+        }
+        Map<String, List<String>> edges = new HashMap<>(repo.prerequisiteEdges(curriculumId));
+        edges.remove(subjectId);
+        for (String prerequisiteId : requested) {
+            if (reaches(edges, prerequisiteId, subjectId)) {
+                throw new AppException(ErrorCode.PREREQUISITE_CYCLE,
+                    "Quan hệ tiên quyết tạo vòng lặp trong chương trình");
+            }
+        }
+    }
+
+    private boolean reaches(Map<String, List<String>> edges, String from, String target) {
+        Deque<String> stack = new ArrayDeque<>(List.of(from));
+        Set<String> seen = new HashSet<>();
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (!seen.add(current)) continue;
+            if (current.equals(target)) return true;
+            for (String next : edges.getOrDefault(current, List.of())) stack.push(next);
+        }
+        return false;
     }
 
     @Transactional

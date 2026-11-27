@@ -108,6 +108,10 @@ public enum ErrorCode {
         "roomRequirement must be ANY or COMPUTER"),
     SUBJECT_USAGE_CONFIRMATION_REQUIRED(2237, HttpStatus.CONFLICT,
         "Subject is in use; resend with confirm=true to apply the change"),
+    PREREQUISITE_CYCLE(2238, HttpStatus.BAD_REQUEST,
+        "Prerequisite relation creates a cycle in the curriculum"),
+    PREREQUISITE_STAGE_INVALID(2239, HttpStatus.BAD_REQUEST,
+        "Subject stage must come after the stage of its prerequisite"),
 
     // Ủy quyền / Tổng quản lý (quy tắc 3, 7)
     DELEGATION_NOT_FOUND(2401, HttpStatus.NOT_FOUND, "Delegation not found"),
@@ -139,6 +143,7 @@ public enum ErrorCode {
     SPECIALTY_EXISTS(2303, HttpStatus.CONFLICT, "Specialty already exists in organization"),
     SPECIALTY_MISMATCH(2304, HttpStatus.CONFLICT,
         "Specialties no longer match the subject of assigned classes"),
+    SPECIALTY_NOT_FOUND(2305, HttpStatus.NOT_FOUND, "Specialty not found"),
 
     // Validate DTO
     NAME_REQUIRED(3001, HttpStatus.BAD_REQUEST, "Name is required"),
@@ -182,7 +187,11 @@ public enum ErrorCode {
     PERMISSIONS_REQUIRED(3038, HttpStatus.BAD_REQUEST, "At least one permission is required"),
     PERMISSIONS_TOO_MANY(3039, HttpStatus.BAD_REQUEST, "At most 50 permissions are allowed"),
     PERMISSION_CODE_REQUIRED(3040, HttpStatus.BAD_REQUEST, "Permission code must not be blank"),
-    PERMISSION_CODE_TOO_LONG(3041, HttpStatus.BAD_REQUEST, "Permission code is too long");
+    PERMISSION_CODE_TOO_LONG(3041, HttpStatus.BAD_REQUEST, "Permission code is too long"),
+    SUBJECT_IDS_REQUIRED(3043, HttpStatus.BAD_REQUEST, "Subject id list is required"),
+    SUBJECT_IDS_TOO_MANY(3044, HttpStatus.BAD_REQUEST, "At most 100 subjects are allowed"),
+    SUBJECT_ID_REQUIRED(3045, HttpStatus.BAD_REQUEST, "Subject id must not be blank"),
+    SUBJECT_ID_TOO_LONG(3046, HttpStatus.BAD_REQUEST, "Subject id is too long");
 
     private final int code;
     private final HttpStatus status;

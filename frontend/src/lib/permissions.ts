@@ -56,6 +56,7 @@ export const PERM = {
   scheduleEdit: 'schedule.edit',
   scheduleCancelSession: 'schedule.cancel_session',
   scheduleDelete: 'schedule.delete',
+  scheduleConfig: 'schedule.config',
   scheduleRecurringCreate: 'schedule.recurring.create',
   schedulePreview: 'schedule.preview',
   scheduleAttendanceMark: 'schedule.attendance.mark',
@@ -194,6 +195,8 @@ export const PERMISSION_GROUPS: { label: string; permissions: PermissionMeta[] }
       { code: PERM.scheduleEdit, label: 'Sửa buổi học', bundle: 'SCHEDULE_MANAGEMENT' },
       { code: PERM.scheduleCancelSession, label: 'Huỷ buổi học', bundle: 'SCHEDULE_MANAGEMENT' },
       { code: PERM.scheduleDelete, label: 'Xoá buổi học', bundle: 'SCHEDULE_MANAGEMENT' },
+      // Cấu hình tiết học/lịch rảnh ở phạm vi tổ chức, không nằm trong bundle.
+      { code: PERM.scheduleConfig, label: 'Cấu hình lịch của tổ chức', bundle: 'ORG' },
       { code: PERM.scheduleRecurringCreate, label: 'Xếp lịch lặp', bundle: 'SCHEDULE_MANAGEMENT' },
       { code: PERM.schedulePreview, label: 'Xem trước lịch lặp', bundle: 'SCHEDULE_MANAGEMENT' },
       { code: PERM.scheduleAttendanceMark, label: 'Điểm danh', bundle: 'SCHEDULE_MANAGEMENT' },

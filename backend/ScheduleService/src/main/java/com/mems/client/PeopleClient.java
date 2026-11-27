@@ -12,7 +12,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /** Đọc lớp/giáo viên/học sinh từ PeopleService qua API nội bộ. */
 @Component
@@ -63,6 +65,22 @@ public class PeopleClient {
         }
     }
 
+    /** Batch giáo viên đủ điều kiện cho nhiều môn; mỗi subjectId luôn có key (có thể rỗng). */
+    public Map<String, List<EligibleTeacherInfo>> eligibleTeachersBatch(String orgId,
+                                                                       Collection<String> subjectIds) {
+        if (subjectIds == null || subjectIds.isEmpty()) return Map.of();
+        try {
+            var response = http.exchange(
+                "/internal/subjects/eligible-teachers?orgId={orgId}&subjectIds={subjectIds}",
+                HttpMethod.GET, null,
+                new ParameterizedTypeReference<Map<String, List<EligibleTeacherInfo>>>() {},
+                orgId, String.join(",", subjectIds));
+            return response.getBody() == null ? Map.of() : response.getBody();
+        } catch (RestClientException ex) {
+            throw new AppException(ErrorCode.PEOPLE_UNAVAILABLE);
+        }
+    }
+
     /** Danh sách tất cả môn học của lớp (cả môn chính và môn thêm thủ công / CTĐT). */
     public List<ClassSubjectInfo> classSubjects(String orgId, String classId) {
         try {
@@ -73,6 +91,23 @@ public class PeopleClient {
             return response.getBody() == null ? List.of() : response.getBody();
         } catch (Exception ex) {
             return List.of();
+        }
+    }
+
+    /** Giáo viên có tồn tại trong tổ chức không; 404 nghĩa là không thuộc org. */
+    public boolean teacherExists(String orgId, String teacherId) {
+        return teacherInfo(orgId, teacherId) != null;
+    }
+
+    /** Trả `null` khi giáo viên không tồn tại trong tổ chức. */
+    public EligibleTeacherInfo teacherInfo(String orgId, String teacherId) {
+        try {
+            return http.exchange("/internal/teachers/{teacherId}?orgId={orgId}", HttpMethod.GET, null,
+                EligibleTeacherInfo.class, teacherId, orgId).getBody();
+        } catch (HttpClientErrorException.NotFound notFound) {
+            return null;
+        } catch (RestClientException ex) {
+            throw new AppException(ErrorCode.PEOPLE_UNAVAILABLE);
         }
     }
 }

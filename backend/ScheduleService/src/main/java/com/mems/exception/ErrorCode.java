@@ -23,7 +23,24 @@ public enum ErrorCode {
     ROOM_SCHEDULE_CONFLICT(3111, HttpStatus.CONFLICT, "Room is already booked in this time range"),
     CLASS_SCHEDULE_CONFLICT(3112, HttpStatus.CONFLICT, "Class already has a session in this time range"),
     ROOM_NOT_AVAILABLE(3113, HttpStatus.CONFLICT, "Room is unavailable"),
-    ROOM_TYPE_MISMATCH(3114, HttpStatus.CONFLICT, "Room type does not match subject requirement");
+    ROOM_TYPE_MISMATCH(3114, HttpStatus.CONFLICT, "Room type does not match subject requirement"),
+    TIME_SLOTS_REQUIRED(3115, HttpStatus.BAD_REQUEST, "At least one time slot is required"),
+    TIME_SLOT_INVALID(3116, HttpStatus.BAD_REQUEST, "Time slot configuration is invalid"),
+    CLASS_SLOT_RULE_INVALID(3117, HttpStatus.BAD_REQUEST, "Class slot rule is invalid"),
+    TEACHER_AVAILABILITY_INVALID(3118, HttpStatus.BAD_REQUEST, "Teacher availability is invalid"),
+    TEACHER_NOT_FOUND(3119, HttpStatus.NOT_FOUND, "Teacher not found in this organization"),
+    SCHEDULE_CONFIG_MISSING(3120, HttpStatus.BAD_REQUEST,
+        "Schedule periods are not configured for this organization"),
+    SCHEDULE_DRAFT_NOT_FOUND(3121, HttpStatus.NOT_FOUND, "Schedule draft not found"),
+    SCHEDULE_DRAFT_NOT_EDITABLE(3122, HttpStatus.CONFLICT,
+        "Only DRAFT schedules can be changed"),
+    SCHEDULE_DRAFT_EXPIRED(3123, HttpStatus.CONFLICT,
+        "The draft is older than the confirmation window"),
+    SCHEDULE_DRAFT_ITEM_NOT_FOUND(3124, HttpStatus.NOT_FOUND, "Draft session not found"),
+    SCHEDULE_DRAFT_ITEM_CONFLICT(3125, HttpStatus.CONFLICT,
+        "Draft session conflicts with another session"),
+    SCHEDULE_DRAFT_CONFIRM_FAILED(3126, HttpStatus.CONFLICT,
+        "Some draft sessions could not be confirmed");
 
     private final int code;
     private final HttpStatus status;

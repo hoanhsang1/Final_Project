@@ -33,9 +33,10 @@ import {
   useClassStudents,
   useClassSubjectMutations,
   useClassSubjects,
+  useCurricula,
+  useEligibleTeachers,
   useStudents,
   useSubjects,
-  useTeachers,
 } from '@/features/academic/hooks'
 import {
   CANCEL_STATE_LABELS,
@@ -48,25 +49,59 @@ import {
   type SchoolClass,
 } from '@/features/academic/types'
 import { usePermission } from '@/features/auth/hooks'
+import { useSchedules } from '@/features/schedule/hooks'
 import { ApiError } from '@/lib/api-error'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { PERM } from '@/lib/permissions'
 
 // ─── Class Subjects Section ───────────────────────────────────────────────────
 
-function ClassSubjectsSection({ classId, classStatus }: { classId: string; classStatus: string }) {
+function ClassSubjectsSection({
+  classId,
+  classStatus,
+  classVersion,
+}: {
+  classId: string
+  classStatus: string
+  classVersion: number
+}) {
+  const { can, session } = usePermission()
   const { data, isLoading, isError, error } = useClassSubjects(classId)
   const subjects = useSubjects({ includeInactive: false })
-  const teachers = useTeachers({ size: 100 })
+  const curricula = useCurricula({ isActive: true, page: 1, size: 100 })
   const mutations = useClassSubjectMutations(classId)
+
+  // "Đã xếp" lấy từ lịch của phòng ban; chỉ gọi khi có quyền xem lịch.
+  const departmentId = session?.user.departmentId ?? null
+  const canViewSchedule = can(PERM.scheduleView) && Boolean(departmentId)
+  const schedules = useSchedules(canViewSchedule ? departmentId : null, { classId })
+  const scheduledBySubject = new Map<string, number>()
+  for (const item of schedules.data ?? []) {
+    if (item.status === 'cancelled' || item.status === 'DA_HUY') continue
+    const name = item.subjectName?.trim()
+    if (!name) continue
+    scheduledBySubject.set(name, (scheduledBySubject.get(name) ?? 0) + 1)
+  }
 
   const [addOpen, setAddOpen] = useState(false)
   const [addSubjectId, setAddSubjectId] = useState('')
   const [addTeacherId, setAddTeacherId] = useState('')
+  const eligibleTeachers = useEligibleTeachers(addSubjectId || undefined, Boolean(addSubjectId))
   const [addPlannedSessions, setAddPlannedSessions] = useState('30')
   const [addSessionMinutes, setAddSessionMinutes] = useState('45')
   const [addError, setAddError] = useState<string | null>(null)
   const [deletingSubject, setDeletingSubject] = useState<ClassSubject | null>(null)
+
+  const [editing, setEditing] = useState<ClassSubject | null>(null)
+  const [editPlanned, setEditPlanned] = useState('')
+  const [editMinutes, setEditMinutes] = useState('')
+  const [editPerWeek, setEditPerWeek] = useState('')
+  const [editStage, setEditStage] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const [applyOpen, setApplyOpen] = useState(false)
+  const [applyCurriculumId, setApplyCurriculumId] = useState('')
+  const [applyError, setApplyError] = useState<string | null>(null)
 
   const canEdit = classStatus === 'CHUA_BAT_DAU'
   const existingSubjectIds = (data?.subjects ?? []).map((s) => s.subjectId)
@@ -92,6 +127,54 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
     }
   }
 
+  const openEdit = (cs: ClassSubject) => {
+    setEditing(cs)
+    setEditPlanned(cs.plannedSessions != null ? String(cs.plannedSessions) : '')
+    setEditMinutes(cs.sessionMinutes != null ? String(cs.sessionMinutes) : '')
+    setEditPerWeek(cs.sessionsPerWeek != null ? String(cs.sessionsPerWeek) : '')
+    setEditStage(String(cs.stageNo ?? 1))
+    setEditError(null)
+  }
+
+  const handleUpdate = async () => {
+    if (!editing) return
+    setEditError(null)
+    try {
+      await mutations.updateSubject.mutateAsync({
+        subjectId: editing.subjectId,
+        input: {
+          plannedSessions: editPlanned ? parseInt(editPlanned) : undefined,
+          sessionMinutes: editMinutes ? parseInt(editMinutes) : undefined,
+          sessionsPerWeek: editPerWeek ? parseInt(editPerWeek) : undefined,
+          stageNo: editStage ? parseInt(editStage) : undefined,
+          // Backend ghi đè teacher_id: gửi lại giá trị hiện tại để không xoá giáo viên.
+          teacherId: editing.teacherId,
+          version: classVersion,
+        },
+      })
+      toast.success('Đã cập nhật môn học của lớp')
+      setEditing(null)
+    } catch (err) {
+      setEditError(ApiError.from(err).message || 'Không thể cập nhật môn học')
+    }
+  }
+
+  const handleApplyCurriculum = async () => {
+    if (!applyCurriculumId) { setApplyError('Vui lòng chọn chương trình đào tạo'); return }
+    setApplyError(null)
+    try {
+      const result = await mutations.applyCurriculum.mutateAsync({
+        curriculumId: applyCurriculumId,
+        version: classVersion,
+      })
+      toast.success(`Đã áp chương trình đào tạo (${result.subjects.length} môn)`)
+      setApplyOpen(false)
+      setApplyCurriculumId('')
+    } catch (err) {
+      setApplyError(ApiError.from(err).message || 'Không thể áp chương trình đào tạo')
+    }
+  }
+
   const handleRemove = async () => {
     if (!deletingSubject) return
     try {
@@ -110,13 +193,19 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink-900">Môn học của lớp ({list.length})</h3>
         {canEdit && (
-          <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
-            <Plus className="size-3.5 mr-1" />
-            Thêm môn
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setApplyOpen(true)}>
+              <BookOpen className="size-3.5 mr-1" />
+              Áp chương trình đào tạo
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+              <Plus className="size-3.5 mr-1" />
+              Thêm môn
+            </Button>
+          </div>
         )}
       </div>
 
@@ -130,34 +219,113 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
         <p className="text-sm text-ink-500">Lớp chưa được gán môn học nào.</p>
       ) : (
         <ul className="divide-y divide-line-100 rounded-md border border-line-200 text-sm">
-          {list.map((cs) => (
-            <li key={cs.subjectId} className="flex items-center justify-between gap-2 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-ink-900 truncate">{cs.subjectName}</span>
-                  {cs.isPrimary && <Badge tone="success" className="text-xs">Môn chính</Badge>}
-                  <Badge tone="outline" className="text-xs">{CLASS_SUBJECT_SOURCE_LABELS[cs.source] ?? cs.source}</Badge>
+          {list.map((cs) => {
+            const scheduled = scheduledBySubject.get(cs.subjectName.trim()) ?? 0
+            return (
+              <li key={cs.subjectId} className="flex items-center justify-between gap-2 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-ink-900 truncate">{cs.subjectName}</span>
+                    {cs.isPrimary && <Badge tone="success" className="text-xs">Môn chính</Badge>}
+                    <Badge tone="outline" className="text-xs">{CLASS_SUBJECT_SOURCE_LABELS[cs.source] ?? cs.source}</Badge>
+                  </div>
+                  <div className="text-xs text-ink-500 mt-0.5 flex flex-wrap gap-3">
+                    {cs.plannedSessions != null && <span>Kế hoạch: {cs.plannedSessions} buổi</span>}
+                    {cs.sessionMinutes != null && <span>{cs.sessionMinutes} phút/buổi</span>}
+                    <span>{cs.sessionsPerWeek ?? 2} buổi/tuần</span>
+                    <span>Giai đoạn {cs.stageNo ?? 1}</span>
+                    {canViewSchedule && (
+                      <span>
+                        Đã xếp {scheduled}
+                        {cs.plannedSessions != null ? `/${cs.plannedSessions}` : ''}
+                      </span>
+                    )}
+                    {cs.teacherName && <span>GV: {cs.teacherName}</span>}
+                  </div>
                 </div>
-                <div className="text-xs text-ink-500 mt-0.5 flex gap-3">
-                  {cs.plannedSessions != null && <span>{cs.plannedSessions} buổi</span>}
-                  {cs.sessionMinutes != null && <span>{cs.sessionMinutes} phút/buổi</span>}
-                  {cs.teacherName && <span>GV: {cs.teacherName}</span>}
-                </div>
-              </div>
-              {canEdit && !cs.isPrimary && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-danger-600 hover:text-danger-700 shrink-0"
-                  onClick={() => setDeletingSubject(cs)}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              )}
-            </li>
-          ))}
+                {canEdit && (
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Sửa ${cs.subjectName}`}
+                      onClick={() => openEdit(cs)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    {!cs.isPrimary && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger-600 hover:text-danger-700"
+                        onClick={() => setDeletingSubject(cs)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
+
+      {/* Edit Subject Dialog */}
+      <Dialog open={Boolean(editing)} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sửa môn {editing?.subjectName}</DialogTitle>
+            <DialogDescription>
+              Cấu hình số buổi, thời lượng, số buổi mỗi tuần và giai đoạn dùng khi xếp lịch.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            {editError && <Alert tone="danger">{editError}</Alert>}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Số buổi học (kế hoạch)">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editPlanned}
+                  onChange={(e) => setEditPlanned(e.target.value)}
+                />
+              </Field>
+              <Field label="Thời lượng (phút)">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editMinutes}
+                  onChange={(e) => setEditMinutes(e.target.value)}
+                />
+              </Field>
+              <Field label="Số buổi/tuần">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editPerWeek}
+                  placeholder="Mặc định 2"
+                  onChange={(e) => setEditPerWeek(e.target.value)}
+                />
+              </Field>
+              <Field label="Giai đoạn">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editStage}
+                  onChange={(e) => setEditStage(e.target.value)}
+                />
+              </Field>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Huỷ</Button>
+            <Button onClick={handleUpdate} isLoading={mutations.updateSubject.isPending}>
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Subject Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -169,7 +337,13 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
           <DialogBody className="space-y-3">
             {addError && <Alert tone="danger">{addError}</Alert>}
             <Field label="Môn học *">
-              <Select value={addSubjectId} onValueChange={setAddSubjectId}>
+              <Select
+                value={addSubjectId}
+                onValueChange={(value) => {
+                  setAddSubjectId(value)
+                  setAddTeacherId('')
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn môn học" />
                 </SelectTrigger>
@@ -187,18 +361,32 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Giáo viên phụ trách (tùy chọn)">
-              <Select value={addTeacherId} onValueChange={setAddTeacherId}>
+            <Field
+              label="Giáo viên phụ trách (tùy chọn)"
+              hint={
+                eligibleTeachers.isError
+                  ? `Không tải được danh sách giáo viên đủ điều kiện: ${
+                      ApiError.from(eligibleTeachers.error).message
+                    }`
+                  : 'Chỉ hiện giáo viên đang dạy và đủ điều kiện dạy môn đã chọn.'
+              }
+            >
+              <Select value={addTeacherId} onValueChange={setAddTeacherId} disabled={!addSubjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tự động phân bổ khi xếp lịch" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">-- Tự động phân bổ khi xếp lịch --</SelectItem>
-                  {(teachers.data?.items ?? []).map((t) => (
+                  {(eligibleTeachers.data ?? []).map((t) => (
                     <SelectItem key={t.userId} value={t.userId}>
-                      {t.fullName} {t.staffCode ? `(${t.staffCode})` : ''}
+                      {t.fullName}
                     </SelectItem>
                   ))}
+                  {addSubjectId && !eligibleTeachers.isLoading && (eligibleTeachers.data ?? []).length === 0 && (
+                    <div className="px-2 py-3 text-xs text-ink-500 text-center">
+                      Chưa có giáo viên đủ điều kiện dạy môn này
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </Field>
@@ -229,6 +417,50 @@ function ClassSubjectsSection({ classId, classStatus }: { classId: string; class
               disabled={!addSubjectId}
             >
               Thêm môn học
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Apply Curriculum Dialog */}
+      <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Áp chương trình đào tạo</DialogTitle>
+            <DialogDescription>
+              Thêm các môn còn thiếu từ chương trình vào lớp. Môn thủ công hiện có được giữ nguyên.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            {applyError && <Alert tone="danger">{applyError}</Alert>}
+            <Field label="Chương trình đào tạo *">
+              <Select value={applyCurriculumId} onValueChange={setApplyCurriculumId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn chương trình" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(curricula.data?.items ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                  {(curricula.data?.items ?? []).length === 0 && (
+                    <div className="px-2 py-3 text-xs text-ink-500 text-center">
+                      Chưa có chương trình đào tạo đang hoạt động
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApplyOpen(false)}>Huỷ</Button>
+            <Button
+              onClick={handleApplyCurriculum}
+              isLoading={mutations.applyCurriculum.isPending}
+              disabled={!applyCurriculumId}
+            >
+              Áp chương trình
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -716,7 +948,11 @@ function ClassDetailDialog({
                 </section>
               ) : null}
 
-              <ClassSubjectsSection classId={schoolClass.id} classStatus={schoolClass.status} />
+              <ClassSubjectsSection
+                classId={schoolClass.id}
+                classStatus={schoolClass.status}
+                classVersion={schoolClass.version}
+              />
 
               <section className="space-y-3">
                 <h3 className="text-sm font-semibold text-ink-900">Quy trình trạng thái</h3>

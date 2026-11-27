@@ -40,7 +40,11 @@ public class AutoScheduleController {
      * Chạy thuật toán greedy xếp lịch tự động.
      * Trả về danh sách buổi đã xếp + danh sách buổi không xếp được với lý do cụ thể.
      * Mỗi buổi thành công được persist ngay vào DB (gọi ScheduleService.create()).
+     *
+     * @deprecated ghi thẳng buổi học, không có bước lịch nháp/chỉnh tay/xác nhận.
+     *     Giữ tạm để không phá client cũ; dùng `/schedules/drafts` cho luồng mới.
      */
+    @Deprecated
     @PostMapping("/auto-generate")
     public AutoScheduleResult autoGenerate(@PathVariable String departmentId,
                                            @Valid @RequestBody AutoScheduleRequest request) {

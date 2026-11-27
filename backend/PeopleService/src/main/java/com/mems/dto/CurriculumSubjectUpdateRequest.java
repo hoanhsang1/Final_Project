@@ -9,6 +9,7 @@ public record CurriculumSubjectUpdateRequest(
     @NotNull @Min(1) int sequenceNo,
     @NotNull @Min(1) int requiredSessions,
     @NotNull @Min(1) int sessionMinutes,
+    @Min(1) Integer sessionsPerWeek,
     Double theoryHours,
     Double practiceHours,
     Boolean isRequired,

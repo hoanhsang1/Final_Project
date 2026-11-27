@@ -50,6 +50,14 @@ public class SubjectController {
         return service.getUsage(id);
     }
 
+    /** Giáo viên đủ điều kiện dạy môn (D1) cho bộ chọn ở màn hình lớp học. */
+    @GetMapping("/{id}/eligible-teachers")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority("
+        + "'class.view','class.edit','subject.view','subject.manage','class.assign_teacher')")
+    public List<EligibleTeacherInfo> eligibleTeachers(@PathVariable String id) {
+        return service.eligibleTeachers(id);
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('OWNER') or hasAuthority('subject.manage')")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody SubjectRequest request) {

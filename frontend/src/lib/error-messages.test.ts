@@ -53,4 +53,20 @@ describe('translateError', () => {
       translateError({ code: 'SUBJECT_USAGE_CONFIRMATION_REQUIRED', status: 409 }),
     ).toContain('Xác nhận')
   })
+
+  it('dịch lỗi giáo viên không đủ điều kiện dạy môn', () => {
+    const message = translateError({ code: 'SUBJECT_MISMATCH', status: 409 })
+    expect(message).toContain('không đủ điều kiện')
+    expect(message).toContain('Đang dạy')
+    expect(translateError({ code: 'SPECIALTY_NOT_FOUND', status: 404 })).toContain(
+      'Không tìm thấy',
+    )
+  })
+
+  it('dịch lỗi tiên quyết môn học sang tiếng Việt', () => {
+    expect(translateError({ code: 'PREREQUISITE_CYCLE', status: 400 })).toContain('vòng lặp')
+    expect(translateError({ code: 'PREREQUISITE_STAGE_INVALID', status: 400 })).toContain(
+      'sau giai đoạn',
+    )
+  })
 })

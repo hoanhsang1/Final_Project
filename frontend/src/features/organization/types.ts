@@ -70,6 +70,12 @@ export interface DepartmentModuleImpact {
 export interface Specialty {
   id: string
   name: string
+  categoryId?: string | null
+}
+
+export interface SpecialtyInput {
+  name: string
+  categoryId?: string | null
 }
 
 export interface Member {

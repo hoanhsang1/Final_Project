@@ -32,6 +32,7 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/departments/*/schedules", "/departments/*/schedules/**").authenticated()
                 .requestMatchers("/schedules/me").authenticated()
+                .requestMatchers("/schedule-config", "/schedule-config/**").authenticated()
                 .anyRequest().denyAll())
             .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(jwt -> {
                 Set<SimpleGrantedAuthority> authorities = new HashSet<>();

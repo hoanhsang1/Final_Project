@@ -10,6 +10,10 @@ public record ClassSubjectResponse(
     Integer requiredSessions,
     Integer plannedSessions,
     Integer sessionMinutes,
+    Integer sessionsPerWeek,   // D8: số buổi mỗi tuần (NULL = chưa đặt, dùng mặc định 2)
+    Integer stageNo,           // D9: giai đoạn (mặc định 1)
+    String categoryId,         // danh mục môn học (từ subject)
+    String roomRequirement,    // ANY | COMPUTER (từ subject)
     String teacherId,
     String teacherName,
     boolean isPrimary,

@@ -14,6 +14,7 @@ import type {
   PositionCloneResult,
   PositionInput,
   Specialty,
+  SpecialtyInput,
   TransferRequest,
 } from '@/features/organization/types'
 import type { PermissionDefinition } from '@/features/workflows/types'
@@ -143,6 +144,16 @@ export const positionsApi = {
 export const specialtiesApi = {
   async list(): Promise<Specialty[]> {
     const { data } = await api.get<Specialty[]>('/specialties')
+    return data
+  },
+
+  async create(input: SpecialtyInput): Promise<Specialty> {
+    const { data } = await api.post<Specialty>('/specialties', input)
+    return data
+  },
+
+  async update(id: string, input: SpecialtyInput): Promise<Specialty> {
+    const { data } = await api.put<Specialty>(`/specialties/${id}`, input)
     return data
   },
 }

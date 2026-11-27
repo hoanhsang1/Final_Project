@@ -91,6 +91,8 @@ public final class PermissionCatalog {
         orgAndDept("schedule.update", "Update department schedules", "SCHEDULE_MANAGEMENT"),
         orgAndDept("schedule.cancel_session", "Cancel a schedule session", "SCHEDULE_MANAGEMENT"),
         orgAndDept("schedule.delete", "Delete department schedules", "SCHEDULE_MANAGEMENT"),
+        // Cấu hình lịch là tài nguyên cấp tổ chức (tiết học, quy tắc lớp, lịch rảnh).
+        orgOnly("schedule.config", "Configure organization schedule", "SCHEDULE_MANAGEMENT"),
         // Cơ sở vật chất
         orgAndDept("facility.view", "View department facilities", "FACILITY_MANAGEMENT"),
         orgAndDept("facility.manage", "Manage department facilities", "FACILITY_MANAGEMENT"),

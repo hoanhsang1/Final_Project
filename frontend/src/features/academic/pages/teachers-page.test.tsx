@@ -2,10 +2,15 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { teachersApi } from '@/features/academic/api'
+import {
+  subjectCategoriesApi,
+  subjectsApi,
+  teacherSubjectsApi,
+  teachersApi,
+} from '@/features/academic/api'
 import type * as AcademicApi from '@/features/academic/api'
 import { TeachersPage } from '@/features/academic/pages/teachers-page'
-import type { TeacherDetail, TeacherItem } from '@/features/academic/types'
+import type { Subject, TeacherDetail, TeacherItem } from '@/features/academic/types'
 import type * as OrgApi from '@/features/organization/api'
 import { departmentsApi, positionsApi, specialtiesApi } from '@/features/organization/api'
 import { ApiError } from '@/lib/api-error'
@@ -23,6 +28,13 @@ vi.mock('@/features/academic/api', async (importOriginal) => {
       update: vi.fn(),
       changeStatus: vi.fn(),
     },
+    teacherSubjectsApi: {
+      ...actual.teacherSubjectsApi,
+      teachable: vi.fn(),
+      replaceExceptions: vi.fn(),
+    },
+    subjectsApi: { ...actual.subjectsApi, list: vi.fn() },
+    subjectCategoriesApi: { ...actual.subjectCategoriesApi, list: vi.fn() },
   }
 })
 
@@ -31,7 +43,12 @@ vi.mock('@/features/organization/api', async (importOriginal) => {
   return {
     ...actual,
     departmentsApi: { ...actual.departmentsApi, list: vi.fn() },
-    specialtiesApi: { ...actual.specialtiesApi, list: vi.fn() },
+    specialtiesApi: {
+      ...actual.specialtiesApi,
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
     positionsApi: { ...actual.positionsApi, list: vi.fn() },
   }
 })
@@ -78,7 +95,13 @@ beforeEach(() => {
   })
   vi.mocked(departmentsApi.list).mockResolvedValue([])
   vi.mocked(specialtiesApi.list).mockResolvedValue([{ id: 'spec-1', name: 'Toán' }])
+  vi.mocked(specialtiesApi.create).mockReset()
+  vi.mocked(specialtiesApi.update).mockReset()
   vi.mocked(positionsApi.list).mockResolvedValue([])
+  vi.mocked(teacherSubjectsApi.teachable).mockResolvedValue([])
+  vi.mocked(teacherSubjectsApi.replaceExceptions).mockReset()
+  vi.mocked(subjectsApi.list).mockResolvedValue([])
+  vi.mocked(subjectCategoriesApi.list).mockResolvedValue([])
 })
 
 describe('TeachersPage — đổi trạng thái giảng dạy', () => {
@@ -169,5 +192,104 @@ describe('TeachersPage — xung đột chuyên môn với lớp đang dạy', ()
 
     await waitFor(() => expect(teachersApi.update).toHaveBeenCalledTimes(2))
     expect(vi.mocked(teachersApi.update).mock.calls[1][1]).toMatchObject({ confirm: true })
+  })
+})
+
+describe('TeachersPage — môn dạy được (quy tắc D1)', () => {
+  const detail: TeacherDetail = {
+    ...teacher,
+    positionIds: [],
+    classes: [],
+    version: 3,
+    createdAt: null,
+    updatedAt: null,
+    history: [],
+  }
+
+  const subjectOf = (id: string, name: string): Subject => ({
+    id,
+    code: null,
+    name,
+    description: null,
+    active: true,
+    createdAt: null,
+    updatedAt: null,
+  })
+
+  it('hiển thị lý do và cho lưu ngoại lệ ngoài danh mục chuyên môn', async () => {
+    vi.mocked(teachersApi.byId).mockResolvedValue(detail)
+    vi.mocked(teacherSubjectsApi.teachable).mockResolvedValue([
+      { subjectId: 'sub-java', subjectCode: 'JAVA', subjectName: 'Lập trình Java', reason: 'CATEGORY' },
+      { subjectId: 'sub-eng', subjectCode: 'ENG', subjectName: 'Tiếng Anh', reason: 'EXCEPTION' },
+    ])
+    vi.mocked(subjectsApi.list).mockResolvedValue([
+      subjectOf('sub-java', 'Lập trình Java'),
+      subjectOf('sub-eng', 'Tiếng Anh'),
+      subjectOf('sub-sql', 'SQL'),
+    ])
+    vi.mocked(teacherSubjectsApi.replaceExceptions).mockResolvedValue([])
+    signInAs({ permissions: [PERM.employeeView, PERM.employeeEdit] })
+
+    renderPage(<TeachersPage />)
+    await screen.findByText('Giáo viên A')
+    await userEvent.click(screen.getByRole('button', { name: 'Sửa' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText(/Cùng danh mục chuyên môn/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Ngoại lệ được duyệt/)).toBeInTheDocument()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Chỉnh ngoại lệ' }))
+
+    const javaBox = within(dialog).getByRole('checkbox', { name: /Lập trình Java/ })
+    expect(javaBox).toBeChecked()
+    expect(javaBox).toBeDisabled()
+    expect(within(dialog).getByRole('checkbox', { name: 'Tiếng Anh' })).toBeChecked()
+
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'SQL' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu ngoại lệ' }))
+
+    await waitFor(() =>
+      expect(teacherSubjectsApi.replaceExceptions).toHaveBeenCalledWith('teacher-1', [
+        'sub-eng',
+        'sub-sql',
+      ]),
+    )
+  })
+
+  it('chỉ hiện nút quản lý chuyên môn khi có employee.edit', async () => {
+    signInAs({ roles: ['STAFF'], role: 'STAFF', permissions: [PERM.employeeView] })
+    renderPage(<TeachersPage />)
+    await screen.findByText('Giáo viên A')
+
+    expect(screen.queryByRole('button', { name: 'Chuyên môn' })).not.toBeInTheDocument()
+  })
+
+  it('tạo chuyên môn kèm danh mục môn học', async () => {
+    vi.mocked(specialtiesApi.create).mockResolvedValue({
+      id: 'spec-2',
+      name: 'Lập trình Web',
+      categoryId: 'cat-prog',
+    })
+    vi.mocked(subjectCategoriesApi.list).mockResolvedValue([
+      { id: 'cat-prog', name: 'Lập trình', active: true, subjectCount: 1, createdAt: null, updatedAt: null },
+    ])
+    signInAs({ roles: ['STAFF'], role: 'STAFF', permissions: [PERM.employeeView, PERM.employeeEdit] })
+
+    renderPage(<TeachersPage />)
+    await screen.findByText('Giáo viên A')
+    await userEvent.click(screen.getByRole('button', { name: 'Chuyên môn' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getAllByRole('textbox')[0]!, 'Lập trình Web')
+    await userEvent.click(within(dialog).getByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Lập trình' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Thêm' }))
+
+    await waitFor(() =>
+      expect(specialtiesApi.create).toHaveBeenCalledWith({
+        name: 'Lập trình Web',
+        categoryId: 'cat-prog',
+      }),
+    )
   })
 })

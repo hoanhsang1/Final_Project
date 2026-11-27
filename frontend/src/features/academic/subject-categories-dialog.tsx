@@ -141,6 +141,18 @@ export function SubjectCategoriesDialog({
 
           {categories.isLoading ? (
             <p className="py-6 text-center text-sm text-ink-500">Đang tải danh mục…</p>
+          ) : categories.isError ? (
+            <div className="py-6 text-center text-sm text-danger-600">
+              <p>Không tải được danh mục: {ApiError.from(categories.error).message}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => void categories.refetch()}
+              >
+                Thử lại
+              </Button>
+            </div>
           ) : rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-500">Chưa có danh mục nào.</p>
           ) : (

@@ -5,6 +5,7 @@ import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
 import com.mems.exception.SubjectUsageWarningException;
 import com.mems.repository.SubjectRepository;
+import com.mems.repository.TeacherRepository;
 import com.mems.security.Actor;
 import com.mems.security.OrganizationModuleGuard;
 import org.springframework.stereotype.Service;
@@ -23,15 +24,18 @@ public class SubjectService {
     public static final String MODULE_STUDENT_MANAGEMENT = "STUDENT_MANAGEMENT";
 
     private final SubjectRepository repository;
+    private final TeacherRepository teachers;
     private final Actor actor;
     private final OrganizationModuleGuard moduleGuard;
     private final PeopleAuditService audit;
 
     public SubjectService(SubjectRepository repository,
+                          TeacherRepository teachers,
                           Actor actor,
                           OrganizationModuleGuard moduleGuard,
                           PeopleAuditService audit) {
         this.repository = repository;
+        this.teachers = teachers;
         this.actor = actor;
         this.moduleGuard = moduleGuard;
         this.audit = audit;
@@ -137,6 +141,15 @@ public class SubjectService {
         String orgId = actor.orgId();
         moduleGuard.requireModuleReadable(orgId, MODULE_STUDENT_MANAGEMENT);
         return repository.getUsage(id, orgId);
+    }
+
+    /** Giáo viên đang dạy đủ điều kiện dạy môn theo D1 — dùng cho bộ chọn giáo viên ở lớp học. */
+    @Transactional(readOnly = true)
+    public List<EligibleTeacherInfo> eligibleTeachers(String subjectId) {
+        String orgId = actor.orgId();
+        moduleGuard.requireModuleReadable(orgId, MODULE_STUDENT_MANAGEMENT);
+        repository.require(subjectId, orgId);
+        return teachers.eligibleForSubject(orgId, subjectId);
     }
 
     private String normalizeCode(String code) {

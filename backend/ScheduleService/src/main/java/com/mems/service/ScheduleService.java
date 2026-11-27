@@ -1,6 +1,7 @@
 package com.mems.service;
 
 import com.mems.client.ClassInfo;
+import com.mems.client.ClassSubjectInfo;
 import com.mems.client.FacilityClient;
 import com.mems.client.PeopleClient;
 import com.mems.client.RoomInfo;
@@ -10,6 +11,7 @@ import com.mems.dto.ScheduleRequest;
 import com.mems.dto.ScheduleResponse;
 import com.mems.exception.AppException;
 import com.mems.exception.ErrorCode;
+import com.mems.scheduling.ExistingSession;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -78,7 +81,8 @@ public class ScheduleService {
         validateWindow(request);
         ClassInfo info = requireClass(orgId, request.classId());
         String teacherId = resolveTeacher(info, request.teacherId());
-        validateRoom(orgId, info, request.roomId(), null);
+        validateRoom(orgId, info, request.roomId(),
+            roomRequirementFor(orgId, request.classId(), request.subjectId()));
 
         ensureClassMirror(orgId, info, request);
         lockResources(orgId, teacherId, request.roomId());
@@ -91,12 +95,12 @@ public class ScheduleService {
         String subjectName = request.subjectName() != null ? request.subjectName() : info.subjectName();
         jdbc.update("""
             INSERT INTO session(id, class_id, teacher_id, teacher_name, room_id, room_code,
-                                subject_name, start_time, end_time, status, department_id,
+                                subject_name, subject_id, start_time, end_time, status, department_id,
                                 created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,'scheduled',?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,'scheduled',?,?,?)
             """, id, request.classId(), teacherId, teacherName,
             blankToNull(request.roomId()), resolveRoomCode(orgId, request.roomId()),
-            subjectName,
+            subjectName, blankToNull(request.subjectId()),
             Timestamp.from(request.startTime()), Timestamp.from(request.endTime()),
             departmentId, now, now);
         return requireSession(orgId, departmentId, id);
@@ -112,7 +116,8 @@ public class ScheduleService {
         validateWindow(request);
         ClassInfo info = requireClass(orgId, request.classId());
         String teacherId = resolveTeacher(info, request.teacherId());
-        validateRoom(orgId, info, request.roomId(), null);
+        validateRoom(orgId, info, request.roomId(),
+            roomRequirementFor(orgId, request.classId(), request.subjectId()));
 
         ensureClassMirror(orgId, info, request);
         lockResources(orgId, teacherId, request.roomId());
@@ -121,11 +126,11 @@ public class ScheduleService {
 
         jdbc.update("""
             UPDATE session SET class_id=?, teacher_id=?, teacher_name=?, room_id=?, room_code=?,
-                             subject_name=?, start_time=?, end_time=?, updated_at=?
+                             subject_name=?, subject_id=?, start_time=?, end_time=?, updated_at=?
             WHERE id=? AND department_id=? AND deleted_at IS NULL
             """, request.classId(), teacherId, info.teacherName(),
             blankToNull(request.roomId()), resolveRoomCode(orgId, request.roomId()),
-            info.subjectName(),
+            info.subjectName(), blankToNull(request.subjectId()),
             Timestamp.from(request.startTime()), Timestamp.from(request.endTime()),
             Timestamp.from(Instant.now()), sessionId, departmentId);
         return requireSession(orgId, departmentId, sessionId);
@@ -309,7 +314,6 @@ public class ScheduleService {
 
     /**
      * `requiredRoomType = "COMPUTER"` bắt buộc phòng máy; null/giá trị khác thì không ràng buộc loại.
-     * P6 sẽ truyền loại phòng theo môn của buổi, hiện create/update chưa có subjectId nên truyền null.
      */
     void validateRoom(String orgId, ClassInfo info, String roomId, String requiredRoomType) {
         if (roomId == null || roomId.isBlank()) return;
@@ -332,6 +336,17 @@ public class ScheduleService {
     private boolean requiresComputerRoom(String requiredRoomType) {
         return "COMPUTER".equalsIgnoreCase(requiredRoomType)
             || "computer_room".equalsIgnoreCase(requiredRoomType);
+    }
+
+    /** Loại phòng yêu cầu của môn trong lớp; null khi buổi không gắn môn hoặc môn không ràng buộc. */
+    private String roomRequirementFor(String orgId, String classId, String subjectId) {
+        if (subjectId == null || subjectId.isBlank()) return null;
+        return people.classSubjects(orgId, classId).stream()
+            .filter(cs -> subjectId.equals(cs.subjectId()))
+            .map(ClassSubjectInfo::roomRequirement)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
     }
 
     /** Schedule DB giữ bản sao lớp để hiển thị; People là nguồn chuẩn. */
@@ -385,8 +400,8 @@ public class ScheduleService {
             """, String.class, orgId, type, resourceId);
     }
 
-    private void assertNoConflicts(String orgId, String teacherId, String roomId, String classId,
-                                   Instant start, Instant end, String excludeId) {
+    void assertNoConflicts(String orgId, String teacherId, String roomId, String classId,
+                           Instant start, Instant end, String excludeId) {
         if (countConflicts(orgId, "s.teacher_id", teacherId, start, end, excludeId) > 0) {
             throw new AppException(ErrorCode.TEACHER_SCHEDULE_CONFLICT);
         }
@@ -441,6 +456,64 @@ public class ScheduleService {
             WHERE c.org_id=? AND s.class_id=? AND s.deleted_at IS NULL AND s.status<>'cancelled'
               AND (s.subject_name=? OR (s.subject_name IS NULL AND c.subject=?))
             """, Integer.class, orgId, classId, subjectName, subjectName);
+        return count != null ? count : 0;
+    }
+
+    /**
+     * Buổi đã xếp (chưa huỷ, chưa xoá) của toàn tổ chức giao với khoảng [from, to].
+     * Dùng làm ràng buộc cứng khi dựng lịch nháp; giới hạn null nghĩa là không chặn.
+     */
+    @Transactional(readOnly = true)
+    public List<ExistingSession> listExistingSessions(String orgId, Instant from, Instant to) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT s.teacher_id, s.room_id, s.class_id, s.start_time, s.end_time
+            FROM session s JOIN `class` c ON c.id=s.class_id
+            WHERE c.org_id=? AND s.deleted_at IS NULL AND c.deleted_at IS NULL
+              AND s.status<>'cancelled'
+            """);
+        List<Object> args = new ArrayList<>(List.of(orgId));
+        if (from != null) {
+            sql.append(" AND s.end_time>?");
+            args.add(Timestamp.from(from));
+        }
+        if (to != null) {
+            sql.append(" AND s.start_time<?");
+            args.add(Timestamp.from(to));
+        }
+        sql.append(" ORDER BY s.start_time");
+        return jdbc.query(sql.toString(), (rs, row) -> new ExistingSession(
+            rs.getString("teacher_id"), rs.getString("room_id"), rs.getString("class_id"),
+            rs.getTimestamp("start_time").toInstant(), rs.getTimestamp("end_time").toInstant()),
+            args.toArray());
+    }
+
+    /**
+     * Đếm buổi đã xếp của một môn: ưu tiên subject_id, buổi cũ chỉ có subject_name
+     * (subject_id NULL) vẫn được tính theo tên như trước.
+     */
+    @Transactional(readOnly = true)
+    public int countScheduledSessions(String orgId, String classId, String subjectId,
+                                      String subjectName) {
+        if (subjectId == null || subjectId.isBlank()) {
+            return countScheduledSessions(orgId, classId, subjectName);
+        }
+        boolean byName = subjectName != null && !subjectName.isBlank();
+        String sql = """
+            SELECT COUNT(*) FROM session s JOIN `class` c ON c.id=s.class_id
+            WHERE c.org_id=? AND s.class_id=? AND s.deleted_at IS NULL AND s.status<>'cancelled'
+              AND (s.subject_id=?
+            """;
+        List<Object> args = new ArrayList<>(List.of(orgId, classId, subjectId));
+        if (byName) {
+            sql += """
+                   OR (s.subject_id IS NULL
+                       AND (s.subject_name=? OR (s.subject_name IS NULL AND c.subject=?)))
+                """;
+            args.add(subjectName);
+            args.add(subjectName);
+        }
+        sql += ")";
+        Integer count = jdbc.queryForObject(sql, Integer.class, args.toArray());
         return count != null ? count : 0;
     }
 

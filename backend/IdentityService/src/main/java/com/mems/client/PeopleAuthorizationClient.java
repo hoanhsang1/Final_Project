@@ -3,6 +3,7 @@ package com.mems.client;
 import com.mems.dto.AccessProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ public class PeopleAuthorizationClient {
     private final RestTemplate http;
     private final AccessProfileCache cache;
 
+    @Autowired
     public PeopleAuthorizationClient(RestTemplateBuilder builder, Environment env) {
         this(builder.rootUri(env.getProperty("PEOPLE_SERVICE_URL", "http://localhost:8082"))
                 .defaultHeader("X-Internal-Api-Key", env.getProperty("INTERNAL_API_KEY", ""))

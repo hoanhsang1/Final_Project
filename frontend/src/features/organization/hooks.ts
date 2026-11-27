@@ -15,6 +15,7 @@ import type {
   EmployeeRow,
   Position,
   PositionInput,
+  SpecialtyInput,
 } from '@/features/organization/types'
 import { hydrateSessionContext, refreshEffectivePermissions } from '@/features/auth/module-hydration'
 import { queryKeys } from '@/lib/query-keys'
@@ -76,6 +77,27 @@ export function useSpecialties() {
     queryFn: () => specialtiesApi.list(),
     staleTime: 10 * 60_000,
   })
+}
+
+/** Danh mục chuyên môn gắn với danh mục môn học quyết định phạm vi môn giáo viên dạy được. */
+export function useSpecialtyMutations() {
+  const queryClient = useQueryClient()
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['specialties'] })
+    // Hồ sơ giáo viên hiển thị chuyên môn + danh sách môn dạy được.
+    await queryClient.invalidateQueries({ queryKey: ['teachers'] })
+  }
+  return {
+    create: useMutation({
+      mutationFn: (input: SpecialtyInput) => specialtiesApi.create(input),
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: SpecialtyInput }) =>
+        specialtiesApi.update(id, input),
+      onSuccess: invalidate,
+    }),
+  }
 }
 
 export function useOrgModules() {

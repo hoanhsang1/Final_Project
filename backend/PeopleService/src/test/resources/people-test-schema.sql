@@ -69,9 +69,14 @@ CREATE TABLE IF NOT EXISTS staff_profile (
  UNIQUE(user_id,org_id), UNIQUE(org_id,staff_code),
  FOREIGN KEY(user_id,org_id) REFERENCES department_member(user_id,org_id) ON DELETE CASCADE
 );
+-- H2 PARITY LIMITATION (migration 54): MySQL has FK(category_id,org_id) ->
+-- subject_category(id,org_id). H2 declares subject_category after this table and a
+-- forward reference is not allowed, so the FK is omitted; the service validates the
+-- category (same org, active) before writing. Column semantics match MySQL.
 CREATE TABLE IF NOT EXISTS specialty (
  id VARCHAR(36) PRIMARY KEY, org_id VARCHAR(36) NOT NULL,
  name VARCHAR(200) NOT NULL, name_unaccented VARCHAR(200) NOT NULL,
+ category_id VARCHAR(36),
  is_active BOOLEAN NOT NULL DEFAULT TRUE, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
  UNIQUE(id,org_id), UNIQUE(org_id,name_unaccented)
 );
@@ -115,6 +120,7 @@ CREATE TABLE IF NOT EXISTS curriculum (
 CREATE TABLE IF NOT EXISTS curriculum_subject (
  curriculum_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
  sequence_no SMALLINT NOT NULL, required_sessions SMALLINT NOT NULL,
+ sessions_per_week SMALLINT,
  theory_sessions SMALLINT NOT NULL DEFAULT 0, practice_sessions SMALLINT NOT NULL DEFAULT 0,
  session_minutes SMALLINT NOT NULL, is_required BOOLEAN NOT NULL DEFAULT TRUE, note VARCHAR(500),
  created_at TIMESTAMP NOT NULL, updated_at TIMESTAMP,
@@ -191,12 +197,19 @@ CREATE TABLE IF NOT EXISTS class_status_log (
 --    "at most one primary per class". That is NOT the same as a DB-generated MySQL column.
 --  * H2 cannot prove the minimum-primary invariant; transaction + application validation must.
 --  * is_primary is BOOLEAN here (MySQL is tinyint(1)); tests must map true/false, not 1/0.
+-- H2 PARITY LIMITATION (Revision-5 vs live MySQL): the target schema has
+-- class_subject.org_id NOT NULL, but the live dump (db.sql) has no org_id column and
+-- ClassSubjectRepository.addSubject does not populate it. Kept nullable here so the
+-- real repository code can be integration-tested; the org filter on reads is unaffected.
+-- This gap predates migration 54 and is reported separately — do not treat it as fixed.
 CREATE TABLE IF NOT EXISTS class_subject (
- class_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ class_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36),
  curriculum_id VARCHAR(36), source VARCHAR(20) NOT NULL DEFAULT 'MANUAL', sequence_no SMALLINT,
  teacher_id VARCHAR(36), is_primary BOOLEAN NOT NULL DEFAULT FALSE, primary_class_id VARCHAR(36),
  required_sessions SMALLINT, planned_sessions SMALLINT, theory_sessions SMALLINT,
  practice_sessions SMALLINT, session_minutes SMALLINT,
+ -- Migration 57 (P5): số buổi/tuần và giai đoạn dùng cho xếp lịch tự động.
+ sessions_per_week SMALLINT, stage_no SMALLINT NOT NULL DEFAULT 1,
  status VARCHAR(20) NOT NULL DEFAULT 'PLANNED', note VARCHAR(500),
  created_by VARCHAR(36), created_at TIMESTAMP NOT NULL, updated_by VARCHAR(36), updated_at TIMESTAMP,
  PRIMARY KEY(class_id,subject_id),
@@ -236,8 +249,14 @@ CREATE TABLE IF NOT EXISTS specialty_subject (
  FOREIGN KEY(specialty_id,org_id) REFERENCES specialty(id,org_id) ON DELETE CASCADE,
  FOREIGN KEY(subject_id,org_id) REFERENCES subject(id,org_id)
 );
+-- H2 PARITY LIMITATION (migration 52): MySQL primary key is (teacher_id, subject_id)
+-- with teacher_id = user_id in practice. This fixture keys on (user_id, subject_id) and
+-- carries teacher_id as a nullable plain column, so inserts must set both user_id and
+-- teacher_id to stay compatible with MySQL. PK semantics are equivalent while
+-- teacher_id == user_id; the service writes them identically.
 CREATE TABLE IF NOT EXISTS teacher_subject (
  user_id VARCHAR(36) NOT NULL, subject_id VARCHAR(36) NOT NULL, org_id VARCHAR(36) NOT NULL,
+ teacher_id VARCHAR(36),
  status VARCHAR(20) NOT NULL DEFAULT 'APPROVED', source VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
  approved_by VARCHAR(36), approved_at TIMESTAMP, created_by VARCHAR(36), created_at TIMESTAMP NOT NULL,
  updated_at TIMESTAMP,

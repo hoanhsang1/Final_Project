@@ -1,4 +1,4 @@
-import { GraduationCap, Pencil, Plus, RefreshCw, UserRound, Users } from 'lucide-react'
+import { GraduationCap, Pencil, Plus, RefreshCw, Settings2, UserRound, Users } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -19,16 +19,18 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
-import { useChangeTeacherStatus, useTeacher, useTeachers, useUpdateTeacher } from '@/features/academic/hooks'
+import { useChangeTeacherStatus, useSubjectCategories, useSubjects, useTeachableSubjectMutations, useTeachableSubjects, useTeacher, useTeachers, useUpdateTeacher } from '@/features/academic/hooks'
 import {
   CONTRACT_TYPE_LABELS,
+  TEACHER_SUBJECT_REASON_LABELS,
   TEACHING_STATUS_LABELS,
   type TeacherItem,
 } from '@/features/academic/types'
 import { usePermission } from '@/features/auth/hooks'
 import { EmployeeCreateDrawer } from '@/features/organization/components/employee-create-drawer'
 import { EmployeeDetailDrawer } from '@/features/organization/components/employee-detail-drawer'
-import { useDepartments, useSpecialties } from '@/features/organization/hooks'
+import { useDepartments, useSpecialties, useSpecialtyMutations } from '@/features/organization/hooks'
+import type { Specialty } from '@/features/organization/types'
 import { ApiError } from '@/lib/api-error'
 import { PERM } from '@/lib/permissions'
 
@@ -38,6 +40,312 @@ type TeacherForm = {
   phone: string
   specialtyIds: string[]
   contractType: '' | 'CO_HUU' | 'THINH_GIANG'
+}
+
+/**
+ * Môn giáo viên dạy được theo quy tắc D1 (cùng danh mục chuyên môn hoặc ngoại lệ).
+ * Ngoại lệ chỉ lưu các môn ngoài danh mục — môn đã đủ điều kiện nhờ chuyên môn bị khoá.
+ */
+function TeachableSubjectsSection({ staffId }: { staffId: string }) {
+  const teachable = useTeachableSubjects(staffId)
+  const subjects = useSubjects()
+  const save = useTeachableSubjectMutations(staffId)
+  const [editing, setEditing] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [error, setError] = useState<string>()
+
+  const items = teachable.data ?? []
+  const categoryCovered = new Set(
+    items.filter((item) => item.reason === 'CATEGORY').map((item) => item.subjectId),
+  )
+  const exceptionCount = items.filter((item) => item.reason === 'EXCEPTION').length
+
+  const startEdit = () => {
+    setSelected(items.filter((item) => item.reason === 'EXCEPTION').map((item) => item.subjectId))
+    setError(undefined)
+    setEditing(true)
+  }
+
+  const toggle = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const submit = () => {
+    save.mutate(selected, {
+      onSuccess: () => {
+        toast.success('Đã cập nhật ngoại lệ môn dạy.')
+        setEditing(false)
+      },
+      onError: (cause) => setError(ApiError.from(cause).message),
+    })
+  }
+
+  return (
+    <div className="rounded-md border border-line-200 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-ink-900">Môn dạy được ({items.length})</p>
+          <p className="text-xs text-ink-500">
+            Theo danh mục chuyên môn và ngoại lệ được duyệt · {exceptionCount} ngoại lệ
+          </p>
+        </div>
+        {!editing ? (
+          <Button size="sm" variant="outline" onClick={startEdit} disabled={teachable.isLoading}>
+            Chỉnh ngoại lệ
+          </Button>
+        ) : null}
+      </div>
+
+      {teachable.isLoading ? <p className="mt-2 text-sm text-ink-500">Đang tải…</p> : null}
+      {teachable.isError ? (
+        <p className="mt-2 text-sm text-danger-600">{ApiError.from(teachable.error).message}</p>
+      ) : null}
+
+      {!teachable.isLoading && !teachable.isError ? (
+        items.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-500">
+            Chưa dạy được môn nào — hãy gắn danh mục cho chuyên môn hoặc thêm ngoại lệ.
+          </p>
+        ) : (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {items.map((item) => (
+              <Badge
+                key={item.subjectId}
+                tone={item.reason === 'EXCEPTION' ? 'warning' : 'neutral'}
+                size="sm"
+              >
+                {item.subjectName}
+                <span className="opacity-70">
+                  · {TEACHER_SUBJECT_REASON_LABELS[item.reason] ?? item.reason}
+                </span>
+              </Badge>
+            ))}
+          </div>
+        )
+      ) : null}
+
+      {editing ? (
+        <div className="mt-3 space-y-3 border-t border-line-100 pt-3">
+          <p className="text-xs text-ink-500">
+            Chọn môn ngoài danh mục chuyên môn. Môn đã đủ điều kiện nhờ chuyên môn không cần chọn.
+          </p>
+          {(subjects.data ?? []).length === 0 ? (
+            <p className="text-sm text-ink-500">Chưa có môn học đang hoạt động.</p>
+          ) : (
+            <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+              {(subjects.data ?? []).map((subject) => {
+                const covered = categoryCovered.has(subject.id)
+                return (
+                  <label key={subject.id} className="flex items-center gap-2 text-sm text-ink-700">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-line-300"
+                      checked={covered || selected.includes(subject.id)}
+                      disabled={covered}
+                      onChange={() => toggle(subject.id)}
+                    />
+                    <span className="truncate">{subject.name}</span>
+                    {covered ? (
+                      <span className="text-xs text-ink-400">(theo chuyên môn)</span>
+                    ) : null}
+                  </label>
+                )
+              })}
+            </div>
+          )}
+          {error ? <p className="text-sm text-danger-600">{error}</p> : null}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={submit} isLoading={save.isPending}>
+              Lưu ngoại lệ
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+              Huỷ
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** Quản lý chuyên môn và danh mục môn học gắn kèm — danh mục quyết định phạm vi môn dạy được. */
+function SpecialtyManagerDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const specialties = useSpecialties()
+  const categories = useSubjectCategories()
+  const mutations = useSpecialtyMutations()
+  const [name, setName] = useState('')
+  const [categoryId, setCategoryId] = useState('none')
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState('none')
+  const [error, setError] = useState<string>()
+
+  const categoryName = (id?: string | null) =>
+    categories.data?.find((category) => category.id === id)?.name ?? 'Chưa gắn danh mục'
+
+  const submitCreate = () => {
+    setError(undefined)
+    if (!name.trim()) {
+      setError('Vui lòng nhập tên chuyên môn.')
+      return
+    }
+    mutations.create.mutate(
+      { name: name.trim(), categoryId: categoryId === 'none' ? null : categoryId },
+      {
+        onSuccess: () => {
+          toast.success('Đã thêm chuyên môn.')
+          setName('')
+          setCategoryId('none')
+        },
+        onError: (cause) => setError(ApiError.from(cause).message),
+      },
+    )
+  }
+
+  const startEdit = (specialty: Specialty) => {
+    setEditId(specialty.id)
+    setEditName(specialty.name)
+    setEditCategoryId(specialty.categoryId ?? 'none')
+    setError(undefined)
+  }
+
+  const submitEdit = () => {
+    setError(undefined)
+    if (!editId) return
+    if (!editName.trim()) {
+      setError('Vui lòng nhập tên chuyên môn.')
+      return
+    }
+    mutations.update.mutate(
+      {
+        id: editId,
+        input: { name: editName.trim(), categoryId: editCategoryId === 'none' ? null : editCategoryId },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Đã cập nhật chuyên môn.')
+          setEditId(null)
+        },
+        onError: (cause) => setError(ApiError.from(cause).message),
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>Chuyên môn &amp; danh mục môn học</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          <p className="text-sm text-ink-600">
+            Giáo viên dạy được mọi môn thuộc danh mục của chuyên môn được gắn; môn ngoài danh mục
+            cần ngoại lệ riêng.
+          </p>
+
+          <div className="grid gap-3 rounded-md border border-line-200 p-3 sm:grid-cols-[1fr_1fr_auto]">
+            <Field label="Tên chuyên môn">
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="VD: Lập trình Web"
+              />
+            </Field>
+            <Field label="Danh mục môn học">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chưa gắn danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Chưa gắn danh mục</SelectItem>
+                  {(categories.data ?? []).map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <div className="flex items-end">
+              <Button size="sm" onClick={submitCreate} isLoading={mutations.create.isPending}>
+                <Plus aria-hidden="true" />
+                Thêm
+              </Button>
+            </div>
+          </div>
+
+          {specialties.isLoading ? <p className="text-sm text-ink-500">Đang tải…</p> : null}
+          {specialties.isError ? (
+            <p className="text-sm text-danger-600">
+              {ApiError.from(specialties.error).message}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-danger-600">{error}</p> : null}
+
+          <ul className="divide-y divide-line-100 rounded-md border border-line-200 text-sm">
+            {(specialties.data ?? []).map((specialty) => (
+              <li key={specialty.id} className="px-3 py-2">
+                {editId === specialty.id ? (
+                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                    <Input
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                      aria-label="Tên chuyên môn"
+                    />
+                    <Select value={editCategoryId} onValueChange={setEditCategoryId}>
+                      <SelectTrigger aria-label="Danh mục môn học">
+                        <SelectValue placeholder="Chưa gắn danh mục" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Chưa gắn danh mục</SelectItem>
+                        {(categories.data ?? []).map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={submitEdit} isLoading={mutations.update.isPending}>
+                        Lưu
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
+                        Huỷ
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink-900">{specialty.name}</p>
+                      <p className="text-xs text-ink-500">{categoryName(specialty.categoryId)}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => startEdit(specialty)}>
+                      <Pencil aria-hidden="true" />
+                      Sửa
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+            {specialties.data?.length === 0 ? (
+              <li className="px-3 py-3 text-sm text-ink-500">Chưa có chuyên môn nào.</li>
+            ) : null}
+          </ul>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function TeacherEditDialog({
@@ -51,6 +359,7 @@ function TeacherEditDialog({
 }) {
   const detail = useTeacher(userId ?? undefined)
   const specialties = useSpecialties()
+  const categories = useSubjectCategories()
   const update = useUpdateTeacher(userId ?? '')
   const [form, setForm] = useState<TeacherForm | null>(null)
   const [error, setError] = useState<string>()
@@ -192,7 +501,12 @@ function TeacherEditDialog({
                         onChange={() => toggleSpecialty(specialty.id)}
                         className="size-4 rounded border-line-300"
                       />
-                      {specialty.name}
+                      <span className="truncate">{specialty.name}</span>
+                      {specialty.categoryId ? (
+                        <span className="truncate text-xs text-ink-400">
+                          · {categories.data?.find((item) => item.id === specialty.categoryId)?.name ?? ''}
+                        </span>
+                      ) : null}
                     </label>
                   ))}
                   {specialties.data?.length === 0 ? (
@@ -200,6 +514,7 @@ function TeacherEditDialog({
                   ) : null}
                 </div>
               </Field>
+              {userId ? <TeachableSubjectsSection staffId={userId} /> : null}
               {mismatch ? (
                 <div className="space-y-2 rounded-md border border-warning-200 bg-warning-50/40 p-3 text-sm">
                   <p className="font-medium text-ink-900">
@@ -318,6 +633,7 @@ export function TeachersPage() {
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(20)
   const [createOpen, setCreateOpen] = useState(false)
+  const [specialtyOpen, setSpecialtyOpen] = useState(false)
   const [detailUser, setDetailUser] = useState<TeacherItem | null>(null)
   const [editUser, setEditUser] = useState<string | null>(null)
   const [statusUser, setStatusUser] = useState<TeacherItem | null>(null)
@@ -434,12 +750,20 @@ export function TeachersPage() {
         title="Giáo viên"
         description="Danh sách giáo viên theo phòng ban, chuyên môn và tình trạng giảng dạy."
         actions={
-          can(PERM.employeeCreate) ? (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden="true" />
-              Thêm giáo viên
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            {can(PERM.employeeEdit) ? (
+              <Button size="sm" variant="outline" onClick={() => setSpecialtyOpen(true)}>
+                <Settings2 aria-hidden="true" />
+                Chuyên môn
+              </Button>
+            ) : null}
+            {can(PERM.employeeCreate) ? (
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus aria-hidden="true" />
+                Thêm giáo viên
+              </Button>
+            ) : null}
+          </div>
         }
         meta={
           <>
@@ -532,6 +856,7 @@ export function TeachersPage() {
       </div>
 
       <EmployeeCreateDrawer open={createOpen} onOpenChange={setCreateOpen} />
+      <SpecialtyManagerDialog open={specialtyOpen} onOpenChange={setSpecialtyOpen} />
       <EmployeeDetailDrawer
         open={Boolean(detailUser)}
         onOpenChange={(open) => !open && setDetailUser(null)}

@@ -1249,6 +1249,7 @@ export const mockAdapter: AxiosAdapter = async (config) => {
         sequenceNo: payload.sequenceNo,
         requiredSessions: payload.requiredSessions,
         sessionMinutes: payload.sessionMinutes,
+        sessionsPerWeek: payload.sessionsPerWeek ?? null,
         theoryHours: payload.theoryHours ?? null,
         practiceHours: payload.practiceHours ?? null,
         isRequired: payload.isRequired ?? true,
@@ -1647,6 +1648,8 @@ export const mockAdapter: AxiosAdapter = async (config) => {
         requiredSessions: payload.plannedSessions ?? 45,
         plannedSessions: payload.plannedSessions ?? 45,
         sessionMinutes: payload.sessionMinutes ?? 45,
+        sessionsPerWeek: null,
+        stageNo: 1,
         teacherId: null,
         teacherName: null,
         isPrimary: true,
@@ -1715,6 +1718,8 @@ export const mockAdapter: AxiosAdapter = async (config) => {
         requiredSessions: cs.requiredSessions,
         plannedSessions: cs.requiredSessions,
         sessionMinutes: cs.sessionMinutes,
+        sessionsPerWeek: cs.sessionsPerWeek ?? 2,
+        stageNo: cs.sequenceNo,
         teacherId: null,
         teacherName: null,
         isPrimary: idx === 0, // D-15: dòng đầu tiên làm primary nếu chưa có
@@ -1758,6 +1763,8 @@ export const mockAdapter: AxiosAdapter = async (config) => {
           requiredSessions: null,
           plannedSessions: null,
           sessionMinutes: null,
+          sessionsPerWeek: null,
+          stageNo: 1,
           teacherId: cls.teacherId, // Fallback teacher chỉ áp dụng cho dòng LEGACY suy ra
           teacherName: teacher?.fullName ?? null,
           isPrimary: true,
@@ -1802,6 +1809,8 @@ export const mockAdapter: AxiosAdapter = async (config) => {
         requiredSessions: payload.plannedSessions,
         plannedSessions: payload.plannedSessions,
         sessionMinutes: payload.sessionMinutes,
+        sessionsPerWeek: payload.sessionsPerWeek ?? null,
+        stageNo: payload.stageNo ?? 1,
         teacherId: payload.teacherId ?? null,
         teacherName: teacher?.fullName ?? null,
         isPrimary: false,
@@ -1830,6 +1839,8 @@ export const mockAdapter: AxiosAdapter = async (config) => {
       }
       if (payload.plannedSessions !== undefined) current.plannedSessions = payload.plannedSessions
       if (payload.sessionMinutes !== undefined) current.sessionMinutes = payload.sessionMinutes
+      if (payload.sessionsPerWeek !== undefined) current.sessionsPerWeek = payload.sessionsPerWeek
+      if (payload.stageNo !== undefined) current.stageNo = payload.stageNo
       if (payload.teacherId !== undefined) {
         current.teacherId = payload.teacherId
         const teacher = payload.teacherId

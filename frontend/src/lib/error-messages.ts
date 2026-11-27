@@ -76,6 +76,32 @@ const MESSAGES: Record<string, string> = {
   // Lịch học & phòng học
   ROOM_NOT_AVAILABLE: 'Phòng học không khả dụng (đang bảo trì, có thiết bị hỏng hoặc không đủ chỗ).',
   ROOM_TYPE_MISMATCH: 'Môn này cần phòng máy — vui lòng chọn phòng máy tính.',
+  TIME_SLOTS_REQUIRED: 'Cần khai báo ít nhất một tiết học.',
+  TIME_SLOT_INVALID:
+    'Cấu hình tiết học chưa hợp lệ: số tiết phải liên tục từ 1, giờ kết thúc sau giờ bắt đầu và các tiết không chồng lấn.',
+  CLASS_SLOT_RULE_INVALID:
+    'Quy tắc tiết của lớp chưa hợp lệ: tiết phải nằm trong khung tiết đã cấu hình và không chồng lấn.',
+  TEACHER_AVAILABILITY_INVALID:
+    'Lịch rảnh của giáo viên chưa hợp lệ: tiết phải nằm trong khung tiết đã cấu hình và không chồng lấn.',
+  TEACHER_NOT_FOUND: 'Không tìm thấy giáo viên trong tổ chức.',
+  SCHEDULE_CONFIG_MISSING:
+    'Chưa cấu hình tiết học của tổ chức. Hãy vào Cấu hình lịch để khai báo khung tiết trước khi xếp lịch.',
+  SCHEDULE_DRAFT_NOT_FOUND: 'Không tìm thấy lịch nháp hoặc bạn không có quyền xem.',
+  SCHEDULE_DRAFT_NOT_EDITABLE: 'Lịch nháp đã được xác nhận hoặc đã huỷ nên không thể sửa.',
+  SCHEDULE_DRAFT_EXPIRED: 'Lịch nháp đã quá hạn xác nhận (7 ngày). Hãy tạo lịch nháp mới.',
+  SCHEDULE_DRAFT_ITEM_NOT_FOUND: 'Không tìm thấy buổi học trong lịch nháp.',
+  SCHEDULE_DRAFT_ITEM_CONFLICT:
+    'Buổi học bị trùng giáo viên, phòng hoặc lớp với lịch hiện có. Vui lòng chọn phương án khác.',
+  SCHEDULE_DRAFT_CONFIRM_FAILED:
+    'Không xác nhận được lịch nháp vì có buổi bị trùng lịch. Toàn bộ thay đổi đã được hoàn tác.',
+
+  // Giáo viên & môn dạy được
+  SUBJECT_MISMATCH:
+    'Giáo viên không đủ điều kiện dạy môn này: cần chuyên môn cùng danh mục môn học hoặc ngoại lệ được duyệt, và đang ở trạng thái “Đang dạy”.',
+  SPECIALTY_NOT_FOUND: 'Không tìm thấy chuyên môn.',
+  SUBJECT_NOT_FOUND: 'Không tìm thấy môn học.',
+  SUBJECT_IDS_REQUIRED: 'Cần chọn ít nhất một môn học.',
+  SUBJECT_IDS_TOO_MANY: 'Chỉ được chọn tối đa 100 môn học.',
 
   // Môn học & danh mục
   SUBJECT_CATEGORY_NOT_FOUND: 'Không tìm thấy danh mục môn học.',
@@ -84,6 +110,9 @@ const MESSAGES: Record<string, string> = {
   ROOM_REQUIREMENT_INVALID: 'Yêu cầu phòng không hợp lệ. Chỉ chọn "Bất kỳ" hoặc "Phòng máy".',
   SUBJECT_USAGE_CONFIRMATION_REQUIRED:
     'Môn học đang được lớp hoặc chương trình sử dụng. Xác nhận để vẫn lưu thay đổi.',
+  PREREQUISITE_CYCLE: 'Môn tiên quyết tạo vòng lặp trong chương trình đào tạo.',
+  PREREQUISITE_STAGE_INVALID:
+    'Giai đoạn của môn phải sau giai đoạn của các môn tiên quyết.',
 
   // Dịch vụ nội bộ
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không phản hồi. Vui lòng thử lại.',

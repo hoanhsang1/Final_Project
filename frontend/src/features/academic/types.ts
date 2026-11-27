@@ -9,6 +9,7 @@ export interface PageResponse<T> {
 export interface Specialty {
   id: string
   name: string
+  categoryId?: string | null
 }
 
 export interface TeacherItem {
@@ -346,6 +347,7 @@ export interface CurriculumSubject {
   sequenceNo: number
   requiredSessions: number
   sessionMinutes: number
+  sessionsPerWeek: number | null
   theoryHours: number | null
   practiceHours: number | null
   isRequired: boolean
@@ -359,6 +361,7 @@ export interface CurriculumSubjectCreateRequest {
   sequenceNo: number
   requiredSessions: number
   sessionMinutes: number
+  sessionsPerWeek?: number | null
   theoryHours?: number | null
   practiceHours?: number | null
   isRequired?: boolean
@@ -370,6 +373,7 @@ export interface CurriculumSubjectUpdateRequest {
   sequenceNo: number
   requiredSessions: number
   sessionMinutes: number
+  sessionsPerWeek?: number | null
   theoryHours?: number | null
   practiceHours?: number | null
   isRequired?: boolean
@@ -418,6 +422,31 @@ export interface SpecialtySubjectUpdateRequest {
 }
 
 // ----------------------------------------------------------------------------
+// Teacher eligibility — quy tắc D1 dùng chung cho mọi màn hình
+// ----------------------------------------------------------------------------
+
+/** Lý do giáo viên dạy được môn: cùng danh mục chuyên môn hoặc ngoại lệ được duyệt. */
+export type TeacherSubjectReason = 'CATEGORY' | 'EXCEPTION'
+
+export const TEACHER_SUBJECT_REASON_LABELS: Record<TeacherSubjectReason, string> = {
+  CATEGORY: 'Cùng danh mục chuyên môn',
+  EXCEPTION: 'Ngoại lệ được duyệt',
+}
+
+export interface TeachableSubject {
+  subjectId: string
+  subjectCode: string | null
+  subjectName: string
+  reason: TeacherSubjectReason
+}
+
+export interface EligibleTeacher {
+  userId: string
+  fullName: string
+  departmentId: string
+}
+
+// ----------------------------------------------------------------------------
 // Class Subject Types (D-01, D-08, D-09, D-15)
 // ----------------------------------------------------------------------------
 
@@ -434,6 +463,8 @@ export interface ClassSubject {
   requiredSessions: number | null
   plannedSessions: number | null
   sessionMinutes: number | null
+  sessionsPerWeek: number | null
+  stageNo: number
   teacherId: string | null
   teacherName: string | null
   isPrimary: boolean
@@ -450,12 +481,16 @@ export interface ClassSubjectCreateRequest {
   subjectId: string
   plannedSessions: number
   sessionMinutes: number
+  sessionsPerWeek?: number | null
+  stageNo?: number | null
   teacherId?: string | null
 }
 
 export interface ClassSubjectUpdateRequest {
   plannedSessions?: number
   sessionMinutes?: number
+  sessionsPerWeek?: number
+  stageNo?: number
   teacherId?: string | null
   version: number // school_class.version
 }

@@ -40,6 +40,7 @@ import { StudentPortalPage } from '@/features/academic/pages/student-portal-page
 import { SchedulePage } from '@/features/schedule/pages/schedule-page'
 import { MySchedulePage } from '@/features/schedule/pages/my-schedule-page'
 import { AutoSchedulePage } from '@/features/schedule/pages/auto-schedule-page'
+import { ScheduleConfigPage } from '@/features/schedule/pages/schedule-config-page'
 import { FacilityPage } from '@/features/facility/pages/facility-page'
 import { FacilityIssuesPage } from '@/features/facility/pages/facility-issues-page'
 import { BackendDependencyPage } from '@/routes/backend-dependency-page'
@@ -355,6 +356,16 @@ export function App() {
               <WorkspaceGuard workspaceId="academic">
                 <PermissionGuard permission={PERM.scheduleCreate}>
                   <AutoSchedulePage />
+                </PermissionGuard>
+              </WorkspaceGuard>
+            }
+          />
+          <Route
+            path="/dao-tao/cau-hinh-lich"
+            element={
+              <WorkspaceGuard workspaceId="academic">
+                <PermissionGuard permission={PERM.scheduleConfig}>
+                  <ScheduleConfigPage />
                 </PermissionGuard>
               </WorkspaceGuard>
             }

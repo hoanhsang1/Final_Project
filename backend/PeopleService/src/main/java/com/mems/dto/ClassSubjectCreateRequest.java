@@ -8,5 +8,7 @@ public record ClassSubjectCreateRequest(
     @NotBlank String subjectId,
     @NotNull @Min(1) int plannedSessions,
     @NotNull @Min(1) int sessionMinutes,
+    @Min(1) Integer sessionsPerWeek,
+    @Min(1) Integer stageNo,
     String teacherId
 ) {}

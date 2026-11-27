@@ -318,6 +318,9 @@ export function CurriculumDetailPage() {
   const {
     data: curriculumSubjects,
     isLoading: loadingSubjects,
+    isError: subjectsError,
+    error: subjectsLoadError,
+    refetch: refetchSubjects,
   } = useCurriculumSubjects(id)
   const mutations = useCurriculumMutations()
   const subjectMutations = useCurriculumSubjectMutations(id ?? '')
@@ -346,6 +349,18 @@ export function CurriculumDetailPage() {
         <ErrorState
           title="Không thể tải thông tin chương trình đào tạo"
           description={ApiError.from(error).message}
+        />
+      </PageContainer>
+    )
+  }
+
+  if (subjectsError) {
+    return (
+      <PageContainer>
+        <ErrorState
+          title="Không tải được môn học của chương trình"
+          description={ApiError.from(subjectsLoadError).message}
+          onRetry={() => void refetchSubjects()}
         />
       </PageContainer>
     )

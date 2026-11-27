@@ -35,3 +35,6 @@ replay_pid*
 
 # Token/JWT tạm cho kiểm thử E2E — không commit
 .e2e_tmp/
+
+# Log/pid/bằng chứng sinh ra khi chạy E2E — không commit
+docs/phase-1/e2e/results/

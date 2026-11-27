@@ -72,6 +72,22 @@ public class TeacherController {
         return service.update(staffId, request);
     }
 
+    /** Môn giáo viên đủ điều kiện dạy (quy tắc D1) kèm lý do CATEGORY/EXCEPTION. */
+    @GetMapping("/{staffId}/subjects")
+    @PreAuthorize("hasRole('OWNER') or hasAnyAuthority('employee.view','employee.edit')")
+    public java.util.List<TeacherSubjectResponse> teachableSubjects(@PathVariable String staffId) {
+        return service.teachableSubjects(staffId);
+    }
+
+    /** Ghi đè tập ngoại lệ môn học (APPROVED/MANUAL). */
+    @PutMapping("/{staffId}/subjects")
+    @PreAuthorize("hasAuthority('employee.edit')")
+    public java.util.List<TeacherSubjectResponse> updateSubjectExceptions(
+        @PathVariable String staffId,
+        @Valid @RequestBody TeacherSubjectUpdateRequest request) {
+        return service.updateSubjectExceptions(staffId, request);
+    }
+
     /** Đổi trạng thái giảng dạy — quyền riêng, không dùng employee.edit. */
     @PutMapping("/{staffId}/teaching-status")
     @PreAuthorize("hasRole('OWNER') or hasAuthority('teacher.change_status')")

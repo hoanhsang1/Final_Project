@@ -199,6 +199,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # Cấu hình lịch cấp tổ chức (tiết học, quy tắc lớp, lịch rảnh giáo viên).
+        - id: schedule-config-api
+          uri: ${SCHEDULE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/schedule-config/**
+          filters:
+            - StripPrefix=1
+
         - id: facility-department-api
           uri: ${FACILITY_SERVICE_URL:http://localhost:8084}
           predicates:

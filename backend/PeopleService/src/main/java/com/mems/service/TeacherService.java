@@ -19,6 +19,7 @@ public class TeacherService {
     private final StaffProfileRepository staff;
     private final SpecialtyRepository specialties;
     private final SpecialtyService specialtyService;
+    private final SubjectRepository subjects;
     private final PositionRepository positions;
     private final MemberRepository memberRepository;
     private final PeopleAuditService audit;
@@ -26,13 +27,14 @@ public class TeacherService {
 
     public TeacherService(MemberService members, TeacherRepository teachers, StaffProfileRepository staff,
                           SpecialtyRepository specialties, SpecialtyService specialtyService,
-                          PositionRepository positions, MemberRepository memberRepository,
-                          PeopleAuditService audit, Actor actor) {
+                          SubjectRepository subjects, PositionRepository positions,
+                          MemberRepository memberRepository, PeopleAuditService audit, Actor actor) {
         this.members = members;
         this.teachers = teachers;
         this.staff = staff;
         this.specialties = specialties;
         this.specialtyService = specialtyService;
+        this.subjects = subjects;
         this.positions = positions;
         this.memberRepository = memberRepository;
         this.audit = audit;
@@ -93,6 +95,33 @@ public class TeacherService {
         String orgId = actor.orgId();
         teachers.requireTeacher(actor.userId(), orgId, false);
         return teachers.classes(actor.userId(), orgId);
+    }
+
+    /** Môn giáo viên đủ điều kiện dạy theo D1, kèm lý do CATEGORY/EXCEPTION. */
+    @Transactional(readOnly = true)
+    public List<TeacherSubjectResponse> teachableSubjects(String userId) {
+        String orgId = actor.orgId();
+        var row = teachers.requireTeacher(userId, orgId, false);
+        actor.requirePermissionIn("employee.view", row.departmentId());
+        return teachers.teachableSubjects(userId, orgId);
+    }
+
+    /** Ghi đè tập ngoại lệ môn học (APPROVED/MANUAL) của giáo viên. */
+    @Transactional
+    public List<TeacherSubjectResponse> updateSubjectExceptions(String userId,
+                                                               TeacherSubjectUpdateRequest request) {
+        String orgId = actor.orgId();
+        var row = teachers.requireTeacher(userId, orgId, true);
+        actor.requirePermissionIn("employee.edit", row.departmentId());
+
+        List<String> subjectIds = request.subjectIds().stream()
+            .map(String::trim).filter(id -> !id.isEmpty()).distinct().toList();
+        subjectIds.forEach(id -> subjects.requireActive(id, orgId));
+
+        teachers.replaceSubjectExceptions(userId, orgId, subjectIds, actor.userId());
+        audit.record(orgId, actor.userId(), "TEACHER_SUBJECTS_UPDATED", userId,
+            Map.of("subjectIds", subjectIds));
+        return teachers.teachableSubjects(userId, orgId);
     }
 
     private static final Set<String> TEACHING_STATUSES =

@@ -10,6 +10,7 @@ public record CurriculumSubjectResponse(
     int sequenceNo,
     int requiredSessions,
     int sessionMinutes,
+    Integer sessionsPerWeek,
     Double theoryHours,
     Double practiceHours,
     boolean isRequired,

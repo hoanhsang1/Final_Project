@@ -302,6 +302,15 @@ public class SchoolClassRepository {
         );
     }
 
+    /** Đặt chương trình đào tạo áp dụng cho lớp và tăng version (optimistic lock). */
+    public int setCurriculum(String id, String orgId, String curriculumId, long expectedVersion) {
+        return jdbc.update("""
+            UPDATE school_class
+            SET curriculum_id = ?, version = version + 1, updated_at = ?
+            WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND version = ?
+            """, curriculumId, Timestamp.from(Instant.now()), id, orgId, expectedVersion);
+    }
+
     /** Gán giáo viên và xoá nhãn "cần phân công lại" (quy tắc 17). */
     public int assignTeacher(String id, String orgId, String teacherId, long expectedVersion) {
         return jdbc.update("""

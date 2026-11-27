@@ -1,50 +1,61 @@
-import { AlertCircle, CalendarCog, CheckCircle2, ChevronDown, ChevronUp, Loader2, Plus, Trash2, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import {
+  AlertCircle,
+  CalendarCog,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  XCircle,
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DataTable, type DataColumn } from '@/components/ui/data-table'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Field, Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ErrorState } from '@/components/ui/states'
 import { PageContainer } from '@/components/layout/page-container'
 import { useClasses } from '@/features/academic/hooks'
 import { useDepartments } from '@/features/organization/hooks'
 import { useDepartmentScope } from '@/features/organization/use-scope'
-import { useAutoSchedule, useSchedules } from '@/features/schedule/hooks'
-import type { AutoScheduleResult, TimeSlot, UnscheduledItem } from '@/features/schedule/types'
-import { SESSION_STATUS_LABELS, type ScheduleSession } from '@/features/schedule/types'
+import { DraftItemDialog } from '@/features/schedule/components/draft-item-dialog'
+import { DraftWeekGrid } from '@/features/schedule/components/draft-week-grid'
+import {
+  useScheduleDraftDetail,
+  useScheduleDraftMutations,
+  useScheduleDrafts,
+  useScheduleTimeSlots,
+} from '@/features/schedule/hooks'
+import {
+  DRAFT_STATUS_LABELS,
+  WEEKDAY_LABELS,
+  type ScheduleDraftConfirmResult,
+  type ScheduleDraftItem,
+  type ScheduleDraftPatch,
+  type ScheduleDraftStatus,
+} from '@/features/schedule/types'
 import { ApiError } from '@/lib/api-error'
 import { PERM } from '@/lib/permissions'
 import { usePermission } from '@/features/auth/hooks'
-
-const DAY_LABELS: Record<number, string> = {
-  1: 'Thứ 2',
-  2: 'Thứ 3',
-  3: 'Thứ 4',
-  4: 'Thứ 5',
-  5: 'Thứ 6',
-  6: 'Thứ 7',
-  7: 'Chủ nhật',
-}
-
-const DEFAULT_SLOTS: TimeSlot[] = [
-  { startTime: '07:30', endTime: '09:00' },
-  { startTime: '09:15', endTime: '10:45' },
-  { startTime: '13:00', endTime: '14:30' },
-  { startTime: '14:45', endTime: '16:15' },
-]
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function nextMonth(): string {
-  const d = new Date()
-  d.setMonth(d.getMonth() + 1)
-  return d.toISOString().slice(0, 10)
+function plusDays(days: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+const STATUS_TONES: Record<ScheduleDraftStatus, 'neutral' | 'success' | 'danger'> = {
+  DRAFT: 'neutral',
+  CONFIRMED: 'success',
+  DISCARDED: 'danger',
 }
 
 export function AutoSchedulePage() {
@@ -54,176 +65,177 @@ export function AutoSchedulePage() {
   const [departmentId, setDepartmentId] = useState<string>(scope.departmentId ?? '')
   const effectiveDepartmentId = scope.isScoped ? scope.departmentId : departmentId
 
-  // ---- Form state ----
+  // ---- Form tạo lịch nháp ----
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([])
   const [dateFrom, setDateFrom] = useState(today())
-  const [dateTo, setDateTo] = useState(nextMonth())
-  const [slots, setSlots] = useState<TimeSlot[]>(DEFAULT_SLOTS)
+  const [dateTo, setDateTo] = useState(plusDays(28))
   const [sessionDays, setSessionDays] = useState<number[]>([1, 2, 3, 4, 5])
 
-  // ---- Result state ----
-  const [result, setResult] = useState<AutoScheduleResult | null>(null)
-  const [showScheduled, setShowScheduled] = useState(true)
-  const [showUnscheduled, setShowUnscheduled] = useState(true)
+  // ---- Lịch nháp đang mở ----
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
+  const [week, setWeek] = useState(1)
+  const [classFilter, setClassFilter] = useState('all')
+  const [teacherFilter, setTeacherFilter] = useState('all')
+  const [editing, setEditing] = useState<ScheduleDraftItem | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const [confirmFailures, setConfirmFailures] = useState<ScheduleDraftConfirmResult['failed']>([])
 
   const classes = useClasses({ page: 1, size: 100, selectable: true })
-  const autoSchedule = useAutoSchedule(effectiveDepartmentId ?? null)
+  const timeSlots = useScheduleTimeSlots()
+  const drafts = useScheduleDrafts(effectiveDepartmentId ?? null)
+  const detail = useScheduleDraftDetail(effectiveDepartmentId ?? null, activeDraftId, week)
+  const mutations = useScheduleDraftMutations(effectiveDepartmentId ?? null)
 
-  // Reload scheduled sessions after auto-generate
-  const _sessions = useSchedules(effectiveDepartmentId ?? null, {
-    from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
-    to: dateTo ? new Date(`${dateTo}T23:59:59`).toISOString() : undefined,
-  })
-  void _sessions
+  function changeDepartment(id: string) {
+    setDepartmentId(id)
+    setActiveDraftId(null)
+    setWeek(1)
+    setConfirmFailures([])
+    setConfirmOpen(false)
+    setDiscardOpen(false)
+  }
 
-  const canRun = can(PERM.scheduleCreate) && Boolean(effectiveDepartmentId) && selectedClassIds.length > 0
+  const classItems = useMemo(() => classes.data?.items ?? [], [classes.data])
+  const classNameById = useMemo(
+    () => new Map(classItems.map((item) => [item.id, item.name])),
+    [classItems],
+  )
+  const classNameOf = (classId: string) => classNameById.get(classId) ?? classId.slice(0, 8)
+  const slots = timeSlots.data ?? []
+  const configMissing = timeSlots.isSuccess && slots.length === 0
+  const canCreate = can(PERM.scheduleCreate)
+  const detailData = detail.data
+  const canEdit = canCreate && detailData?.status === 'DRAFT'
+
+  const teachersInDraft = useMemo(() => {
+    const map = new Map<string, string>()
+    detailData?.items.forEach((item) => {
+      if (item.teacherId) map.set(item.teacherId, item.teacherName ?? item.teacherId.slice(0, 8))
+    })
+    return Array.from(map.entries())
+  }, [detailData])
+
+  const filteredItems = useMemo(
+    () =>
+      (detailData?.items ?? []).filter(
+        (item) =>
+          (classFilter === 'all' || item.classId === classFilter) &&
+          (teacherFilter === 'all' || item.teacherId === teacherFilter),
+      ),
+    [detailData, classFilter, teacherFilter],
+  )
 
   function toggleClass(id: string) {
-    setSelectedClassIds(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id],
+    setSelectedClassIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
     )
   }
 
   function toggleDay(day: number) {
-    setSessionDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort(),
+    setSessionDays((prev) =>
+      prev.includes(day) ? prev.filter((value) => value !== day) : [...prev, day].sort(),
     )
   }
 
-  function addSlot() {
-    setSlots(prev => [...prev, { startTime: '07:30', endTime: '09:00' }])
-  }
-
-  function removeSlot(index: number) {
-    setSlots(prev => prev.filter((_, i) => i !== index))
-  }
-
-  function updateSlot(index: number, field: keyof TimeSlot, value: string) {
-    setSlots(prev => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
-  }
-
-  function runAutoSchedule() {
+  function createDraft() {
     if (!effectiveDepartmentId) return
-    setResult(null)
-    autoSchedule.mutate(
+    mutations.create.mutate(
       {
         classIds: selectedClassIds,
         dateFrom,
         dateTo,
-        slots,
         sessionDays: sessionDays.length > 0 ? sessionDays : undefined,
       },
       {
-        onSuccess: (data) => {
-          setResult(data)
-          if (data.summary.scheduled > 0) {
-            toast.success(`Đã xếp được ${data.summary.scheduled}/${data.summary.totalRequested} lớp.`)
-          } else {
-            toast.error('Không xếp được lớp nào. Xem chi tiết bên dưới.')
-          }
+        onSuccess: (created) => {
+          setActiveDraftId(created.id)
+          setWeek(1)
+          setClassFilter('all')
+          setTeacherFilter('all')
+          setConfirmFailures([])
+          toast.success(`Đã tạo lịch nháp với ${created.totalItems} buổi dự kiến.`)
         },
-        onError: (err) => {
-          toast.error(ApiError.from(err).message || 'Lỗi khi chạy thuật toán.')
-        },
+        onError: (error) => toast.error(ApiError.from(error).message),
       },
     )
   }
 
-  // ---- Table columns: scheduled ----
-  const scheduledColumns: DataColumn<ScheduleSession>[] = [
-    { id: 'className', header: 'Lớp', cell: (r: ScheduleSession) => r.className ?? r.classId },
-    {
-      id: 'subjectName',
-      header: 'Môn học',
-      cell: (r: ScheduleSession) => {
-        if (r.subjectName) return r.subjectName
-        const cls = ((classes.data as { items?: { id: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
-          c => c.id === r.classId
-        )
-        return cls?.subjectName ?? '—'
-      },
-    },
-    {
-      id: 'teacher',
-      header: 'Giáo viên',
-      cell: (r: ScheduleSession) => (
-        <span className="text-xs">
-          {r.teacherName ?? (r.teacherId ? <span className="font-mono">{r.teacherId.slice(0, 8)}…</span> : '—')}
-        </span>
-      ),
-    },
-    {
-      id: 'room',
-      header: 'Phòng',
-      cell: (r: ScheduleSession) => (
-        <span className="text-xs font-medium">
-          {r.roomCode ?? (r.roomId ? <span className="font-mono">{r.roomId.slice(0, 8)}…</span> : '—')}
-        </span>
-      ),
-    },
-    {
-      id: 'date',
-      header: 'Ngày',
-      cell: (r: ScheduleSession) => new Date(r.startTime).toLocaleDateString('vi-VN'),
-    },
-    {
-      id: 'time',
-      header: 'Giờ',
-      cell: (r: ScheduleSession) => {
-        const start = new Date(r.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-        const end = new Date(r.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-        return `${start} - ${end}`
-      },
-    },
-    {
-      id: 'status',
-      header: 'Trạng thái',
-      cell: (r: ScheduleSession) => (
-        <Badge tone="success">
-          {SESSION_STATUS_LABELS[r.status] ?? r.status}
-        </Badge>
-      ),
-    },
-  ]
+  function openDraft(id: string) {
+    setActiveDraftId(id)
+    setWeek(1)
+    setClassFilter('all')
+    setTeacherFilter('all')
+    setConfirmFailures([])
+  }
 
-  // ---- Table columns: unscheduled ----
-  const unscheduledColumns: DataColumn<UnscheduledItem>[] = [
-    { id: 'className', header: 'Lớp', cell: (r: UnscheduledItem) => r.className ?? r.classId },
-    { id: 'subjectName', header: 'Môn học', cell: (r: UnscheduledItem) => r.subjectName ?? '—' },
-    {
-      id: 'reason',
-      header: 'Lý do không xếp được',
-      cell: (r: UnscheduledItem) => (
-        <span className="flex items-start gap-1.5 text-red-600">
-          <XCircle className="mt-0.5 size-4 shrink-0" />
-          {r.reason}
-        </span>
-      ),
-    },
-  ]
+  function saveItem(patch: ScheduleDraftPatch) {
+    if (!activeDraftId || !editing) return
+    setSaveError(null)
+    mutations.patchItem.mutate(
+      { draftId: activeDraftId, itemId: editing.id, patch },
+      {
+        onSuccess: () => {
+          setEditing(null)
+          toast.success('Đã cập nhật buổi học trong lịch nháp.')
+        },
+        onError: (error) => setSaveError(ApiError.from(error).message),
+      },
+    )
+  }
+
+  function confirmDraft() {
+    if (!activeDraftId) return
+    mutations.confirm.mutate(activeDraftId, {
+      onSuccess: (result) => {
+        setConfirmOpen(false)
+        if (result.failed.length > 0) {
+          setConfirmFailures(result.failed)
+          toast.error('Không xác nhận được lịch nháp. Toàn bộ thay đổi đã được hoàn tác.')
+        } else {
+          setConfirmFailures([])
+          toast.success(`Đã xác nhận ${result.created} buổi học vào lịch chính thức.`)
+        }
+      },
+      onError: (error) => toast.error(ApiError.from(error).message),
+    })
+  }
+
+  function discardDraft() {
+    if (!activeDraftId) return
+    mutations.discard.mutate(activeDraftId, {
+      onSuccess: () => {
+        setDiscardOpen(false)
+        setActiveDraftId(null)
+        toast.success('Đã huỷ lịch nháp.')
+      },
+      onError: (error) => toast.error(ApiError.from(error).message),
+    })
+  }
+
+  const canRun = canCreate && Boolean(effectiveDepartmentId) && selectedClassIds.length > 0
 
   return (
     <PageContainer>
       <PageHeader
         eyebrow="Đào tạo › Lịch học"
-        title="Tự động xếp lịch"
-        description="Chọn lớp, khoảng thời gian và khung giờ — hệ thống sẽ tự phân bổ giáo viên, phòng và buổi học."
+        title="Xếp lịch tự động"
+        description="Tạo lịch nháp cho nhiều lớp, xem lưới tuần, sửa tay nếu cần rồi xác nhận mới ghi vào lịch chính thức."
       />
 
-      {/* ---- Input section ---- */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Dept selector */}
         {!scope.isScoped && (
           <div className="lg:col-span-2">
             <Field label="Phòng ban" labelSize="sm">
-              <Select value={departmentId} onValueChange={setDepartmentId}>
+              <Select value={departmentId} onValueChange={changeDepartment}>
                 <SelectTrigger className="sm:w-72">
                   <SelectValue placeholder="Chọn phòng ban" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(departments.data ?? []).map(d => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
+                  {(departments.data ?? []).map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -232,83 +244,40 @@ export function AutoSchedulePage() {
           </div>
         )}
 
-        {/* Date range */}
         <div className="flex gap-3">
           <Field label="Từ ngày" labelSize="sm">
-            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
           </Field>
           <Field label="Đến ngày" labelSize="sm">
-            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           </Field>
         </div>
 
-        {/* Session days */}
         <div>
           <p className="mb-1.5 text-sm font-medium text-ink-700">Các thứ được phép xếp</p>
           <div className="flex flex-wrap gap-2">
-            {[1, 2, 3, 4, 5, 6, 7].map(day => (
+            {[1, 2, 3, 4, 5, 6, 7].map((day) => (
               <button
                 key={day}
                 type="button"
                 onClick={() => toggleDay(day)}
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   sessionDays.includes(day)
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-zinc-300 bg-white text-ink-700 hover:border-blue-400'
+                    ? 'border-jade-700 bg-jade-700 text-white'
+                    : 'border-line-strong bg-surface text-ink-700 hover:border-jade-400'
                 }`}
               >
-                {DAY_LABELS[day]}
+                {WEEKDAY_LABELS[day]}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Time slots */}
-        <div className="lg:col-span-2">
-          <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-sm font-medium text-ink-700">Khung giờ trong ngày</p>
-            <Button size="sm" variant="ghost" onClick={addSlot}>
-              <Plus className="size-3.5" />
-              Thêm khung giờ
-            </Button>
-          </div>
-          <div className="flex flex-col gap-2">
-            {slots.map((slot, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Field label={`Ca ${i + 1} – Bắt đầu`} labelSize="sm">
-                  <Input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={e => updateSlot(i, 'startTime', e.target.value)}
-                  />
-                </Field>
-                <Field label="Kết thúc" labelSize="sm">
-                  <Input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={e => updateSlot(i, 'endTime', e.target.value)}
-                  />
-                </Field>
-                {slots.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeSlot(i)}
-                    className="mt-5 text-zinc-400 hover:text-red-500"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Class selector */}
         <div className="lg:col-span-2">
           <p className="mb-1.5 text-sm font-medium text-ink-700">
             Chọn lớp cần xếp lịch
             {selectedClassIds.length > 0 && (
-              <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+              <span className="ml-2 rounded-full bg-jade-100 px-2 py-0.5 text-xs font-semibold text-jade-800">
                 {selectedClassIds.length} đã chọn
               </span>
             )}
@@ -316,188 +285,294 @@ export function AutoSchedulePage() {
           {classes.isLoading ? (
             <p className="text-sm text-ink-500">Đang tải danh sách lớp...</p>
           ) : (
-            <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-lg border border-zinc-200 p-2">
-              {((classes.data as { items?: { id: string; name: string; classCode?: string; subjectName?: string }[] } | undefined)?.items ?? []).map(cls => (
+            <div className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-lg border border-line p-2">
+              {classItems.map((schoolClass) => (
                 <label
-                  key={cls.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50"
+                  key={schoolClass.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-ink-50"
                 >
                   <input
                     type="checkbox"
-                    className="size-4 rounded border-zinc-300"
-                    checked={selectedClassIds.includes(cls.id)}
-                    onChange={() => toggleClass(cls.id)}
+                    className="size-4 rounded border-line-strong"
+                    checked={selectedClassIds.includes(schoolClass.id)}
+                    onChange={() => toggleClass(schoolClass.id)}
                   />
                   <span className="text-sm">
-                    <span className="font-medium">{cls.name}</span>
-                    {cls.classCode && (
-                      <span className="ml-1.5 text-xs text-ink-500">({cls.classCode})</span>
-                    )}
-                    {cls.subjectName && (
-                      <span className="ml-1.5 text-xs text-ink-400">· {cls.subjectName}</span>
+                    <span className="font-medium">{schoolClass.name}</span>
+                    <span className="ml-1.5 text-xs text-ink-500">({schoolClass.classCode})</span>
+                    {schoolClass.subjectName && (
+                      <span className="ml-1.5 text-xs text-ink-400">· {schoolClass.subjectName}</span>
                     )}
                   </span>
                 </label>
               ))}
-              {((classes.data as { items?: unknown[] } | undefined)?.items ?? []).length === 0 && (
+              {classItems.length === 0 && (
                 <p className="py-4 text-center text-sm text-ink-500">Không có lớp nào.</p>
               )}
             </div>
           )}
         </div>
-
-        {/* Selected classes subject review (Step 2) */}
-        {selectedClassIds.length > 0 && (
-          <div className="lg:col-span-2 rounded-xl border border-line-200 bg-surface p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink-900">
-                Môn học sẽ được xếp lịch theo từng lớp ({selectedClassIds.length} lớp)
-              </p>
-              <span className="text-xs text-ink-500">Theo môn học đã gán cho lớp</span>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              {selectedClassIds.map((id) => {
-                const cls = ((classes.data as { items?: { id: string; name: string; classCode?: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
-                  (c) => c.id === id,
-                )
-                if (!cls) return null
-                return (
-                  <div
-                    key={id}
-                    className="flex items-center justify-between rounded-lg border border-line-100 bg-ink-50/50 p-2.5 text-sm"
-                  >
-                    <div>
-                      <span className="font-medium text-ink-900">{cls.name}</span>
-                      {cls.classCode && (
-                        <span className="ml-1 text-xs text-ink-500 font-mono">({cls.classCode})</span>
-                      )}
-                    </div>
-                    {cls.subjectName ? (
-                      <Badge tone="success">{cls.subjectName}</Badge>
-                    ) : (
-                      <Badge tone="warning">Chưa gán môn</Badge>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {selectedClassIds.some((id) => {
-              const cls = ((classes.data as { items?: { id: string; subjectName?: string }[] } | undefined)?.items ?? []).find(
-                (c) => c.id === id,
-              )
-              return !cls?.subjectName
-            }) && (
-              <p className="text-xs text-warning-600">
-                Lưu ý: Lớp chưa gán môn học có thể không tìm được giáo viên đủ điều kiện để xếp lịch. Hãy vào trang Quản lý Lớp học để gán môn học trước khi xếp lịch.
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* ---- Run button ---- */}
-      <div className="mt-6 flex items-center gap-3">
-        <Button
-          size="md"
-          disabled={!canRun || autoSchedule.isPending}
-          onClick={runAutoSchedule}
-        >
-          {autoSchedule.isPending ? (
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Button size="md" disabled={!canRun || mutations.create.isPending} onClick={createDraft}>
+          {mutations.create.isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Đang xếp lịch...
+              Đang tạo lịch nháp...
             </>
           ) : (
             <>
               <CalendarCog className="size-4" />
-              Tự động xếp lịch
+              Tạo lịch nháp
             </>
           )}
         </Button>
-        {!can(PERM.scheduleCreate) && (
-          <p className="text-sm text-red-500">Bạn không có quyền xếp lịch.</p>
-        )}
+        {!canCreate && <p className="text-sm text-danger-500">Bạn không có quyền xếp lịch.</p>}
         {!effectiveDepartmentId && (
-          <p className="text-sm text-zinc-500">Chọn phòng ban để bắt đầu.</p>
+          <p className="text-sm text-ink-500">Chọn phòng ban để bắt đầu.</p>
+        )}
+        {configMissing && (
+          <p className="flex items-center gap-1.5 text-sm text-warning-600">
+            <AlertCircle className="size-4" />
+            Chưa cấu hình khung tiết.
+            <Link to="/dao-tao/cau-hinh-lich" className="font-medium text-jade-700 hover:underline">
+              Mở cấu hình lịch
+            </Link>
+          </p>
         )}
       </div>
 
-      {/* ---- Results ---- */}
-      {result && (
-        <div className="mt-8 space-y-6">
-          {/* Summary banner */}
-          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4">
-            <div className="flex items-center gap-2 text-green-700">
-              <CheckCircle2 className="size-5" />
-              <span className="font-semibold">{result.summary.scheduled}</span>
-              <span className="text-sm">buổi học đã xếp</span>
-            </div>
-            <div className="h-5 w-px bg-zinc-300" />
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="size-5" />
-              <span className="font-semibold">{result.summary.unscheduled}</span>
-              <span className="text-sm">mục chưa xếp được</span>
-            </div>
-            <div className="h-5 w-px bg-zinc-300" />
-            <span className="text-sm text-ink-500">Tổng: {result.summary.totalRequested} lớp</span>
-
-            {result.summary.scheduled > 0 && (
-              <Link
-                to="/dao-tao/lich-hoc"
-                className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline"
-              >
-                Xem chi tiết trên trang Lịch học →
-              </Link>
-            )}
-          </div>
-
-          {/* Scheduled sessions */}
-          {result.scheduled.length > 0 && (
-            <div>
-              <button
-                type="button"
-                className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-green-700"
-                onClick={() => setShowScheduled(v => !v)}
-              >
-                {showScheduled ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-                Buổi học đã xếp ({result.scheduled.length})
-              </button>
-              {showScheduled && (
-                <DataTable
-                  columns={scheduledColumns}
-                  data={result.scheduled}
-                  rowKey={r => r.id}
-                  initialPageSize={20}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Unscheduled items */}
-          {result.unscheduled.length > 0 && (
-            <div>
-              <button
-                type="button"
-                className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-red-600"
-                onClick={() => setShowUnscheduled(v => !v)}
-              >
-                {showUnscheduled ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-                Lớp chưa xếp được ({result.unscheduled.length})
-              </button>
-              {showUnscheduled && (
-                <DataTable
-                  columns={unscheduledColumns}
-                  data={result.unscheduled}
-                  rowKey={(r: UnscheduledItem) => `${r.classId}-${r.subjectName ?? ''}`}
-                  initialPageSize={20}
-                />
-              )}
-            </div>
-          )}
+      {confirmFailures.length > 0 && (
+        <div className="mt-6 rounded-xl border border-danger-100 bg-danger-50 px-4 py-3">
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-danger-500">
+            <XCircle className="size-4" />
+            Không xác nhận được — toàn bộ thay đổi đã được hoàn tác
+          </p>
+          <ul className="space-y-1 text-xs text-danger-500">
+            {confirmFailures.map((failure) => (
+              <li key={failure.itemId}>
+                {classNameOf(failure.classId ?? '')} · {failure.subjectName ?? '—'} — {failure.reason}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
+
+      {activeDraftId && detail.isLoading ? (
+        <p className="mt-8 flex items-center gap-2 text-sm text-ink-500">
+          <Loader2 className="size-4 animate-spin" />
+          Đang tải lịch nháp...
+        </p>
+      ) : null}
+
+      {activeDraftId && detail.isError ? (
+        <div className="mt-8">
+          <ErrorState
+            title="Không tải được lịch nháp"
+            description={ApiError.from(detail.error).message}
+            onRetry={() => void detail.refetch()}
+          />
+        </div>
+      ) : null}
+
+      {activeDraftId && detailData ? (
+        <section className="mt-8 space-y-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-ink-900">Lịch nháp</h2>
+              <Badge tone={STATUS_TONES[detailData.status]}>
+                {DRAFT_STATUS_LABELS[detailData.status]}
+              </Badge>
+            </div>
+            <span className="text-xs text-ink-500">
+              {detailData.totalItems} buổi · {detailData.exceptionCount} ngoại lệ ·{' '}
+              {detailData.unscheduledCount} chưa xếp được
+            </span>
+
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                size="icon-sm"
+                variant="outline"
+                aria-label="Tuần trước"
+                disabled={week <= 1}
+                onClick={() => {
+                  setWeek((value) => Math.max(1, value - 1))
+                  setEditing(null)
+                }}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <span className="text-xs font-medium text-ink-700">
+                Tuần {detailData.week}/{detailData.totalWeeks}
+              </span>
+              <Button
+                size="icon-sm"
+                variant="outline"
+                aria-label="Tuần sau"
+                disabled={week >= detailData.totalWeeks}
+                onClick={() => {
+                  setWeek((value) => Math.min(detailData.totalWeeks, value + 1))
+                  setEditing(null)
+                }}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+
+              {canEdit && (
+                <>
+                  <Button size="sm" onClick={() => setConfirmOpen(true)}>
+                    <CheckCircle2 className="size-4" />
+                    Xác nhận
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setDiscardOpen(true)}>
+                    Huỷ lịch nháp
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setActiveDraftId(null)}>
+                Đóng
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Select value={classFilter} onValueChange={setClassFilter}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Lọc theo lớp" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả lớp</SelectItem>
+                {detailData.classIds.map((classId) => (
+                  <SelectItem key={classId} value={classId}>
+                    {classNameOf(classId)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={teacherFilter} onValueChange={setTeacherFilter}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Lọc theo giáo viên" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả giáo viên</SelectItem>
+                {teachersInDraft.map(([teacherId, name]) => (
+                  <SelectItem key={teacherId} value={teacherId}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DraftWeekGrid
+            detail={{ ...detailData, items: filteredItems }}
+            timeSlots={slots}
+            classNameOf={classNameOf}
+            canEdit={canEdit}
+            onEdit={(item) => {
+              setSaveError(null)
+              setEditing(item)
+            }}
+          />
+
+          <div>
+            <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-danger-500">
+              <AlertCircle className="size-4" />
+              Chưa xếp được ({detailData.unscheduledCount})
+            </h3>
+            {detailData.unscheduled.length === 0 ? (
+              <p className="text-sm text-ink-500">Tất cả buổi dự kiến đều đã xếp được.</p>
+            ) : (
+              <ul className="space-y-1 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-ink-600">
+                {detailData.unscheduled.map((item) => (
+                  <li key={item.id}>
+                    {classNameOf(item.classId)}
+                    {item.sessionNo ? ` · buổi ${item.sessionNo}` : ''} — {item.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="mt-8">
+          <h2 className="mb-2 text-sm font-semibold text-ink-900">Lịch nháp gần đây</h2>
+          {!effectiveDepartmentId ? (
+            <p className="text-sm text-ink-500">Chọn phòng ban để xem lịch nháp.</p>
+          ) : drafts.isLoading ? (
+            <p className="text-sm text-ink-500">Đang tải danh sách lịch nháp...</p>
+          ) : (drafts.data ?? []).length === 0 ? (
+            <p className="text-sm text-ink-500">Chưa có lịch nháp nào.</p>
+          ) : (
+            <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+              {(drafts.data ?? []).map((draft) => (
+                <li key={draft.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                  <Badge tone={STATUS_TONES[draft.status]}>
+                    {DRAFT_STATUS_LABELS[draft.status]}
+                  </Badge>
+                  <span className="text-ink-700">
+                    {draft.dateFrom} → {draft.dateTo}
+                  </span>
+                  <span className="text-xs text-ink-500">
+                    {draft.classIds.length} lớp · {draft.itemCount} buổi · {draft.unscheduledCount} chưa
+                    xếp được
+                  </span>
+                  <span className="text-xs text-ink-400">
+                    Tạo lúc {new Date(draft.createdAt).toLocaleString('vi-VN')}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto"
+                    onClick={() => openDraft(draft.id)}
+                  >
+                    Mở
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {detailData && editing && (
+        <DraftItemDialog
+          item={editing}
+          detail={detailData}
+          timeSlots={slots}
+          departmentId={effectiveDepartmentId ?? ''}
+          classNameOf={classNameOf}
+          isSaving={mutations.patchItem.isPending}
+          error={saveError}
+          onClose={() => {
+            setEditing(null)
+            setSaveError(null)
+          }}
+          onSave={saveItem}
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Xác nhận lịch nháp?"
+        description="Hệ thống sẽ kiểm tra lại toàn bộ ràng buộc và ghi các buổi học vào lịch chính thức. Nếu một buổi bị trùng, toàn bộ thay đổi sẽ được hoàn tác."
+        confirmLabel="Xác nhận lịch"
+        tone="primary"
+        isLoading={mutations.confirm.isPending}
+        onConfirm={confirmDraft}
+      />
+
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title="Huỷ lịch nháp?"
+        description="Lịch nháp sẽ được đánh dấu đã huỷ và không thể sửa hay xác nhận nữa."
+        confirmLabel="Huỷ lịch nháp"
+        isLoading={mutations.discard.isPending}
+        onConfirm={discardDraft}
+      />
     </PageContainer>
   )
 }

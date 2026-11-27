@@ -15,7 +15,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
@@ -116,6 +118,7 @@ public class CurriculumRepository {
 
     public CurriculumSubjectResponse addSubject(String curriculumId, String subjectId,
                                                 int sequenceNo, int requiredSessions, int sessionMinutes,
+                                                Integer sessionsPerWeek,
                                                 Double theoryHours, Double practiceHours,
                                                 boolean isRequired, String notes,
                                                 List<String> prerequisiteSubjectIds) {
@@ -127,10 +130,11 @@ public class CurriculumRepository {
 
         jdbc.update("""
             INSERT INTO curriculum_subject(curriculum_id, subject_id, sequence_no, required_sessions,
-                                          session_minutes, theory_hours, practice_hours, is_required, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                          session_minutes, sessions_per_week, theory_hours,
+                                          practice_hours, is_required, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, curriculumId, subjectId, sequenceNo, requiredSessions, sessionMinutes,
-            theoryHours, practiceHours, isRequired, trimToNull(notes));
+            sessionsPerWeek, theoryHours, practiceHours, isRequired, trimToNull(notes));
 
         // Insert prerequisites
         if (prerequisiteSubjectIds != null) {
@@ -151,6 +155,7 @@ public class CurriculumRepository {
 
     public CurriculumSubjectResponse updateSubject(String curriculumId, String subjectId,
                                                    int sequenceNo, int requiredSessions, int sessionMinutes,
+                                                   Integer sessionsPerWeek,
                                                    Double theoryHours, Double practiceHours,
                                                    boolean isRequired, String notes,
                                                    List<String> prerequisiteSubjectIds) {
@@ -161,10 +166,11 @@ public class CurriculumRepository {
 
         jdbc.update("""
             UPDATE curriculum_subject SET sequence_no=?, required_sessions=?, session_minutes=?,
-                                          theory_hours=?, practice_hours=?, is_required=?, notes=?
+                                          sessions_per_week=?, theory_hours=?, practice_hours=?,
+                                          is_required=?, notes=?
             WHERE curriculum_id=? AND subject_id=?
-            """, sequenceNo, requiredSessions, sessionMinutes, theoryHours, practiceHours,
-            isRequired, trimToNull(notes), curriculumId, subjectId);
+            """, sequenceNo, requiredSessions, sessionMinutes, sessionsPerWeek, theoryHours,
+            practiceHours, isRequired, trimToNull(notes), curriculumId, subjectId);
 
         if (prerequisiteSubjectIds != null) {
             jdbc.update("DELETE FROM curriculum_subject_prerequisite WHERE curriculum_id=? AND subject_id=?",
@@ -222,8 +228,27 @@ public class CurriculumRepository {
         return new CurriculumSubjectResponse(
             currId, subId, rs.getString("subject_code"), rs.getString("subject_name"),
             rs.getInt("sequence_no"), rs.getInt("required_sessions"), rs.getInt("session_minutes"),
+            getIntOrNull(rs, "sessions_per_week"),
             getDoubleOrNull(rs, "theory_hours"), getDoubleOrNull(rs, "practice_hours"),
             rs.getBoolean("is_required"), rs.getString("notes"), prereqIds);
+    }
+
+    /** Toàn bộ cạnh tiên quyết của chương trình: subjectId -> danh sách môn phải học trước. */
+    public Map<String, List<String>> prerequisiteEdges(String curriculumId) {
+        Map<String, List<String>> edges = new LinkedHashMap<>();
+        jdbc.query("""
+            SELECT subject_id, prerequisite_subject_id
+            FROM curriculum_subject_prerequisite WHERE curriculum_id=?
+            """, rs -> {
+                edges.computeIfAbsent(rs.getString("subject_id"), k -> new ArrayList<>())
+                    .add(rs.getString("prerequisite_subject_id"));
+            }, curriculumId);
+        return edges;
+    }
+
+    private Integer getIntOrNull(ResultSet rs, String col) throws SQLException {
+        int v = rs.getInt(col);
+        return rs.wasNull() ? null : v;
     }
 
     private Double getDoubleOrNull(ResultSet rs, String col) throws SQLException {
