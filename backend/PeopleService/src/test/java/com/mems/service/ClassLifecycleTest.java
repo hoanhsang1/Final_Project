@@ -69,7 +69,8 @@ class ClassLifecycleTest {
             mock(ClassApprovalPolicy.class), mock(NotificationService.class), outbox);
         classService = new SchoolClassService(classes, mock(StudentRepository.class), actor, guard,
             mock(PeopleAuditService.class), mock(TeacherRepository.class), statusService,
-            mock(SubjectRepository.class), outbox, "TEACHER_ASSIGNMENT");
+            mock(SubjectRepository.class), mock(ClassSubjectService.class), outbox,
+            "TEACHER_ASSIGNMENT");
     }
 
     @Test

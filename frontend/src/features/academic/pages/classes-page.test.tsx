@@ -2,10 +2,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { classesApi, subjectsApi } from '@/features/academic/api'
+import { classesApi, curriculaApi, subjectsApi } from '@/features/academic/api'
 import type * as AcademicApi from '@/features/academic/api'
 import { ClassesPage } from '@/features/academic/pages/classes-page'
-import type { SchoolClass, Subject } from '@/features/academic/types'
+import type { CurriculumSummary, SchoolClass, Subject } from '@/features/academic/types'
 import { PERM } from '@/lib/permissions'
 import { renderPage, signInAs } from '@/tests/render-page'
 
@@ -14,6 +14,7 @@ vi.mock('@/features/academic/api', async (importOriginal) => {
   return {
     ...actual,
     classesApi: { ...actual.classesApi, list: vi.fn(), create: vi.fn() },
+    curriculaApi: { ...actual.curriculaApi, list: vi.fn() },
     subjectsApi: { ...actual.subjectsApi, list: vi.fn() },
   }
 })
@@ -55,6 +56,16 @@ const subject: Subject = {
   updatedAt: null,
 }
 
+const curriculum: CurriculumSummary = {
+  id: 'cur-1',
+  code: 'CT10',
+  name: 'Chương trình 10',
+  gradeLevel: '10',
+  isActive: true,
+  version: 0,
+  subjectCount: 2,
+}
+
 beforeAll(() => {
   // Radix Select dùng Pointer Capture — jsdom chưa hỗ trợ.
   Element.prototype.hasPointerCapture ??= () => false
@@ -68,6 +79,8 @@ beforeEach(() => {
   vi.mocked(classesApi.create).mockReset()
   vi.mocked(subjectsApi.list).mockReset()
   vi.mocked(subjectsApi.list).mockResolvedValue([subject])
+  vi.mocked(curriculaApi.list).mockReset()
+  vi.mocked(curriculaApi.list).mockResolvedValue({ items: [curriculum], total: 1, page: 1, size: 100 })
   signInAs({ permissions: [PERM.classView, PERM.classCreate] })
 })
 
@@ -125,6 +138,27 @@ describe('ClassesPage — quyền tạo lớp độc lập với quyền xem', (
 
     await waitFor(() => expect(classesApi.create).toHaveBeenCalled())
     expect(vi.mocked(classesApi.create).mock.calls[0]?.[0]).not.toHaveProperty('status')
+  })
+
+  it('tạo lớp kèm chương trình: gửi curriculumId để backend áp môn ngay', async () => {
+    vi.mocked(classesApi.create).mockResolvedValue(schoolClass)
+    renderPage(<ClassesPage />)
+    await screen.findByText('LH-10A1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo lớp' }))
+    const dialog = await screen.findByRole('dialog')
+    const inputs = within(dialog).getAllByRole('textbox')
+    await userEvent.type(inputs[0]!, 'LH-10C1')
+    await userEvent.type(inputs[1]!, 'Lớp 10C1')
+    await userEvent.click(within(dialog).getAllByRole('combobox')[1]!)
+    await userEvent.click(await screen.findByRole('option', { name: 'Chương trình 10 (CT10)' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tạo lớp' }))
+
+    await waitFor(() =>
+      expect(classesApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ classCode: 'LH-10C1', curriculumId: 'cur-1' }),
+      ),
+    )
   })
 
   it('bộ lọc trạng thái dùng đúng mã trạng thái của backend', async () => {

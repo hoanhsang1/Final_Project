@@ -485,6 +485,7 @@ type ClassForm = {
   name: string
   academicYear: string
   subjectId: string
+  curriculumId: string
   startDate: string
   endDate: string
 }
@@ -494,6 +495,7 @@ const EMPTY_FORM: ClassForm = {
   name: '',
   academicYear: '',
   subjectId: '',
+  curriculumId: '',
   startDate: '',
   endDate: '',
 }
@@ -510,6 +512,7 @@ function ClassFormDialog({
   onCreated?: (created: SchoolClass) => void
 }) {
   const subjects = useSubjects()
+  const curricula = useCurricula({ isActive: true, page: 1, size: 100 })
   const mutations = useClassMutations()
   const [form, setForm] = useState<ClassForm>(EMPTY_FORM)
   const [error, setError] = useState<string>()
@@ -523,6 +526,7 @@ function ClassFormDialog({
             name: schoolClass.name,
             academicYear: schoolClass.academicYear ?? '',
             subjectId: schoolClass.subjectId ?? 'none',
+            curriculumId: '',
             startDate: schoolClass.startDate ?? '',
             endDate: schoolClass.endDate ?? '',
           }
@@ -575,6 +579,7 @@ function ClassFormDialog({
         name: form.name.trim(),
         academicYear: form.academicYear.trim() || undefined,
         subjectId: form.subjectId === 'none' ? undefined : form.subjectId || undefined,
+        curriculumId: form.curriculumId || undefined,
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
       }
@@ -645,11 +650,34 @@ function ClassFormDialog({
                 onChange={(event) => setForm({ ...form, endDate: event.target.value })}
               />
             </Field>
+            {!schoolClass ? (
+              <Field label="Chương trình đào tạo">
+                <Select
+                  value={form.curriculumId || 'none'}
+                  onValueChange={(value) =>
+                    setForm({ ...form, curriculumId: value === 'none' ? '' : value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Không áp chương trình" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không áp chương trình</SelectItem>
+                    {(curricula.data?.items ?? []).map((curriculum) => (
+                      <SelectItem key={curriculum.id} value={curriculum.id}>
+                        {curriculum.name} ({curriculum.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
           </div>
           {!schoolClass ? (
             <p className="text-xs text-ink-500">
               Lớp mới bắt đầu ở trạng thái “Chưa bắt đầu”; trạng thái tự chuyển khi tới ngày bắt
-              đầu/kết thúc.
+              đầu/kết thúc. Chọn chương trình đào tạo thì danh sách môn được áp ngay sau khi tạo
+              lớp.
             </p>
           ) : null}
           {error ? <p className="text-sm text-danger-600">{error}</p> : null}

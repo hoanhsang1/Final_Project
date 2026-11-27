@@ -151,6 +151,7 @@ export interface ClassInput {
   name: string
   academicYear?: string
   subjectId?: string
+  curriculumId?: string
   startDate?: string
   endDate?: string
 }

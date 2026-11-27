@@ -1,5 +1,6 @@
 package com.mems.service;
 
+import com.mems.dto.ApplyCurriculumRequest;
 import com.mems.dto.ClassTeacherAssignRequest;
 import com.mems.dto.SchoolClassRequest;
 import com.mems.dto.SchoolClassResponse;
@@ -38,13 +39,15 @@ public class SchoolClassService {
     private final TeacherRepository teacherRepository;
     private final ClassStatusService classStatusService;
     private final SubjectRepository subjectRepository;
+    private final ClassSubjectService classSubjectService;
     private final OutboxEventRepository outbox;
     private final String teacherAssignmentModuleCode;
 
     public SchoolClassService(SchoolClassRepository repository, StudentRepository studentRepository,
                               Actor actor, OrganizationModuleGuard moduleGuard, PeopleAuditService audit,
                               TeacherRepository teacherRepository, ClassStatusService classStatusService,
-                              SubjectRepository subjectRepository, OutboxEventRepository outbox,
+                              SubjectRepository subjectRepository, ClassSubjectService classSubjectService,
+                              OutboxEventRepository outbox,
                               @Value("${TEACHER_ASSIGNMENT_MODULE_CODE:TEACHER_ASSIGNMENT}")
                               String teacherAssignmentModuleCode) {
         this.repository = repository;
@@ -55,6 +58,7 @@ public class SchoolClassService {
         this.teacherRepository = teacherRepository;
         this.classStatusService = classStatusService;
         this.subjectRepository = subjectRepository;
+        this.classSubjectService = classSubjectService;
         this.outbox = outbox;
         this.teacherAssignmentModuleCode = teacherAssignmentModuleCode;
     }
@@ -113,6 +117,13 @@ public class SchoolClassService {
         );
 
         audit.record(orgId, actor.userId(), "CLASS_CREATED", id, created);
+
+        if (request.curriculumId() != null && !request.curriculumId().isBlank()) {
+            // Cùng một transaction: chương trình lỗi thì không lớp nào được lưu lại.
+            classSubjectService.applyCurriculum(id, new ApplyCurriculumRequest(
+                request.curriculumId().trim(), Math.toIntExact(created.version()), null, null));
+            return repository.require(id, orgId, false);
+        }
         return created;
     }
 

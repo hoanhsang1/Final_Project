@@ -52,7 +52,7 @@ class ClassTeacherAssignmentTest {
     void setUp() {
         service = new SchoolClassService(classes, students, actor,
             new OrganizationModuleGuard(identityClient), audit, teachers, classStatusService, subjects,
-            outbox, "TEACHER_ASSIGNMENT");
+            mock(ClassSubjectService.class), outbox, "TEACHER_ASSIGNMENT");
         when(actor.orgId()).thenReturn("org-1");
         when(actor.userId()).thenReturn("actor-1");
         when(identityClient.activeModules("org-1")).thenReturn(List.of("STUDENT_MANAGEMENT"));

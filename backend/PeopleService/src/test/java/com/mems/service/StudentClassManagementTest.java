@@ -84,7 +84,8 @@ class StudentClassManagementTest {
         moduleGuard = new OrganizationModuleGuard(identityClient);
         studentService = new StudentService(studentRepository, actor, moduleGuard, audit, identityClient);
         classService = new SchoolClassService(classRepository, studentRepository, actor, moduleGuard, audit,
-            teacherRepository, classStatusService, subjectRepository, outbox, "TEACHER_ASSIGNMENT");
+            teacherRepository, classStatusService, subjectRepository, mock(ClassSubjectService.class),
+            outbox, "TEACHER_ASSIGNMENT");
         effectivePermissions = new EffectivePermissionsService(jdbc, identityClient,
             assignmentRepository, positionRepository);
     }
