@@ -45,6 +45,9 @@ export interface TeacherClass {
   status?: ClassStatus | null;
   closeState?: ClassCloseState | null;
   closeLabel?: string | null;
+  /** Endpoint /me/classes có thể báo lớp cần gán lại giáo viên. */
+  needsReassignment?: boolean;
+  reassignmentReason?: string | null;
 }
 
 /** §5.2 — một dòng lịch sử thay đổi hồ sơ. */
@@ -127,6 +130,20 @@ export type ClassStatus = 'CHUA_BAT_DAU' | 'DANG_DIEN_RA' | 'DA_KET_THUC' | 'DA_
 
 /** §7 — trạng thái đóng (độc lập với `status`). */
 export type ClassCloseState = 'NONE' | 'PENDING' | 'CLOSED';
+
+/** `ClassSubjectResponse` từ `/api/students/me/classes` — chỉ khai báo field FE dùng. */
+export interface StudentClass {
+  id: string;
+  classCode?: string | null;
+  name?: string | null;
+  academicYear?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status?: ClassStatus | null;
+  closeState?: ClassCloseState | null;
+  teacherName?: string | null;
+  subjectName?: string | null;
+}
 
 /** §6.2 — khối "Giáo viên phụ trách". */
 export interface ClassTeacher {
@@ -238,6 +255,54 @@ export interface CloseEventItem {
   note?: string | null;
   reason?: string | null;
 }
+
+/* ── Học sinh ──────────────────────────────────────────────────────────── */
+
+/**
+ * §4.1 — một dòng danh sách **và** hồ sơ học sinh (dùng chung một kiểu).
+ *
+ * BE chưa có `gender`/`version`/lịch sử thay đổi/lớp quá khứ nên FE không khai
+ * báo. Các field ngày giữ nguyên ISO string từ BE (`LocalDate` → `YYYY-MM-DD`,
+ * `Instant` → ISO-8601) hoặc `null` khi chưa có.
+ */
+export interface StudentListItem {
+  id: string;
+  studentCode: string;
+  fullName: string;
+  dateOfBirth: string | null;
+  email: string | null;
+  phone: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  classId: string | null;
+  classCode: string | null;
+  className: string | null;
+  accountUsername: string | null;
+  accountCreatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** §4.1 — `GET /api/students?page=&size=&q=&status=&classId=`. */
+export interface StudentListQuery {
+  page: number;
+  size: number;
+  q?: string;
+  status?: string;
+  classId?: string;
+}
+
+/** §4.1 — `POST /api/students`; bỏ `studentCode` khi trống để BE tự sinh. */
+export interface StudentCreatePayload {
+  studentCode?: string;
+  fullName: string;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: string;
+}
+
+/** §4.1 — `PUT /api/students/{id}`: `studentCode` chỉ đọc, không gửi lên. */
+export type StudentUpdatePayload = Omit<StudentCreatePayload, 'studentCode'>;
 
 /* ── Dùng chung ────────────────────────────────────────────────────────── */
 

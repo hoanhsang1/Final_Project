@@ -1,3 +1,5 @@
+> ⚠️ **Cập nhật 2026-11-26:** một số mục bên dưới là snapshot cũ; đọc cùng `D:\Final_Project\docs\trang-thai-hien-tai-2026-11-26.md` để có trạng thái hiện tại.
+
 # MEMS — Frontend
 
 Phần giao diện của **MEMS** (Hệ thống Quản lý Giáo dục theo Module).
@@ -8,8 +10,15 @@ Phần giao diện của **MEMS** (Hệ thống Quản lý Giáo dục theo Modu
 ## Công nghệ
 
 React 19 · TypeScript · Vite · React Router · TanStack Query (dữ liệu từ server) ·
-Zustand (trạng thái phía trình duyệt) · Axios · Ant Design 5 · React Hook Form + Zod ·
-dayjs · Recharts · Vitest + React Testing Library · Playwright · ESLint + Prettier.
+Zustand (trạng thái phía trình duyệt) · Axios · **`@astryxdesign/core` 0.7.16** ·
+`useFormState` (hook nội bộ) · dayjs · Recharts · Vitest + React Testing Library ·
+Playwright · ESLint + Prettier.
+
+> **Cập nhật 26/11:** dòng cũ "Ant Design 5 · React Hook Form + Zod" và các mục antd bên
+> dưới là snapshot. `frontend/src` hiện có **0 import `from 'antd'`**. Toolchain trên máy
+> này không có `npm`/`npx` trong PATH; dùng trực tiếp Node Playwright driver
+> `D:\AI skill\SEO\.venv\Lib\site-packages\playwright\driver\node.exe`. Xem
+> `../docs/trang-thai-hien-tai-2026-11-26.md`.
 
 ## Chạy
 
@@ -49,7 +58,7 @@ src/
 ├── features/admin/ # Gọi API + câu chữ cho console quản trị
 ├── stores/         # Zustand — chỉ giữ trạng thái phía trình duyệt
 ├── lib/api.ts      # Axios + interceptor gắn token, tự refresh khi gặp 401
-├── theme.ts        # Token của Ant Design
+├── theme.ts        # Token/theme Astryx + CSS variables (không phải Ant Design)
 └── router.tsx
 e2e/                # Test e2e Playwright cho console quản trị
 ```
@@ -63,8 +72,9 @@ e2e/                # Test e2e Playwright cho console quản trị
 
 - Thông báo sau khi gửi là **trung tính** ("Nếu email đã đăng ký…") để không ai dùng màn này
   dò email nào có trong hệ thống.
-- BE chưa có `D-32`/`D-33` (`docs/api.md`) → bấm gửi hiện *"chức năng chưa sẵn sàng"*,
-  **không** giả thành công (`NFR-REL-001`).
+- BE **vẫn chưa có** `D-32`/`D-33` (`../docs/api.md`; link cũ `docs/api.md` là sai, không tồn
+  tại trong `frontend/`) → bấm gửi hiện *"chức năng chưa sẵn sàng"*, **không** giả thành
+  công (`NFR-REL-001`).
 
 ## Console quản trị (Sprint 2)
 
@@ -88,8 +98,9 @@ e2e/                # Test e2e Playwright cho console quản trị
   **Ẩn UI không phải bảo mật** — backend vẫn phải chặn (`SUPER_ADMIN` trên các endpoint quản trị).
 - Đăng nhập bằng `SUPER_ADMIN` sẽ vào thẳng **Tổng quan** `/quan-tri`. Tài khoản nhiều role thì
   lấy role quyền cao nhất, không phụ thuộc thứ tự role trong JWT.
-- E2E của các màn mới chạy được **không cần backend** (mock trong `e2e/helpers.ts`), vì
-  `GET /organizations`, `/audit-logs`, `/accounts`… (`D-20`–`D-28`) chưa có ở BE.
+- E2E của các màn mới chạy được **không cần backend** (mock trong `e2e/helpers.ts`). Lý do
+  "vì `D-20`–`D-28` chưa có ở BE" là snapshot cũ — **đã có code + verify HTTP 200 (26/11)**;
+  mock vẫn giữ để test chạy độc lập. Full suite **125/125 pass**.
 
 ## Gọi backend
 
@@ -99,17 +110,19 @@ e2e/                # Test e2e Playwright cho console quản trị
 server: { proxy: { '/api': 'http://127.0.0.1:8080' } }
 ```
 
-Backend **chưa** cấu hình CORS, nên **không** gọi thẳng `http://localhost:8080` từ
-trình duyệt — phải đi qua proxy này.
+**Cập nhật 26/11:** backend **đã có** `CorsConfig` ở cả 4 service (`CORS_ALLOWED_ORIGINS`,
+mặc định `http://localhost:5173`), nên nhận xét "chưa cấu hình CORS" là cũ. Vẫn dùng proxy
+trong dev; khi tách domain phải set đúng origin cho từng service.
 
 ## Quy ước khi viết code
 
 - Một component một thư mục: `Component.tsx`, `Component.test.tsx`, `use-component.ts`, `types.ts`.
 - Tách **container** (gọi API, xử lý loading/error) khỏi **presentation** (chỉ nhận props).
 - Đủ **5 trạng thái** khi áp dụng được: loading, empty, error, success, no-permission.
-- Chỉ dùng **Ant Design 5**. Không dùng Tailwind hay CSS framework khác.
-- Mọi màu/khoảng cách/bo góc đi qua **token** của `ConfigProvider` — không hardcode hex hay px.
-- Locale **`vi_VN`** cho Ant Design. Chữ trên giao diện viết **tiếng Việt**; code đặt tên **tiếng Anh**.
+- Chỉ dùng **Astryx `@astryxdesign/core`** (đã thay Ant Design 5 từ tháng 11). Không dùng Tailwind.
+- Mọi màu/khoảng cách/bo góc đi qua **token** (`src/theme.ts` + CSS vars) — không hardcode hex hay px.
+- Locale Astryx **`vi-VN`** (`vi_VN` là locale antd cũ). Chữ trên giao diện viết **tiếng Việt**;
+  code đặt tên **tiếng Anh**. Form dùng `src/hooks/useFormState.ts` (không React Hook Form/Zod).
 - **Server state = TanStack Query**, **client state = Zustand**. Không nhét dữ liệu server vào store.
 - Lỗi từ backend là tiếng Anh → dịch ở `features/auth/authApi.ts`, không hiện thẳng cho người dùng.
 - Không dùng `dangerouslySetInnerHTML`. Buộc render HTML do người dùng nhập thì phải sanitize.

@@ -12,7 +12,7 @@ export default function AcademicConsoleLayout() {
   const backendRoles = useAuthStore((s) => s.backendRoles);
   const permissions = useAuthStore((s) => s.permissions);
   const items = useMemo(
-    () => getAcademicMenu(permissions, isOwnerRole(backendRoles)),
+    () => getAcademicMenu(permissions, isOwnerRole(backendRoles), backendRoles),
     [permissions, backendRoles],
   );
 

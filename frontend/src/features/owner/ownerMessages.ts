@@ -17,6 +17,8 @@ export const MSG_OWNER = {
   MENU_DEPARTMENTS: 'Phòng ban',
   /** Mục menu: chức vụ. */
   MENU_POSITIONS: 'Chức vụ',
+  /** Mục menu: cơ sở vật chất (phòng/thiết bị/sự cố). */
+  MENU_FACILITY: 'Cơ sở vật chất',
   /** Không đủ quyền vào khu vực tổ chức (403 tại chỗ). */
   NO_PERMISSION: 'Bạn không có quyền truy cập khu vực quản lý tổ chức.',
   /** Câu chung khi lưu thất bại (NFR-REL-001: lỗi không bao giờ hiện thành công). */

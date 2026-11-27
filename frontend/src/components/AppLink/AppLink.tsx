@@ -10,6 +10,16 @@ export interface AppLinkProps extends Omit<AstryxLinkProps, 'as' | 'href'> {
 }
 
 /**
+ * Nối `departmentId` hiện tại vào link nội bộ (đã encode để không phá query).
+ * Không có departmentId → giữ nguyên đường dẫn.
+ */
+export function linkWithDepartmentId(to: string, departmentId: string): string {
+  if (!departmentId) return to;
+  const separator = to.includes('?') ? '&' : '?';
+  return `${to}${separator}departmentId=${encodeURIComponent(departmentId)}`;
+}
+
+/**
  * Cầu nối giữa `Link` của Astryx và `Link` của react-router.
  *
  * Astryx đổi sang component link của router qua prop `as` và tự truyền `to`

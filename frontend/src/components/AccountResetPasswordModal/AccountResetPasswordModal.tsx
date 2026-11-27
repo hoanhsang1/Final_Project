@@ -18,7 +18,24 @@ import { useFormState } from '../../hooks/useFormState';
 export type PasswordResetMode = 'email' | 'manual';
 
 /** Độ dài mật khẩu tối thiểu — khớp validate của BE (`D-31`). */
-const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 12;
+/** Số byte UTF-8 tối đa — BCrypt chỉ hash được 72 byte đầu. */
+export const MAX_PASSWORD_BYTES = 72;
+
+/**
+ * Validate chính sách mật khẩu dùng chung cho đặt lại (admin) và đổi mật khẩu
+ * cưỡng chế (người dùng). Trả `undefined` khi hợp lệ, ngược lại trả câu chữ
+ * tiếng Việt để đưa thẳng vào `status` của `TextInput`.
+ */
+export function validateNewPassword(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return MSG_ACC.PASSWORD_REQUIRED;
+  if (trimmed.length < MIN_PASSWORD_LENGTH) return MSG_ACC.PASSWORD_TOO_SHORT;
+  if (new TextEncoder().encode(trimmed).length > MAX_PASSWORD_BYTES) {
+    return MSG_ACC.PASSWORD_TOO_LONG;
+  }
+  return undefined;
+}
 
 interface AccountResetPasswordModalProps {
   open: boolean;
@@ -30,7 +47,7 @@ interface AccountResetPasswordModalProps {
   onCancel: () => void;
   /**
    * `mode = 'email'` → không truyền mật khẩu (BE sinh tạm + gửi email);
-   * `mode = 'manual'` → truyền mật khẩu đã trim (≥ 8 ký tự).
+   * `mode = 'manual'` → truyền mật khẩu đã trim (≥ 12 ký tự, ≤ 72 byte).
    */
   onConfirm: (mode: PasswordResetMode, newPassword?: string) => void;
 }
@@ -53,7 +70,7 @@ type AccountResetFormValues = {
  * - **Gửi mật khẩu tạm qua email** (mặc định) — admin không thấy/đặt được mật
  *   khẩu người khác; cần mail service (`D-27`) chạy thật thì luồng mới trọn.
  * - **Đặt mật khẩu mới thủ công** — cho trường hợp người dùng không nhận được
- *   email; FE validate ≥ 8 ký tự, BE validate lại là chốt.
+ *   email; FE validate ≥ 12 ký tự / ≤ 72 byte, BE validate lại là chốt.
  */
 export default function AccountResetPasswordModal({
   open,
@@ -70,10 +87,7 @@ export default function AccountResetPasswordModal({
       // (validator của `useFormState` nhận cả `values`).
       newPassword: (value, values) => {
         if (values.resetMode !== 'manual') return undefined;
-        if (!value.trim()) return MSG_ACC.PASSWORD_REQUIRED;
-        return value.trim().length >= MIN_PASSWORD_LENGTH
-          ? undefined
-          : MSG_ACC.PASSWORD_TOO_SHORT;
+        return validateNewPassword(value);
       },
     },
   );
@@ -126,7 +140,7 @@ export default function AccountResetPasswordModal({
             <RadioListItem label={MSG_ACC.RESET_MANUAL} value="manual" />
           </RadioList>
 
-          {/* Chỉ hiện ô mật khẩu khi chọn chế độ thủ công — validate ≥ 8 ký tự. */}
+          {/* Chỉ hiện ô mật khẩu khi chọn chế độ thủ công — validate 12..72 byte. */}
           {form.values.resetMode === 'manual' ? (
             <TextInput
               type="password"

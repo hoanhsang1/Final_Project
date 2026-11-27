@@ -1,7 +1,8 @@
 import { useLocation } from 'react-router-dom';
 import ConsoleShell from '../ConsoleShell/ConsoleShell';
 import { MSG_ADM } from '../../features/admin/adminMessages';
-import { activeMenuKey, CONSOLE_MENU } from '../../features/admin/consoleMenu';
+import { activeMenuKey, consoleMenu } from '../../features/admin/consoleMenu';
+import { useModuleStatus } from '../../features/modules/useModuleStatus';
 
 /**
  * Khung console quản trị hệ thống — `UC-ADMIN-01`.
@@ -11,6 +12,9 @@ import { activeMenuKey, CONSOLE_MENU } from '../../features/admin/consoleMenu';
  */
 export default function AdminConsoleLayout() {
   const location = useLocation();
+  const moduleStatus = useModuleStatus();
+  // Loading / lỗi fetch → KHÔNG truyền map: filterMenuByModuleStatus giữ nguyên menu.
+  const statuses = moduleStatus.isError || !moduleStatus.data ? undefined : moduleStatus.data;
 
   return (
     <ConsoleShell
@@ -18,8 +22,8 @@ export default function AdminConsoleLayout() {
       menuAriaLabel={MSG_ADM.MENU_ARIA}
       openMenuLabel={MSG_ADM.OPEN_MENU}
       logoutLabel={MSG_ADM.LOGOUT}
-      items={CONSOLE_MENU}
-      selectedKey={activeMenuKey(location.pathname, location.search)}
+      items={consoleMenu(statuses)}
+      selectedKey={activeMenuKey(location.pathname, location.search, statuses)}
     />
   );
 }

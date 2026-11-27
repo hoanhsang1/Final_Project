@@ -1,0 +1,193 @@
+/*
+ * Lịch tuần gọn 3 buổi: bổ sung cho Astryx (Astryx không có lưới buổi).
+ * Màu ô do `pastelFor()` trong weeklyGrid.ts cấp qua inline style nên không
+ * nhân bản ở đây; màu đỏ chỉ dùng cho dải "Đã hủy", không dùng cho trạng thái khác.
+ * Font chữ kế thừa từ theme Astryx — không cài font mới.
+ * Không đặt rule cho class `.astryx-*` của thư viện.
+ */
+
+.compact-grid {
+  --compact-grid-background: #F9FAFB;
+  --compact-grid-text: #0F1729;
+  --compact-grid-muted: #6B7280;
+  --compact-grid-line: #E5E7EB;
+  --compact-grid-accent: #2461DB;
+  --compact-grid-cancelled: #B42318;
+
+  color: var(--compact-grid-text);
+  background: var(--compact-grid-background);
+}
+
+.compact-grid__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block-end: 8px;
+}
+
+.compact-grid__nav {
+  padding: 4px 10px;
+  border: 1px solid var(--compact-grid-line);
+  border-radius: 4px;
+  background: var(--compact-grid-background);
+  color: var(--compact-grid-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.compact-grid__nav:hover {
+  border-color: var(--compact-grid-accent);
+  color: var(--compact-grid-accent);
+}
+
+.compact-grid__week-label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compact-grid__nav:focus-visible,
+.compact-session:focus-visible {
+  outline: 2px solid var(--compact-grid-accent);
+  outline-offset: 2px;
+}
+
+/* Màn hẹp: giữ chiều rộng tối thiểu của lưới và cho cuộn ngang. */
+.compact-grid__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.compact-grid__table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.compact-grid__corner,
+.compact-grid__buoi-head {
+  width: 72px;
+}
+
+.compact-grid__day-head {
+  padding: 4px;
+  border-inline-start: 1px solid var(--compact-grid-line);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.compact-grid__date {
+  display: block;
+  color: var(--compact-grid-muted);
+  font-weight: 500;
+}
+
+.compact-grid__buoi-head {
+  padding: 4px;
+  border-block-start: 1px solid var(--compact-grid-line);
+  color: var(--compact-grid-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: start;
+  vertical-align: top;
+}
+
+.compact-grid__cell {
+  /* Dải "Đã hủy" xoay nghiêng nên phải cắt phần tràn ra ngoài ô. */
+  overflow: hidden;
+  padding: 4px;
+  border-block-start: 1px solid var(--compact-grid-line);
+  border-inline-start: 1px solid var(--compact-grid-line);
+  vertical-align: top;
+}
+
+.compact-grid__empty {
+  color: var(--compact-grid-muted);
+  font-size: 12px;
+  opacity: 0.45;
+}
+
+.compact-session {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  flex-direction: column;
+  gap: 1px;
+  margin-block-end: 4px;
+  padding: 3px 5px;
+  border: 1px solid rgb(15 23 41 / 12%);
+  border-radius: 4px;
+  background-color: var(--compact-grid-background);
+  color: var(--compact-grid-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: start;
+  cursor: pointer;
+}
+
+.compact-session:last-child {
+  margin-block-end: 0;
+}
+
+.compact-session:hover {
+  filter: brightness(0.97);
+}
+
+.compact-session__time,
+.compact-session__title,
+.compact-session__teacher {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-session__time {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.compact-session__title {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.compact-session__teacher {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Buổi đã hủy: nội dung mờ + gạch ngang, kèm dải đỏ chéo. */
+.compact-session--cancelled .compact-session__time,
+.compact-session--cancelled .compact-session__title,
+.compact-session--cancelled .compact-session__teacher {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.compact-session__ribbon {
+  position: absolute;
+  top: 50%;
+  right: -20%;
+  left: -20%;
+  height: 16px;
+  background: var(--compact-grid-cancelled);
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  transform: translateY(-50%) rotate(-28deg);
+  pointer-events: none;
+}
+
+.compact-grid--empty {
+  padding: 16px;
+}

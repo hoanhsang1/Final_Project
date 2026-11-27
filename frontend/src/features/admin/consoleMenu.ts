@@ -1,4 +1,5 @@
 import { createElement, type ReactNode, type SVGProps } from 'react';
+import type { ModuleStatusMap } from '../modules/moduleApi';
 import { MSG_ADM } from './adminMessages';
 
 type SvgChild = readonly [tag: 'rect' | 'path' | 'circle', props: Record<string, string | number>];
@@ -95,16 +96,43 @@ export interface ConsoleMenuItem {
    * sẽ khớp cả mục "Tổ chức chờ duyệt" lẫn "Tất cả tổ chức" và cả hai đều được chọn.
    */
   exact?: boolean;
+  /**
+   * Mục này thuộc module tổ chức nào — dùng để lọc menu theo trạng thái module.
+   * Không khai báo → mục luôn hiện (vd Tổng quan, Nhật ký hệ thống).
+   */
+  moduleCode?: string;
 }
 
 export const CONSOLE_MENU: readonly ConsoleMenuItem[] = [
   { key: 'tong-quan', label: MSG_ADM.MENU_OVERVIEW, path: '/quan-tri', exact: true, icon: createElement(DashboardIcon) },
-  { key: 'to-chuc', label: 'Tổ chức chờ duyệt', path: '/quan-tri/to-chuc', exact: true, icon: createElement(AuditIcon) },
-  { key: 'to-chuc-tat-ca', label: MSG_ADM.MENU_ORG_ALL, path: '/quan-tri/to-chuc/tat-ca', exact: true, icon: createElement(BankIcon) },
-  { key: 'module', label: MSG_ADM.MENU_MODULES, path: '/quan-tri/module', icon: createElement(ModulesIcon) },
-  { key: 'tai-khoan', label: MSG_ADM.MENU_ACCOUNTS, path: '/quan-tri/tai-khoan', icon: createElement(AccountsIcon) },
+  { key: 'to-chuc', label: 'Tổ chức chờ duyệt', path: '/quan-tri/to-chuc', exact: true, icon: createElement(AuditIcon), moduleCode: 'ORGANIZATION_APPROVAL_MANAGEMENT' },
+  { key: 'to-chuc-tat-ca', label: MSG_ADM.MENU_ORG_ALL, path: '/quan-tri/to-chuc/tat-ca', exact: true, icon: createElement(BankIcon), moduleCode: 'ORGANIZATION_MANAGEMENT' },
+  { key: 'module', label: MSG_ADM.MENU_MODULES, path: '/quan-tri/module', icon: createElement(ModulesIcon), moduleCode: 'MODULE_MANAGEMENT' },
+  { key: 'tai-khoan', label: MSG_ADM.MENU_ACCOUNTS, path: '/quan-tri/tai-khoan', icon: createElement(AccountsIcon), moduleCode: 'ACCOUNT_MANAGEMENT' },
   { key: 'nhat-ky', label: MSG_ADM.MENU_AUDIT, path: '/quan-tri/nhat-ky', icon: createElement(AuditLogIcon) },
 ];
+
+/**
+ * Lọc menu theo trạng thái module của tổ chức hiện tại.
+ *
+ * `statuses` là map `{ code: status }` từ `useModuleStatus()`. Chỉ mục có
+ * `moduleCode` bị `not_registered` mới bị ẩn — `disabled`/`locked` vẫn hiện để
+ * người dùng còn biết module đó tồn tại. Không truyền map → giữ nguyên menu.
+ */
+export function filterMenuByModuleStatus<T extends ConsoleMenuItem>(
+  items: readonly T[],
+  statuses?: ModuleStatusMap,
+): readonly T[] {
+  if (!statuses) {
+    return items;
+  }
+  return items.filter((item) => !item.moduleCode || statuses[item.moduleCode] !== 'not_registered');
+}
+
+/** `CONSOLE_MENU` sau khi áp dụng bộ lọc status tuỳ chọn. */
+export function consoleMenu(statuses?: ModuleStatusMap): readonly ConsoleMenuItem[] {
+  return filterMenuByModuleStatus(CONSOLE_MENU, statuses);
+}
 
 /**
  * Tìm mục menu đang được chọn.
@@ -113,9 +141,21 @@ export const CONSOLE_MENU: readonly ConsoleMenuItem[] = [
  * query param `?from=` (giá trị là **khóa menu**) để quay về đúng nhóm: 
  * `?from=to-chuc-tat-ca` → chọn mục "Tất cả tổ chức", không có `from` → chọn
  * "Tổ chức chờ duyệt". Không có `from` → không chọn mục nào (tới bằng URL trực tiếp).
+ *
+ * Tham số `statuses` cho phép highlight trên đúng menu đã lọc theo module.
  */
-export function activeMenuKey(pathname: string, search?: string): string | null {
-  for (const item of CONSOLE_MENU) {
+export function activeMenuKey(
+  pathname: string,
+  search?: string,
+  statuses?: ModuleStatusMap,
+): string | null {
+  // Màn module của 1 tổ chức là con của `/quan-tri/to-chuc/:id` nhưng thuộc
+  // nhóm "Danh mục module" — phải xét TRƯỚC regex chi tiết tổ chức bên dưới.
+  if (/^\/quan-tri\/to-chuc\/[^/]+\/module$/.test(pathname)) {
+    return 'module';
+  }
+
+  for (const item of consoleMenu(statuses)) {
     const matched = item.exact ? pathname === item.path : pathname.startsWith(item.path);
     if (matched) {
       return item.key;

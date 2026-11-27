@@ -1,5 +1,9 @@
 import { apiClient, REFRESH_TOKEN_KEY } from '../../lib/api';
+import { ApiError, getApiCode } from '../platform/errorCodes';
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from './types';
+
+// Re-export để caller luồng đăng nhập có thể bắt đúng class mà không cần biết nơi định nghĩa.
+export { ApiError };
 
 /**
  * Gọi API đăng nhập thật.
@@ -14,15 +18,19 @@ import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } f
  * do GlobalExceptionHandler của backend chưa bắt MethodArgumentNotValidException.
  * Đã báo Sang. FE tự validate trước khi gửi nên bình thường sẽ không chạm nhánh này.
  *
- * Ném lỗi kèm message thân thiện để UI hiện ngay cho người dùng (NFR-REL-001:
- * khi lỗi thì KHÔNG được hiện thành công).
+ * Ném `ApiError` giữ `code`/`status` (vd `LOGIN_RATE_LIMITED`/429) để luồng sau
+ * xử lý tiếp, nhưng message vẫn là copy tiếng Việt của `getAuthErrorMessage`
+ * (NFR-REL-001: khi lỗi thì KHÔNG được hiện thành công).
  */
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   try {
     const { data } = await apiClient.post<LoginResponse>('/api/v1/auth/login', request);
     return data;
   } catch (error) {
-    throw new Error(getAuthErrorMessage(error));
+    throw new ApiError(getAuthErrorMessage(error), {
+      code: getApiCode(error),
+      status: httpStatusOf(error) ?? undefined,
+    });
   }
 }
 
@@ -241,6 +249,30 @@ export async function resetPassword(token: string, newPassword: string): Promise
     });
   } catch (error) {
     throw toPasswordResetError(error);
+  }
+}
+
+/**
+ * Đổi mật khẩu khi đang đăng nhập (bắt buộc sau khi dùng mật khẩu tạm) —
+ * `POST /api/v1/auth/change-password`, body `{ currentPassword, newPassword }`.
+ *
+ * - 204 → không có body, caller xoá session và cho đăng nhập lại bằng mật khẩu mới.
+ * - 403 `PASSWORD_CHANGE_REQUIRED` (code Chuỗi) → FE giữ nguyên flag/ep chế độ đổi mật khẩu.
+ * - `ApiError` giữ `code`/`status` để các luồng khác (SessionWatcher, LoginPage)
+ *   nhận diện mà không phải parse message.
+ * - Lỗi 429 (vd đổi mật khẩu quá nhiều lần) cũng giữ `code` để UI hiện copy riêng.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  try {
+    await apiClient.post('/api/v1/auth/change-password', {
+      currentPassword,
+      newPassword,
+    });
+  } catch (error) {
+    throw new ApiError(getAuthErrorMessage(error), {
+      code: getApiCode(error),
+      status: httpStatusOf(error) ?? undefined,
+    });
   }
 }
 

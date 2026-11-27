@@ -31,7 +31,7 @@ import EmptyState from '../../components/EmptyState/EmptyState';
 import ForbiddenNotice from '../../components/ForbiddenNotice/ForbiddenNotice';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
-import { canViewClasses, hasPermission, isOwnerRole } from '../../features/auth/permissions';
+import { canViewClasses, hasAnyPermissionWithAliases, isOwnerRole } from '../../features/auth/permissions';
 import {
   CLASS_STATUS_BADGE,
   CLASS_STATUS_LABEL,
@@ -129,11 +129,14 @@ export default function ClassDetailPage() {
   const isOwner = isOwnerRole(backendRoles);
   const canView = canViewClasses(isOwner, permissions);
 
-  const canAssign = isOwner || hasPermission(permissions, 'CLASS_ASSIGN_TEACHER');
-  const canCancel = isOwner || hasPermission(permissions, 'CLASS_CANCEL');
-  const canRequestClose = isOwner || hasPermission(permissions, 'CLASS_CLOSE_REQUEST');
-  const canApproveClose = isOwner || hasPermission(permissions, 'CLASS_CLOSE_APPROVE');
-  const canReopen = isOwner || hasPermission(permissions, 'CLASS_REOPEN');
+  const canAssign =
+    isOwner || hasAnyPermissionWithAliases(permissions, ['CLASS_ASSIGN_TEACHER']);
+  const canCancel = isOwner || hasAnyPermissionWithAliases(permissions, ['CLASS_CANCEL']);
+  const canRequestClose =
+    isOwner || hasAnyPermissionWithAliases(permissions, ['CLASS_CLOSE_REQUEST']);
+  const canApproveClose =
+    isOwner || hasAnyPermissionWithAliases(permissions, ['CLASS_CLOSE_APPROVE']);
+  const canReopen = isOwner || hasAnyPermissionWithAliases(permissions, ['CLASS_REOPEN']);
 
   const [activeTab, setActiveTab] = useState('info');
   const [modal, setModal] = useState<ModalKind>(null);

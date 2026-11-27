@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { beforeEach, vi } from 'vitest';
 import { ROLES } from '../../features/auth/roles';
+import { ApiError } from '../../features/platform/errorCodes';
 import { routes } from '../../router';
 import { useAuthStore } from '../../stores/authStore';
 
 /** Mock tầng gọi API để test độc lập, không cần backend chạy. */
 vi.mock('../../features/auth/authApi', () => ({
   login: vi.fn(),
+  changePassword: vi.fn(),
 }));
 const { login } = await import('../../features/auth/authApi');
 const mockLogin = vi.mocked(login);
@@ -29,6 +31,8 @@ beforeEach(() => {
     username: null,
     role: null,
     backendRoles: [],
+    permissions: [],
+    mustChangePassword: false,
     isAuthenticated: false,
   });
 });
@@ -110,6 +114,7 @@ it('nhập đúng rồi bấm Đăng nhập thì gọi API và vào trang theo v
   expect(mockLogin).toHaveBeenCalledWith({ username: 'gv', password: '123456' }, expect.anything());
   expect(router.state.location.pathname).toBe('/xem-thu/teacher');
   expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  expect(useAuthStore.getState().mustChangePassword).toBe(false);
 });
 
 it('nhập sai mật khẩu thì hiện lỗi, KHÔNG điều hướng (NFR-REL-001)', async () => {
@@ -164,4 +169,110 @@ it('OWNER đăng nhập thành công thì vào thẳng /to-chuc', async () => {
     await screen.findByRole('heading', { name: 'Phòng ban' }, { timeout: 3000 }),
   ).toBeInTheDocument();
   expect(useAuthStore.getState().backendRoles).toContain('OWNER');
+});
+
+it('429 LOGIN_RATE_LIMITED hiện thông báo riêng, KHÔNG hiện "sai mật khẩu"', async () => {
+  mockLogin.mockRejectedValue(
+    new ApiError('Sai tên đăng nhập hoặc mật khẩu.', {
+      code: 'LOGIN_RATE_LIMITED',
+      status: 429,
+    }),
+  );
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'gv');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), 'sai');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  expect(await screen.findByText(/quá nhiều lần/i)).toBeInTheDocument();
+  expect(screen.queryByText('Sai tên đăng nhập hoặc mật khẩu.')).not.toBeInTheDocument();
+  expect(router.state.location.pathname).toBe('/dang-nhap');
+  expect(useAuthStore.getState().isAuthenticated).toBe(false);
+});
+
+it('JWT có mustChangePassword:true → mở modal bắt đổi, KHÔNG điều hướng', async () => {
+  mockLogin.mockResolvedValue({
+    accessToken: fakeJwt({
+      userId: 'u4',
+      username: 'temp',
+      roles: ['TEACHER'],
+      mustChangePassword: true,
+    }),
+    refreshToken: 'r4',
+    tokenType: 'Bearer',
+    expiresIn: 900,
+  });
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'temp');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), 'MatKhauTam123');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  await waitFor(() => expect(useAuthStore.getState().mustChangePassword).toBe(true));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe('/dang-nhap');
+});
+
+it('FACILITY_STAFF có quyền CSVC đăng nhập thì vào /co-so-vat-chat', async () => {
+  mockLogin.mockResolvedValue({
+    accessToken: fakeJwt({
+      userId: 'u4',
+      username: 'nv',
+      roles: ['FACILITY_STAFF'],
+      permissions: ['FACILITY_READ', 'INCIDENT_CREATE'],
+    }),
+    refreshToken: 'r4',
+    tokenType: 'Bearer',
+    expiresIn: 900,
+  });
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'nv');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), '123456');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/co-so-vat-chat'));
+  expect(useAuthStore.getState().isAuthenticated).toBe(true);
+});
+
+it('ACADEMIC_STAFF có CLASS_READ đăng nhập thì vào khu vực /dao-tao', async () => {
+  mockLogin.mockResolvedValue({
+    accessToken: fakeJwt({
+      userId: 'u5',
+      username: 'gv',
+      roles: ['ACADEMIC_STAFF'],
+      permissions: ['CLASS_READ'],
+    }),
+    refreshToken: 'r5',
+    tokenType: 'Bearer',
+    expiresIn: 900,
+  });
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'gv');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), '123456');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  // Index /dao-tao tiếp tục đưa tới màn đầu tiên của menu thực tế (`lop-hoc`),
+  // nên chờ đích đã resolved thay vì chờ `/dao-tao` thoáng qua.
+  await waitFor(() => expect(router.state.location.pathname).toBe('/dao-tao/lop-hoc'));
+  expect(router.state.location.pathname).toMatch(/^\/dao-tao(?:\/|$)/);
+});
+
+it('API trả code PASSWORD_CHANGE_REQUIRED → mở modal bắt đổi', async () => {
+  mockLogin.mockRejectedValue(
+    new ApiError('Yêu cầu đổi mật khẩu.', {
+      code: 'PASSWORD_CHANGE_REQUIRED',
+      status: 403,
+    }),
+  );
+  const router = renderLogin();
+
+  await userEvent.type(screen.getByLabelText('Tên đăng nhập'), 'temp');
+  await userEvent.type(screen.getByLabelText('Mật khẩu'), 'MatKhauTam123');
+  await userEvent.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  expect(useAuthStore.getState().mustChangePassword).toBe(true);
+  expect(router.state.location.pathname).toBe('/dang-nhap');
 });

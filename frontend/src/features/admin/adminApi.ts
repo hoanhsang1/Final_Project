@@ -328,15 +328,27 @@ export async function updateAccountStatus(
   }
 }
 
+/** Kết quả đặt lại mật khẩu: BE trả body PHẲNG, không bọc ApiResponse. */
+export interface ResetAccountPasswordResult {
+  /** Có khi BE sinh mật khẩu tạm và trả về cho admin copy cho người dùng. */
+  temporaryPassword?: string;
+}
+
 /**
  * Tạo tài khoản — `POST /api/v1/accounts` (`D-29`).
  *
  * `username` + mật khẩu tạm do **BE sinh** (gửi qua email). Thành công 201
- * trả về item vừa tạo; 409 khi email/username đã tồn tại.
+ * trả về item vừa tạo kèm `temporaryPassword` để admin có thể copy/hiện cho
+ * người dùng trong phiên này; 409 khi email/username đã tồn tại.
  */
-export async function createAccount(payload: AccountCreatePayload): Promise<AccountItem> {
+export async function createAccount(
+  payload: AccountCreatePayload,
+): Promise<AccountItem & { temporaryPassword: string }> {
   try {
-    const { data } = await apiClient.post<AccountItem>('/api/v1/accounts', payload);
+    const { data } = await apiClient.post<AccountItem & { temporaryPassword: string }>(
+      '/api/v1/accounts',
+      payload,
+    );
     return data;
   } catch (error) {
     throw toAdminError(error);
@@ -360,19 +372,26 @@ export async function updateAccountRole(accountId: string, role: string): Promis
 /**
  * Đặt lại mật khẩu — `POST /api/v1/accounts/{id}/reset-password` (`D-31`).
  *
- * - Không truyền `newPassword` → BE sinh mật khẩu tạm + gửi email người dùng.
- * - Truyền `newPassword` (≥ 8 ký tự) → BE đặt thẳng mật khẩu mới.
+ * - Không truyền `newPassword` → BE sinh mật khẩu tạm + gửi email người dùng,
+ *   trả HTTP 200 với body PHẲNG `{ temporaryPassword }` để admin copy ngay.
+ * - Truyền `newPassword` (≥ 12 ký tự, ≤ 72 byte UTF-8) → BE đặt thẳng mật khẩu
+ *   mới; body trả về có thể rỗng (`{}`).
  *
- * Thành công 204.
+ * ⚠️ Request dùng `new_password` (snake_case) theo contract BE, response dùng
+ * `temporaryPassword` (camelCase). Không đọc `data.data` — BE không bọc envelope.
  */
 export async function resetAccountPassword(
   accountId: string,
   newPassword?: string,
-): Promise<void> {
+): Promise<ResetAccountPasswordResult> {
   try {
-    await apiClient.post(`/api/v1/accounts/${accountId}/reset-password`, {
-      ...(newPassword ? { new_password: newPassword } : {}),
-    });
+    const { data } = await apiClient.post<ResetAccountPasswordResult>(
+      `/api/v1/accounts/${accountId}/reset-password`,
+      {
+        ...(newPassword ? { new_password: newPassword } : {}),
+      },
+    );
+    return data ?? {};
   } catch (error) {
     throw toAdminError(error);
   }

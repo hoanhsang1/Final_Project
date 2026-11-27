@@ -13,6 +13,14 @@ export interface JwtClaims {
   roles?: unknown;
   /** Quyền (permissions) — dùng cho phân quyền nghiệp vụ Sprint 4+. */
   permissions?: unknown;
+  /** Cờ backend bắt đổi mật khẩu tạm (claim JWT, KHÔNG nằm trong LoginResponse). */
+  mustChangePassword?: boolean;
+  /** Phạm vi quyền theo phòng ban — dạng map `{ [code]: string[] }`. */
+  permissionScopes?: unknown;
+  /** Quyền được ủy quyền còn hiệu lực. */
+  delegatedPermissions?: unknown;
+  /** Profile quyền đang stale → cần refetch/đăng nhập lại. */
+  permissionsStale?: boolean;
   /** Thời điểm hết hạn (giây kể từ epoch). */
   exp?: number;
 }
@@ -47,6 +55,18 @@ export function normalizeRoles(roles: unknown): string[] {
 export function normalizePermissions(permissions: unknown): string[] {
   if (!Array.isArray(permissions)) return [];
   return permissions.filter((p): p is string => typeof p === 'string');
+}
+
+/**
+ * Chuẩn hoá claim boolean (`mustChangePassword`, `permissionsStale`) về `boolean`.
+ *
+ * Backend ghi boolean, nhưng token cũ/JSON có thể mang chuỗi `"true"`.
+ * Mọi giá trị khác → `false` để không mở nhầm guard đổi mật khẩu.
+ */
+export function normalizeBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.trim().toLowerCase() === 'true';
+  return false;
 }
 
 /**

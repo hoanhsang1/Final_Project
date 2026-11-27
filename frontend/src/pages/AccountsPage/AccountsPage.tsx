@@ -21,6 +21,7 @@ import AccountCreateModal from '../../components/AccountCreateModal/AccountCreat
 import EmptyState from '../../components/EmptyState/EmptyState';
 import PageHeader from '../../components/PageHeader/PageHeader';
 import PageLoading from '../../components/PageLoading/PageLoading';
+import TempPasswordModal from '../../components/TempPasswordModal/TempPasswordModal';
 import {
   AdminApiError,
   createAccount,
@@ -119,13 +120,24 @@ export default function AccountsPage() {
   // Modal tạo tài khoản (`D-29`) — lỗi hiện TRONG modal, không toast (NFR-REL-001).
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  // Mật khẩu tạm chỉ hiện MỘT LẦN sau khi tạo (TempPasswordModal, display-only).
+  const [tempCredential, setTempCredential] = useState<{ username: string; password: string } | null>(
+    null,
+  );
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
     mutationFn: (payload: AccountCreatePayload) => createAccount(payload),
-    onSuccess: () => {
+    onSuccess: (created) => {
       notify.success(MSG_ACC.CREATE_SUCCESS);
       setCreateOpen(false);
+      // BE trả `temporaryPassword` trong body 201 → copy/hiện ngay cho admin.
+      if (created?.temporaryPassword) {
+        setTempCredential({
+          username: created.username,
+          password: created.temporaryPassword,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       // Tạo tài khoản cũng ghi nhật ký hệ thống (`D-22`).
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
@@ -417,6 +429,15 @@ export default function AccountsPage() {
         onCancel={() => setCreateOpen(false)}
         onConfirm={(payload) => createMutation.mutate(payload)}
       />
+
+      {tempCredential ? (
+        <TempPasswordModal
+          open
+          username={tempCredential.username}
+          password={tempCredential.password}
+          onClose={() => setTempCredential(null)}
+        />
+      ) : null}
     </Stack>
   );
 }

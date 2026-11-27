@@ -19,6 +19,12 @@ import type {
   SpecialtyMismatchClass,
   SpecialtyMismatchPayload,
   StatusLogItem,
+  StudentClass,
+  StudentCreatePayload,
+  StudentListItem,
+  StudentListQuery,
+  StudentUpdatePayload,
+  TeacherClass,
   TeacherCreatePayload,
   TeacherCreatedResponse,
   TeacherDetail,
@@ -75,6 +81,7 @@ const CODE_MESSAGES: Record<string, string> = {
   SELF_APPROVAL_NOT_ALLOWED: 'Bạn không thể tự duyệt yêu cầu của mình.',
   TEACHER_NOT_FOUND: 'Không tìm thấy giáo viên.',
   CLASS_NOT_FOUND: 'Không tìm thấy lớp học.',
+  STUDENT_NOT_FOUND: 'Không tìm thấy học sinh.',
   DEPARTMENT_NOT_FOUND: 'Không tìm thấy phòng ban.',
   POSITION_NOT_FOUND: 'Không tìm thấy chức vụ.',
   EMAIL_EXISTS: 'Email đã được dùng bởi nhân sự khác.',
@@ -163,7 +170,8 @@ export function isNotFoundError(error: unknown): boolean {
   return (
     error.status === 404 ||
     error.code === 'TEACHER_NOT_FOUND' ||
-    error.code === 'CLASS_NOT_FOUND'
+    error.code === 'CLASS_NOT_FOUND' ||
+    error.code === 'STUDENT_NOT_FOUND'
   );
 }
 
@@ -255,6 +263,14 @@ export const fetchTeachers = (query: TeacherListQuery = {}) =>
 export const fetchTeacherDetail = (userId: string) =>
   request(() => apiClient.get<TeacherDetail>(`/api/teachers/${userId}`)).then(normalizeTeacherDetail);
 
+/** Endpoint /me — trả nguyên payload, không tính lại classCount/classLabel. */
+export const fetchTeacherSelf = (): Promise<TeacherDetail> =>
+  request(() => apiClient.get<TeacherDetail>('/api/teachers/me'));
+
+/** Endpoint /me/classes — BE trả mảng thuần, không chuẩn hoá phân trang. */
+export const fetchTeacherSelfClasses = (): Promise<TeacherClass[]> =>
+  request(() => apiClient.get<TeacherClass[]>('/api/teachers/me/classes'));
+
 export const createTeacher = (payload: TeacherCreatePayload) =>
   request(() => apiClient.post<TeacherCreatedResponse>('/api/teachers', payload));
 
@@ -313,6 +329,14 @@ export const fetchClasses = (query: ClassListQuery = {}) =>
 export const fetchClassDetail = (classId: string) =>
   request(() => apiClient.get<ClassDetail>(`/api/classes/${classId}`));
 
+/** Học sinh trong lớp của chính giáo viên — `classId` phải được mã hoá. */
+export const fetchMyClassStudents = (classId: string): Promise<StudentListItem[]> =>
+  request(() =>
+    apiClient.get<StudentListItem[]>(
+      `/api/classes/me/${encodeURIComponent(classId)}/students`,
+    ),
+  );
+
 export const assignTeacher = (classId: string, payload: AssignTeacherPayload) =>
   request(() => apiClient.put<ClassDetail>(`/api/classes/${classId}/teacher`, payload));
 
@@ -340,3 +364,77 @@ export const fetchCloseEvents = (classId: string) =>
   request(() => apiClient.get<CloseEventItem[]>(`/api/classes/${classId}/close-events`)).then(
     (items) => (items ?? []).map(normalizeCloseEvent),
   );
+
+/* ── Học sinh ──────────────────────────────────────────────────────────── */
+
+/**
+ * Shape `StudentResponse` của PeopleService — chỉ khai báo field FE dùng.
+ *
+ * Danh sách trả về đúng shape này (BE map `Map.of("items", List<StudentResponse>)`),
+ * nhưng `StudentListItem` bỏ `orgId`/`createdBy`; `fetchStudent`/`createStudent`/
+ * `updateStudent` map qua `toStudentListItem` để UI chỉ thấy một kiểu.
+ */
+interface StudentApiResponse {
+  id: string;
+  studentCode: string;
+  fullName: string;
+  dateOfBirth?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status: StudentListItem['status'];
+  classId?: string | null;
+  classCode?: string | null;
+  className?: string | null;
+  accountUsername?: string | null;
+  accountCreatedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toStudentListItem(raw: StudentApiResponse): StudentListItem {
+  return {
+    id: raw.id,
+    studentCode: raw.studentCode,
+    fullName: raw.fullName,
+    dateOfBirth: raw.dateOfBirth ?? null,
+    email: raw.email ?? null,
+    phone: raw.phone ?? null,
+    status: raw.status,
+    classId: raw.classId ?? null,
+    classCode: raw.classCode ?? null,
+    className: raw.className ?? null,
+    accountUsername: raw.accountUsername ?? null,
+    accountCreatedAt: raw.accountCreatedAt ?? null,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+export const fetchStudents = (query: StudentListQuery) =>
+  request(() => apiClient.get('/api/students', { params: query })).then(
+    normalizePaged<StudentListItem>,
+  );
+
+export const fetchStudent = (id: string) =>
+  request(() => apiClient.get<StudentApiResponse>(`/api/students/${id}`)).then(toStudentListItem);
+
+/** Endpoint /me — trả nguyên `StudentResponse` (kể cả orgId/createdBy). */
+export const fetchStudentSelf = (): Promise<StudentListItem> =>
+  request(() => apiClient.get<StudentListItem>('/api/students/me'));
+
+/** Endpoint /me/classes — BE trả mảng thuần, không chuẩn hoá phân trang. */
+export const fetchStudentSelfClasses = (): Promise<StudentClass[]> =>
+  request(() => apiClient.get<StudentClass[]>('/api/students/me/classes'));
+
+export const createStudent = (payload: StudentCreatePayload) =>
+  request(() => apiClient.post<StudentApiResponse>('/api/students', payload)).then(
+    toStudentListItem,
+  );
+
+export const updateStudent = (id: string, payload: StudentUpdatePayload) =>
+  request(() => apiClient.put<StudentApiResponse>(`/api/students/${id}`, payload)).then(
+    toStudentListItem,
+  );
+
+export const deleteStudent = (id: string): Promise<void> =>
+  request(() => apiClient.delete(`/api/students/${id}`)).then(() => undefined);

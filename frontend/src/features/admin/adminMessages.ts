@@ -359,8 +359,10 @@ export const MSG_ACC = {
   RESET_MANUAL: 'Đặt mật khẩu mới thủ công',
   /** `MSG-ACC-32` — nhãn ô mật khẩu mới (chế độ thủ công). */
   PASSWORD_LABEL: 'Mật khẩu mới',
-  /** `MSG-ACC-33` — mật khẩu tối thiểu 8 ký tự (`D-31` validate cả FE và BE). */
-  PASSWORD_TOO_SHORT: 'Mật khẩu tối thiểu 8 ký tự',
+  /** `MSG-ACC-33` — mật khẩu tối thiểu 12 ký tự (`D-31` validate cả FE và BE). */
+  PASSWORD_TOO_SHORT: 'Mật khẩu tối thiểu 12 ký tự',
+  /** Mật khẩu tối đa 72 byte UTF-8 (giới hạn của BCrypt). */
+  PASSWORD_TOO_LONG: 'Mật khẩu tối đa 72 byte UTF-8',
   /** `MSG-ACC-34` — toast đã gửi email mật khẩu tạm. */
   RESET_SENT: 'Đã gửi mật khẩu tạm tới email của tài khoản.',
   /** `MSG-ACC-35` — toast đã đặt mật khẩu mới (chế độ thủ công). */

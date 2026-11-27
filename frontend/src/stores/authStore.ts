@@ -6,6 +6,7 @@ import { mapBackendRole } from '../features/auth/backendRoles';
 import {
   decodeJwtClaims,
   isTokenExpired,
+  normalizeBoolean,
   normalizePermissions,
   normalizeRoles,
 } from '../features/auth/jwt';
@@ -34,9 +35,23 @@ interface AuthSession {
   backendRoles: string[];
   /** Quyền (permissions) từ JWT — dùng cho phân quyền nghiệp vụ (Sprint 4+). Chỉ để UX. */
   permissions: string[];
+  /**
+   * Cờ bắt đổi mật khẩu tạm — đọc từ claim JWT `mustChangePassword` HOẶC bật
+   * khi API trả `PASSWORD_CHANGE_REQUIRED`.
+   * `LoginResponse` KHÔNG chứa field này (giữ nguyên 4 field theo contract BE).
+   */
+  mustChangePassword: boolean;
+  /**
+   * Override nội bộ: API đã bật cờ bắt đổi mật khẩu. Giữ tới khi đổi mật khẩu
+   * thành công (modal gọi `clearSession`) hoặc đăng xuất — refresh JWT không
+   * được xoá cờ này dù token mới thiếu claim.
+   */
+  passwordChangeRequiredByApi: boolean;
   isAuthenticated: boolean;
   setSession: (res: LoginResponse) => void;
   clearSession: () => void;
+  /** Bật cờ khi API báo `PASSWORD_CHANGE_REQUIRED` (lỗi 403 từ bất kỳ màn nào). */
+  requirePasswordChange: () => void;
 }
 
 /**
@@ -47,7 +62,14 @@ interface AuthSession {
  */
 function restoreSession(): Pick<
   AuthSession,
-  'userId' | 'username' | 'role' | 'backendRoles' | 'permissions' | 'isAuthenticated'
+  | 'userId'
+  | 'username'
+  | 'role'
+  | 'backendRoles'
+  | 'permissions'
+  | 'mustChangePassword'
+  | 'passwordChangeRequiredByApi'
+  | 'isAuthenticated'
 > {
   const token = getAccessToken();
   if (!token || isTokenExpired(token)) {
@@ -57,6 +79,8 @@ function restoreSession(): Pick<
       role: null,
       backendRoles: [],
       permissions: [],
+      mustChangePassword: false,
+      passwordChangeRequiredByApi: false,
       isAuthenticated: false,
     };
   }
@@ -68,6 +92,8 @@ function restoreSession(): Pick<
     role: mapBackendRole(roles),
     backendRoles: roles,
     permissions: normalizePermissions(payload.permissions),
+    mustChangePassword: normalizeBoolean(payload.mustChangePassword),
+    passwordChangeRequiredByApi: false,
     isAuthenticated: true,
   };
 }
@@ -85,6 +111,9 @@ export const useAuthStore = create<AuthSession>((set) => ({
       role: mapBackendRole(roles),
       backendRoles: roles,
       permissions: normalizePermissions(payload.permissions),
+      mustChangePassword: normalizeBoolean(payload.mustChangePassword),
+      // Đăng nhập lại là phiên mới: không kế thừa override của phiên cũ.
+      passwordChangeRequiredByApi: false,
       isAuthenticated: true,
     });
   },
@@ -96,8 +125,13 @@ export const useAuthStore = create<AuthSession>((set) => ({
       role: null,
       backendRoles: [],
       permissions: [],
+      mustChangePassword: false,
+      passwordChangeRequiredByApi: false,
       isAuthenticated: false,
     });
+  },
+  requirePasswordChange: () => {
+    set({ mustChangePassword: true, passwordChangeRequiredByApi: true });
   },
 }));
 
@@ -115,12 +149,16 @@ export function syncSessionFromToken(): void {
   }
   const payload = decodeJwtClaims(token);
   const roles = normalizeRoles(payload.roles);
+  const passwordChangeRequiredByApi = useAuthStore.getState().passwordChangeRequiredByApi;
   useAuthStore.setState({
     userId: payload.userId ?? null,
     username: payload.username ?? null,
     role: mapBackendRole(roles),
     backendRoles: roles,
     permissions: normalizePermissions(payload.permissions),
+    // JWT mới thiếu claim vẫn không được xoá cờ do API bật (xem AuthSession).
+    mustChangePassword: passwordChangeRequiredByApi || normalizeBoolean(payload.mustChangePassword),
+    passwordChangeRequiredByApi,
     isAuthenticated: true,
   });
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { getAuthErrorMessage, login } from './authApi';
+import { ApiError } from '../platform/errorCodes';
+import { changePassword, getAuthErrorMessage, login } from './authApi';
 
 /**
  * Mock tầng HTTP (axios client) để test riêng logic của authApi,
@@ -60,6 +61,57 @@ describe('login', () => {
     await expect(login({ username: 'x', password: 'y' })).rejects.toThrow(
       'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
     );
+  });
+
+  it('giữ code LOGIN_RATE_LIMITED và status 429 trong ApiError', async () => {
+    mockPost.mockRejectedValue(
+      axiosLikeError(429, {
+        success: false,
+        code: 'LOGIN_RATE_LIMITED',
+        message: 'Too many login attempts',
+        data: null,
+      }),
+    );
+
+    const result = login({ username: 'x', password: 'y' });
+    await expect(result).rejects.toBeInstanceOf(ApiError);
+    await expect(result).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'LOGIN_RATE_LIMITED',
+      status: 429,
+    });
+  });
+});
+
+describe('changePassword', () => {
+  it('POST /auth/change-password với currentPassword/newPassword và 204 không có body', async () => {
+    mockPost.mockResolvedValue({ data: '', status: 204 });
+
+    await expect(
+      changePassword('MatKhauTam123', 'MatKhauMoi456'),
+    ).resolves.toBeUndefined();
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/auth/change-password', {
+      currentPassword: 'MatKhauTam123',
+      newPassword: 'MatKhauMoi456',
+    });
+  });
+
+  it('giữ code PASSWORD_CHANGE_REQUIRED (chuỗi) trong ApiError', async () => {
+    mockPost.mockRejectedValue(
+      axiosLikeError(403, {
+        success: false,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Change your temporary password first',
+        data: null,
+      }),
+    );
+
+    const result = changePassword('tam', 'moi');
+    await expect(result).rejects.toBeInstanceOf(ApiError);
+    await expect(result).rejects.toMatchObject({
+      code: 'PASSWORD_CHANGE_REQUIRED',
+      status: 403,
+    });
   });
 });
 

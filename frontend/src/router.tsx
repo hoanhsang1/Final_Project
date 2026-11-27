@@ -1,12 +1,18 @@
 import { Spinner, Text } from '@astryxdesign/core';
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import type { PropsWithChildren } from 'react';
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import AcademicConsoleLayout from './components/AcademicConsoleLayout/AcademicConsoleLayout';
 import AcademicGuard from './components/AcademicGuard/AcademicGuard';
 import AdminConsoleLayout from './components/AdminConsoleLayout/AdminConsoleLayout';
 import AdminGuard from './components/AdminGuard/AdminGuard';
 import DocumentTitle from './components/DocumentTitle/DocumentTitle';
+import FacilityGuard from './components/FacilityGuard/FacilityGuard';
+import { landingPathFor } from './features/auth/landing';
+import { isOwnerRole, canViewTeachers } from './features/auth/permissions';
+import { getAcademicMenu } from './features/sprint4/academicMenu';
+import { MSG_SELF } from './features/sprint4/sprint4Messages';
 import OwnerConsoleLayout from './components/OwnerConsoleLayout/OwnerConsoleLayout';
 import OwnerGuard from './components/OwnerGuard/OwnerGuard';
 import SessionWatcher from './components/SessionWatcher/SessionWatcher';
@@ -16,6 +22,7 @@ import NotFoundPage from './pages/NotFoundPage/NotFoundPage';
 import RegisterPage from './pages/RegisterPage/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage/ResetPasswordPage';
 import RolePreviewPage from './pages/RolePreviewPage/RolePreviewPage';
+import { useAuthStore } from './stores/authStore';
 
 /**
  * 9 màn console tách chunk riêng bằng `React.lazy`.
@@ -56,6 +63,31 @@ const TeachersPage = lazy(() => import('./pages/TeachersPage/TeachersPage'));
 const TeacherDetailPage = lazy(() => import('./pages/TeacherDetailPage/TeacherDetailPage'));
 const ClassesPage = lazy(() => import('./pages/ClassesPage/ClassesPage'));
 const ClassDetailPage = lazy(() => import('./pages/ClassDetailPage/ClassDetailPage'));
+const StudentsPage = lazy(() => import('./pages/StudentsPage/StudentsPage'));
+const StudentDetailPage = lazy(() => import('./pages/StudentDetailPage/StudentDetailPage'));
+const AdminModulesPage = lazy(() => import('./pages/AdminModulesPage/AdminModulesPage'));
+const OrganizationModulesPage = lazy(
+  () => import('./pages/OrganizationModulesPage/OrganizationModulesPage'),
+);
+const SchedulePage = lazy(() => import('./pages/SchedulePage/SchedulePage'));
+const AutoSchedulePage = lazy(() => import('./pages/AutoSchedulePage/AutoSchedulePage'));
+const ImpactsPage = lazy(() => import('./pages/ImpactsPage/ImpactsPage'));
+const MySchedulePage = lazy(() => import('./pages/MySchedulePage/MySchedulePage'));
+const RoomsPage = lazy(() => import('./pages/RoomsPage/RoomsPage'));
+const FacilityIssuesPage = lazy(() => import('./pages/FacilityIssuesPage/FacilityIssuesPage'));
+const SelfHomePage = lazy(() => import('./pages/SelfHomePage/SelfHomePage'));
+const TeacherSelfPage = lazy(() => import('./pages/TeacherSelfPage/TeacherSelfPage'));
+const TeacherMyClassesPage = lazy(
+  () => import('./pages/TeacherMyClassesPage/TeacherMyClassesPage'),
+);
+const MyClassStudentsPage = lazy(() => import('./pages/MyClassStudentsPage/MyClassStudentsPage'));
+const StudentSelfPage = lazy(() => import('./pages/StudentSelfPage/StudentSelfPage'));
+const StudentMyClassesPage = lazy(
+  () => import('./pages/StudentMyClassesPage/StudentMyClassesPage'),
+);
+const StudentClassDetailPage = lazy(
+  () => import('./pages/StudentClassDetailPage/StudentClassDetailPage'),
+);
 
 /** Màn chờ trong lúc tải chunk của route — chữ kết bằng "…" (quy ước loading). */
 function RouteFallback() {
@@ -77,6 +109,62 @@ function RouteFallback() {
       </Text>
     </div>
   );
+}
+
+/**
+ * Index của `/dao-tao`: `/dao-tao` là cổng, không phải màn — phải tiếp tục tới
+ * màn đầu tiên có trong menu thực tế (STAFF/class.view → `lop-hoc`; self-only →
+ * `trang-ca-nhan`). Giữ ưu tiên `giao-vien` cho OWNER / PEOPLE_VIEW như trước;
+  * SUPER_ADMIN thì đi thẳng `/quan-tri` theo `landingPathFor()`.
+ * Không gọi API — chỉ đọc phiên từ store.
+ */
+function AcademicIndexRedirect() {
+  const backendRoles = useAuthStore((s) => s.backendRoles);
+  const permissions = useAuthStore((s) => s.permissions);
+  const to = landingPathFor({ backendRoles, permissions, role: null });
+
+  if (to === '/dao-tao' || to === '/to-chuc') {
+    if (canViewTeachers(isOwnerRole(backendRoles), permissions)) {
+      return <Navigate to="/dao-tao/giao-vien" replace />;
+    }
+    const firstMenuPath = getAcademicMenu(permissions, false, backendRoles)[0]?.path;
+    return <Navigate to={firstMenuPath ?? '/dang-nhap'} replace />;
+  }
+  return <Navigate to={to ?? '/dang-nhap'} replace />;
+}
+
+/**
+ * `AcademicGuard` nằm trước index nên chặn SUPER_ADMIN (không có permission
+ * đào tạo) bằng màn 403 trước khi `AcademicIndexRedirect` kịp chạy. Gate này
+ * chỉ xử lý riêng đích `/quan-tri` của admin tại đúng `/dao-tao`; mọi path con
+ * khác vẫn đi qua `AcademicGuard` như cũ.
+ */
+function AcademicAdminIndexGate({ children }: PropsWithChildren) {
+  const backendRoles = useAuthStore((s) => s.backendRoles);
+  const permissions = useAuthStore((s) => s.permissions);
+  const { pathname } = useLocation();
+  const to = landingPathFor({ backendRoles, permissions, role: null });
+
+  if (pathname === '/dao-tao' && to === '/quan-tri') {
+    return <Navigate to={to} replace />;
+  }
+  return <>{children}</>;
+}
+
+/** Ánh xạ URL CSVC cũ (dưới `/to-chuc`) sang URL độc lập, giữ nguyên `search`. */
+const LEGACY_FACILITY_PATHS: Readonly<Record<string, string>> = {
+  '/to-chuc/co-so-vat-chat': '/co-so-vat-chat',
+  '/to-chuc/co-so-vat-chat/su-co': '/co-so-vat-chat/su-co',
+};
+
+function LegacyFacilityRedirect() {
+  const { pathname, search } = useLocation();
+  // React Router v6 so khớp route bỏ qua chữ hoa/thường và dấu `/` cuối, nhưng
+  // `pathname` vẫn giữ nguyên chuỗi gốc → chuẩn hoá trước khi tra cứu, đề phòng
+  // `undefined` trong đích chuyển hướng. `/` được giữ lại thay vì rỗng.
+  const normalizedPath = (pathname.replace(/\/+$/, '') || '/').toLowerCase();
+  const to = LEGACY_FACILITY_PATHS[normalizedPath] ?? '/co-so-vat-chat';
+  return <Navigate to={`${to}${search}`} replace />;
 }
 
 /**
@@ -173,7 +261,23 @@ export const routes: RouteObject[] = [
             handle: { title: 'Chi tiết tài khoản' },
           },
           { path: 'nhat-ky', element: <AuditLogPage />, handle: { title: 'Nhật ký hệ thống' } },
+          {
+            // Module của 1 tổ chức — route con của `to-chuc/:id` nhưng thuộc nhóm
+            // module (xem matcher trong `consoleMenu.activeMenuKey`).
+            path: 'to-chuc/:id/module',
+            element: <AdminModulesPage />,
+            handle: { title: 'Module của tổ chức' },
+          },
         ],
+      },
+      {
+        // Giữ liên kết/đánh dấu cũ hoạt động: chuyển sang khu vực CSVC độc lập.
+        path: 'to-chuc/co-so-vat-chat',
+        element: <LegacyFacilityRedirect />,
+      },
+      {
+        path: 'to-chuc/co-so-vat-chat/su-co',
+        element: <LegacyFacilityRedirect />,
       },
       {
         // Khu vực của chủ tổ chức (Sprint 3) — song song với `/quan-tri` nhưng
@@ -196,6 +300,30 @@ export const routes: RouteObject[] = [
             element: <DepartmentDetailPage />,
             handle: { title: 'Chi tiết phòng ban' },
           },
+          {
+            path: 'module',
+            element: <OrganizationModulesPage />,
+            handle: { title: 'Module tổ chức' },
+          },
+        ],
+      },
+      {
+        // Khu vực CSVC độc lập — mở cho OWNER hoặc user có quyền facility/issue
+        // (chung ConsoleShell với Owner nhưng menu riêng và FacilityGuard).
+        path: 'co-so-vat-chat',
+        element: (
+          <FacilityGuard>
+            <OwnerConsoleLayout variant="facility" />
+          </FacilityGuard>
+        ),
+        handle: { title: 'Cơ sở vật chất' },
+        children: [
+          { index: true, element: <RoomsPage />, handle: { title: 'Cơ sở vật chất' } },
+          {
+            path: 'su-co',
+            element: <FacilityIssuesPage />,
+            handle: { title: 'Sự cố thiết bị' },
+          },
         ],
       },
       {
@@ -203,14 +331,37 @@ export const routes: RouteObject[] = [
         // `/to-chuc` Owner Console giữ nguyên.
         path: 'dao-tao',
         element: (
-          <AcademicGuard>
-            <AcademicConsoleLayout />
-          </AcademicGuard>
+          <AcademicAdminIndexGate>
+            <AcademicGuard>
+              <AcademicConsoleLayout />
+            </AcademicGuard>
+          </AcademicAdminIndexGate>
         ),
         handle: { title: 'Đào tạo' },
         children: [
-          { index: true, element: <Navigate to="giao-vien" replace /> },
+          { index: true, element: <AcademicIndexRedirect /> },
+          {
+            path: 'trang-ca-nhan',
+            element: <SelfHomePage />,
+            handle: { title: MSG_SELF.TITLE_HOME },
+          },
           { path: 'giao-vien', element: <TeachersPage />, handle: { title: 'Giáo viên' } },
+          {
+            // Self phải khai TRƯỚC `/giao-vien/:id` để không bị nuốt như một id.
+            path: 'giao-vien/cua-toi',
+            element: <TeacherSelfPage />,
+            handle: { title: MSG_SELF.PROFILE_TEACHER },
+          },
+          {
+            path: 'lop-hoc-cua-toi',
+            element: <TeacherMyClassesPage />,
+            handle: { title: MSG_SELF.MY_CLASSES },
+          },
+          {
+            path: 'lop-hoc-cua-toi/:id',
+            element: <MyClassStudentsPage />,
+            handle: { title: MSG_SELF.CLASS_STUDENTS },
+          },
           {
             path: 'giao-vien/:id',
             element: <TeacherDetailPage />,
@@ -218,6 +369,45 @@ export const routes: RouteObject[] = [
           },
           { path: 'lop-hoc', element: <ClassesPage />, handle: { title: 'Lớp học' } },
           { path: 'lop-hoc/:id', element: <ClassDetailPage />, handle: { title: 'Chi tiết lớp học' } },
+          { path: 'hoc-sinh', element: <StudentsPage />, handle: { title: 'Học sinh' } },
+          {
+            // Self phải khai TRƯỚC `/hoc-sinh/:id` để không bị nuốt như một id.
+            path: 'hoc-sinh/cua-toi',
+            element: <StudentSelfPage />,
+            handle: { title: MSG_SELF.PROFILE_STUDENT },
+          },
+          {
+            path: 'hoc-sinh/lop-cua-toi',
+            element: <StudentMyClassesPage />,
+            handle: { title: MSG_SELF.MY_CLASSES },
+          },
+          {
+            // Phải khai TRƯỚC `/hoc-sinh/:id` để id không nuốt route chi tiết self.
+            path: 'hoc-sinh/lop-cua-toi/:id',
+            element: <StudentClassDetailPage />,
+            handle: { title: MSG_SELF.CLASS_DETAIL_TITLE },
+          },
+          {
+            path: 'hoc-sinh/:id',
+            element: <StudentDetailPage />,
+            handle: { title: 'Hồ sơ học sinh' },
+          },
+          { path: 'lich', element: <SchedulePage />, handle: { title: 'Lịch đào tạo' } },
+          {
+            path: 'tu-dong-xep-lich',
+            element: <AutoSchedulePage />,
+            handle: { title: 'Tự động xếp lịch' },
+          },
+          {
+            path: 'lich/buoi-bi-anh-huong',
+            element: <ImpactsPage />,
+            handle: { title: 'Buổi bị ảnh hưởng' },
+          },
+          {
+            path: 'lich-cua-toi',
+            element: <MySchedulePage />,
+            handle: { title: 'Lịch cá nhân' },
+          },
         ],
       },
       { path: '*', element: <NotFoundPage />, handle: { title: 'Không tìm thấy trang' } },

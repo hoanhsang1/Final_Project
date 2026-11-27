@@ -147,6 +147,115 @@ export const MSG_CLASS = {
   REOPEN_CONFIRM: 'Mở lại lớp này?',
 } as const;
 
+export const MSG_STUDENT = {
+  TITLE: 'Học sinh',
+  DETAIL_TITLE: 'Hồ sơ học sinh',
+  EMPTY: 'Chưa có học sinh nào.',
+
+  SEARCH: 'Tìm theo mã học sinh hoặc họ tên',
+  STATUS_ALL: 'Tất cả trạng thái',
+  /** Tên cho `nav` phân trang — hai landmark cùng tên là lỗi axe. */
+  PAGINATION_LABEL: 'Phân trang danh sách học sinh',
+
+  CREATE: 'Thêm học sinh',
+  EDIT: 'Sửa hồ sơ',
+  DELETE: 'Xoá',
+  DELETE_CONFIRM: 'Bạn có chắc muốn xoá học sinh này?',
+
+  /** Đơn vị của dòng tổng số — dùng qua `studentTotalLabel(total)`. */
+  TOTAL: 'học sinh',
+  NO_CLASS: 'Chưa ghi danh lớp',
+  NO_ACCOUNT: 'Chưa tạo tài khoản',
+
+  // Hồ sơ
+  BACK: 'Về danh sách',
+  PROFILE: 'Thông tin hồ sơ',
+  CURRENT_CLASS: 'Lớp hiện tại',
+  ACCOUNT: 'Tài khoản',
+  CREATED_AT: 'Ngày tạo hồ sơ',
+  UPDATED_AT: 'Ngày cập nhật hồ sơ',
+} as const;
+
+/** Câu chữ cho các trang self-service của giáo viên / học sinh. */
+export const MSG_SELF = {
+  TITLE_HOME: 'Trang cá nhân',
+  HOME_HINT: 'Xem hồ sơ và lớp học của bạn tại đây.',
+  MY_PROFILE: 'Hồ sơ của tôi',
+  MY_CLASSES: 'Lớp của tôi',
+  CLASS_STUDENTS: 'Học sinh trong lớp',
+  PROFILE_TEACHER: 'Hồ sơ giáo viên của tôi',
+  PROFILE_STUDENT: 'Hồ sơ học sinh của tôi',
+  CLASS_DETAIL_TITLE: 'Chi tiết lớp của tôi',
+  CLASS_DETAILS: 'Thông tin lớp',
+  CLASS_DETAIL_EMPTY: 'Không tìm thấy lớp này trong danh sách lớp của bạn.',
+
+  TEACHER_LOAD_ERROR: 'Không tải được hồ sơ giáo viên.',
+  TEACHER_CLASSES_LOAD_ERROR: 'Không tải được danh sách lớp bạn phụ trách.',
+  CLASS_STUDENTS_LOAD_ERROR: 'Không tải được danh sách học sinh trong lớp.',
+  STUDENT_LOAD_ERROR: 'Không tải được hồ sơ học sinh.',
+  STUDENT_CLASSES_LOAD_ERROR: 'Không tải được danh sách lớp của bạn.',
+
+  TEACHER_CLASSES_EMPTY: 'Bạn chưa được phân công phụ trách lớp nào.',
+  STUDENT_CLASSES_EMPTY: 'Bạn chưa được ghi danh vào lớp nào.',
+  CLASS_STUDENTS_EMPTY: 'Lớp này chưa có học sinh nào.',
+
+  BACK_TO_CLASSES: 'Về danh sách lớp',
+  MY_PROFILE_HINT: 'Xem thông tin hồ sơ của bạn.',
+  MY_CLASSES_HINT: 'Xem các lớp bạn đang phụ trách hoặc đang học.',
+  CLASS_STUDENTS_HINT: 'Danh sách học sinh đang học trong lớp này.',
+  OPEN_PROFILE: 'Xem hồ sơ của tôi',
+  OPEN_CLASSES: 'Xem lớp của tôi',
+  VIEW_STUDENTS: 'Xem học sinh',
+  RETRY: MSG_S4.RETRY,
+
+  // Nhãn trên các màn self (dùng chung, không hardcode trong page).
+  PROFILE_DETAILS: 'Thông tin hồ sơ',
+  MY_CLASSES_SECTION: 'Các lớp bạn phụ trách',
+  TEACHER_PROFILE_EMPTY:
+    'Chưa có hồ sơ giáo viên cho tài khoản này. Vui lòng liên hệ quản trị viên tổ chức.',
+  STUDENT_PROFILE_EMPTY:
+    'Chưa có hồ sơ học sinh cho tài khoản này. Vui lòng liên hệ quản trị viên tổ chức.',
+  STUDENT_CLASSES_SECTION: 'Các lớp bạn đang học',
+  STAFF_CODE: 'Mã nhân sự',
+  FULL_NAME: 'Họ tên',
+  EMAIL: 'Email',
+  PHONE: 'Số điện thoại',
+  UNIT: 'Đơn vị',
+  SPECIALTY: 'Chuyên môn',
+  CONTRACT_TYPE: 'Loại hợp đồng',
+  TEACHING_STATUS: 'Trạng thái dạy',
+  CLASS_COUNT: 'Số lớp',
+  CREATED_AT: 'Ngày tạo',
+  UPDATED_AT: 'Cập nhật gần nhất',
+  CLASS_CODE: 'Mã lớp',
+  CLASS_NAME: 'Tên lớp',
+  ACADEMIC_YEAR: 'Năm học',
+  PERIOD: 'Thời gian',
+  STATUS: 'Trạng thái',
+  TEACHER: 'Giáo viên',
+  SUBJECT: 'Môn học',
+  CLOSE_STATE: 'Đóng lớp',
+  NEEDS_REASSIGNMENT: 'Cần phân công lại',
+  STUDENT_CODE: 'Mã học sinh',
+  DATE_OF_BIRTH: 'Ngày sinh',
+  CURRENT_CLASS: 'Lớp hiện tại',
+  ACCOUNT: 'Tài khoản',
+  CLASS: 'Lớp',
+  STUDENT_ACTIVE: 'Đang học',
+  STUDENT_INACTIVE: 'Ngừng học',
+  STUDENT_SUSPENDED: 'Đình chỉ',
+} as const;
+
+/**
+ * Dòng tổng số phía trên bảng học sinh — "12 học sinh".
+ *
+ * Cùng lý do như `classTotalLabel`: số này là `total` của BE, không phải số
+ * dòng đang hiện trên một trang.
+ */
+export function studentTotalLabel(total: number): string {
+  return `${total} ${MSG_STUDENT.TOTAL}`;
+}
+
 /**
  * Dòng tổng số phía trên bảng — "12 lớp".
  *

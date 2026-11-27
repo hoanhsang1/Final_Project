@@ -20,10 +20,11 @@ import { AuthCard } from '../../components/AuthCard/AuthCard';
 import { AuthSwitch } from '../../components/AuthCard/AuthSwitch';
 import { RoleButton } from '../../components/RoleButton/RoleButton';
 import { login } from '../../features/auth/authApi';
+import { landingPathFor } from '../../features/auth/landing';
+import { ApiError } from '../../features/platform/errorCodes';
 import { ROLES, rolePreviewPath } from '../../features/auth/roles';
 import type { Role } from '../../features/auth/roles';
 import { useAuthStore } from '../../stores/authStore';
-import { canAccessAcademicArea, isOwnerRole } from '../../features/auth/permissions';
 import { useFormState } from '../../hooks/useFormState';
 
 type LoginFormValues = {
@@ -45,6 +46,7 @@ type LoginFormValues = {
 export default function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
+  const requirePasswordChange = useAuthStore((s) => s.requirePasswordChange);
 
   /** Lỗi từ backend / lỗi mạng, hiển thị inline trong form. */
   const [formError, setFormError] = useState<string | null>(null);
@@ -67,32 +69,39 @@ export default function LoginPage() {
 
       // Đọc phiên MỚI NHẤT từ store (setSession đã cập nhật xong).
       const state = useAuthStore.getState();
-      // SUPER_ADMIN → console quản trị (Sprint 2).
-      if (state.backendRoles.includes('SUPER_ADMIN')) {
-        navigate('/quan-tri');
+      // Cờ nằm ở claim JWT, KHÔNG nằm trong LoginResponse (giữ nguyên 4 field).
+      // Bật cờ rồi dừng — SessionWatcher mount modal cưỡng chế; không điều hướng.
+      if (state.mustChangePassword) {
+        requirePasswordChange();
         return;
       }
-      // OWNER → console tổ chức (Sprint 3). (Giữ nguyên hành vi hiện có.)
-      if (isOwnerRole(state.backendRoles)) {
-        navigate('/to-chuc');
+      const to = landingPathFor({
+        backendRoles: state.backendRoles,
+        permissions: state.permissions,
+        role: state.role,
+      });
+      if (to) {
+        navigate(to);
         return;
       }
-      // Sprint 4 (option B): user có quyền PEOPLE_*/CLASS_* (vd HR/STAFF đào tạo) → /dao-tao.
-      if (canAccessAcademicArea(state)) {
-        navigate('/dao-tao');
-        return;
-      }
-      const role = state.role;
-      if (role) {
-        navigate(rolePreviewPath(role));
-      } else {
-        setNotice(
-          'Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau.',
-        );
-      }
+      setNotice(
+        'Đăng nhập thành công, nhưng vai trò của bạn chưa có màn hình ở giai đoạn này. Vui lòng thử lại sau.',
+      );
     },
     onError: (error: Error) => {
       // NFR-REL-001: lỗi thì hiển thị rõ, KHÔNG điều hướng, KHÔNG hiện thành công.
+      const apiError = error instanceof ApiError ? error : null;
+      // Chỉ nhận code DẠNG CHUỖI — backend cũng hay trả số (vd 1006) nhưng số đó
+      // KHÔNG phải mã FE dùng, không được mở nhầm modal bắt đổi mật khẩu.
+      if (apiError?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        setFormError(null);
+        requirePasswordChange();
+        return;
+      }
+      if (apiError?.code === 'LOGIN_RATE_LIMITED' || apiError?.status === 429) {
+        setFormError('Bạn đã đăng nhập quá nhiều lần. Vui lòng đợi vài phút rồi thử lại.');
+        return;
+      }
       setFormError(error.message);
     },
   });

@@ -21,6 +21,7 @@ import type { TargetAccountStatus } from '../../components/AccountStatusModal/Ac
 import AuditLogTable from '../../components/AuditLogTable/AuditLogTable';
 import DetailSection from '../../components/DetailSection/DetailSection';
 import StatusScreen from '../../components/StatusScreen/StatusScreen';
+import TempPasswordModal from '../../components/TempPasswordModal/TempPasswordModal';
 import {
   AdminApiError,
   resetAccountPassword,
@@ -132,6 +133,10 @@ export default function AccountDetailPage() {
   const [roleError, setRoleError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  /** Mật khẩu tạm do BE trả về (HTTP 200) — hiện đúng 1 lần, display-only. */
+  const [tempCredential, setTempCredential] = useState<{ username: string; password: string } | null>(
+    null,
+  );
 
   const roleMutation = useMutation({
     mutationFn: (role: string) => updateAccountRole(accountId, role),
@@ -159,15 +164,22 @@ export default function AccountDetailPage() {
   const resetMutation = useMutation({
     mutationFn: ({ newPassword }: { mode: PasswordResetMode; newPassword?: string }) =>
       resetAccountPassword(accountId, newPassword),
-    onSuccess: (_data, variables) => {
+    onSuccess: (result, variables) => {
       notify.success(variables.mode === 'manual' ? MSG_ACC.PASSWORD_UPDATED : MSG_ACC.RESET_SENT);
       setResetOpen(false);
+      // BE có thể sinh mật khẩu tạm và trả trong body → admin copy ngay.
+      if (result?.temporaryPassword) {
+        setTempCredential({
+          username: detailQuery.data?.username ?? '',
+          password: result.temporaryPassword,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
     },
     onError: (error) => {
       const status = error instanceof AdminApiError ? error.status : null;
       if (status === 400) {
-        // BE validate mật khẩu < 8 ký tự — cùng câu với validate FE.
+        // BE validate mật khẩu < 12 ký tự — cùng câu với validate FE.
         setResetError(MSG_ACC.PASSWORD_TOO_SHORT);
       } else if (status === 403) {
         setResetError(MSG_ORG.FORBIDDEN);
@@ -364,6 +376,15 @@ export default function AccountDetailPage() {
         onCancel={() => setResetOpen(false)}
         onConfirm={(mode, newPassword) => resetMutation.mutate({ mode, newPassword })}
       />
+
+      {tempCredential ? (
+        <TempPasswordModal
+          open
+          username={tempCredential.username}
+          password={tempCredential.password}
+          onClose={() => setTempCredential(null)}
+        />
+      ) : null}
     </Stack>
   );
 }
