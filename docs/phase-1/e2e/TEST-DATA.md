@@ -1,14 +1,14 @@
 # DỮ LIỆU MẪU & CÁCH CHẠY ĐỂ TEST XẾP LỊCH TỰ ĐỘNG
 
-Có 2 cách. **Cách A dùng được ngay**, không đụng DB thật. Cách B ghi vào `mems_*` local nhưng hiện **chưa chạy được** vì schema live còn thiếu migration (xem mục 4).
+Có 3 cách. **Cách A** chạy ngay trên schema cách ly; **Cách C** đã nạp sẵn vào org DEMO trong DB local của bạn; **Cách B** (seed cách ly vào `mems_*`) hiện **chưa chạy được** vì guard phát hiện schema live còn thiếu (xem mục 5).
 
-| | Cách A — schema cách ly | Cách B — schema `mems_*` local |
-|---|---|---|
-| DB | 4 schema `mems_e2e_*` (tạo từ cấu trúc live) | `mems_identity_db`, `mems_people_db`, ... |
-| Dữ liệu thật | Không đụng | Có, nhưng chỉ **thêm** dòng mới id `eeeeeeee-` |
-| Điều kiện | Có `.env` + 4 schema live để clone cấu trúc | Phải chạy đủ migration 43–59 trước |
-| Trạng thái | **Sẵn sàng** | **Chưa** (guard sẽ báo thiếu cột/bảng) |
-| Cổng | 9080–9084 | 9180–9184 |
+| | Cách A — schema cách ly | Cách C — org DEMO (đã nạp) | Cách B — seed cách ly vào `mems_*` |
+|---|---|---|---|
+| DB | 4 schema `mems_e2e_*` (tạo từ cấu trúc live) | `mems_*` local, org DEMO | `mems_*` local |
+| Dữ liệu thật | Không đụng | Có, chỉ **thêm** id `d0000000-…` | Có, chỉ **thêm** dòng id `eeeeeeee-` |
+| Điều kiện | Có `.env` + 4 schema live để clone cấu trúc | Đã chạy `apply-demo-schema.sql` + `seed-demo-org.sql` | Phải chạy đủ migration 43–59 trước |
+| Trạng thái | **Sẵn sàng** | **Sẵn sàng** | **Chưa** (guard sẽ báo thiếu cột/bảng) |
+| Cổng | 9080–9084 | 9180–9184 | 9180–9184 |
 
 ---
 
@@ -110,16 +110,78 @@ Tạo lại DB sạch (xoá **chỉ 4 schema e2e**):
 
 ---
 
-## 4. Cách B — schema `mems_*` local (đang bị chặn)
+## 4. Cách C — test trên org DEMO của bạn (đã nạp sẵn 2026-11-27)
 
-### 4.1 Vì sao chưa chạy được
+Dùng chính DB local `mems_*` và org **DEMO** (owner `AnhSang`). Đã chạy 2 file:
+
+```bash
+mysql --default-character-set=utf8mb4 ... < docs/phase-1/e2e/apply-demo-schema.sql
+mysql --default-character-set=utf8mb4 ... < docs/phase-1/e2e/seed-demo-org.sql
+```
+
+### 4.1 Đã thêm gì (chỉ thêm, id `d0000000-…`)
+
+| Nhóm | Nội dung |
+|---|---|
+| Schema | 2 cột `teacher_subject.approved_by`, `approved_at`; quyền `schedule.config` cấp cho `ORG_OWNER` + `SUPER_ADMIN` |
+| Danh mục môn | 7 danh mục (Toán, Lập trình, CSDL, Mạng & Hệ thống, Ngoại ngữ, AI, Tin học) + **gán danh mục cho 13 môn cũ** (chỉ khi còn NULL) |
+| Chuyên môn | 5 chuyên môn gắn danh mục; chuyên môn `English` cũ gắn *Ngoại ngữ* |
+| Giáo viên | `demo_gv1..4` (`DEMO-GV1..4`), mật khẩu **`123456abcdef`** như `AnhSang`, vai trò TEACHER, thuộc phòng **CNTT**; chuyên môn: 1=Toán, 2=Lập trình, 3=CSDL+Tin, 4=Mạng |
+| Tiết học | 6 tiết 07:30 → 12:25 (org-level) |
+| Lớp demo | `XLDEMO1`, `XLDEMO2` — `DANG_DIEN_RA`, 01/12/2026 – 31/01/2027, mỗi lớp 3 môn, 1 môn/lớp bắt buộc **phòng máy** (`TINHOC`) |
+| Học sinh | 20 em `DEMOHS01..20`, 10 em/lớp |
+
+Môn của 2 lớp (đã có `sessions_per_week`):
+
+| Lớp | Môn | Buổi/tuần | GV |
+|---|---|---|---|
+| XLDEMO1 | MATH101 (Toán cao cấp) | 1 | demo_gv1 |
+| XLDEMO1 | JAVA | 2 | demo_gv2 |
+| XLDEMO1 | DATABASE | 1 | demo_gv3 |
+| XLDEMO2 | TINHOC (*bắt buộc phòng máy*) | 1 | demo_gv3 |
+| XLDEMO2 | NETWORKING | 2 | demo_gv4 |
+| XLDEMO2 | PYTHON | 1 | demo_gv2 |
+
+### 4.2 Chạy
+
+```bash
+# Chạy 5 service trỏ vào schema mems_* local, cổng 9180–9184
+SCHEMA_PREFIX=mems_ BASE_PORT=9180 ./docs/phase-1/e2e/run-services.sh
+
+# Cửa sổ khác
+cd frontend
+VITE_API_PROXY_TARGET=http://localhost:9180 npm run dev
+```
+
+Đăng nhập `AnhSang` / `123456abcdef` → `/dao-tao/tu-dong-xep-lich` → tạo nháp cho `XLDEMO1`/`XLDEMO2`.
+
+Nếu màn "Cấu hình lịch" báo 403, khởi động lại **IdentityService** một lần để nạp lại catalog quyền.
+
+### 4.3 Giới hạn ở chế độ này
+
+- API `GET /departments/{d}/schedules/impacts` và luồng consumer sự kiện cần bảng `inbox_event`, `session_impact`, `outbox_event` (Facility) — DB local **chưa có**, nên đừng test các phần đó ở đây.
+- Dữ liệu cũ có sẵn mojibake (`TEST-K27` tên `Lá»?p Test K27`, `GV011` tên `Phan Thu Ph??ng`) — không sửa; dữ liệu mới ghi đúng UTF-8.
+
+### 4.4 Gỡ dữ liệu mẫu
+
+```bash
+mysql --default-character-set=utf8mb4 ... < docs/phase-1/e2e/rollback-demo-org.sql
+```
+
+Chỉ xoá id `d0000000-…`, trả `category_id` về NULL và gỡ quyền `schedule.config`. Nếu đã tạo lịch nháp cho 2 lớp demo, xoá nháp trong UI trước.
+
+---
+
+## 5. Cách B — schema `mems_*` local với seed cách ly (đang bị chặn)
+
+### 5.1 Vì sao chưa chạy được
 
 HEAD cần các cột/bảng của migration 43–59. Trên DB local hiện mới có 53, 55, 56, 57, 58, 59; **51/52 chưa chạy được** vì precheck tự abort trên schema cũ, và các bảng/cột tương đương 43–50 cũng chưa có. Vì vậy:
 
 - `seed-local-test-org.sh` sẽ **dừng và liệt kê** cột/bảng còn thiếu.
 - Muốn dùng cách B phải viết + chạy migration nâng cấp riêng (chưa có trong đợt này).
 
-### 4.2 Khi schema đã đủ
+### 5.2 Khi schema đã đủ
 
 ```bash
 # Ghi dữ liệu mẫu (chỉ THÊM, id eeeeeeee-)
@@ -137,12 +199,13 @@ Lưu ý: đây là DB local mà tunnel có thể đang trỏ tới. Script khôn
 
 ---
 
-## 5. Dọn dẹp
+## 6. Dọn dẹp
 
 - Cách A: `setup-e2e-db.sh --reset` (xoá & tạo lại 4 schema e2e).
 - Cách B: mọi dòng mẫu có id bắt đầu `eeeeeeee-` (account `e2e_*`). Không có script xoá tự động để tránh xoá nhầm; nếu cần, xoá thủ công theo id sau khi đã sao lưu.
+- Cách C: `rollback-demo-org.sql` (xoá đúng id `d0000000-…`).
 
-## 6. Lỗi thường gặp
+## 7. Lỗi thường gặp
 
 | Hiện tượng | Xử lý |
 |---|---|
